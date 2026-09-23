@@ -1,4 +1,4 @@
-# skop (skill op) — Implementation Spec (v1, rev 11)
+# skop (skill op) — Implementation Spec (v1, rev 12)
 
 Audience: an engineer or LLM implementing this from scratch. Everything
 marked **MUST** is normative. Where this spec says "verify against current
@@ -262,11 +262,14 @@ variables bound by `run … as`, `ask … as`, `for each`.
   action items. Violation = lint error.
 - `QUOTED` (page text) may interpolate anything, and MUST be escaped for
   the pager (no mentions, no links) at runtime.
-- `Q` (question text) treats names by kind:
+- `Q` (question text) treats each name by where its **current value** came
+  from. A name can be rebound, and hold a param on one path and command
+  output on another, so this is decided at run time by the core, which
+  tags every bound value with its origin:
   - a trusted value (param, built-in, list item, Score answer) is pasted
     into the question, as in `Is it worth running "{step}"?`;
-  - a `run` output is written into the question as its name in backticks,
-    and its value goes in the request's context (§6.3). `Given {errors},
+  - a value from a `run` command is written into the question as its name
+    in backticks, and the value goes in the request's context (§6.3). `Given {errors},
     what's the best next step?` reaches the model as ``Given `errors`,
     what's the best next step?``, with the log text alongside.
 
@@ -547,14 +550,15 @@ A Score ask (v1.1) in core JSON:
   "rubric":{"1":"known noise, nothing to do","2":"worth a human look, not urgent",
             "3":"degraded service","4":"outage or data at risk"},
   "as":"severity"},
-  "question":[{"lit":"How severe are the errors in "},{"ref":"errors"},{"lit":"?"}],
+  "question":[{"lit":"How severe are the errors in "},{"var":"errors"},{"lit":"?"}],
   "sure":75,"else":null}}
 ```
 Bound variables can hold an `int` (params already can).
 
 - `CMD`, `Q` and `QUOTED` arrive pre-split into literal and variable parts, so
-  the core never scans strings for `{`. In `Q`, a `run` output is a `ref`
-  part: named in the question, with its value sent as context (§3.5).
+  the core never scans strings for `{`. The preprocessor emits every name as
+  a plain `var`. It never decides whether a name holds command output; the
+  core does, from the value's origin tag (§3.5).
 - Section and list ids are prefixed (`s:`, `l:`) and targets are tagged
   (`{"stop":{}}` vs `{"section":"s:page"}`), so a section named "Page" or
   "Stop" can't collide with a keyword.
@@ -615,7 +619,9 @@ CI runs `dafny verify` and fails on any unproven obligation.
   `do`, and never returns `Page`. P3 covers only what skop runs. It says
   nothing about what a `run` or `check` command does.
 - **P4 Taint.** Every `Exec` command string is a concatenation of author
-  literals and trusted values that passed the safe-value check. (Score
+  literals and trusted values that passed the safe-value check. Every Jev
+  question string is author literals and trusted values; values from `run`
+  commands appear only as their names, with the values in context. (Score
   answers are trusted integers, so they pass trivially.)
 - **P5 Answers.** Confidence never counts `unassigned` probability for the
   chosen option, and a gate fails if that probability could change the
@@ -735,11 +741,35 @@ goes through the same validation in the core (§6.1, P5).
   format, auth, and model names; do not guess.** Checked against the docs
   for `jev-1.13` in September 2026.
   - **Request.** `POST https://api.typesafe.ai/v1/systemone` with a bearer
-    key. One question per request:
-    - `state` = the context object (§6.3);
+    key. The body has three top-level fields: `state` = the context object
+    (§6.3), `model` = `jev.model`, and `questions`, a map holding one
+    question under the id `q`. The id isn't shown to the model. The
+    question object has `type`, `instructions` and `criteria`:
     - `instructions` = `{"question": …, "guidance": …}`, leaving out
       `guidance` when the section has none;
-    - `model` = `jev.model`.
+    - `type` and `criteria` per question kind, below.
+
+    Read the answer from `answers.q`. A response without it is invalid.
+    Full example, for disk-full's first question:
+    ```json
+    {"model":"jev-1.13.0",
+     "state":{"used":"91%","errors":"…","biggest":"…"},
+     "questions":{"q":{
+       "type":"choice",
+       "instructions":{"question":"Given `used`, `errors` and `biggest`, what's the best next step?",
+                       "guidance":"Look at usage, recent errors and what's biggest on disk."},
+       "criteria":{"Clean up":"Run cleanups least risky first. Stop as soon as usage is under target.",
+                   "Restart":"Restart the one service most likely behind the growth. Never more than one.",
+                   "Page":"Nothing here is safe to try automatically. Tell a human.",
+                   "Investigate":"Nothing in the lists fits. Work out what's filling the disk from the errors and sizes gathered in Triage. Don't run anything outside Cleanups or Services without asking a human first."}}}}
+    ```
+    Response, from which `jev-ask` maps "Clean up" back to `s:clean_up`:
+    ```json
+    {"model":"jev-1.13.0",
+     "answers":{"q":{"type":"choice","choice":"Clean up","confidence":0.76,
+       "probabilities":{"Clean up":0.82,"Restart":0.12,"Page":0.04,"Investigate":0.02}}},
+     "usage":{"input_tokens":1180,"output_tokens":30}}
+    ```
   - **Option names are shown to the model**, so Jev's Choice keys are the
     option labels, not skop's internal ids. A section option's key is its
     display name ("Clean up") and a `one of` option's key is the item text.
@@ -819,11 +849,13 @@ goes through the same validation in the core (§6.1, P5).
   `skop --fake`.
 
 ### 6.3 Context
-- Context = exactly the `run` outputs the question names (§3.5), keyed by
-  name. Nothing else is sent: Jev's docs report that unrelated material
+- Context = exactly the names in the question whose current value came
+  from a `run` command (§3.5), keyed by name. Nothing else is sent: Jev's docs report that unrelated material
   lowers accuracy. A possibly-unbound name is sent as `(unavailable)`.
-- An `ask` whose question names no `run` output gets warning
-  `W-ASK-NO-CONTEXT`: the model would be deciding with no evidence.
+- An `ask` whose question names nothing that could hold `run` output on
+  any path gets warning `W-ASK-NO-CONTEXT`: the model would be deciding
+  with no evidence. The lint decides this from the bindings that can reach
+  the `ask`.
 - Apply redaction (§9) **before** anything leaves the machine.
 - Truncate to `limits.jev_state`, at most 30k tokens (approximate tokens as
   chars/4), so context and question fit Jev's 32k limit: shrink the
@@ -977,7 +1009,7 @@ Warnings don't stop a run:
 | `W-SCORE-THRESHOLD` | a Score variable is only used in one comparison against one threshold; a `yes \| no` ask gates more reliably (v1.1) |
 | `W-SCORE-UNUSED` | a Score variable is never used after it's bound (v1.1) |
 | `W-SECTION-UNREACHED` | no path reaches a section (§5.6) |
-| `W-ASK-NO-CONTEXT` | an `ask` question names no `run` output, so the model gets no evidence (§6.3) |
+| `W-ASK-NO-CONTEXT` | an `ask` question names nothing that could hold `run` output, so the model gets no evidence (§6.3) |
 | `W-MODEL-ALIAS` | `jev.model` is an alias, or a response came from a different model than configured (§6.2) |
 | `W-NO-GUIDANCE` | a section offered as an `ask` option has no guidance paragraph (§3.2) |
 | `W-REDACT-OFF` | built-in redaction patterns are turned off (§9) |
@@ -1209,8 +1241,9 @@ both, MUST exit 40 with `E-MODE`.
 
 Jev response tests (each MUST be rejected as invalid): a missing option, an
 extra option, a value of 1.1, a negative value, `NaN`, and values summing to
-0.9. A tie for highest MUST fail the gate. So MUST A = 0.6, B = 0.3,
-`unassigned` = 0.3 before normalising, since B could reach 0.6.
+0.9. A tie for highest MUST fail the gate. So MUST A = 0.5, B = 0.2,
+`unassigned` = 0.3 at `sure` 40%: the response is valid and A clears 40%,
+but B plus `unassigned` could tie A.
 
 Score tests (v1.1). Each lint case MUST fail with the listed code and line:
 - `→ 5 to 1` (LOW ≥ HIGH), `→ 1 to 1` (one level), `→ 1 to 11` (too many): `E-SCORE-RANGE`
@@ -1697,6 +1730,17 @@ Also, where things live in the Markdown:
 - **Steering risk documented** (§11 rule 12).
 - **`sure` vs Jev's `confidence` explained**, so authors don't copy Jev's
   thresholds.
+
+### Rev 12 (after a review of rev 11)
+
+- **Jev request example completed.** It now has the `questions` map, with
+  `type`, `instructions` and `criteria` inside the question, and reads the
+  answer from `answers.q`.
+- **Question references decided by the core at run time**, from each
+  value's origin tag. A name can hold a param on one path and command output
+  on another, so the preprocessor can't decide it from syntax.
+- **Unassigned-probability test fixed.** The old one summed to 1.2 and was
+  rejected before reaching the gate.
 
 ---
 
