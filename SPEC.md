@@ -1,4 +1,4 @@
-# skop (skill op) — Implementation Spec (v1, rev 10)
+# skop (skill op) — Implementation Spec (v1, rev 11)
 
 Audience: an engineer or LLM implementing this from scratch. Everything
 marked **MUST** is normative. Where this spec says "verify against current
@@ -115,7 +115,7 @@ limits:                         # optional; defaults shown
   run_timeout: 30s              # run and check commands
   do_timeout: 5m                # do commands
   deadline: 15m                 # whole run; checked between steps (§7)
-  jev_state: 4k tokens
+  jev_state: 4k tokens          # at most 30k: Jev allows 32k for context plus question
 ---
 ```
 
@@ -238,7 +238,7 @@ stop     = "**stop**"
 
   Example:
   ~~~markdown
-  - **ask** How severe are these errors? → 1 to 4 as severity · sure 75%
+  - **ask** How severe are the errors in {errors}? → 1 to 4 as severity · sure 75%
     - 1: known noise, nothing to do
     - 2: worth a human look, not urgent
     - 3: degraded service
@@ -260,8 +260,19 @@ variables bound by `run … as`, `ask … as`, `for each`.
   be interpolated into a `CMD`. Use `do item` to run its command.
 - `CMD` (in `run`, `do`, `check`) MUST NOT interpolate untrusted values or
   action items. Violation = lint error.
-- `Q` and `QUOTED` may interpolate anything. `page` text MUST be escaped
-  for the pager (no mentions, no links) at runtime.
+- `QUOTED` (page text) may interpolate anything, and MUST be escaped for
+  the pager (no mentions, no links) at runtime.
+- `Q` (question text) treats names by kind:
+  - a trusted value (param, built-in, list item, Score answer) is pasted
+    into the question, as in `Is it worth running "{step}"?`;
+  - a `run` output is written into the question as its name in backticks,
+    and its value goes in the request's context (§6.3). `Given {errors},
+    what's the best next step?` reaches the model as ``Given `errors`,
+    what's the best next step?``, with the log text alongside.
+
+  So raw command output never becomes part of the question itself, and the
+  model sees exactly the evidence the question names. This follows Jev's
+  own pattern of referring to state fields by name.
 
 **Safe-value check (replaces shell quoting).** Every value substituted into a
 `CMD` MUST:
@@ -281,7 +292,8 @@ nothing to escape, and mounts, domains and unit names never need more.
 - A name used in a `CMD` or `OPERAND` MUST be bound on every path that
   reaches that use.
 - A name used in `Q` or `QUOTED` that may be unbound renders as
-  `(unavailable)`.
+  `(unavailable)`. For a `run` output named in `Q`, that's its value in the
+  context.
 - A name that is never bound anywhere is a lint error wherever it's used.
 - A `for each` variable is scoped to the loop body.
 - A Score answer is bound only on paths where its gate passed.
@@ -299,6 +311,8 @@ The list may be numbered or bulleted. Item forms:
 
 Rules:
 - A list MUST be non-empty and MUST NOT mix action and value items.
+- Item labels MUST be unique, ignoring case (`E-LIST-DUP`). They become
+  option names the model reads (§6.2).
 - Item order is significant (it's the iteration order).
 - `for each` MUST iterate a list of action items or value items; `do NAME`
   requires action items.
@@ -372,7 +386,11 @@ timeout `limits.do_timeout`.
 - Validate the response (§6.1). An invalid response counts as Jev
   unavailable.
 - Chosen = the option with the highest probability. Confidence = that
-  probability. The gate fails on a tie: when any other option, given all
+  probability. `sure` is compared with it directly. This isn't Jev's own
+  `confidence` figure, which Jev rescales by the number of options: a top
+  probability of 85% is a Jev confidence of 0.70 with two options and 0.80
+  with four. Authors reading Jev's docs shouldn't copy its thresholds into
+  `sure`. The gate fails on a tie: when any other option, given all
   of the response's `unassigned` probability (§6.1), would match or beat
   the chosen one.
 - Confidence ≥ `sure` → proceed:
@@ -529,13 +547,14 @@ A Score ask (v1.1) in core JSON:
   "rubric":{"1":"known noise, nothing to do","2":"worth a human look, not urgent",
             "3":"degraded service","4":"outage or data at risk"},
   "as":"severity"},
-  "question":[{"lit":"How severe are these errors?"}],
+  "question":[{"lit":"How severe are the errors in "},{"ref":"errors"},{"lit":"?"}],
   "sure":75,"else":null}}
 ```
 Bound variables can hold an `int` (params already can).
 
 - `CMD`, `Q` and `QUOTED` arrive pre-split into literal and variable parts, so
-  the core never scans strings for `{`.
+  the core never scans strings for `{`. In `Q`, a `run` output is a `ref`
+  part: named in the question, with its value sent as context (§3.5).
 - Section and list ids are prefixed (`s:`, `l:`) and targets are tagged
   (`{"stop":{}}` vs `{"section":"s:page"}`), so a section named "Page" or
   "Stop" can't collide with a keyword.
@@ -654,7 +673,7 @@ From the explore handler, report:
   P6; checked anyway)
 - max Jev calls on any path; max `do` effects on any path
 - worst-case duration estimate, for information only. It includes command
-  timeouts plus kill grace, Jev timeouts with the retry, and the pager
+  timeouts plus kill grace, Jev timeouts with the retry and its wait, and the pager
   timeout. The enforced limit is `limits.deadline` (§7).
 - sections never reached (warning `W-SECTION-UNREACHED`)
 
@@ -668,13 +687,13 @@ jev-ask --request /path/req.json   # prints one JSON object to stdout
 ~~~
 Request:
 ```json
-{"kind":"choice","question":"What's the best next step?",
+{"kind":"choice","question":"Given `used`, `errors` and `biggest`, what's the best next step?",
  "guidance":"Look at usage, recent errors and what's biggest on disk.",
  "options":[{"id":"s:clean_up","label":"Clean up",
              "description":"Run cleanups least risky first. Stop as soon as usage is under target."},
             {"id":"s:restart","label":"Restart",
              "description":"Restart the one service most likely behind the growth. Never more than one."}],
- "context":{"used":"91%","errors":"..."},"timeout_ms":2000}
+ "context":{"used":"91%","errors":"...","biggest":"..."},"timeout_ms":2000}
 ```
 - `kind` is `choice`, `yesno` or `score` (v1.1).
 - Section options: `label` is the display name, `description` is the
@@ -712,11 +731,34 @@ Exactly one backend is used per run. Elsewhere in this spec, "Jev
 unavailable" means whichever backend is configured. Every backend's answer
 goes through the same validation in the core (§6.1, P5).
 
-- **`jev`**: TypeSafe Jev. Map `choice` → Jev *Choice*, `yesno` → Jev *Noul*
-  (a 0–1 "is this true?" probability; derive `{"yes":p,"no":1-p}`).
-  **Read TypeSafe's current API docs for request format, auth, and model
-  names; do not guess.** Each attempt times out after `ask.timeout_ms`. One
-  retry on 5xx or timeout, after 500ms.
+- **`jev`**: TypeSafe Jev. **Read TypeSafe's current API docs for request
+  format, auth, and model names; do not guess.** Checked against the docs
+  for `jev-1.13` in September 2026.
+  - **Request.** `POST https://api.typesafe.ai/v1/systemone` with a bearer
+    key. One question per request:
+    - `state` = the context object (§6.3);
+    - `instructions` = `{"question": …, "guidance": …}`, leaving out
+      `guidance` when the section has none;
+    - `model` = `jev.model`.
+  - **Option names are shown to the model**, so Jev's Choice keys are the
+    option labels, not skop's internal ids. A section option's key is its
+    display name ("Clean up") and a `one of` option's key is the item text.
+    `jev-ask` maps the keys back to ids before the core validates them.
+    Labels are unique (§3.2, §3.6), so the mapping is exact.
+  - `choice` → Jev *Choice*, with `criteria` = label → description (or
+    null). `yesno` → Jev *Noul*, a 0–1 "is this yes?" probability; derive
+    `{"yes":p,"no":1-p}`.
+  - **Pin a version.** `jev.model` should be a versioned id like
+    `jev-1.13.0`. An alias like `jev-latest` moves when Jev ships a new
+    release, which silently shifts every tuned `sure`. An alias gets warning
+    `W-MODEL-ALIAS` on every run, and so does a response whose `model`
+    differs from the one configured.
+  - **Timeouts and retry.** Each attempt times out after `ask.timeout_ms`.
+    Retry once on a timeout, a connection error, 408, 429 or 5xx, after
+    500ms. On 429, wait for `retry-after` instead, if it's no longer than
+    `ask.timeout_ms`; otherwise don't retry. `jev-ask` MAY use TypeSafe's
+    JavaScript SDK (`@typesafe-ai/sdk`), with its own retries turned off so
+    skop's time budget stays exact.
   - Map `score` → Jev *Score*. Send the rubric as Jev's `criteria` array,
     lowest level first. Jev numbers levels by array position from 0, so Jev
     level `i` is skop level `LOW + i`. `jev-ask` converts the ids before the
@@ -777,10 +819,14 @@ goes through the same validation in the core (§6.1, P5).
   `skop --fake`.
 
 ### 6.3 Context
-- Context = all variables bound so far in the run. Possibly-unbound names are
-  left out.
+- Context = exactly the `run` outputs the question names (§3.5), keyed by
+  name. Nothing else is sent: Jev's docs report that unrelated material
+  lowers accuracy. A possibly-unbound name is sent as `(unavailable)`.
+- An `ask` whose question names no `run` output gets warning
+  `W-ASK-NO-CONTEXT`: the model would be deciding with no evidence.
 - Apply redaction (§9) **before** anything leaves the machine.
-- Truncate to `limits.jev_state` (approximate tokens as chars/4): shrink the
+- Truncate to `limits.jev_state`, at most 30k tokens (approximate tokens as
+  chars/4), so context and question fit Jev's 32k limit: shrink the
   largest values first, keeping their **last** lines (logs are most useful
   at the end).
 - Every request, after redaction, is written to the run directory as
@@ -910,6 +956,7 @@ and have no codes.
 | `E-LIST-KIND` | lint | the wrong kind of list for the instruction | `one of` over action items; `do item` over value items |
 | `E-LIST-EMPTY` | lint | a data list has no items | |
 | `E-LIST-MIXED` | lint | a data list mixes action and value items | |
+| `E-LIST-DUP` | lint | two items in a data list have the same label, ignoring case (§3.6) | `nginx` twice |
 | `E-SCORE-RANGE` | lint | Score bounds invalid, or not 2–10 levels (v1.1) | `→ 5 to 1`; `→ 1 to 11` |
 | `E-SCORE-RUBRIC` | lint | Score rubric missing, incomplete, out of range or duplicated (v1.1) | no line for level 2 |
 | `E-MODE` | args | neither or both of `--apply` and `--dry-run` (§7 step 0) | |
@@ -930,6 +977,8 @@ Warnings don't stop a run:
 | `W-SCORE-THRESHOLD` | a Score variable is only used in one comparison against one threshold; a `yes \| no` ask gates more reliably (v1.1) |
 | `W-SCORE-UNUSED` | a Score variable is never used after it's bound (v1.1) |
 | `W-SECTION-UNREACHED` | no path reaches a section (§5.6) |
+| `W-ASK-NO-CONTEXT` | an `ask` question names no `run` output, so the model gets no evidence (§6.3) |
+| `W-MODEL-ALIAS` | `jev.model` is an alias, or a response came from a different model than configured (§6.2) |
 | `W-NO-GUIDANCE` | a section offered as an `ask` option has no guidance paragraph (§3.2) |
 | `W-REDACT-OFF` | built-in redaction patterns are turned off (§9) |
 
@@ -1013,7 +1062,7 @@ ask:
   backend: jev            # jev | openrouter | fake
   timeout_ms: 2000        # per attempt; one retry (§6.2)
 jev:
-  model: <jev model id>
+  model: jev-1.13.0       # a versioned id, not an alias (§6.2)
   key_env: TYPESAFE_API_KEY
 openrouter:
   model: <model id>       # must support logprobs (§6.2)
@@ -1096,6 +1145,13 @@ logs warning `W-REDACT-OFF` on every run):
    anyway".
 11. A handoff under `--apply` pages a human unless explicitly told not to
     (§8). Skop never guesses from how it was started.
+12. Command output can steer which option the model picks. Jev's docs say
+    it doesn't treat its input as hostile, and anyone who can write a log
+    line can write to skop's context. The model still only chooses among
+    the author's options, and command output never enters the question
+    (§3.5). Authors SHOULD still put destructive options behind a `check` on
+    a measured value, or a per-item `yes | no` with a high `sure`, rather
+    than one `ask` over raw logs.
 
 Deliberately deferred (don't build in v1): dedicated users, sudoers
 generation, skill signing, off-host log shipping, agent launching.
@@ -1136,6 +1192,8 @@ match on code and line, never on message text.
 - an `ask` with 1 option, and with 256 options: `E-OPTION-COUNT`
 - an empty data list: `E-LIST-EMPTY`; a list mixing action and value items: `E-LIST-MIXED`
 - a skill with two errors reports both
+- two `nginx` items in one data list: `E-LIST-DUP`
+- `jev_state: 40k tokens`: `E-FRONTMATTER`
 - `- **run** \`df -h\`` before the first `##`, inside a blockquote, and nested
   under a plain bullet: `E-MISPLACED` for each
 - value item `` `nginx` ``: `E-DATA-ITEM`
@@ -1178,7 +1236,9 @@ prose; `**run**` in a paragraph is prose; a section ending in `**stop**`
 lints; a prose-only `## Background` section lints; instructions in two lists
 under separate `###` headings run in document order; a nested `for each`
 lints; a numbered data list works; a section offered as an option with no
-guidance gets `W-NO-GUIDANCE`; an instruction after
+guidance gets `W-NO-GUIDANCE`; an `ask` naming no `run` output gets
+`W-ASK-NO-CONTEXT`; a question naming `{errors}` sends the log text as
+context and `` `errors` `` in the question, while `{step}` is pasted in; an instruction after
 `check … → stop` is reachable; `(unavailable)` renders for a
 possibly-unbound name in `page` text.
 
@@ -1196,7 +1256,10 @@ file paths.
 - **M3 Exec with fakes**: for each scenario, the event stream matches a golden
   JSONL. Dry run issues no `do` and no page.
 - **M4 Real backends + runner features**: both `jev` and `openrouter`
-  against recorded responses. For `openrouter` that covers letters mapped
+  against recorded responses. For `jev` that covers option labels (not
+  ids) as Choice keys, mapped back to ids; context holding only the named
+  `run` outputs; a 429 with `retry-after` within and beyond the timeout;
+  and `W-MODEL-ALIAS` for `jev-latest`. For `openrouter` that covers letters mapped
   to options, the missing-letter example in §6.2 failing a 99% gate, low
   letter mass, missing logprobs, a reasoning-only response, a model without
   logprobs, and too many options. A recorded request for disk-full's
@@ -1276,7 +1339,7 @@ Look at usage, recent errors and what's biggest on disk.
 - **check** {used} < {threshold}% → stop
 - **run** `journalctl -p err -n 100 --no-pager` as errors
 - **run** `du -xh -d2 /var /tmp /home | sort -h` as biggest · else skip
-- **ask** What's the best next step? · sure 85%
+- **ask** Given {used}, {errors} and {biggest}, what's the best next step? · sure 85%
   - [Clean up]
   - [Restart]
   - [Page]
@@ -1286,7 +1349,7 @@ Look at usage, recent errors and what's biggest on disk.
 Run cleanups least risky first. Stop as soon as usage is under target.
 
 - **for each** step in [Cleanups]
-  - **ask** Is it worth running "{step}"? → yes | no · sure 90% · else skip
+  - **ask** Given {used} and {biggest}, is it worth running "{step}"? → yes | no · sure 90% · else skip
   - **if yes** do step · else skip
   - **run** `df --output=pcent {mount} | tail -1` as used
   - **check** {used} < {target}% → stop
@@ -1295,7 +1358,7 @@ Run cleanups least risky first. Stop as soon as usage is under target.
 ## Restart
 Restart the one service most likely behind the growth. Never more than one.
 
-- **ask** Which service is behind it? → one of [Services] as service · sure 90%
+- **ask** Given {errors} and {biggest}, which service is behind it? → one of [Services] as service · sure 90%
 - **do** `systemctl restart {service}`
 - **run** `df --output=pcent {mount} | tail -1` as used
 - **check** {used} < {target}% → stop
@@ -1390,7 +1453,7 @@ Check what's actually being served, then what's on disk.
 - **run** `systemctl list-timers certbot.timer --no-pager` as timer
 - **run** `journalctl -u certbot -n 50 --no-pager` as renew_log
 - **Note:** a stopped timer or a failed HTTP challenge are the usual causes.
-- **ask** What's the best next step? · sure 85%
+- **ask** Given {timer} and {renew_log}, what's the best next step? · sure 85%
   - [Renew]
   - [Page]
   - [Investigate]
@@ -1406,7 +1469,8 @@ keep the existing key.
 ## Reload
 The cert on disk is fresh, so the server just needs to pick it up.
 
-- **ask** Which server is serving {domain}? → one of [Servers] as server · sure 90%
+- **run** `ss -ltnp 'sport = :443'` as listeners
+- **ask** Given {listeners}, which server is serving {domain}? → one of [Servers] as server · sure 90%
 - **do** `systemctl reload {server}`
 - **check** `echo | openssl s_client -connect {domain}:443 -servername {domain} 2>/dev/null | openssl x509 -checkend {warn_seconds} -noout` succeeds → stop
 - **then** [Page]
@@ -1613,6 +1677,27 @@ Also, where things live in the Markdown:
 - The reviewer suggested deferring OpenRouter. It stays, per the decision to
   support both backends, gated by the recorded-response tests in M4.
 
+### Rev 11 (checked against Jev's docs)
+
+- **Option labels are Jev's keys.** Jev shows option names to the model, so
+  skop sends "Clean up", not `s:clean_up`, and maps back. List items must be
+  unique (`E-LIST-DUP`).
+- **Context is only what the question names.** Trusted values are pasted
+  into the question; `run` outputs are named in backticks and sent as
+  context. Command output never enters the question. `W-ASK-NO-CONTEXT`
+  flags questions with no evidence. The examples now name their evidence,
+  and cert-expiry's Reload reads the port 443 listeners first.
+- **Jev request layout specified:** `state`, `instructions` with question
+  and guidance, Choice, Noul and Score mappings.
+- **Pinned model version.** An alias gets `W-MODEL-ALIAS`.
+- **Rate limits retried.** 429 honours `retry-after` within the timeout;
+  408 and connection errors retry too. The JavaScript SDK may be used with
+  its retries off.
+- **Context capped at 30k tokens** to fit Jev's 32k limit.
+- **Steering risk documented** (§11 rule 12).
+- **`sure` vs Jev's `confidence` explained**, so authors don't copy Jev's
+  thresholds.
+
 ---
 
 ## Appendix D — `error-triage/SKILL.md` (v1.1)
@@ -1636,7 +1721,7 @@ someone to look at, or page.
 Read the recent errors and rate how severe they are.
 
 - **run** `journalctl -p err --since -15min --no-pager` as errors
-- **ask** How severe are these errors? → 1 to 4 as severity · sure 75% · else [Unsure]
+- **ask** How severe are the errors in {errors}? → 1 to 4 as severity · sure 75% · else [Unsure]
   - 1: known noise, nothing to do
   - 2: worth a human look, not urgent
   - 3: degraded service
