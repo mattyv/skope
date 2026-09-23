@@ -133,7 +133,11 @@ limits:                         # optional; defaults shown
     `## Background`, are fine, whatever lists they contain. A section used
     as a list (`[List]`) is a **data section** and MUST contain exactly one
     list (§3.6), or it's `E-SECTION-KIND`. Only a data section's items are
-    held to §3.6's forms (`E-DATA-ITEM`).
+    held to §3.6's forms (`E-DATA-ITEM`), and only data sections get the
+    core's list checks. Core JSON gives any other non-instruction section
+    just the list items that parse as data items.
+- A skill with no instruction section and no `entry` has nowhere to start:
+  lint reports its entry as `E-UNRESOLVED`.
 - A heading with no letters or digits has no slug, so no id: it's
   `E-SECTION-NAME`.
 - An instruction section's **guidance** is its first paragraph before its
@@ -174,9 +178,13 @@ Rules:
      (`**run**:`, `**Stop:**`) → instruction, so a colon can never turn a
      keyword into prose (it then fails the grammar, rule 4);
    - other bold text ending in `:` (inside or right after the bold, e.g.
-     `**Note:**` or `**Note**:`) → prose;
+     `**Note:**` or `**Note**:`) → prose, unless dropping case, `_`, `-`
+     and spaces leaves a keyword (`**for_each:**`), which is
+     `E-UNKNOWN-BOLD`;
    - anything else → **parse error**. This catches typos like `**rn**`.
-   `__bold__` counts as bold, the same as `**bold**`.
+   `__bold__` counts as bold, the same as `**bold**`. HTML bold
+   (`<b>run</b>`, `<strong>`) leading an item is `E-UNKNOWN-BOLD`: it
+   renders like a keyword, so it can't quietly be prose.
 
    Items that don't start with bold text are prose.
 4. A keyword item whose remaining text does **not** match the grammar in §3.4
@@ -202,7 +210,11 @@ Rules:
    indented) and HTML blocks, including `<!-- comments -->`, are opaque:
    nothing inside them is an instruction, because nothing inside them
    renders as a list item. The preprocessor uses a CommonMark parser, so
-   what runs is what a reader sees.
+   what runs is what a reader sees. A line break inside an item counts as
+   a space between tokens; a tab between tokens is `E-GRAMMAR`. Lists
+   nested more than 100 deep are `E-NESTED-LIST`. `[Name]` in an
+   instruction is always a section reference, even if the file also
+   defines a Markdown link called `Name`.
 
 ### 3.4 Instruction grammar (surface)
 Whitespace between tokens is one or more spaces. `CMD` is exactly one inline

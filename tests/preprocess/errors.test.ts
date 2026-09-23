@@ -100,6 +100,25 @@ describe("E-UNKNOWN-BOLD (parse): bold text that isn't a keyword and doesn't end
     expect(codesAt(md)).toContainEqual({ code: "E-UNKNOWN-BOLD", line: BODY_START + 1 });
   });
 
+  test("**for_each:** and **Hand-Off**: (a misspelt keyword with a colon is still E-UNKNOWN-BOLD, not a note)", () => {
+    for (const lead of ["**for_each:**", "**Hand-Off**:", "**foreach:**"]) {
+      const md = skillMd("## Triage", `- ${lead} x in [Items]`, "- **stop**", "", "## Items", "- a");
+      expect(codesAt(md), lead).toContainEqual({ code: "E-UNKNOWN-BOLD", line: BODY_START + 1 });
+    }
+  });
+
+  test("**Note:** and **Tip:** stay prose (they don't normalise to a keyword)", () => {
+    const md = skillMd("## Triage", "- **Note:** careful", "- **Tip:** also careful", "- **stop**");
+    expect(preprocess(md)).toHaveProperty("program");
+  });
+
+  test("<b>run</b> and <strong>stop</strong> (HTML bold renders like a keyword, so it's an error)", () => {
+    for (const lead of ["<b>run</b> `df`", "<strong>stop</strong>"]) {
+      const md = skillMd("## Triage", `- ${lead}`, "- **stop**");
+      expect(codesAt(md), lead).toContainEqual({ code: "E-UNKNOWN-BOLD", line: BODY_START + 1 });
+    }
+  });
+
   test("**foreach** (no space at all)", () => {
     const md = skillMd("## Triage", "- **foreach** x in [Items]", "- **stop**", "", "## Items", "- a");
     expect(codesAt(md)).toContainEqual({ code: "E-UNKNOWN-BOLD", line: BODY_START + 1 });

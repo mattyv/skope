@@ -59,6 +59,12 @@ Decisions the spec left open, made here:
   `[Clean_Up](#clean-up)` matches `## Clean up`. When the text resolves to
   no section, `expected` is the slug of the text itself, and the core
   reports the missing section anyway.
+- **Ids trim `_`:** `sectionId` drops `_` at both ends, so `## _Triage_`
+  is `s:triage`. A defaulted entry with no instruction section is
+  `s:_entry`, which no real section can have.
+- **Non-instruction sections** carry only the list items that parse as data
+  items; a list with none is left out. Only sections used as lists are
+  checked (`E-DATA-ITEM`, and the core's list checks).
 - **Guidance** is the paragraph's plain text: inline formatting removed,
   and a link or `[Section]` reference becomes its text (as in SPEC §6.2's
   example). `null` when the section has none.

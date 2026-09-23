@@ -18,6 +18,10 @@ export type Lead =
  * markers just inside the bold (`***run***`, `**_run_**`) don't hide a
  * keyword. */
 export function classifyLead(text: string): Lead | null {
+  // HTML bold renders like **bold** but isn't skop's bold: an error, not a
+  // silent prose item (SPEC §3.3 rule 3).
+  const html = /^<(b|strong)>(.*?)<\/\1>/i.exec(text);
+  if (html) return { kind: "unknown", content: html[2] ?? "" };
   const delim = text.slice(0, 2);
   if (delim !== "**" && delim !== "__") return null;
   const close = text.indexOf(delim, 3);
@@ -29,6 +33,10 @@ export function classifyLead(text: string): Lead | null {
   const word = (bare.endsWith(":") ? bare.slice(0, -1) : bare).toLowerCase();
   const keyword = KEYWORDS.find((k) => k === word);
   if (keyword) return { kind: "keyword", keyword, colon, rest };
+  // A misspelt multi-word keyword with a colon (`**for_each:**`) is still a
+  // typo, not a note: it normalises to a keyword.
+  const squashed = word.replace(/[\s_-]+/g, "");
+  if (colon && KEYWORDS.some((k) => k.replace(/ /g, "") === squashed)) return { kind: "unknown", content };
   return colon ? { kind: "note" } : { kind: "unknown", content };
 }
 
