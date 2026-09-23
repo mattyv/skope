@@ -1,4 +1,4 @@
-# skop (skill op) — Implementation Spec (v1, rev 6)
+# skop (skill op) — Implementation Spec (v1, rev 7)
 
 Audience: an engineer or LLM implementing this from scratch. Everything
 marked **MUST** is normative. Where this spec says "verify against current
@@ -514,7 +514,7 @@ Bound variables can hold an `int` (params already can).
 ### 5.2 Interpreter shape
 
 ~~~
-Lint(prog)             : seq<LintError>
+Lint(prog)             : seq<LintError>   // code + src, per §7.1
 Start(prog, runConfig) : State                 // requires Lint(prog) == []
 Step(state, response)  : (State, seq<Event>, Next)
 
@@ -621,7 +621,7 @@ From the explore handler, report:
 - worst-case duration estimate, for information only. It includes command
   timeouts plus kill grace, Jev timeouts with the retry, and the pager
   timeout. The enforced limit is `limits.deadline` (§7).
-- sections never reached (warning)
+- sections never reached (warning `W-SECTION-UNREACHED`)
 
 ---
 
@@ -718,7 +718,8 @@ Responsibilities, in order:
 0. Check the mode. A run needs exactly one of `--apply` and `--dry-run`.
    Neither or both → print why to stderr and exit 40 before anything runs.
    Read-only modes (`--lint`, `--explain`, `--verify`) need neither.
-1. Preprocess + lint. On failure, print errors with file:line to stderr, exit 40.
+1. Preprocess + lint. Report every error found, not just the first (§7.1).
+   Any error → exit 40.
 2. Validate params and built-ins: types, and the safe-value check for any
    value that reaches a `CMD`. On failure, exit 40. This applies whoever the
    caller is, agents included.
@@ -769,6 +770,75 @@ Linting (step 1) MUST include:
   threshold. Message: "this Score is only used as a threshold; a `yes | no`
   ask gates more reliably." This counts uses; it doesn't guess at meaning.
 - warn: a Score variable never used after it's bound
+
+### 7.1 Errors and warnings
+
+Every error and warning has a stable **code**. Codes are normative; message
+wording isn't. Tests match on code and line, so messages can improve freely.
+A code, once released, is never renamed or reused. New codes may be added.
+
+Each one is reported twice:
+- **stdout**: one JSON event per error or warning (§10):
+  `{"event":"error","code":"E-TAINT","stage":"lint","file":"disk-full/SKILL.md","line":14,"message":"…"}`
+- **stderr**: one readable line:
+  `disk-full/SKILL.md:14: E-TAINT: {errors} comes from a run command and can't go in a command`
+
+`file` and `line` point at the Markdown source (via the source map) and are
+left out when there's no source line, as with `E-MODE`. Errors that stop a
+run before it starts end with outcome `invalid`, exit 40. The runtime errors
+at the bottom of the table end with outcome `error`, exit 50.
+
+Handoff reasons (§8.1), `locked` and `stale_lock` are outcomes, not errors,
+and have no codes.
+
+| Code | Stage | Meaning | Example |
+|---|---|---|---|
+| `E-NOT-RUNNABLE` | parse | no `format: 1` in the frontmatter (§3.1) | a plain agent skill |
+| `E-FRONTMATTER` | parse | a frontmatter field is missing or invalid | no `description`; `run_timeout: soon` |
+| `E-DUP-SECTION` | parse | two sections share a name, ignoring case | `## Page` twice |
+| `E-SECTION-KIND` | parse | a section is neither an instruction section nor a data section with one list | a data section with two lists |
+| `E-UNKNOWN-BOLD` | parse | bold text that isn't a keyword and doesn't end in `:` (§3.3 rule 3) | ``**rn** `df -h` `` |
+| `E-GRAMMAR` | parse | a keyword item doesn't match §3.4 | `**Run** the tests first`; `**run** df -h` |
+| `E-NESTED-LIST` | parse | a nested list under an instruction that doesn't take one | a list under a `run` item |
+| `E-OPTION-ITEM` | parse | an option item isn't exactly one `[Section]` link | `- [Page] or restart` |
+| `E-RUBRIC-ITEM` | parse | a rubric line isn't `INT: text` (v1.1) | `- very bad`; `- **4**: outage` |
+| `E-UNRESOLVED` | lint | a `[Section]` or `[List]` reference doesn't resolve | `[Nonexistent]` |
+| `E-REF-KIND` | lint | a data section used as a target, or an instruction section used as a list | `then [Cleanups]` |
+| `E-CYCLE` | lint | the transfer graph has a cycle (§4.6) | A → B → A |
+| `E-FALLS-OFF` | lint | a path reaches the end of a section without ending or transferring | a section ending in `run` |
+| `E-UNREACHABLE` | lint | an instruction can never run (§4.1) | anything after `then [X]` |
+| `E-TAINT` | lint | an untrusted value in a command (§3.5) | ``**do** `rm -rf {errors}` `` |
+| `E-ACTION-IN-CMD` | lint | an action item interpolated into a command (§3.5) | ``**run** `echo {step}` `` |
+| `E-UNSAFE-VALUE` | lint | a param default or value item reaching a command fails the safe-value check | value item `my app` |
+| `E-UNBOUND` | lint | a name in a command or comparison may be unbound, is never bound, or is out of scope | a `for each` variable used after the loop |
+| `E-IF-YES` | lint | `if yes` has no governing `yes \| no` ask (§4.2) | `if yes` first in a section |
+| `E-ELSE-SKIP` | lint | `else skip` where it isn't allowed | on a section-option or Score ask |
+| `E-OPTION-COUNT` | lint | a section-option ask has fewer than 2 or more than 255 options | one option |
+| `E-LIST-KIND` | lint | the wrong kind of list for the instruction | `one of` over action items; `do item` over value items |
+| `E-LIST-EMPTY` | lint | a data list has no items | |
+| `E-LIST-MIXED` | lint | a data list mixes action and value items | |
+| `E-SCORE-RANGE` | lint | Score bounds invalid, or not 2–10 levels (v1.1) | `→ 5 to 1`; `→ 1 to 11` |
+| `E-SCORE-RUBRIC` | lint | Score rubric missing, incomplete, out of range or duplicated (v1.1) | no line for level 2 |
+| `E-MODE` | args | neither or both of `--apply` and `--dry-run` (§7 step 0) | |
+| `E-PARAM-UNKNOWN` | args | `--param` names a param the skill doesn't declare | |
+| `E-PARAM-TYPE` | args | a `--param` value has the wrong type | `threshold=high` |
+| `E-PARAM-UNSAFE` | args | a param override or built-in fails the safe-value check | `mount='/; rm -rf /'` |
+| `E-CONFIG` | args | the config file is unreadable or invalid | |
+| `E-FAKE-UNMATCHED` | runtime | `--fake-exec` has no answer for a command (§5.4) | |
+| `E-IO` | runtime | skop can't write its run directory or lock file | |
+| `E-INTERNAL` | runtime | a runner bug. Unreachable by P6, so always a bug report | |
+
+Warnings don't stop a run:
+
+| Code | Meaning |
+|---|---|
+| `W-SCORE-THRESHOLD` | a Score variable is only used in one comparison against one threshold; a `yes \| no` ask gates more reliably (v1.1) |
+| `W-SCORE-UNUSED` | a Score variable is never used after it's bound (v1.1) |
+| `W-SECTION-UNREACHED` | no path reaches a section (§5.6) |
+| `W-REDACT-OFF` | built-in redaction patterns are turned off (§9) |
+
+Parse codes come from the preprocessor. Lint codes come from the Dafny core,
+so `LintError` carries the code. The rest come from the TypeScript host.
 
 ---
 
@@ -860,7 +930,7 @@ state_dir: $XDG_STATE_HOME/skop   # run directories (§10.1)
 ```
 
 **Built-in redaction patterns** (on unless `redact.defaults: false`, which
-logs a warning on every run):
+logs warning `W-REDACT-OFF` on every run):
 - AWS access key ids: `AKIA[0-9A-Z]{16}`
 - private key blocks: `-----BEGIN [A-Z ]*PRIVATE KEY-----` through the matching END line
 - bearer tokens: `(?i)bearer\s+\S+`
@@ -891,6 +961,7 @@ logs a warning on every run):
 | `transfer` | `from`, `to` |
 | `outcome` | `outcome`, `reason`, `jev_calls`, `effects`, `dry_run` |
 | `handoff_record` | `path`, `record` |
+| `error` / `warning` | `code`, `stage`, `file`, `line`, `message` (§7.1) |
 | `locked` | `holder_pid` |
 | `stale_lock` | `path`, `holder_pid` |
 
@@ -940,41 +1011,48 @@ generation, skill signing, off-host log shipping, agent launching.
 - Fixture tests run with `--fake` and `--fake-exec`. CI never runs a
   fixture's real commands, so results don't depend on the CI machine.
 
-### 12.2 Negative lint tests (each MUST fail with a line number)
-- `- **Run** the tests first` (keyword, bad grammar)
-- `- **run** df -h` (missing code span)
-- `- **rn** \`df -h\`` (bold, not a keyword, no colon)
-- a nested list under a `run` item
-- `**do** \`rm -rf {errors}\`` where `errors` came from `run` (taint)
-- `**run** \`echo {step}\`` inside `for each step in [Cleanups]` (action item in `CMD`)
-- a value item `my app` used in a `CMD` (fails safe-value check)
-- a `CMD` using a name bound by `run … as x · else skip` (possibly unbound)
-- a `for each` variable used after the loop
-- `if yes` with no preceding `yes | no` ask
-- an instruction after `then [X]` (unreachable)
-- a transfer cycle (`A → B → A`)
-- a section that can fall off its end
-- `[Nonexistent]` link
-- `else skip` on a section-option ask
-- an `ask` with 1 option, and with 256 options
-- an empty data list, and a list mixing action and value items
+### 12.2 Negative lint tests
+Each case MUST fail with the listed code (§7.1) and the right line. Tests
+match on code and line, never on message text.
+- `- **Run** the tests first` (keyword, bad grammar): `E-GRAMMAR`
+- `- **run** df -h` (missing code span): `E-GRAMMAR`
+- `- **rn** \`df -h\`` (bold, not a keyword, no colon): `E-UNKNOWN-BOLD`
+- a nested list under a `run` item: `E-NESTED-LIST`
+- `**do** \`rm -rf {errors}\`` where `errors` came from `run`: `E-TAINT`
+- `**run** \`echo {step}\`` inside `for each step in [Cleanups]`: `E-ACTION-IN-CMD`
+- a value item `my app` used in a `CMD`: `E-UNSAFE-VALUE`
+- a `CMD` using a name bound by `run … as x · else skip`: `E-UNBOUND`
+- a `for each` variable used after the loop: `E-UNBOUND`
+- `if yes` with no preceding `yes | no` ask: `E-IF-YES`
+- an instruction after `then [X]`: `E-UNREACHABLE`
+- a transfer cycle (`A → B → A`): `E-CYCLE`
+- a section that can fall off its end: `E-FALLS-OFF`
+- `[Nonexistent]` link: `E-UNRESOLVED`
+- `else skip` on a section-option ask: `E-ELSE-SKIP`
+- an `ask` with 1 option, and with 256 options: `E-OPTION-COUNT`
+- an empty data list: `E-LIST-EMPTY`; a list mixing action and value items: `E-LIST-MIXED`
+- a skill with two errors reports both
 
-Also: `--param mount='/; rm -rf /'` MUST exit 40 before anything runs. So
-MUST a run with neither `--apply` nor `--dry-run`, or with both.
+Every code in §7.1 MUST have at least one test, except `E-INTERNAL` and
+`E-IO`, which can't be triggered on purpose.
+
+Also: `--param mount='/; rm -rf /'` MUST exit 40 with `E-PARAM-UNSAFE`
+before anything runs. A run with neither `--apply` nor `--dry-run`, or with
+both, MUST exit 40 with `E-MODE`.
 
 Jev response tests (each MUST be rejected as invalid): a missing option, an
 extra option, a value of 1.1, a negative value, `NaN`, and values summing to
 0.9. A tie for highest MUST fail the gate.
 
-Score tests (v1.1). Each lint case MUST fail with a line number:
-- `→ 5 to 1` (LOW ≥ HIGH), `→ 1 to 1` (one level), `→ 1 to 11` (too many)
-- rubric item `6: …` on a `1 to 5` ask (out of range)
-- two rubric items for level 3 (duplicate)
-- rubric item without a level (`- very bad`)
-- a `1 to 4` ask with no rubric, or with no line for level 2
-- `else skip` on a Score ask
-- a nested instruction (`- **run** …`) under a Score ask
-- a bold rubric line (`- **4**: outage`)
+Score tests (v1.1). Each lint case MUST fail with the listed code and line:
+- `→ 5 to 1` (LOW ≥ HIGH), `→ 1 to 1` (one level), `→ 1 to 11` (too many): `E-SCORE-RANGE`
+- rubric item `6: …` on a `1 to 5` ask (out of range): `E-SCORE-RUBRIC`
+- two rubric items for level 3 (duplicate): `E-SCORE-RUBRIC`
+- a `1 to 4` ask with no rubric, or with no line for level 2: `E-SCORE-RUBRIC`
+- rubric item without a level (`- very bad`): `E-RUBRIC-ITEM`
+- a bold rubric line (`- **4**: outage`): `E-RUBRIC-ITEM`
+- `else skip` on a Score ask: `E-ELSE-SKIP`
+- a nested instruction (`- **run** …`) under a Score ask: `E-RUBRIC-ITEM`
 
 Each of these responses MUST be rejected as invalid: a missing level, an
 extra level `"5"` on a `1 to 4` ask, values summing to 0.9. A tie between two
@@ -982,7 +1060,7 @@ levels fails the gate, and so does 0.45 / 0.45 / 0.1 at 75%.
 
 Positive Score tests: `check {severity} == 2` after a Score ask lints and
 runs; a Score answer in a `CMD` lints; the threshold-only warning fires for a
-Score used in one `>=` check; `--verify` on Appendix D reports 4 level
+Score used in one `>=` check (`W-SCORE-THRESHOLD`); `--verify` on Appendix D reports 4 level
 branches, 1 unsure and 1 unavailable at the ask.
 
 Positive: `- **Note:** …` and `- **Warning**: …` in an instruction list are
@@ -1356,6 +1434,14 @@ Also from a review of rev 5:
 - **Score levels mapped.** Jev level `i` is skop level `LOW + i`.
 - **Score rubric required** for every level, since Jev's model sees only
   the descriptions.
+
+### Rev 7 (error codes)
+
+- **Every error and warning has a stable code** (§7.1), reported as a JSON
+  event on stdout and a readable line on stderr. Codes are normative;
+  wording isn't.
+- **Lint reports every error**, not just the first.
+- **Tests match on code and line**, and each negative test names its code.
 
 ---
 
