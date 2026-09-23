@@ -1,0 +1,18 @@
+{
+  "line:23": {
+    "exit": 1,
+    "stdout": "Certificate will expire\n"
+  },
+  "line:24": {
+    "exit": 1,
+    "stdout": "Certificate will expire\n"
+  },
+  "line:25": {
+    "exit": 0,
+    "stdout": "certbot.timer active\n"
+  },
+  "line:26": {
+    "exit": 0,
+    "stdout": "no recent failures\n"
+  }
+}

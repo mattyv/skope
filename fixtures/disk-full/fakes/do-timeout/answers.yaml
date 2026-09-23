@@ -1,0 +1,14 @@
+{
+  "line:27": {
+    "s:clean_up": 0.03125,
+    "s:restart": 0.875,
+    "s:page": 0.0625,
+    "s:investigate": 0.03125
+  },
+  "line:46": {
+    "nginx": 0.03125,
+    "rsyslog": 0.03125,
+    "myapp-worker": 0.875,
+    "myapp-api": 0.03125
+  }
+}

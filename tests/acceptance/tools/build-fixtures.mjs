@@ -25,6 +25,12 @@ const ROOT = fileURLToPath(new URL("../../..", import.meta.url));
 const sha256 = (s) => `sha256:${createHash("sha256").update(s).digest("hex")}`;
 const PLACEHOLDER_HASH = `sha256:${"0".repeat(64)}`;
 
+// SPEC §9's key-value-secret built-in pattern, for the one scenario that pins redaction.
+// SPEC.md doesn't say what a redacted span is replaced with; "[REDACTED]" is this generator's
+// placeholder choice, flagged in the final report as an open spec question.
+const SECRET_PATTERN = /(?:[a-z_]*(?:password|passwd|secret|token|api[_-]?key)[a-z_]*["']?\s*[=:]\s*(?:"[^"]*"|'[^']*'|\S+))/gi;
+const redact = (s) => s.replace(SECRET_PATTERN, "[REDACTED]");
+
 // --- envelope -----------------------------------------------------------
 
 const ENV = { ts: "2026-09-23T00:00:00Z", run_id: "r-test", host: "test-host", skill_hash: `sha256:${"a".repeat(64)}` };
@@ -130,6 +136,23 @@ const mk = {
       after_would_do,
       ...(range ? { range } : {}),
       ...(detail ? { detail } : {}),
+    }),
+  // Same shape as `run`, but `stdout_hash` is computed from the raw (unredacted) fake stdout
+  // (SPEC §9: redaction runs before logging, so the captured text a hash identifies is the
+  // pre-redaction one) while `stdout_tail` is the redacted text a reader would actually see.
+  runRedacted: (skill, { section, line, cmd, exit, rawStdout, redactedStdout, after_would_do = false }) =>
+    wrap(skill, {
+      event: "run",
+      section,
+      line,
+      cmd,
+      exit,
+      ms: 1,
+      timed_out: false,
+      truncated: false,
+      stdout_hash: sha256(rawStdout),
+      stdout_tail: redactedStdout,
+      after_would_do,
     }),
   effectStart: (skill, { section, line, cmd }) => wrap(skill, { event: "effect_start", section, line, cmd }),
   effectEnd: (skill, { section, line, cmd, exit, timed_out = false }) =>
@@ -581,6 +604,455 @@ function dfRunStart(dry_run) {
   );
 }
 
+// --- ask-unavailable: backend down on the Triage (choice) ask -> handoff ---
+{
+  const events = [
+    dfRunStart(false),
+    mk.run(DF, { section: "Triage", line: 23, cmd: "df --output=pcent / | tail -1", exit: 0, stdout: " 91%\n" }),
+    mk.check(DF, { section: "Triage", line: 24, expr: "{used} < {threshold}", left: "91", right: "85", result: false }),
+    mk.run(DF, { section: "Triage", line: 25, cmd: "journalctl -p err -n 100 --no-pager", exit: 0, stdout: "3 disk write errors\n" }),
+    mk.run(DF, { section: "Triage", line: 26, cmd: "du -xh -d2 /var /tmp /home | sort -h", exit: 0, stdout: "12G\t/var\n" }),
+    mk.ask(DF, {
+      section: "Triage",
+      line: 27,
+      question: "Given `used`, `errors` and `biggest`, what's the best next step?",
+      kind: "choice",
+      probs: null,
+      chosen: null,
+      confidence: null,
+      sure: 85,
+      passed: false,
+      detail: "unavailable",
+    }),
+    mk.handoffRecord(DF, {
+      section: "Triage",
+      line: 27,
+      record: buildRecord({
+        skill: DF,
+        section: "Triage",
+        line: 27,
+        reason: "ask_unavailable",
+        detail: { question: "Given `used`, `errors` and `biggest`, what's the best next step?", probs: null, sure: 85 },
+        variables: { used: "91%", errors: "3 disk write errors", biggest: "12G\t/var" },
+        effects: [],
+        dry_run: false,
+      }),
+    }),
+    mk.handoffPage(DF, {
+      section: "Triage",
+      line: 27,
+      text: "test-host: skop disk-full handed off (ask_unavailable) in Triage. Record: /tmp/skop/runs/r-test/handoff.json",
+      ok: true,
+    }),
+    mk.outcome(DF, { outcome: "handoff", reason: "ask_unavailable", ask_calls: 1, effects: 0, dry_run: false }),
+  ];
+  emit(
+    "fixtures/disk-full",
+    "ask-unavailable",
+    events,
+    { "line:27": "unavailable" },
+    {
+      "line:23": { exit: 0, stdout: " 91%\n" },
+      "line:25": { exit: 0, stdout: "3 disk write errors\n" },
+      "line:26": { exit: 0, stdout: "12G\t/var\n" },
+    },
+    "handoff",
+  );
+}
+
+// --- ask-invalid: probs that don't sum to 1 on a choice ask -> same as unavailable ---
+// SPEC §6.1: "Anything else is invalid and handled as the backend being unavailable." The fake
+// passes the malformed probs through unchanged (fakes.schema.json has no sum constraint, so it
+// can express this); the core is what must reject it. The resulting event stream is identical
+// in shape to `ask-unavailable`.
+{
+  const events = [
+    dfRunStart(false),
+    mk.run(DF, { section: "Triage", line: 23, cmd: "df --output=pcent / | tail -1", exit: 0, stdout: " 91%\n" }),
+    mk.check(DF, { section: "Triage", line: 24, expr: "{used} < {threshold}", left: "91", right: "85", result: false }),
+    mk.run(DF, { section: "Triage", line: 25, cmd: "journalctl -p err -n 100 --no-pager", exit: 0, stdout: "3 disk write errors\n" }),
+    mk.run(DF, { section: "Triage", line: 26, cmd: "du -xh -d2 /var /tmp /home | sort -h", exit: 0, stdout: "12G\t/var\n" }),
+    mk.ask(DF, {
+      section: "Triage",
+      line: 27,
+      question: "Given `used`, `errors` and `biggest`, what's the best next step?",
+      kind: "choice",
+      probs: null,
+      chosen: null,
+      confidence: null,
+      sure: 85,
+      passed: false,
+      detail: "unavailable",
+    }),
+    mk.handoffRecord(DF, {
+      section: "Triage",
+      line: 27,
+      record: buildRecord({
+        skill: DF,
+        section: "Triage",
+        line: 27,
+        reason: "ask_unavailable",
+        detail: { question: "Given `used`, `errors` and `biggest`, what's the best next step?", probs: null, sure: 85 },
+        variables: { used: "91%", errors: "3 disk write errors", biggest: "12G\t/var" },
+        effects: [],
+        dry_run: false,
+      }),
+    }),
+    mk.handoffPage(DF, {
+      section: "Triage",
+      line: 27,
+      text: "test-host: skop disk-full handed off (ask_unavailable) in Triage. Record: /tmp/skop/runs/r-test/handoff.json",
+      ok: true,
+    }),
+    mk.outcome(DF, { outcome: "handoff", reason: "ask_unavailable", ask_calls: 1, effects: 0, dry_run: false }),
+  ];
+  emit(
+    "fixtures/disk-full",
+    "ask-invalid",
+    events,
+    // sum = 0.9375, off by 0.0625 (dyadic, well outside the 1e-3 tolerance): invalid.
+    { "line:27": { "s:clean_up": 0.5, "s:restart": 0.25, "s:page": 0.125, "s:investigate": 0.0625 } },
+    {
+      "line:23": { exit: 0, stdout: " 91%\n" },
+      "line:25": { exit: 0, stdout: "3 disk write errors\n" },
+      "line:26": { exit: 0, stdout: "12G\t/var\n" },
+    },
+    "handoff",
+  );
+}
+
+// --- do-timeout: Restart's `do` (no else) times out -> handoff (command_failed) ---
+{
+  const events = [
+    dfRunStart(false),
+    mk.run(DF, { section: "Triage", line: 23, cmd: "df --output=pcent / | tail -1", exit: 0, stdout: " 93%\n" }),
+    mk.check(DF, { section: "Triage", line: 24, expr: "{used} < {threshold}", left: "93", right: "85", result: false }),
+    mk.run(DF, { section: "Triage", line: 25, cmd: "journalctl -p err -n 100 --no-pager", exit: 0, stdout: "myapp-worker OOM\n" }),
+    mk.run(DF, { section: "Triage", line: 26, cmd: "du -xh -d2 /var /tmp /home | sort -h", exit: 0, stdout: "40G\t/var\n" }),
+    mk.ask(DF, {
+      section: "Triage",
+      line: 27,
+      question: "Given `used`, `errors` and `biggest`, what's the best next step?",
+      kind: "choice",
+      probs: { "s:clean_up": 0.03125, "s:restart": 0.875, "s:page": 0.0625, "s:investigate": 0.03125 },
+      chosen: "s:restart",
+      confidence: 0.875,
+      sure: 85,
+      passed: true,
+    }),
+    mk.transfer(DF, { section: "Triage", line: 27, from: "Triage", to: "Restart" }),
+    mk.ask(DF, {
+      section: "Restart",
+      line: 46,
+      question: "Given `errors` and `biggest`, which service is behind it?",
+      kind: "choice",
+      probs: { nginx: 0.03125, rsyslog: 0.03125, "myapp-worker": 0.875, "myapp-api": 0.03125 },
+      chosen: "myapp-worker",
+      confidence: 0.875,
+      sure: 90,
+      passed: true,
+    }),
+    mk.effectStart(DF, { section: "Restart", line: 47, cmd: "systemctl restart myapp-worker" }),
+    mk.effectEnd(DF, { section: "Restart", line: 47, cmd: "systemctl restart myapp-worker", exit: null, timed_out: true }),
+    mk.handoffRecord(DF, {
+      section: "Restart",
+      line: 47,
+      record: buildRecord({
+        skill: DF,
+        section: "Restart",
+        line: 47,
+        reason: "command_failed",
+        detail: { cmd: "systemctl restart myapp-worker", exit: null, timed_out: true, stderr_tail: "" },
+        variables: { used: "93%", errors: "myapp-worker OOM", biggest: "40G\t/var", service: "myapp-worker" },
+        effects: [{ cmd: "systemctl restart myapp-worker", status: "unknown" }],
+        dry_run: false,
+      }),
+    }),
+    mk.handoffPage(DF, {
+      section: "Restart",
+      line: 47,
+      text: "test-host: skop disk-full handed off (command_failed) in Restart. Record: /tmp/skop/runs/r-test/handoff.json",
+      ok: true,
+    }),
+    mk.outcome(DF, { outcome: "handoff", reason: "command_failed", ask_calls: 2, effects: 1, dry_run: false }),
+  ];
+  emit(
+    "fixtures/disk-full",
+    "do-timeout",
+    events,
+    {
+      "line:27": { "s:clean_up": 0.03125, "s:restart": 0.875, "s:page": 0.0625, "s:investigate": 0.03125 },
+      "line:46": { nginx: 0.03125, rsyslog: 0.03125, "myapp-worker": 0.875, "myapp-api": 0.03125 },
+    },
+    {
+      "line:23": { exit: 0, stdout: " 93%\n" },
+      "line:25": { exit: 0, stdout: "myapp-worker OOM\n" },
+      "line:26": { exit: 0, stdout: "40G\t/var\n" },
+      "line:47": { exit: null, timed_out: true },
+    },
+    "handoff",
+  );
+}
+
+// --- command-failed: Triage's `run` at line 25 (no else) fails -> handoff (command_failed) ---
+{
+  const events = [
+    dfRunStart(false),
+    mk.run(DF, { section: "Triage", line: 23, cmd: "df --output=pcent / | tail -1", exit: 0, stdout: " 89%\n" }),
+    mk.check(DF, { section: "Triage", line: 24, expr: "{used} < {threshold}", left: "89", right: "85", result: false }),
+    mk.run(DF, { section: "Triage", line: 25, cmd: "journalctl -p err -n 100 --no-pager", exit: 1, stdout: "" }),
+    mk.handoffRecord(DF, {
+      section: "Triage",
+      line: 25,
+      record: buildRecord({
+        skill: DF,
+        section: "Triage",
+        line: 25,
+        reason: "command_failed",
+        detail: {
+          cmd: "journalctl -p err -n 100 --no-pager",
+          exit: 1,
+          timed_out: false,
+          stderr_tail: "journalctl: unrecognized option\n",
+        },
+        variables: { used: "89%" },
+        effects: [],
+        dry_run: false,
+      }),
+    }),
+    mk.handoffPage(DF, {
+      section: "Triage",
+      line: 25,
+      text: "test-host: skop disk-full handed off (command_failed) in Triage. Record: /tmp/skop/runs/r-test/handoff.json",
+      ok: true,
+    }),
+    mk.outcome(DF, { outcome: "handoff", reason: "command_failed", ask_calls: 0, effects: 0, dry_run: false }),
+  ];
+  emit(
+    "fixtures/disk-full",
+    "command-failed",
+    events,
+    {},
+    {
+      "line:23": { exit: 0, stdout: " 89%\n" },
+      "line:25": { exit: 1, stdout: "", stderr: "journalctl: unrecognized option\n" },
+    },
+    "handoff",
+  );
+}
+
+// --- deadline: a huge simulated `ms` on line 23 pushes the run past limits.deadline (default
+// 15m/900000ms, SPEC §3.1) before the next instruction (the line 24 check) can start ---
+{
+  const events = [
+    dfRunStart(false),
+    mk.run(DF, { section: "Triage", line: 23, cmd: "df --output=pcent / | tail -1", exit: 0, stdout: " 91%\n" }),
+    mk.handoffRecord(DF, {
+      section: "Triage",
+      line: 24,
+      record: buildRecord({
+        skill: DF,
+        section: "Triage",
+        line: 24,
+        reason: "deadline",
+        variables: { used: "91%" },
+        effects: [],
+        dry_run: false,
+      }),
+    }),
+    mk.handoffPage(DF, {
+      section: "Triage",
+      line: 24,
+      text: "test-host: skop disk-full handed off (deadline) in Triage. Record: /tmp/skop/runs/r-test/handoff.json",
+      ok: true,
+    }),
+    mk.outcome(DF, { outcome: "handoff", reason: "deadline", ask_calls: 0, effects: 0, dry_run: false }),
+  ];
+  emit("fixtures/disk-full", "deadline", events, {}, { "line:23": { exit: 0, stdout: " 91%\n", ms: 1_000_000 } }, "handoff");
+}
+
+// --- tie-unassigned: a tie via `unassigned` fails the gate (SPEC §4.2, §12.2-style) ---
+// s:clean_up=0.5 is the top raw probability, but s:restart (0.25) plus all of `unassigned`
+// (0.25) would match it (0.5 >= 0.5), so the gate fails on the tie, not just on being below
+// `sure`. All dyadic.
+{
+  const events = [
+    dfRunStart(false),
+    mk.run(DF, { section: "Triage", line: 23, cmd: "df --output=pcent / | tail -1", exit: 0, stdout: " 91%\n" }),
+    mk.check(DF, { section: "Triage", line: 24, expr: "{used} < {threshold}", left: "91", right: "85", result: false }),
+    mk.run(DF, { section: "Triage", line: 25, cmd: "journalctl -p err -n 100 --no-pager", exit: 0, stdout: "ambiguous\n" }),
+    mk.run(DF, { section: "Triage", line: 26, cmd: "du -xh -d2 /var /tmp /home | sort -h", exit: 0, stdout: "ambiguous\n" }),
+    mk.ask(DF, {
+      section: "Triage",
+      line: 27,
+      question: "Given `used`, `errors` and `biggest`, what's the best next step?",
+      kind: "choice",
+      probs: { "s:clean_up": 0.5, "s:restart": 0.25, "s:page": 0, "s:investigate": 0, unassigned: 0.25 },
+      chosen: "s:clean_up",
+      confidence: 0.5,
+      sure: 85,
+      passed: false,
+    }),
+    mk.handoffRecord(DF, {
+      section: "Triage",
+      line: 27,
+      record: buildRecord({
+        skill: DF,
+        section: "Triage",
+        line: 27,
+        reason: "gate_failed",
+        detail: {
+          question: "Given `used`, `errors` and `biggest`, what's the best next step?",
+          probs: { "s:clean_up": 0.5, "s:restart": 0.25, "s:page": 0, "s:investigate": 0, unassigned: 0.25 },
+          sure: 85,
+        },
+        variables: { used: "91%", errors: "ambiguous", biggest: "ambiguous" },
+        effects: [],
+        dry_run: false,
+      }),
+    }),
+    mk.handoffPage(DF, {
+      section: "Triage",
+      line: 27,
+      text: "test-host: skop disk-full handed off (gate_failed) in Triage. Record: /tmp/skop/runs/r-test/handoff.json",
+      ok: true,
+    }),
+    mk.outcome(DF, { outcome: "handoff", reason: "gate_failed", ask_calls: 1, effects: 0, dry_run: false }),
+  ];
+  emit(
+    "fixtures/disk-full",
+    "tie-unassigned",
+    events,
+    { "line:27": { "s:clean_up": 0.5, "s:restart": 0.25, "s:page": 0, "s:investigate": 0, unassigned: 0.25 } },
+    {
+      "line:23": { exit: 0, stdout: " 91%\n" },
+      "line:25": { exit: 0, stdout: "ambiguous\n" },
+      "line:26": { exit: 0, stdout: "ambiguous\n" },
+    },
+    "handoff",
+  );
+}
+
+// --- unbound-biggest: line 26's `du … · else skip` fails, leaving `biggest` unbound; the
+// Triage ask's question shows it per SPEC §3.5 ("(unavailable)" for a name that may be unbound)
+// ---
+{
+  const question = "Given `used`, `errors` and (unavailable), what's the best next step?";
+  const events = [
+    dfRunStart(false),
+    mk.run(DF, { section: "Triage", line: 23, cmd: "df --output=pcent / | tail -1", exit: 0, stdout: " 89%\n" }),
+    mk.check(DF, { section: "Triage", line: 24, expr: "{used} < {threshold}", left: "89", right: "85", result: false }),
+    mk.run(DF, { section: "Triage", line: 25, cmd: "journalctl -p err -n 100 --no-pager", exit: 0, stdout: "some errors\n" }),
+    mk.run(DF, {
+      section: "Triage",
+      line: 26,
+      cmd: "du -xh -d2 /var /tmp /home | sort -h",
+      exit: 1,
+      stdout: "du: cannot access '/var': Permission denied\n",
+    }),
+    mk.ask(DF, {
+      section: "Triage",
+      line: 27,
+      question,
+      kind: "choice",
+      probs: { "s:clean_up": 0.03125, "s:restart": 0.03125, "s:page": 0.875, "s:investigate": 0.0625 },
+      chosen: "s:page",
+      confidence: 0.875,
+      sure: 85,
+      passed: true,
+    }),
+    mk.transfer(DF, { section: "Triage", line: 27, from: "Triage", to: "Page" }),
+    mk.page(DF, {
+      section: "Page",
+      line: 55,
+      text: "test-host: / at 89%. Run r-test has the errors and biggest dirs.",
+      ok: true,
+    }),
+    mk.outcome(DF, { outcome: "paged", reason: null, ask_calls: 1, effects: 0, dry_run: false }),
+  ];
+  emit(
+    "fixtures/disk-full",
+    "unbound-biggest",
+    events,
+    { "line:27": { "s:clean_up": 0.03125, "s:restart": 0.03125, "s:page": 0.875, "s:investigate": 0.0625 } },
+    {
+      "line:23": { exit: 0, stdout: " 89%\n" },
+      "line:25": { exit: 0, stdout: "some errors\n" },
+      "line:26": { exit: 1, stdout: "du: cannot access '/var': Permission denied\n" },
+    },
+    "paged",
+  );
+}
+
+// --- secret-redaction: a secret in a fake's stdout is redacted in both `stdout_tail` and the
+// handoff record's `variables` (SPEC §9, §11 rule 7). Built on top of `gate-failure`. ---
+{
+  const rawErrors = "3 disk write errors password=hunter2\n";
+  const redactedErrors = redact(rawErrors);
+  const events = [
+    dfRunStart(false),
+    mk.run(DF, { section: "Triage", line: 23, cmd: "df --output=pcent / | tail -1", exit: 0, stdout: " 91%\n" }),
+    mk.check(DF, { section: "Triage", line: 24, expr: "{used} < {threshold}", left: "91", right: "85", result: false }),
+    mk.runRedacted(DF, {
+      section: "Triage",
+      line: 25,
+      cmd: "journalctl -p err -n 100 --no-pager",
+      exit: 0,
+      rawStdout: rawErrors,
+      redactedStdout: redactedErrors,
+    }),
+    mk.run(DF, { section: "Triage", line: 26, cmd: "du -xh -d2 /var /tmp /home | sort -h", exit: 0, stdout: "ambiguous\n" }),
+    mk.ask(DF, {
+      section: "Triage",
+      line: 27,
+      question: "Given `used`, `errors` and `biggest`, what's the best next step?",
+      kind: "choice",
+      probs: { "s:clean_up": 0.5, "s:restart": 0.25, "s:page": 0.125, "s:investigate": 0.125 },
+      chosen: "s:clean_up",
+      confidence: 0.5,
+      sure: 85,
+      passed: false,
+    }),
+    mk.handoffRecord(DF, {
+      section: "Triage",
+      line: 27,
+      record: buildRecord({
+        skill: DF,
+        section: "Triage",
+        line: 27,
+        reason: "gate_failed",
+        detail: {
+          question: "Given `used`, `errors` and `biggest`, what's the best next step?",
+          probs: { "s:clean_up": 0.5, "s:restart": 0.25, "s:page": 0.125, "s:investigate": 0.125 },
+          sure: 85,
+        },
+        variables: { used: "91%", errors: redactedErrors.trim(), biggest: "ambiguous" },
+        effects: [],
+        dry_run: false,
+      }),
+    }),
+    mk.handoffPage(DF, {
+      section: "Triage",
+      line: 27,
+      text: "test-host: skop disk-full handed off (gate_failed) in Triage. Record: /tmp/skop/runs/r-test/handoff.json",
+      ok: true,
+    }),
+    mk.outcome(DF, { outcome: "handoff", reason: "gate_failed", ask_calls: 1, effects: 0, dry_run: false }),
+  ];
+  emit(
+    "fixtures/disk-full",
+    "secret-redaction",
+    events,
+    { "line:27": { "s:clean_up": 0.5, "s:restart": 0.25, "s:page": 0.125, "s:investigate": 0.125 } },
+    {
+      "line:23": { exit: 0, stdout: " 91%\n" },
+      "line:25": { exit: 0, stdout: rawErrors },
+      "line:26": { exit: 0, stdout: "ambiguous\n" },
+    },
+    "handoff",
+  );
+}
+
 console.log("wrote disk-full fakes and goldens");
 
 // =====================================================================
@@ -828,6 +1300,455 @@ function ceRunStart(dry_run) {
       "line:47": { exit: 1, stdout: "Certificate will expire\n" },
     },
     "paged",
+  );
+}
+
+// --- ask-unavailable: backend down on the Triage (choice) ask -> handoff ---
+{
+  const events = [
+    ceRunStart(false),
+    mk.checkCmd(CE, { section: "Triage", line: 23, cmd: ceCheckCmd, exit: 1, stdout: "Certificate will expire\n" }),
+    mk.checkCmd(CE, { section: "Triage", line: 24, cmd: ceDiskCmd, exit: 1, stdout: "Certificate will expire\n" }),
+    mk.run(CE, {
+      section: "Triage",
+      line: 25,
+      cmd: "systemctl list-timers certbot.timer --no-pager",
+      exit: 0,
+      stdout: "certbot.timer active\n",
+    }),
+    mk.run(CE, { section: "Triage", line: 26, cmd: "journalctl -u certbot -n 50 --no-pager", exit: 0, stdout: "no recent failures\n" }),
+    mk.ask(CE, {
+      section: "Triage",
+      line: 28,
+      question: "Given `timer` and `renew_log`, what's the best next step?",
+      kind: "choice",
+      probs: null,
+      chosen: null,
+      confidence: null,
+      sure: 85,
+      passed: false,
+      detail: "unavailable",
+    }),
+    mk.handoffRecord(CE, {
+      section: "Triage",
+      line: 28,
+      record: buildRecord({
+        skill: CE,
+        section: "Triage",
+        line: 28,
+        reason: "ask_unavailable",
+        detail: { question: "Given `timer` and `renew_log`, what's the best next step?", probs: null, sure: 85 },
+        variables: { timer: "certbot.timer active", renew_log: "no recent failures" },
+        effects: [],
+        dry_run: false,
+      }),
+    }),
+    mk.handoffPage(CE, {
+      section: "Triage",
+      line: 28,
+      text: "test-host: skop cert-expiry handed off (ask_unavailable) in Triage. Record: /tmp/skop/runs/r-test/handoff.json",
+      ok: true,
+    }),
+    mk.outcome(CE, { outcome: "handoff", reason: "ask_unavailable", ask_calls: 1, effects: 0, dry_run: false }),
+  ];
+  emit(
+    "fixtures/cert-expiry",
+    "ask-unavailable",
+    events,
+    { "line:28": "unavailable" },
+    {
+      "line:23": { exit: 1, stdout: "Certificate will expire\n" },
+      "line:24": { exit: 1, stdout: "Certificate will expire\n" },
+      "line:25": { exit: 0, stdout: "certbot.timer active\n" },
+      "line:26": { exit: 0, stdout: "no recent failures\n" },
+    },
+    "handoff",
+  );
+}
+
+// --- ask-invalid: probs that don't sum to 1 on a choice ask -> same as unavailable ---
+{
+  const events = [
+    ceRunStart(false),
+    mk.checkCmd(CE, { section: "Triage", line: 23, cmd: ceCheckCmd, exit: 1, stdout: "Certificate will expire\n" }),
+    mk.checkCmd(CE, { section: "Triage", line: 24, cmd: ceDiskCmd, exit: 1, stdout: "Certificate will expire\n" }),
+    mk.run(CE, {
+      section: "Triage",
+      line: 25,
+      cmd: "systemctl list-timers certbot.timer --no-pager",
+      exit: 0,
+      stdout: "certbot.timer active\n",
+    }),
+    mk.run(CE, { section: "Triage", line: 26, cmd: "journalctl -u certbot -n 50 --no-pager", exit: 0, stdout: "no recent failures\n" }),
+    mk.ask(CE, {
+      section: "Triage",
+      line: 28,
+      question: "Given `timer` and `renew_log`, what's the best next step?",
+      kind: "choice",
+      probs: null,
+      chosen: null,
+      confidence: null,
+      sure: 85,
+      passed: false,
+      detail: "unavailable",
+    }),
+    mk.handoffRecord(CE, {
+      section: "Triage",
+      line: 28,
+      record: buildRecord({
+        skill: CE,
+        section: "Triage",
+        line: 28,
+        reason: "ask_unavailable",
+        detail: { question: "Given `timer` and `renew_log`, what's the best next step?", probs: null, sure: 85 },
+        variables: { timer: "certbot.timer active", renew_log: "no recent failures" },
+        effects: [],
+        dry_run: false,
+      }),
+    }),
+    mk.handoffPage(CE, {
+      section: "Triage",
+      line: 28,
+      text: "test-host: skop cert-expiry handed off (ask_unavailable) in Triage. Record: /tmp/skop/runs/r-test/handoff.json",
+      ok: true,
+    }),
+    mk.outcome(CE, { outcome: "handoff", reason: "ask_unavailable", ask_calls: 1, effects: 0, dry_run: false }),
+  ];
+  emit(
+    "fixtures/cert-expiry",
+    "ask-invalid",
+    events,
+    // sum = 0.875, off by 0.125 (dyadic): invalid.
+    { "line:28": { "s:renew": 0.5, "s:page": 0.25, "s:investigate": 0.125 } },
+    {
+      "line:23": { exit: 1, stdout: "Certificate will expire\n" },
+      "line:24": { exit: 1, stdout: "Certificate will expire\n" },
+      "line:25": { exit: 0, stdout: "certbot.timer active\n" },
+      "line:26": { exit: 0, stdout: "no recent failures\n" },
+    },
+    "handoff",
+  );
+}
+
+// --- do-timeout: Renew's second `do` (line 38, no else) times out -> handoff (command_failed) ---
+{
+  const events = [
+    ceRunStart(false),
+    mk.checkCmd(CE, { section: "Triage", line: 23, cmd: ceCheckCmd, exit: 1, stdout: "Certificate will expire\n" }),
+    mk.checkCmd(CE, { section: "Triage", line: 24, cmd: ceDiskCmd, exit: 1, stdout: "Certificate will expire\n" }),
+    mk.run(CE, {
+      section: "Triage",
+      line: 25,
+      cmd: "systemctl list-timers certbot.timer --no-pager",
+      exit: 0,
+      stdout: "certbot.timer active\n",
+    }),
+    mk.run(CE, { section: "Triage", line: 26, cmd: "journalctl -u certbot -n 50 --no-pager", exit: 0, stdout: "no recent failures\n" }),
+    mk.ask(CE, {
+      section: "Triage",
+      line: 28,
+      question: "Given `timer` and `renew_log`, what's the best next step?",
+      kind: "choice",
+      probs: { "s:renew": 0.875, "s:page": 0.0625, "s:investigate": 0.0625 },
+      chosen: "s:renew",
+      confidence: 0.875,
+      sure: 85,
+      passed: true,
+    }),
+    mk.transfer(CE, { section: "Triage", line: 28, from: "Triage", to: "Renew" }),
+    mk.effectStart(CE, { section: "Renew", line: 37, cmd: "certbot renew --dry-run --cert-name example.com" }),
+    mk.effectEnd(CE, { section: "Renew", line: 37, cmd: "certbot renew --dry-run --cert-name example.com", exit: 0 }),
+    mk.effectStart(CE, { section: "Renew", line: 38, cmd: "certbot renew --reuse-key --cert-name example.com" }),
+    mk.effectEnd(CE, { section: "Renew", line: 38, cmd: "certbot renew --reuse-key --cert-name example.com", exit: null, timed_out: true }),
+    mk.handoffRecord(CE, {
+      section: "Renew",
+      line: 38,
+      record: buildRecord({
+        skill: CE,
+        section: "Renew",
+        line: 38,
+        reason: "command_failed",
+        detail: { cmd: "certbot renew --reuse-key --cert-name example.com", exit: null, timed_out: true, stderr_tail: "" },
+        variables: { timer: "certbot.timer active", renew_log: "no recent failures" },
+        effects: [
+          { cmd: "certbot renew --dry-run --cert-name example.com", status: "done" },
+          { cmd: "certbot renew --reuse-key --cert-name example.com", status: "unknown" },
+        ],
+        dry_run: false,
+      }),
+    }),
+    mk.handoffPage(CE, {
+      section: "Renew",
+      line: 38,
+      text: "test-host: skop cert-expiry handed off (command_failed) in Renew. Record: /tmp/skop/runs/r-test/handoff.json",
+      ok: true,
+    }),
+    mk.outcome(CE, { outcome: "handoff", reason: "command_failed", ask_calls: 1, effects: 2, dry_run: false }),
+  ];
+  emit(
+    "fixtures/cert-expiry",
+    "do-timeout",
+    events,
+    { "line:28": { "s:renew": 0.875, "s:page": 0.0625, "s:investigate": 0.0625 } },
+    {
+      "line:23": { exit: 1, stdout: "Certificate will expire\n" },
+      "line:24": { exit: 1, stdout: "Certificate will expire\n" },
+      "line:25": { exit: 0, stdout: "certbot.timer active\n" },
+      "line:26": { exit: 0, stdout: "no recent failures\n" },
+      "line:37": { exit: 0 },
+      "line:38": { exit: null, timed_out: true },
+    },
+    "handoff",
+  );
+}
+
+// --- command-failed: Triage's `run` at line 25 (no else) fails -> handoff (command_failed) ---
+{
+  const events = [
+    ceRunStart(false),
+    mk.checkCmd(CE, { section: "Triage", line: 23, cmd: ceCheckCmd, exit: 1, stdout: "Certificate will expire\n" }),
+    mk.checkCmd(CE, { section: "Triage", line: 24, cmd: ceDiskCmd, exit: 1, stdout: "Certificate will expire\n" }),
+    mk.run(CE, { section: "Triage", line: 25, cmd: "systemctl list-timers certbot.timer --no-pager", exit: 1, stdout: "" }),
+    mk.handoffRecord(CE, {
+      section: "Triage",
+      line: 25,
+      record: buildRecord({
+        skill: CE,
+        section: "Triage",
+        line: 25,
+        reason: "command_failed",
+        detail: {
+          cmd: "systemctl list-timers certbot.timer --no-pager",
+          exit: 1,
+          timed_out: false,
+          stderr_tail: "systemctl: command not found\n",
+        },
+        variables: {},
+        effects: [],
+        dry_run: false,
+      }),
+    }),
+    mk.handoffPage(CE, {
+      section: "Triage",
+      line: 25,
+      text: "test-host: skop cert-expiry handed off (command_failed) in Triage. Record: /tmp/skop/runs/r-test/handoff.json",
+      ok: true,
+    }),
+    mk.outcome(CE, { outcome: "handoff", reason: "command_failed", ask_calls: 0, effects: 0, dry_run: false }),
+  ];
+  emit(
+    "fixtures/cert-expiry",
+    "command-failed",
+    events,
+    {},
+    {
+      "line:23": { exit: 1, stdout: "Certificate will expire\n" },
+      "line:24": { exit: 1, stdout: "Certificate will expire\n" },
+      "line:25": { exit: 1, stdout: "", stderr: "systemctl: command not found\n" },
+    },
+    "handoff",
+  );
+}
+
+// --- deadline: a huge simulated `ms` on line 23 pushes the run past limits.deadline (default
+// 15m/900000ms) before the next instruction (the line 24 check) can start ---
+{
+  const events = [
+    ceRunStart(false),
+    mk.checkCmd(CE, { section: "Triage", line: 23, cmd: ceCheckCmd, exit: 1, stdout: "Certificate will expire\n" }),
+    mk.handoffRecord(CE, {
+      section: "Triage",
+      line: 24,
+      record: buildRecord({
+        skill: CE,
+        section: "Triage",
+        line: 24,
+        reason: "deadline",
+        variables: {},
+        effects: [],
+        dry_run: false,
+      }),
+    }),
+    mk.handoffPage(CE, {
+      section: "Triage",
+      line: 24,
+      text: "test-host: skop cert-expiry handed off (deadline) in Triage. Record: /tmp/skop/runs/r-test/handoff.json",
+      ok: true,
+    }),
+    mk.outcome(CE, { outcome: "handoff", reason: "deadline", ask_calls: 0, effects: 0, dry_run: false }),
+  ];
+  emit(
+    "fixtures/cert-expiry",
+    "deadline",
+    events,
+    {},
+    { "line:23": { exit: 1, stdout: "Certificate will expire\n", ms: 1_000_000 } },
+    "handoff",
+  );
+}
+
+// --- tie-unassigned: a tie via `unassigned` fails the gate (SPEC §4.2, §12.2-style). All dyadic.
+{
+  const events = [
+    ceRunStart(false),
+    mk.checkCmd(CE, { section: "Triage", line: 23, cmd: ceCheckCmd, exit: 1, stdout: "Certificate will expire\n" }),
+    mk.checkCmd(CE, { section: "Triage", line: 24, cmd: ceDiskCmd, exit: 1, stdout: "Certificate will expire\n" }),
+    mk.run(CE, { section: "Triage", line: 25, cmd: "systemctl list-timers certbot.timer --no-pager", exit: 0, stdout: "ambiguous\n" }),
+    mk.run(CE, { section: "Triage", line: 26, cmd: "journalctl -u certbot -n 50 --no-pager", exit: 0, stdout: "ambiguous\n" }),
+    mk.ask(CE, {
+      section: "Triage",
+      line: 28,
+      question: "Given `timer` and `renew_log`, what's the best next step?",
+      kind: "choice",
+      probs: { "s:renew": 0.5, "s:page": 0.25, "s:investigate": 0, unassigned: 0.25 },
+      chosen: "s:renew",
+      confidence: 0.5,
+      sure: 85,
+      passed: false,
+    }),
+    mk.handoffRecord(CE, {
+      section: "Triage",
+      line: 28,
+      record: buildRecord({
+        skill: CE,
+        section: "Triage",
+        line: 28,
+        reason: "gate_failed",
+        detail: {
+          question: "Given `timer` and `renew_log`, what's the best next step?",
+          probs: { "s:renew": 0.5, "s:page": 0.25, "s:investigate": 0, unassigned: 0.25 },
+          sure: 85,
+        },
+        variables: { timer: "ambiguous", renew_log: "ambiguous" },
+        effects: [],
+        dry_run: false,
+      }),
+    }),
+    mk.handoffPage(CE, {
+      section: "Triage",
+      line: 28,
+      text: "test-host: skop cert-expiry handed off (gate_failed) in Triage. Record: /tmp/skop/runs/r-test/handoff.json",
+      ok: true,
+    }),
+    mk.outcome(CE, { outcome: "handoff", reason: "gate_failed", ask_calls: 1, effects: 0, dry_run: false }),
+  ];
+  emit(
+    "fixtures/cert-expiry",
+    "tie-unassigned",
+    events,
+    { "line:28": { "s:renew": 0.5, "s:page": 0.25, "s:investigate": 0, unassigned: 0.25 } },
+    {
+      "line:23": { exit: 1, stdout: "Certificate will expire\n" },
+      "line:24": { exit: 1, stdout: "Certificate will expire\n" },
+      "line:25": { exit: 0, stdout: "ambiguous\n" },
+      "line:26": { exit: 0, stdout: "ambiguous\n" },
+    },
+    "handoff",
+  );
+}
+
+// --- page-direct: Triage -> Page -----------------------------------------
+{
+  const events = [
+    ceRunStart(false),
+    mk.checkCmd(CE, { section: "Triage", line: 23, cmd: ceCheckCmd, exit: 1, stdout: "Certificate will expire\n" }),
+    mk.checkCmd(CE, { section: "Triage", line: 24, cmd: ceDiskCmd, exit: 1, stdout: "Certificate will expire\n" }),
+    mk.run(CE, {
+      section: "Triage",
+      line: 25,
+      cmd: "systemctl list-timers certbot.timer --no-pager",
+      exit: 0,
+      stdout: "no clear timer state\n",
+    }),
+    mk.run(CE, { section: "Triage", line: 26, cmd: "journalctl -u certbot -n 50 --no-pager", exit: 0, stdout: "unclear\n" }),
+    mk.ask(CE, {
+      section: "Triage",
+      line: 28,
+      question: "Given `timer` and `renew_log`, what's the best next step?",
+      kind: "choice",
+      probs: { "s:renew": 0.0625, "s:page": 0.875, "s:investigate": 0.0625 },
+      chosen: "s:page",
+      confidence: 0.875,
+      sure: 85,
+      passed: true,
+    }),
+    mk.transfer(CE, { section: "Triage", line: 28, from: "Triage", to: "Page" }),
+    mk.page(CE, {
+      section: "Page",
+      line: 53,
+      text: "test-host: cert for example.com expires soon and couldn't be fixed automatically.",
+      ok: true,
+    }),
+    mk.outcome(CE, { outcome: "paged", reason: null, ask_calls: 1, effects: 0, dry_run: false }),
+  ];
+  emit(
+    "fixtures/cert-expiry",
+    "page-direct",
+    events,
+    { "line:28": { "s:renew": 0.0625, "s:page": 0.875, "s:investigate": 0.0625 } },
+    {
+      "line:23": { exit: 1, stdout: "Certificate will expire\n" },
+      "line:24": { exit: 1, stdout: "Certificate will expire\n" },
+      "line:25": { exit: 0, stdout: "no clear timer state\n" },
+      "line:26": { exit: 0, stdout: "unclear\n" },
+    },
+    "paged",
+  );
+}
+
+// --- investigate-handoff: Triage -> Investigate -> hand off ---------------
+{
+  const events = [
+    ceRunStart(false),
+    mk.checkCmd(CE, { section: "Triage", line: 23, cmd: ceCheckCmd, exit: 1, stdout: "Certificate will expire\n" }),
+    mk.checkCmd(CE, { section: "Triage", line: 24, cmd: ceDiskCmd, exit: 1, stdout: "Certificate will expire\n" }),
+    mk.run(CE, { section: "Triage", line: 25, cmd: "systemctl list-timers certbot.timer --no-pager", exit: 0, stdout: "unclear\n" }),
+    mk.run(CE, { section: "Triage", line: 26, cmd: "journalctl -u certbot -n 50 --no-pager", exit: 0, stdout: "unclear\n" }),
+    mk.ask(CE, {
+      section: "Triage",
+      line: 28,
+      question: "Given `timer` and `renew_log`, what's the best next step?",
+      kind: "choice",
+      probs: { "s:renew": 0.0625, "s:page": 0.0625, "s:investigate": 0.875 },
+      chosen: "s:investigate",
+      confidence: 0.875,
+      sure: 85,
+      passed: true,
+    }),
+    mk.transfer(CE, { section: "Triage", line: 28, from: "Triage", to: "Investigate" }),
+    mk.handoffRecord(CE, {
+      section: "Investigate",
+      line: 56,
+      record: buildRecord({
+        skill: CE,
+        section: "Investigate",
+        line: 56,
+        reason: "explicit",
+        variables: { timer: "unclear", renew_log: "unclear" },
+        effects: [],
+        dry_run: false,
+      }),
+    }),
+    mk.handoffPage(CE, {
+      section: "Investigate",
+      line: 56,
+      text: "test-host: skop cert-expiry handed off (explicit) in Investigate. Record: /tmp/skop/runs/r-test/handoff.json",
+      ok: true,
+    }),
+    mk.outcome(CE, { outcome: "handoff", reason: "explicit", ask_calls: 1, effects: 0, dry_run: false }),
+  ];
+  emit(
+    "fixtures/cert-expiry",
+    "investigate-handoff",
+    events,
+    { "line:28": { "s:renew": 0.0625, "s:page": 0.0625, "s:investigate": 0.875 } },
+    {
+      "line:23": { exit: 1, stdout: "Certificate will expire\n" },
+      "line:24": { exit: 1, stdout: "Certificate will expire\n" },
+      "line:25": { exit: 0, stdout: "unclear\n" },
+      "line:26": { exit: 0, stdout: "unclear\n" },
+    },
+    "handoff",
   );
 }
 

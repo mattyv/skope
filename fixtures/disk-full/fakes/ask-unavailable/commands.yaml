@@ -1,0 +1,14 @@
+{
+  "line:23": {
+    "exit": 0,
+    "stdout": " 91%\n"
+  },
+  "line:25": {
+    "exit": 0,
+    "stdout": "3 disk write errors\n"
+  },
+  "line:26": {
+    "exit": 0,
+    "stdout": "12G\t/var\n"
+  }
+}

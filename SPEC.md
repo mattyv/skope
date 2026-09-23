@@ -1280,6 +1280,9 @@ Then skop exits 20.
  "skop":{"version":"0.1.0","build":"1bfd…"},
  "preamble":"You are taking over a run of a runnable skill. …"}
 ```
+- `detail` depends on the reason: for `gate_failed` and `ask_unavailable`,
+  the question as above; for `command_failed`, `{cmd, exit, timed_out,
+  stderr_tail}` (redacted); for `explicit` and `deadline`, `null`.
 - For a Score ask, `detail.probs` is keyed by level
   (`{"1":0.05,"2":0.1,"3":0.45,"4":0.4}`) and `detail` adds `"range":[1,4]`.
 - `reason` is one of `explicit`, `gate_failed`, `command_failed`,
@@ -1346,7 +1349,7 @@ logs warning `W-REDACT-OFF` on every run):
 - the values of the backend key variables (§4.4), literally
 - credentials in URLs: `://[^/\s:@]+:[^/\s@]+@`
 
-Patterns MUST run in linear time on hostile input (anyone who can write a
+Each match is replaced by `[REDACTED]`. Patterns MUST run in linear time on hostile input (anyone who can write a
 log line can write to skop's input, §11), and a test redacts 1 MiB of
 each pattern's worst case within a time bound. Redaction runs on the
 whole captured text before anything is cut from it: a tail cut from

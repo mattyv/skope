@@ -93,21 +93,52 @@ Known caveats still open:
 - **`transfer`/`handoff_record`/`handoff_page` line numbers on gate
   failure and Score-gate-failure-via-`else`** point at the `ask`
   statement's own `src` line, matching `contracts/examples/events.jsonl`.
-- **New scenarios flagged in the task are only partly added.** This pass
-  added `error-triage/severity-3-page`. Still missing, called out
-  explicitly by the review and left as follow-up scope: per-fixture
-  backend-unavailable/invalid-response scenarios on a **choice** ask (only
-  error-triage's Score ask has one), a `do` timeout, a `command_failed`
-  without an `else`, a `deadline` scenario using `commands.yaml`'s `ms`
-  field, disk-full's line 26 (`du … · else skip`) actually failing so
-  `biggest` is unbound, a tie via `unassigned`, and cert-expiry's
-  Page/Investigate options beyond what `gate-failure`/`renew-happy` already
-  exercise. A secret-redaction pin (a fake's stdout containing something
-  that should be redacted, checked in `stdout_tail` and
-  `record.variables`) is also not yet added. SPEC §7's `deadline` handoff
-  section/line ("the instruction the run would have started next") still
-  needs a human/implementor decision on exactly which line that is when
-  the deadline is checked between steps, not at one.
+- **New scenarios flagged in the task are now added** (this pass, on top of
+  the earlier `error-triage/severity-3-page`): per-fixture
+  backend-unavailable/invalid-response scenarios on a **choice** ask
+  (`ask-unavailable`, `ask-invalid`, disk-full and cert-expiry), a `do`
+  timeout (`do-timeout`), a `command_failed` without an `else`
+  (`command-failed`), a `deadline` scenario using `commands.yaml`'s `ms`
+  field (`deadline`), a tie via `unassigned` (`tie-unassigned`),
+  disk-full's line 26 (`du … · else skip`) actually failing so `biggest`
+  is unbound (`unbound-biggest`), and cert-expiry's Page/Investigate
+  options (`page-direct`, `investigate-handoff`) beyond what
+  `gate-failure`/`renew-happy` already exercise. A secret-redaction pin
+  (`disk-full/secret-redaction`) is also added. See the scenario index
+  below for what each one covers, and the final report (or this pass's
+  commit) for the modelling choices behind them — in particular:
+  - `deadline` uses each skill's *default* `limits.deadline` (15m /
+    900000ms, SPEC §3.1 — neither fixture's frontmatter overrides it) and
+    a `commands.yaml` `ms: 1000000` on the first instruction, rather than
+    editing frontmatter (out of this pass's scope). The handoff's
+    `section`/`line` is the next instruction that didn't start (SPEC §7
+    step 5), which for both fixtures is the very next line after the one
+    the huge `ms` was attached to.
+  - `unbound-biggest` renders the ask's unbound name as `(unavailable)`
+    per SPEC §3.5 ("A name used in `Q` or `QUOTED` that may be unbound
+    renders as `(unavailable)`") — this is not actually ambiguous in
+    SPEC.md, despite the note this file used to carry.
+  - `tie-unassigned` uses dyadic `A=0.5, B=0.25, unassigned=0.25` as in
+    the task brief. At every `sure` value the two fixtures actually use
+    (75–90%), a tie-causing `unassigned` share can only appear together
+    with the chosen option *also* being below `sure` (the remaining
+    budget for "any other option + unassigned" tops out at `1 - chosen`,
+    so `chosen ≤ 0.5` is required for a tie to be reachable at all, which
+    is already below every `sure` these skills use) — so this scenario
+    necessarily exercises the tie mechanism and the below-`sure` gate
+    failure together, not the tie in isolation. A skill with `sure` ≤ 50%
+    would be needed to isolate it, and neither fixture has one.
+  - `command_failed`'s and `deadline`'s handoff-record `detail` shape
+    isn't pinned by SPEC §8.1 the way `gate_failed`/`ask_unavailable`'s
+    is (there's no worked example). For `command_failed` this pass uses
+    `{cmd, exit, timed_out, stderr_tail}` (matching §4.3's "exit code,
+    stderr tail, timeout flag"); `deadline` gets no `detail` at all
+    (`buildRecord` already omits it when absent). Confirm this shape
+    against the real core's output once it exists.
+  - The redaction replacement text (`"[REDACTED]"` in
+    `secret-redaction`) isn't specified by SPEC §9 either; that section
+    says only that built-in patterns are redacted, never what they're
+    replaced with.
 
 ## Scenario index
 
@@ -119,10 +150,26 @@ Known caveats still open:
 | disk-full | `investigate-handoff` | Triage → Investigate → hand off (explicit) |
 | disk-full | `gate-failure` | Triage ask below `sure`, no else → handoff (gate_failed) |
 | disk-full | `dry-run` | `--dry-run`: one `would_do`, full 5-item loop, `would_page` |
+| disk-full | `ask-unavailable` | Backend unavailable on the Triage (choice) ask → handoff (ask_unavailable), exit 20 |
+| disk-full | `ask-invalid` | Triage ask's probs don't sum to 1 → same as backend unavailable |
+| disk-full | `do-timeout` | Restart's `do` (no else) times out → effect unknown → handoff (command_failed) |
+| disk-full | `command-failed` | Triage's `run` (line 25, no else) fails → handoff (command_failed) |
+| disk-full | `deadline` | Huge simulated `ms` exceeds `limits.deadline` → handoff (deadline) before the next step |
+| disk-full | `tie-unassigned` | Triage ask ties via `unassigned` (0.5/0.25/…/0.25) → handoff (gate_failed) |
+| disk-full | `unbound-biggest` | Line 26's `du … · else skip` fails; Triage ask's question shows `biggest` as `(unavailable)` |
+| disk-full | `secret-redaction` | A secret in `errors`' stdout is redacted in `stdout_tail` and `record.variables` |
 | cert-expiry | `stop-happy` | First check succeeds → stop, no ask |
 | cert-expiry | `renew-happy` | Triage → Renew (two `do`s) → Reload → stop |
 | cert-expiry | `gate-failure` | Triage ask below `sure` → handoff (gate_failed) |
 | cert-expiry | `dry-run` | `--dry-run`: two `would_do`s in Renew, second check still fails, Page |
+| cert-expiry | `ask-unavailable` | Backend unavailable on the Triage (choice) ask → handoff (ask_unavailable), exit 20 |
+| cert-expiry | `ask-invalid` | Triage ask's probs don't sum to 1 → same as backend unavailable |
+| cert-expiry | `do-timeout` | Renew's second `do` (line 38, no else) times out → handoff (command_failed) |
+| cert-expiry | `command-failed` | Triage's `run` (line 25, no else) fails → handoff (command_failed) |
+| cert-expiry | `deadline` | Huge simulated `ms` exceeds `limits.deadline` → handoff (deadline) before the next step |
+| cert-expiry | `tie-unassigned` | Triage ask ties via `unassigned` (0.5/0.25/0/0.25) → handoff (gate_failed) |
+| cert-expiry | `page-direct` | Triage → Page directly |
+| cert-expiry | `investigate-handoff` | Triage → Investigate → hand off (explicit) |
 | error-triage | `severity-1-stop` | Score level 1 → stop |
 | error-triage | `severity-2-investigate` | Score level 2 → Investigate → hand off |
 | error-triage | `severity-3-page` | Score level 3 → Page (falls through, same as level 4) |

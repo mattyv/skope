@@ -1,0 +1,14 @@
+{
+  "line:23": {
+    "exit": 0,
+    "stdout": " 89%\n"
+  },
+  "line:25": {
+    "exit": 0,
+    "stdout": "some errors\n"
+  },
+  "line:26": {
+    "exit": 1,
+    "stdout": "du: cannot access '/var': Permission denied\n"
+  }
+}
