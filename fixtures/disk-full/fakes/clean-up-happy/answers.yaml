@@ -1,0 +1,12 @@
+{
+  "line:27": {
+    "s:clean_up": 0.91,
+    "s:restart": 0.05,
+    "s:page": 0.03,
+    "s:investigate": 0.01
+  },
+  "line:37": {
+    "yes": 0.95,
+    "no": 0.05
+  }
+}

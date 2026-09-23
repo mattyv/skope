@@ -13,6 +13,7 @@ describe("golden helper (SPEC §12.3)", () => {
       exit: 0,
       ms: 12,
       request_path: "/tmp/a",
+      request_sha256: `sha256:${"0".repeat(64)}`,
     };
     expect(normalise([e])).toEqual([{ event: "run", cmd: "df", exit: 0 }]);
   });

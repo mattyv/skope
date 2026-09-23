@@ -1,0 +1,21 @@
+{
+  "line:23": {
+    "exit": 0,
+    "stdout": " 93%\n"
+  },
+  "line:25": {
+    "exit": 0,
+    "stdout": "myapp-worker OOM\n"
+  },
+  "line:26": {
+    "exit": 0,
+    "stdout": "40G\t/var\n"
+  },
+  "line:47": {
+    "exit": 0
+  },
+  "line:48": {
+    "exit": 0,
+    "stdout": " 91%\n"
+  }
+}

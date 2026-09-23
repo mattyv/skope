@@ -1038,7 +1038,8 @@ Responsibilities, in order:
 5. Enforce `limits.deadline`. Check it between steps only, never in the
    middle of a command: each command already has its own timeout, and
    killing a `do` halfway leaves the system in an unknown state. Past the
-   deadline → `handoff` with reason `deadline`.
+   deadline → `handoff` with reason `deadline`. Its `section` and `line`
+   are the instruction the run would have started next.
 6. On `handoff`, write the handoff record, page if §8 says to, and exit 20.
 7. Exit with the outcome's code.
 
@@ -1443,7 +1444,10 @@ file paths.
   fixtures terminates, reports every path ending in an outcome, and reports
   max backend calls. (disk-full: Clean up loop is 5 items, bounded.)
 - **M3 Exec with fakes**: for each scenario, the event stream matches a golden
-  JSONL. Dry run issues no `do` and no page.
+  JSONL. Dry run issues no `do` and no page. A golden ignores the fields
+  that change from run to run or from build to build: `ts`, `ms`,
+  `run_id`, `host`, `skill_hash`, `run_dir`, `request_path`,
+  `request_sha256`, `path`, `file`, `skop_version` and `skop_build`.
 - **M4 Real backends + runner features**: both `jev` and `openrouter`
   against recorded responses. For `jev` that covers option labels (not
   ids) as Choice keys, mapped back to ids; context holding only the named
@@ -1983,6 +1987,9 @@ Also, where things live in the Markdown:
 - **Standalone binaries and `install.sh`** (§5.5), so skop can run on a
   machine without Node. The installer checks each download against the
   release's `SHA256SUMS`.
+- **Goldens list what they ignore**, including `request_sha256`, whose
+  exact bytes are an implementation detail.
+- **A deadline handoff points at the next instruction** it didn't start.
 - **A Score rubric in core JSON is a list** of `{src, level, text}`, so
   each line keeps its source line.
 - **The event contract is one shape per event**, with an example of each

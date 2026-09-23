@@ -22,6 +22,7 @@ const VARYING = new Set([
   "skill_hash",
   "run_dir",
   "request_path",
+  "request_sha256",
   "path",
   "file",
   "skop_version",
