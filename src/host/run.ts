@@ -10,7 +10,7 @@ import { join } from "node:path";
 import { load as loadYaml } from "js-yaml";
 import { runAsk } from "../ask/cli.js";
 import { askFake } from "../ask/fake.js";
-import { FAKE_LIMITS, JEV_LIMITS, OPENROUTER_LIMITS } from "../ask/limits.js";
+import { JEV_LIMITS, OPENROUTER_LIMITS } from "../ask/limits.js";
 import { checkModel } from "../ask/openrouter.js";
 import { type AskOutput, checkAskLimits, isFailure } from "../ask/types.js";
 import type { CoreProgram, FakesAnswers, FakesCommands, Section } from "../contracts.gen.js";
@@ -65,8 +65,12 @@ export async function runSkill(o: RunOptions): Promise<number> {
   let askCalls = 0;
   let effects = 0;
 
-  const emit = (e: Record<string, unknown>) =>
+  const emit = (e: Record<string, unknown>) => {
+    // Counted here, not taken from the core's outcome, so a run that ends in error still reports them.
+    if (e.event === "ask") askCalls++;
+    if (e.event === "effect_start") effects++;
     process.stdout.write(`${JSON.stringify({ ts: new Date().toISOString(), ...run, host, ...e })}\n`);
+  };
   const diag = (kind: "error" | "warning", d: Diagnostic) => {
     emit({ event: kind, ...Object.fromEntries(Object.entries(d).filter(([, v]) => v !== undefined)) });
     process.stderr.write(`${diagnosticLine(d)}\n`);
@@ -255,8 +259,6 @@ export async function runSkill(o: RunOptions): Promise<number> {
       deadlineMs: program.limits.deadline_ms,
       emit,
     });
-    askCalls = result.outcomeEvent.ask_calls as number;
-    effects = result.outcomeEvent.effects as number;
 
     // Step 6: handoff (SPEC §8).
     if (result.outcome.kind === "handoff") {
@@ -340,7 +342,6 @@ async function checkBackend(
 ): Promise<BackendEnv> {
   const asks = Object.values(program.sections).flatMap((s) => ("body" in s ? allAsks(s.body) : []));
   const name = o.fake ? "fake" : config.ask.backend;
-  const limits = { jev: JEV_LIMITS, openrouter: OPENROUTER_LIMITS, fake: FAKE_LIMITS }[name];
   if (asks.length === 0) return { model: name };
   if (name === "fake") {
     if (!o.fake) fail("E-CONFIG", "args", "ask.backend is fake, which needs --fake answers.yaml");
@@ -349,6 +350,7 @@ async function checkBackend(
   const block = name === "jev" ? config.jev : config.openrouter;
   if (!block) return fail("E-CONFIG", "args", `ask.backend is ${name}, but the config has no ${name} block`);
   if (!process.env[block.key_env]) fail("E-CONFIG", "args", `${name}: no API key in $${block.key_env}`);
+  const limits = name === "jev" ? JEV_LIMITS : OPENROUTER_LIMITS;
   let contextTokens = limits.contextTokens;
   if (name === "openrouter") {
     const m = await checkModel(block.model, { fetch });

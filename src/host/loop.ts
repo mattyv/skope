@@ -39,8 +39,6 @@ export interface LoopResult {
   outcome: Outcome;
   /** Where the run ended: for a deadline, the instruction it would have started next. */
   at: Where | null;
-  /** The outcome event, emitted last by the caller (after any handoff events, SPEC §8). */
-  outcomeEvent: Record<string, unknown>;
   effects: Effect[];
   /** The request and result the run ended on, for the handoff record's detail (SPEC §8.1). */
   lastAsk: Record<string, unknown> | null;
@@ -86,7 +84,8 @@ export async function runLoop(interp: Interp, ctx: LoopContext): Promise<LoopRes
       const { at, ...body } = e;
       if (body.event === "outcome") {
         if (next.kind !== "done") throw new Error("the core reported an outcome but didn't finish");
-        return { outcome: next.outcome, at, outcomeEvent: body, effects, lastAsk, lastExec, variables: interp.variables() };
+        // The caller emits the outcome last, after any handoff events (SPEC §8).
+        return { outcome: next.outcome, at, effects, lastAsk, lastExec, variables: interp.variables() };
       }
       const out: Record<string, unknown> = { ...(at ?? {}), ...body };
       const hostFields = EVENT_FIELDS[body.event]?.host ?? [];
