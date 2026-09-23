@@ -283,11 +283,17 @@ variables bound by `run … as`, `ask … as`, `for each`.
 
 **Taint rule (MUST be enforced statically by the core lint):**
 - *Trusted*: params, built-ins, value items (bound by `for each` or chosen by
-  `one of`), and Score answers. A Score answer is an integer, so it always
-  passes the safe-value check and may be interpolated into a `CMD`.
+  `one of`), yes/no answers (`yes` or `no`), and Score answers. A Score
+  answer is an integer, so it always passes the safe-value check and may be
+  interpolated into a `CMD`.
 - *Untrusted*: anything bound by `run … as`.
 - *Action items*: `{item}` renders the item's label. An action item MUST NOT
   be interpolated into a `CMD`. Use `do item` to run its command.
+- An action item's own command is a `CMD` too, but it runs wherever
+  `do item` is, so it may interpolate only params and built-ins that no
+  instruction in the skill rebinds (`run … as`, `ask … as`, `for each`).
+  A name bound nowhere is `E-UNBOUND`; a param or built-in that something
+  rebinds is `E-TAINT`. Both are reported at the item's line.
 - `CMD` (in `run`, `do`, `check`) MUST NOT interpolate untrusted values or
   action items. Violation = lint error.
 - `QUOTED` (page text) may interpolate anything, and MUST be escaped for
@@ -328,7 +334,9 @@ nothing to escape, and mounts, domains and unit names never need more.
   `(unavailable)`. For a `run` output named in `Q`, that's its value in the
   context.
 - A name that is never bound anywhere is a lint error wherever it's used.
-- A `for each` variable is scoped to the loop body.
+- A `for each` variable is scoped to the loop body. When the loop ends, or a
+  transfer leaves it, the name is unbound, even if it had a value before
+  the loop.
 - A Score answer is bound only on paths where its gate passed.
 
 As a result the runtime never meets an unbound name (proven, §5.3).
@@ -2072,6 +2080,10 @@ Also, where things live in the Markdown:
 - **Standalone binaries and `install.sh`** (§5.5), so skop can run on a
   machine without Node. The installer checks each download against the
   release's `SHA256SUMS`.
+- **Action-item commands are checked:** they may interpolate only params
+  and built-ins that nothing rebinds (§3.5). Yes/no answers are trusted
+  values. A loop variable is dropped when its loop ends or a transfer
+  leaves it; an outer value of the same name isn't restored.
 - **Runner hardening:** skill commands don't get the backend keys;
   timeouts are bounded; an interrupted run stops its command and releases
   the lock (`E-INTERRUPTED`); the lock's fallback directory is per-user
