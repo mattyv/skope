@@ -1,11 +1,12 @@
-# skop (skill op) — Implementation Spec (v1, rev 3)
+# skop (skill op) — Implementation Spec (v1, rev 4)
 
 Audience: an engineer or LLM implementing this from scratch. Everything
 marked **MUST** is normative. Where this spec says "verify against current
 docs", do so rather than guessing: some external APIs (Jev, the Dafny CLI and
 its JavaScript backend) are named here from memory and may have changed.
 
-Appendix C lists what changed in each revision.
+Appendix C lists what changed in each revision. Score asks (rev 4) target
+v1.1: build them after milestones M1–M6 (§12.3).
 
 ---
 
@@ -47,7 +48,9 @@ Node.
 - Resuming a run after handoff (v1.1).
 - `guarantees:` block for custom effect properties (v1.1).
 - MCP server (v1.1; the CLI contract below is designed to be wrapped).
-- Jev's `Score` type and multi-select (v1.1).
+- Multi-select and numeric answers. Use a `for each` of `yes | no` asks
+  instead of multi-select, and `check` on a measured value instead of a
+  model-estimated number. See Appendix E.
 - Launching an agent on handoff (v1.1). v1 writes the record and exits.
 - An LLM fallback when Jev is down (v1.1). v1 hands off instead.
 
@@ -130,8 +133,10 @@ content, case-insensitively, is one of the keywords:
 Rules:
 1. **Where instructions live.** Instructions are recognised in (a) items of a
    top-level list in an instruction section, and (b) items of the nested list
-   under a `for each`. The nested list under a section-option `ask` is not
-   instructions: each item MUST be exactly one `[Section]` link.
+   under a `for each`. Two other nested lists are not instructions:
+   - under a section-option `ask`: each item MUST be exactly one `[Section]`
+     link;
+   - under a Score `ask`: each item MUST be a rubric line (§3.4).
 2. **Nested lists.** A nested list under any other instruction is a **parse
    error**. A nested list under a prose item is prose.
 3. **Leading bold.** In the lists from rule 1, an item that starts with bold
@@ -170,6 +175,9 @@ ELSE     = " · else " ("skip" | "[" SECTION "]")
 ask      = "**ask**" Q " · sure " INT "%" [ELSE]              (* section options, nested list *)
          | "**ask**" Q " → yes | no" [" as " NAME] " · sure " INT "%" [ELSE]
          | "**ask**" Q " → one of [" LIST "] as " NAME " · sure " INT "%" [ELSE]
+         | "**ask**" Q " → " INT " to " INT " as " NAME " · sure " INT "%" [ELSE]
+                                                               (* score, v1.1; optional rubric *)
+RUBRIC   = INT ": " TEXT                                       (* one per nested item *)
 
 foreach  = "**for each**" NAME " in [" LIST "]"               (* body = nested list *)
 ifyes    = "**if yes**" INLINE [ELSE]
@@ -181,6 +189,24 @@ handoff  = "**hand off**"
 
 - Section-option `ask`: at least 2, at most 255 options.
 - `one of [L]`: L MUST be a list of value items.
+- Score `ask` (v1.1), `→ LOW to HIGH`. All of these are lint errors:
+  - `LOW` and `HIGH` aren't integers with `0 ≤ LOW < HIGH`;
+  - the ask has fewer than 2 or more than 10 levels (`HIGH − LOW + 1`).
+    Check Jev's maximum number of score levels and lower this bound if
+    needed;
+  - a rubric item isn't `INT: text`, its level is outside `LOW..HIGH`, or a
+    level appears twice. The rubric is optional, and levels may be left out.
+    Unlisted levels are sent without a description;
+  - `else skip`. (`else [X]` is allowed.)
+
+  Example:
+  ~~~markdown
+  - **ask** How severe are these errors? → 1 to 4 as severity · sure 75%
+    - 1: known noise, nothing to do
+    - 2: worth a human look, not urgent
+    - 3: degraded service
+    - 4: outage or data at risk
+  ~~~
 - The `%` on an operand is decoration. It is stripped during coercion (§4.2).
 
 ### 3.5 Interpolation
@@ -190,7 +216,8 @@ variables bound by `run … as`, `ask … as`, `for each`.
 
 **Taint rule (MUST be enforced statically by the core lint):**
 - *Trusted*: params, built-ins, value items (bound by `for each` or chosen by
-  `one of`).
+  `one of`), and Score answers. A Score answer is an integer, so it always
+  passes the safe-value check and may be interpolated into a `CMD`.
 - *Untrusted*: anything bound by `run … as`.
 - *Action items*: `{item}` renders the item's label. An action item MUST NOT
   be interpolated into a `CMD`. Use `do item` to run its command.
@@ -220,6 +247,7 @@ nothing to escape, and mounts, domains and unit names never need more.
   `(unavailable)`.
 - A name that is never bound anywhere is a lint error wherever it's used.
 - A `for each` variable is scoped to the loop body.
+- A Score answer is bound only on paths where its gate passed.
 
 As a result the runtime never meets an unbound name (proven, §5.3).
 
@@ -238,7 +266,8 @@ Rules:
 - Value items that reach a `CMD` MUST pass the safe-value check (§3.5).
 
 ### 3.7 Canonical examples
-See Appendix A (`disk-full`) and Appendix B (`cert-expiry`). Both MUST be
+See Appendix A (`disk-full`), Appendix B (`cert-expiry`) and, for v1.1,
+Appendix D (`error-triage`). All MUST be
 included as test fixtures.
 
 ---
@@ -327,6 +356,34 @@ flowchart TD
   els -- "else [X]" --> x["transfer to X"]
 ```
 
+**`ask … → LOW to HIGH as NAME`** (Score, v1.1): one Jev call (§6).
+- Options are the levels `LOW..HIGH`, with ids `"1"`, `"2"`, … and rubric
+  text as descriptions.
+- Validation is the same as for `choice` (§6.1).
+- Chosen = the level with the highest probability. Confidence = that
+  probability. A tie for highest fails the gate. The gate doesn't combine
+  neighbouring levels.
+- Confidence ≥ `sure` → bind NAME to the chosen level as an integer and
+  continue. A Score ask never transfers by itself.
+- Gate failed → no else: `handoff` (reason `gate_failed`); `else [X]`:
+  transfer to X.
+- Jev unavailable or invalid response → `handoff` (reason `ask_unavailable`).
+
+Branch on the answer with ordinary `check`s on a known, trusted value:
+~~~markdown
+- **check** {severity} <= 1 → stop
+- **check** {severity} == 2 → [Investigate]
+- **then** [Page]
+~~~
+
+Authoring note (put this in the user docs). Probability spreads across
+neighbouring levels. A 0.45 / 0.45 split between 3 and 4 fails a 75% gate,
+even though "at least 3" is 90% likely. So:
+- If the next step is a single threshold ("page if severe"), ask a
+  `yes | no` instead: "Is this severe enough to page someone?"
+- Use Score when three or more levels lead to different actions, as in the
+  example above.
+
 **`for each NAME in [L]`**: run the nested body once per item, in order,
 with NAME bound to the item. A transfer or `stop` inside the body leaves the
 loop and the section. After the last item, continue after the loop.
@@ -410,6 +467,16 @@ shapes here as shape, not copy-paste.
                           "then":{"stop":{}}}}]}}}
 ```
 
+A Score ask (v1.1) in core JSON:
+```json
+{"src":22,"ask":{"score":{"low":1,"high":4,
+  "rubric":{"1":"known noise, nothing to do","4":"outage or data at risk"},
+  "as":"severity"},
+  "question":[{"lit":"How severe are these errors?"}],
+  "sure":75,"else":null}}
+```
+Bound variables can hold an `int` (params already can).
+
 - `CMD`, `Q` and `QUOTED` arrive pre-split into literal and variable parts, so
   the core never scans strings for `{`.
 - Section and list ids are prefixed (`s:`, `l:`) and targets are tagged
@@ -472,12 +539,14 @@ CI runs `dafny verify` and fails on any unproven obligation.
   `do`, and never returns `Page`. P3 covers only what skop runs. It says
   nothing about what a `run` or `check` command does.
 - **P4 Taint.** Every `Exec` command string is a concatenation of author
-  literals and trusted values that passed the safe-value check.
+  literals and trusted values that passed the safe-value check. (Score
+  answers are trusted integers, so they pass trivially.)
 - **P5 Answers.** A gate passes only on a response that passed validation
-  (§6.1), and only ever selects one of the options the author wrote.
+  (§6.1), and only ever selects one of the options the author wrote. A Score
+  gate binds an integer in `LOW..HIGH`.
 - **P6 Lint soundness.** If `Lint(prog) == []`, `Step` never hits an unbound
   name, a missing section or list, or a type mismatch. No internal-error path
-  is reachable.
+  is reachable. A comparison on a Score variable never fails coercion.
 
 Shipped Dafny code MUST NOT contain `assume`, `{:axiom}` or
 `{:verify false}`. CI greps for them.
@@ -496,9 +565,11 @@ Shipped Dafny code MUST NOT contain `assume`, `{:axiom}` or
     returns `Choose(3)` and the handler takes all three.
   - Every `Exec` is answered with each of: ok, fail, timeout.
   - Every `Ask` is answered with each option confident, plus unsure. A `one
-    of` answer binds the real item, so its value stays known.
+    of` answer binds the real item, so its value stays known. A Score ask
+    gives one branch per level plus unsure, at most 11. The level is a known
+    value, so later `check`s on it are decided, not split three ways.
   - Memoise on abstract state: position, bound names, **known values** (params,
-    list items, yes/no answers), loop index, counters. Two states that
+    list items, yes/no answers, Score levels), loop index, counters. Two states that
     differ in a known value are different states. Compute maxima as a
     longest path over the resulting finite graph, not by listing paths.
 
@@ -540,11 +611,14 @@ Request:
              "description":"Restart the one service most likely behind the growth. Never more than one."}],
  "context":{"used":"91%","errors":"..."},"timeout_ms":2000}
 ```
-- `kind` is `choice` or `yesno`.
+- `kind` is `choice`, `yesno` or `score` (v1.1).
 - Section options: `label` is the display name, `description` is the
   section's guidance (§3.2).
 - `one of` options: `id` = `label` = the item text, no description.
 - `yesno`: options are `yes` and `no`.
+- `score`: one option per level. `id` = `label` = the level as a string
+  (`"1"`, `"2"`, …), `description` = its rubric text, if any. Validation is the
+  same as for `choice`.
 - `guidance` is the asking section's guidance.
 
 Response:
@@ -568,9 +642,15 @@ Anything else is invalid and handled as Jev unavailable.
   **Read TypeSafe's current API docs for request format, auth, and model
   names; do not guess.** Each attempt times out after `ask.timeout_ms`. One
   retry on 5xx or timeout, after 500ms.
+  - Map `score` → Jev *Score*, with the rubric as level anchors. Check
+    whether Score returns a probability for every level. If it only returns
+    one level and a confidence, put that confidence on the chosen level and
+    spread the rest evenly over the others. Raise this in §13: ties and
+    neighbouring levels then behave differently from `choice`.
 - **`fake`**: reads `--fake answers.yaml`, keyed by question text (after
   interpolation) or by source-map id; value is a probs object or the literal
-  `unsure`. Used by tests and `skop --fake`.
+  `unsure`. Score probabilities are keyed by level id. Used by tests and
+  `skop --fake`.
 
 ### 6.3 Context
 - Context = all variables bound so far in the run. Possibly-unbound names are
@@ -646,6 +726,11 @@ Linting (step 1) MUST include:
 - `else skip` only where allowed
 - `ask` with section options has 2–255 options; `one of` uses value items
 - lists non-empty and not mixed (§3.6)
+- Score constraints (§3.4, v1.1)
+- warn: a Score variable whose only use is one comparison against one
+  threshold. Message: "this Score is only used as a threshold; a `yes | no`
+  ask gates more reliably." This counts uses; it doesn't guess at meaning.
+- warn: a Score variable never used after it's bound
 
 ---
 
@@ -668,6 +753,8 @@ exits 20. Whoever called skop continues from there.
  "dry_run":true,
  "preamble":"You are taking over a run of a runnable skill. …"}
 ```
+- For a Score ask, `detail.probs` is keyed by level
+  (`{"1":0.05,"2":0.1,"3":0.45,"4":0.4}`) and `detail` adds `"range":[1,4]`.
 - `reason` is one of `explicit`, `gate_failed`, `command_failed`,
   `ask_unavailable`, `deadline`.
 - `effects[].status` is `done`, `failed`, `would_do` (dry run), or `unknown`
@@ -736,7 +823,7 @@ logs a warning on every run):
 | `run_start` | `params`, `dry_run`, `caller`, `run_dir` |
 | `run` / `check_cmd` | `cmd`, `exit`, `ms`, `timed_out`, `truncated`, `stdout_hash`, `stdout_tail` (redacted, ≤2KB), `after_would_do` |
 | `check` | `expr`, `left`, `right`, `result`, `after_would_do` |
-| `ask` | `question`, `kind`, `probs`, `chosen`, `confidence`, `sure`, `passed`, `backend`, `model`, `ms`, `request_path`, `request_sha256`, `after_would_do` |
+| `ask` | `question`, `kind`, `probs`, `chosen`, `confidence`, `sure`, `passed`, `backend`, `model`, `ms`, `request_path`, `request_sha256`, `after_would_do`; for `score`, `range`, and `chosen` is an integer |
 | `effect_start` / `effect_end` | `cmd`, `exit`, `ms`, `timed_out` (end only) |
 | `would_do` | `cmd` |
 | `would_page` | `text` |
@@ -780,7 +867,8 @@ generation, skill signing, off-host log shipping, agent launching.
 ## 12. Testing and acceptance
 
 ### 12.1 Fixtures
-- Appendix A and B skills.
+- Appendix A and B skills, and for v1.1 Appendix D. Its fakes cover each
+  level, unsure, and Jev unavailable.
 - A `fakes/` directory per fixture with a Jev answer file and a command file
   for each scenario: happy path, every section option, gate failure, command
   failure, `do` timeout, Jev unavailable, invalid Jev response, deadline,
@@ -812,6 +900,23 @@ Also: `--param mount='/; rm -rf /'` MUST exit 40 before anything runs.
 Jev response tests (each MUST be rejected as invalid): a missing option, an
 extra option, a value of 1.1, a negative value, `NaN`, and values summing to
 0.9. A tie for highest MUST fail the gate.
+
+Score tests (v1.1). Each lint case MUST fail with a line number:
+- `→ 5 to 1` (LOW ≥ HIGH), `→ 1 to 1` (one level), `→ 1 to 11` (too many)
+- rubric item `6: …` on a `1 to 5` ask (out of range)
+- two rubric items for level 3 (duplicate)
+- rubric item without a level (`- very bad`)
+- `else skip` on a Score ask
+- a nested instruction (`- **run** …`) under a Score ask
+
+Each of these responses MUST be rejected as invalid: a missing level, an
+extra level `"5"` on a `1 to 4` ask, values summing to 0.9. A tie between two
+levels fails the gate, and so does 0.45 / 0.45 / 0.1 at 75%.
+
+Positive Score tests: `check {severity} == 2` after a Score ask lints and
+runs; a Score answer in a `CMD` lints; the threshold-only warning fires for a
+Score used in one `>=` check; `--verify` on Appendix D reports 4 level
+branches plus 1 unsure at the ask.
 
 Positive: `- **Note:** …` and `- **Warning**: …` in an instruction list are
 prose; `**run**` in a paragraph is prose; an instruction after
@@ -854,6 +959,10 @@ Run in CI.
   is the same design in plain TypeScript with property-based tests.
 - Pager integration target (Slack, PagerDuty, etc.).
 - How agent launching should work in v1.1.
+- What Jev Score actually returns (every level, or one level plus a
+  confidence), and its maximum number of levels.
+- Whether to add a cumulative gate, e.g. "level ≥ 3 with 75% confidence".
+  Not in v1.1: it's a second gate meaning to prove and explain.
 - Default `sure` values. A four-way ask at 85% may fail the gate on most real
   incidents. Tune against real runs, or split big asks into `yes | no`
   chains.
@@ -1116,3 +1225,94 @@ flowchart LR
 - **Cut: agent launching.** Skop writes the record, with the preamble, and
   exits. The caller continues.
 - **Cut: the "this question should be a check" warning.** It was guesswork.
+
+### Rev 4 (Score asks, target v1.1)
+
+- **Score asks added.** `→ 1 to N as name`, with an optional rubric. They're
+  validated like `choice`, bind a trusted integer, and branch with ordinary
+  `check`s. P5 extended.
+- **Authoring rule.** Use Score only when three or more levels lead to
+  different actions; otherwise ask `yes | no`. The lint warns on
+  threshold-only use.
+- **Multi-select dropped** from the roadmap in favour of a `for each` of
+  `yes | no` asks.
+- **Numeric answers ruled out.** Use `check` on measured values.
+- **New fixture:** `error-triage` (Appendix D).
+
+---
+
+## Appendix D — `error-triage/SKILL.md` (v1.1)
+
+````markdown
+---
+name: error-triage
+description: Decide what to do about a burst of system errors. Use when an error-rate alert fires.
+format: 1
+limits:
+  run_timeout: 30s
+  jev_state: 4k tokens
+---
+
+# Error triage
+
+Work out how bad a burst of errors is, then either leave it, hand it to
+someone to look at, or page.
+
+## Triage
+Read the recent errors and rate how severe they are.
+
+- **run** `journalctl -p err --since -15min --no-pager` as errors
+- **ask** How severe are these errors? → 1 to 4 as severity · sure 75%
+  - 1: known noise, nothing to do
+  - 2: worth a human look, not urgent
+  - 3: degraded service
+  - 4: outage or data at risk
+- **check** {severity} <= 1 → stop
+- **check** {severity} == 2 → [Investigate]
+- **then** [Page]
+
+## Page
+- **page** "{host}: error burst rated {severity}/4. Run {run_id} has the details."
+
+## Investigate
+- **hand off**
+
+The errors look real but not urgent. Find the cause from the errors gathered
+in Triage and suggest a fix or a change to this skill as a diff.
+````
+
+Transfer graph. Any command failure or failed gate without an else also ends in handoff. Those edges aren't drawn.
+
+```mermaid
+flowchart LR
+  triage["Triage"] -- "severity ≤ 1" --> stopped(["stopped"])
+  triage -- "severity = 2" --> inv["Investigate"]
+  triage -- "severity ≥ 3" --> page["Page"]
+  page --> paged(["paged"])
+  inv --> handoff(["handoff"])
+```
+
+---
+
+## Appendix E — Why not multi-select or numeric answers
+
+**Multi-select** (`any of [List]`). disk-full's Clean up loop is already a
+multi-select, asked one item at a time. That's better for ops:
+- each question sees fresh state, because the loop re-reads usage after
+  every cleanup;
+- the loop stops as soon as usage is under target;
+- it needs no new validation rule (per-item probabilities that don't sum to
+  1), no new P5 case, and no way to iterate over a bound set.
+
+The only gain would be one Jev call instead of several, about 100ms each.
+
+**Numeric answers** (a number the model estimates):
+- Numbers in skop should be measured facts, read by `run` and compared by
+  `check`.
+- `sure` has no single meaning on a distribution. Probability above X? Width
+  of a range? It would need a new kind of gate to design, explain and prove.
+- P5 says a gate only selects an author-written option. A number isn't one.
+- The explorer tracks known values in its state. A 0–48 range in steps of 2
+  is 25 values per question, multiplied through every later branch.
+- Real cases are buckets anyway ("under an hour / a few hours / a day"),
+  which a `choice` or Score covers.
