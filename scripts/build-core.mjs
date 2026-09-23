@@ -17,7 +17,7 @@ import { fileURLToPath } from "node:url";
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const DAFNY = process.env.DAFNY ?? "dafny";
 // The Dafny modules the TypeScript adapter uses (src/core.ts).
-const MODULES = ["SkopSyntax", "SkopLint", "SkopInterp", "SkopAst", "SkopStep"];
+const MODULES = ["SkopSyntax", "SkopLint", "SkopInterp", "SkopAst", "SkopStep", "SkopWellFormed", "SkopCheck"];
 
 // Dafny prints verification errors on stdout, so pass it straight through.
 function dafny(args) {
