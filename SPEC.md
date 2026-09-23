@@ -705,8 +705,9 @@ Shipped Dafny code MUST NOT contain `assume`, `{:axiom}` or
 - **fake**: `--fake` answers backend questions from a file (§6.2). `--fake-exec` answers
   commands from a file keyed by command text (after interpolation) or
   source-map id; value is `{exit, stdout, stderr, timed_out}`. An unmatched
-  command is an error (exit 50). With `--fake-exec`, no real command ever
-  runs.
+  command is an error (exit 50). With `--fake-exec`, no skill command
+  ever really runs. The pager isn't a skill command: it still runs the
+  configured `pager.command`, so tests configure a harmless one.
 - **explore**: used by `--verify` and `--explain`. It must reach every path
   a real run could take.
   - Values from `run` are unknown. A comparison on an unknown value has three
@@ -1006,6 +1007,7 @@ skop <path/to/SKILL.md> [options]
   --param k=v             override a frontmatter param (repeatable, typed, safe-value checked)
   --explain               print sections, transfer graph, and worst-case cost; run nothing
   --verify                run the explore handler and print the verify report; run nothing
+  --trace events.jsonl    with --verify: check that one run's path is one the explorer can take (§12.4)
   --lint                  parse + static checks only
   --fake answers.yaml     use the fake backend
   --fake-exec cmds.yaml   use the fake command handler; no real command runs
@@ -1183,7 +1185,9 @@ Rules:
 ## 8. Handoff
 
 Skop never launches an agent in v1. On handoff it writes the record to
-`<run dir>/handoff.json` and prints the record as the final stdout event.
+`<run dir>/handoff.json` and prints the record as a `handoff_record`
+event. The events end `handoff_record`, then `handoff_page` if it pages,
+then `outcome`: `outcome` is always the last event.
 
 When nobody is watching, nobody would pick that record up. A systemd timer or
 an alert webhook just sees exit 20. So with `--apply`, skop also pages a
@@ -1299,15 +1303,15 @@ logs warning `W-REDACT-OFF` on every run):
 |---|---|
 | `run_start` | `params`, `dry_run`, `caller`, `run_dir`, `skop_version`, `skop_build` (§7.2) |
 | `run` / `check_cmd` | `cmd`, `exit`, `ms`, `timed_out`, `truncated`, `stdout_hash`, `stdout_tail` (redacted, ≤2KB), `after_would_do` |
-| `check` | `expr`, `left`, `right`, `result`, `after_would_do` |
-| `ask` | `question`, `kind`, `probs`, `chosen`, `confidence`, `sure`, `passed`, `backend`, `model`, `ms`, `request_path`, `request_sha256`, `after_would_do`; for `score`, `range`, and `chosen` is an integer. If the backend failed, `probs`, `chosen` and `confidence` are `null` and `detail` is `unavailable` or `request_too_large` |
+| `check` | `expr`, `left`, `right`, `result`, `after_would_do`. `expr` is rendered from the core program: operands as `{name}` or the number, e.g. `{used} < {threshold}` (a decorative `%` is gone by then) |
+| `ask` | `question` (as sent, §3.5: trusted values pasted in, `run` outputs named in backticks), `kind`, `probs`, `chosen`, `confidence`, `sure`, `passed`, `backend`, `model`, `ms`, `request_path`, `request_sha256`, `after_would_do`; for `score`, `range`, and `chosen` is an integer. If the backend failed, `probs`, `chosen` and `confidence` are `null` and `detail` is `unavailable` or `request_too_large` |
 | `effect_start` / `effect_end` | `cmd`, `exit`, `ms`, `timed_out` (end only) |
 | `would_do` | `cmd` |
 | `page` | `text`, `ok` (did the pager command succeed) |
 | `would_page` | `text` |
 | `handoff_page` | `text`, `ok` (did the pager command succeed) |
 | `transfer` | `from`, `to` |
-| `outcome` | `outcome`, `reason` (a §8.1 reason, or `null`), `ask_calls`, `effects`, `dry_run` (`null` if the mode was never set) |
+| `outcome` | `outcome`, `reason` (a §8.1 reason, or `null`), `ask_calls`, `effects` (`do` commands started, so 0 in a dry run), `dry_run` (`null` if the mode was never set) |
 | `handoff_record` | `path`, `record` |
 | `error` / `warning` | `code`, `stage`, `file`, `line`, `message` (§7.1). A warning's `stage` is the stage that found it: `parse`, `lint`, `args` or `runtime` |
 | `locked` | `holder_pid` |
@@ -1507,7 +1511,11 @@ Installer tests (§5.5), in M6, against a local download server via
 
 ### 12.4 Differential check (optional but cheap)
 For each fake scenario, the concrete trace MUST appear among the explore
-handler's paths. Deadline scenarios are excluded (§5.4). This tests the host glue, since both share one interpreter.
+handler's paths. `skop SKILL.md --verify --trace events.jsonl` checks one:
+it replays the trace's sequence of (section, line, response class) through
+the explorer's graph and exits 0 if the explorer can take that path, 40
+if it can't. Deadline scenarios are excluded (§5.4). This tests the host
+glue, since both share one interpreter.
 Run in CI.
 
 ---
@@ -1999,6 +2007,11 @@ Also, where things live in the Markdown:
 - **Goldens list what they ignore**, including `request_sha256`, whose
   exact bytes are an implementation detail.
 - **A deadline handoff points at the next instruction** it didn't start.
+- **Event order and fields pinned for goldens:** `outcome` is always last,
+  after `handoff_record` and `handoff_page`; `check.expr` is rendered from
+  the core program; `ask.question` is the question as sent; `effects`
+  counts `do` commands started. The pager still runs under `--fake-exec`.
+  The differential check is `--verify --trace`.
 - **A link's anchor is checked against the heading it resolves to**, not
   its link text, so `[Clean_Up](#clean-up)` finds `## Clean up`.
 - **The step interface includes events**, split between what the core
