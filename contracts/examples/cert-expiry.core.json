@@ -1,0 +1,347 @@
+{
+  "skill": "cert-expiry",
+  "format": 1,
+  "entry": "s:triage",
+  "params": {
+    "domain": {
+      "str": "example.com"
+    },
+    "warn_seconds": {
+      "int": 1209600
+    }
+  },
+  "limits": {
+    "run_timeout_ms": 60000,
+    "do_timeout_ms": 300000,
+    "deadline_ms": 900000,
+    "ask_context_tokens": 2000
+  },
+  "lists": {
+    "l:servers": {
+      "name": "Servers",
+      "src": 64,
+      "items": [
+        {
+          "src": 65,
+          "value": "nginx"
+        },
+        {
+          "src": 66,
+          "value": "haproxy"
+        }
+      ]
+    }
+  },
+  "sections": {
+    "s:triage": {
+      "name": "Triage",
+      "src": 20,
+      "guidance": "Check what's actually being served, then what's on disk.",
+      "body": [
+        {
+          "src": 23,
+          "check": {
+            "cond": {
+              "succeeds": [
+                {
+                  "lit": "echo | openssl s_client -connect "
+                },
+                {
+                  "var": "domain"
+                },
+                {
+                  "lit": ":443 -servername "
+                },
+                {
+                  "var": "domain"
+                },
+                {
+                  "lit": " 2>/dev/null | openssl x509 -checkend "
+                },
+                {
+                  "var": "warn_seconds"
+                },
+                {
+                  "lit": " -noout"
+                }
+              ]
+            },
+            "then": {
+              "stop": {}
+            },
+            "else": null
+          }
+        },
+        {
+          "src": 24,
+          "check": {
+            "cond": {
+              "succeeds": [
+                {
+                  "lit": "openssl x509 -checkend "
+                },
+                {
+                  "var": "warn_seconds"
+                },
+                {
+                  "lit": " -noout -in /etc/letsencrypt/live/"
+                },
+                {
+                  "var": "domain"
+                },
+                {
+                  "lit": "/cert.pem"
+                }
+              ]
+            },
+            "then": {
+              "section": "s:reload"
+            },
+            "else": null
+          }
+        },
+        {
+          "src": 25,
+          "run": {
+            "cmd": [
+              {
+                "lit": "systemctl list-timers certbot.timer --no-pager"
+              }
+            ],
+            "as": "timer"
+          },
+          "else": null
+        },
+        {
+          "src": 26,
+          "run": {
+            "cmd": [
+              {
+                "lit": "journalctl -u certbot -n 50 --no-pager"
+              }
+            ],
+            "as": "renew_log"
+          },
+          "else": null
+        },
+        {
+          "src": 28,
+          "ask": {
+            "question": [
+              {
+                "lit": "Given "
+              },
+              {
+                "var": "timer"
+              },
+              {
+                "lit": " and "
+              },
+              {
+                "var": "renew_log"
+              },
+              {
+                "lit": ", what's the best next step?"
+              }
+            ],
+            "sure": 85,
+            "else": null,
+            "sections": [
+              {
+                "src": 29,
+                "section": "s:renew"
+              },
+              {
+                "src": 30,
+                "section": "s:page"
+              },
+              {
+                "src": 31,
+                "section": "s:investigate"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "s:renew": {
+      "name": "Renew",
+      "src": 33,
+      "guidance": "Dry run first, so nothing changes if the real renewal would fail. Always keep the existing key.",
+      "body": [
+        {
+          "src": 37,
+          "do": {
+            "cmd": [
+              {
+                "lit": "certbot renew --dry-run --cert-name "
+              },
+              {
+                "var": "domain"
+              }
+            ]
+          },
+          "else": {
+            "section": "s:investigate"
+          }
+        },
+        {
+          "src": 38,
+          "do": {
+            "cmd": [
+              {
+                "lit": "certbot renew --reuse-key --cert-name "
+              },
+              {
+                "var": "domain"
+              }
+            ]
+          },
+          "else": null
+        },
+        {
+          "src": 39,
+          "then": {
+            "section": "s:reload"
+          }
+        }
+      ]
+    },
+    "s:reload": {
+      "name": "Reload",
+      "src": 41,
+      "guidance": "The cert on disk is fresh, so the server just needs to pick it up.",
+      "body": [
+        {
+          "src": 44,
+          "run": {
+            "cmd": [
+              {
+                "lit": "ss -ltnp 'sport = :443'"
+              }
+            ],
+            "as": "listeners"
+          },
+          "else": null
+        },
+        {
+          "src": 45,
+          "ask": {
+            "question": [
+              {
+                "lit": "Given "
+              },
+              {
+                "var": "listeners"
+              },
+              {
+                "lit": ", which server is serving "
+              },
+              {
+                "var": "domain"
+              },
+              {
+                "lit": "?"
+              }
+            ],
+            "sure": 90,
+            "else": null,
+            "one_of": {
+              "list": "l:servers",
+              "as": "server"
+            }
+          }
+        },
+        {
+          "src": 46,
+          "do": {
+            "cmd": [
+              {
+                "lit": "systemctl reload "
+              },
+              {
+                "var": "server"
+              }
+            ]
+          },
+          "else": null
+        },
+        {
+          "src": 47,
+          "check": {
+            "cond": {
+              "succeeds": [
+                {
+                  "lit": "echo | openssl s_client -connect "
+                },
+                {
+                  "var": "domain"
+                },
+                {
+                  "lit": ":443 -servername "
+                },
+                {
+                  "var": "domain"
+                },
+                {
+                  "lit": " 2>/dev/null | openssl x509 -checkend "
+                },
+                {
+                  "var": "warn_seconds"
+                },
+                {
+                  "lit": " -noout"
+                }
+              ]
+            },
+            "then": {
+              "stop": {}
+            },
+            "else": null
+          }
+        },
+        {
+          "src": 48,
+          "then": {
+            "section": "s:page"
+          }
+        }
+      ]
+    },
+    "s:page": {
+      "name": "Page",
+      "src": 50,
+      "guidance": "The cert can't be fixed automatically. Tell a human.",
+      "body": [
+        {
+          "src": 53,
+          "page": [
+            {
+              "var": "host"
+            },
+            {
+              "lit": ": cert for "
+            },
+            {
+              "var": "domain"
+            },
+            {
+              "lit": " expires soon and couldn't be fixed automatically."
+            }
+          ]
+        }
+      ]
+    },
+    "s:investigate": {
+      "name": "Investigate",
+      "src": 55,
+      "guidance": "Renewal is failing and the reason isn't obvious. Read the certbot log from Triage. Common causes: DNS moved, port 80 blocked, a redirect breaking the HTTP challenge. Don't change DNS or firewall rules without asking a human.",
+      "body": [
+        {
+          "src": 56,
+          "hand_off": {}
+        }
+      ]
+    }
+  }
+}

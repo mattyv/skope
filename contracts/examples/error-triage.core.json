@@ -1,0 +1,192 @@
+{
+  "skill": "error-triage",
+  "format": 1,
+  "entry": "s:triage",
+  "params": {},
+  "limits": {
+    "run_timeout_ms": 30000,
+    "do_timeout_ms": 300000,
+    "deadline_ms": 900000,
+    "ask_context_tokens": 4000
+  },
+  "lists": {},
+  "sections": {
+    "s:triage": {
+      "name": "Triage",
+      "src": 15,
+      "guidance": "Read the recent errors and rate how severe they are.",
+      "body": [
+        {
+          "src": 18,
+          "run": {
+            "cmd": [
+              {
+                "lit": "journalctl -p err --since -15min --no-pager"
+              }
+            ],
+            "as": "errors"
+          },
+          "else": null
+        },
+        {
+          "src": 19,
+          "ask": {
+            "question": [
+              {
+                "lit": "How severe are the errors in "
+              },
+              {
+                "var": "errors"
+              },
+              {
+                "lit": "?"
+              }
+            ],
+            "sure": 75,
+            "else": {
+              "section": "s:unsure"
+            },
+            "score": {
+              "low": 1,
+              "high": 4,
+              "as": "severity",
+              "rubric": [
+                {
+                  "src": 20,
+                  "level": 1,
+                  "text": "known noise, nothing to do"
+                },
+                {
+                  "src": 21,
+                  "level": 2,
+                  "text": "worth a human look, not urgent"
+                },
+                {
+                  "src": 22,
+                  "level": 3,
+                  "text": "degraded service"
+                },
+                {
+                  "src": 23,
+                  "level": 4,
+                  "text": "outage or data at risk"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "src": 24,
+          "check": {
+            "cond": {
+              "cmp": {
+                "op": "<=",
+                "l": {
+                  "var": "severity"
+                },
+                "r": {
+                  "num": "1"
+                }
+              }
+            },
+            "then": {
+              "stop": {}
+            },
+            "else": null
+          }
+        },
+        {
+          "src": 25,
+          "check": {
+            "cond": {
+              "cmp": {
+                "op": "==",
+                "l": {
+                  "var": "severity"
+                },
+                "r": {
+                  "num": "2"
+                }
+              }
+            },
+            "then": {
+              "section": "s:investigate"
+            },
+            "else": null
+          }
+        },
+        {
+          "src": 26,
+          "then": {
+            "section": "s:page"
+          }
+        }
+      ]
+    },
+    "s:page": {
+      "name": "Page",
+      "src": 28,
+      "guidance": null,
+      "body": [
+        {
+          "src": 29,
+          "page": [
+            {
+              "var": "host"
+            },
+            {
+              "lit": ": error burst rated "
+            },
+            {
+              "var": "severity"
+            },
+            {
+              "lit": "/4. Run "
+            },
+            {
+              "var": "run_id"
+            },
+            {
+              "lit": " has the details."
+            }
+          ]
+        }
+      ]
+    },
+    "s:unsure": {
+      "name": "Unsure",
+      "src": 31,
+      "guidance": "An unwatched alert shouldn't end in a handoff nobody reads. If the rating is unclear, page.",
+      "body": [
+        {
+          "src": 35,
+          "page": [
+            {
+              "var": "host"
+            },
+            {
+              "lit": ": error burst, severity unclear. Run "
+            },
+            {
+              "var": "run_id"
+            },
+            {
+              "lit": " has the details."
+            }
+          ]
+        }
+      ]
+    },
+    "s:investigate": {
+      "name": "Investigate",
+      "src": 37,
+      "guidance": "The errors look real but not urgent. Find the cause from the errors gathered in Triage and suggest a fix or a change to this skill as a diff.",
+      "body": [
+        {
+          "src": 38,
+          "hand_off": {}
+        }
+      ]
+    }
+  }
+}

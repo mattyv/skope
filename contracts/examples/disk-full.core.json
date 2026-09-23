@@ -1,0 +1,474 @@
+{
+  "skill": "disk-full",
+  "format": 1,
+  "entry": "s:triage",
+  "params": {
+    "mount": {
+      "str": "/"
+    },
+    "threshold": {
+      "int": 85
+    },
+    "target": {
+      "int": 80
+    }
+  },
+  "limits": {
+    "run_timeout_ms": 30000,
+    "do_timeout_ms": 600000,
+    "deadline_ms": 900000,
+    "ask_context_tokens": 4000
+  },
+  "lists": {
+    "l:cleanups": {
+      "name": "Cleanups",
+      "src": 67,
+      "items": [
+        {
+          "src": 70,
+          "action": {
+            "label": "Vacuum the journal to 500MB",
+            "cmd": [
+              {
+                "lit": "journalctl --vacuum-size=500M"
+              }
+            ]
+          }
+        },
+        {
+          "src": 71,
+          "action": {
+            "label": "Clear the apt cache",
+            "cmd": [
+              {
+                "lit": "apt-get clean"
+              }
+            ]
+          }
+        },
+        {
+          "src": 72,
+          "action": {
+            "label": "Delete rotated logs older than 7 days",
+            "cmd": [
+              {
+                "lit": "find /var/log -name '*.gz' -mtime +7 -delete"
+              }
+            ]
+          }
+        },
+        {
+          "src": 73,
+          "action": {
+            "label": "Delete /tmp files older than 7 days",
+            "cmd": [
+              {
+                "lit": "find /tmp -type f -mtime +7 -delete"
+              }
+            ]
+          }
+        },
+        {
+          "src": 74,
+          "action": {
+            "label": "Prune unused docker images",
+            "cmd": [
+              {
+                "lit": "docker image prune -af"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "l:services": {
+      "name": "Services",
+      "src": 76,
+      "items": [
+        {
+          "src": 77,
+          "value": "nginx"
+        },
+        {
+          "src": 78,
+          "value": "rsyslog"
+        },
+        {
+          "src": 79,
+          "value": "myapp-worker"
+        },
+        {
+          "src": 80,
+          "value": "myapp-api"
+        }
+      ]
+    }
+  },
+  "sections": {
+    "s:triage": {
+      "name": "Triage",
+      "src": 20,
+      "guidance": "Look at usage, recent errors and what's biggest on disk.",
+      "body": [
+        {
+          "src": 23,
+          "run": {
+            "cmd": [
+              {
+                "lit": "df --output=pcent "
+              },
+              {
+                "var": "mount"
+              },
+              {
+                "lit": " | tail -1"
+              }
+            ],
+            "as": "used"
+          },
+          "else": null
+        },
+        {
+          "src": 24,
+          "check": {
+            "cond": {
+              "cmp": {
+                "op": "<",
+                "l": {
+                  "var": "used"
+                },
+                "r": {
+                  "var": "threshold"
+                }
+              }
+            },
+            "then": {
+              "stop": {}
+            },
+            "else": null
+          }
+        },
+        {
+          "src": 25,
+          "run": {
+            "cmd": [
+              {
+                "lit": "journalctl -p err -n 100 --no-pager"
+              }
+            ],
+            "as": "errors"
+          },
+          "else": null
+        },
+        {
+          "src": 26,
+          "run": {
+            "cmd": [
+              {
+                "lit": "du -xh -d2 /var /tmp /home | sort -h"
+              }
+            ],
+            "as": "biggest"
+          },
+          "else": {
+            "skip": {}
+          }
+        },
+        {
+          "src": 27,
+          "ask": {
+            "question": [
+              {
+                "lit": "Given "
+              },
+              {
+                "var": "used"
+              },
+              {
+                "lit": ", "
+              },
+              {
+                "var": "errors"
+              },
+              {
+                "lit": " and "
+              },
+              {
+                "var": "biggest"
+              },
+              {
+                "lit": ", what's the best next step?"
+              }
+            ],
+            "sure": 85,
+            "else": null,
+            "sections": [
+              {
+                "src": 28,
+                "section": "s:clean_up"
+              },
+              {
+                "src": 29,
+                "section": "s:restart"
+              },
+              {
+                "src": 30,
+                "section": "s:page"
+              },
+              {
+                "src": 31,
+                "section": "s:investigate"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "s:clean_up": {
+      "name": "Clean up",
+      "src": 33,
+      "guidance": "Run cleanups least risky first. Stop as soon as usage is under target.",
+      "body": [
+        {
+          "src": 36,
+          "for_each": {
+            "var": "step",
+            "list": "l:cleanups",
+            "body": [
+              {
+                "src": 37,
+                "ask": {
+                  "question": [
+                    {
+                      "lit": "Given "
+                    },
+                    {
+                      "var": "used"
+                    },
+                    {
+                      "lit": " and "
+                    },
+                    {
+                      "var": "biggest"
+                    },
+                    {
+                      "lit": ", is it worth running \""
+                    },
+                    {
+                      "var": "step"
+                    },
+                    {
+                      "lit": "\"?"
+                    }
+                  ],
+                  "sure": 90,
+                  "else": {
+                    "skip": {}
+                  },
+                  "yesno": {
+                    "as": "_yn"
+                  }
+                }
+              },
+              {
+                "src": 38,
+                "if_yes": {
+                  "do": {
+                    "item": "step"
+                  },
+                  "else": {
+                    "skip": {}
+                  }
+                }
+              },
+              {
+                "src": 39,
+                "run": {
+                  "cmd": [
+                    {
+                      "lit": "df --output=pcent "
+                    },
+                    {
+                      "var": "mount"
+                    },
+                    {
+                      "lit": " | tail -1"
+                    }
+                  ],
+                  "as": "used"
+                },
+                "else": null
+              },
+              {
+                "src": 40,
+                "check": {
+                  "cond": {
+                    "cmp": {
+                      "op": "<",
+                      "l": {
+                        "var": "used"
+                      },
+                      "r": {
+                        "var": "target"
+                      }
+                    }
+                  },
+                  "then": {
+                    "stop": {}
+                  },
+                  "else": null
+                }
+              }
+            ]
+          }
+        },
+        {
+          "src": 41,
+          "then": {
+            "section": "s:page"
+          }
+        }
+      ]
+    },
+    "s:restart": {
+      "name": "Restart",
+      "src": 43,
+      "guidance": "Restart the one service most likely behind the growth. Never more than one.",
+      "body": [
+        {
+          "src": 46,
+          "ask": {
+            "question": [
+              {
+                "lit": "Given "
+              },
+              {
+                "var": "errors"
+              },
+              {
+                "lit": " and "
+              },
+              {
+                "var": "biggest"
+              },
+              {
+                "lit": ", which service is behind it?"
+              }
+            ],
+            "sure": 90,
+            "else": null,
+            "one_of": {
+              "list": "l:services",
+              "as": "service"
+            }
+          }
+        },
+        {
+          "src": 47,
+          "do": {
+            "cmd": [
+              {
+                "lit": "systemctl restart "
+              },
+              {
+                "var": "service"
+              }
+            ]
+          },
+          "else": null
+        },
+        {
+          "src": 48,
+          "run": {
+            "cmd": [
+              {
+                "lit": "df --output=pcent "
+              },
+              {
+                "var": "mount"
+              },
+              {
+                "lit": " | tail -1"
+              }
+            ],
+            "as": "used"
+          },
+          "else": null
+        },
+        {
+          "src": 49,
+          "check": {
+            "cond": {
+              "cmp": {
+                "op": "<",
+                "l": {
+                  "var": "used"
+                },
+                "r": {
+                  "var": "target"
+                }
+              }
+            },
+            "then": {
+              "stop": {}
+            },
+            "else": null
+          }
+        },
+        {
+          "src": 50,
+          "then": {
+            "section": "s:page"
+          }
+        }
+      ]
+    },
+    "s:page": {
+      "name": "Page",
+      "src": 52,
+      "guidance": "Nothing here is safe to try automatically. Tell a human.",
+      "body": [
+        {
+          "src": 55,
+          "page": [
+            {
+              "var": "host"
+            },
+            {
+              "lit": ": "
+            },
+            {
+              "var": "mount"
+            },
+            {
+              "lit": " at "
+            },
+            {
+              "var": "used"
+            },
+            {
+              "lit": ". Run "
+            },
+            {
+              "var": "run_id"
+            },
+            {
+              "lit": " has the errors and biggest dirs."
+            }
+          ]
+        }
+      ]
+    },
+    "s:investigate": {
+      "name": "Investigate",
+      "src": 57,
+      "guidance": "Nothing in the lists fits. Work out what's filling the disk from the errors and sizes gathered in Triage. Don't run anything outside Cleanups or Services without asking a human first.",
+      "body": [
+        {
+          "src": 58,
+          "hand_off": {}
+        }
+      ]
+    }
+  }
+}
