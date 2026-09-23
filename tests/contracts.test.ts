@@ -4,6 +4,8 @@
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { describe, expect, test } from "vitest";
+// @ts-expect-error: a plain .mjs build script with no type declarations
+import { generate } from "../scripts/gen-types.mjs";
 
 const require = createRequire(import.meta.url);
 const Ajv2020 = require("ajv/dist/2020").default;
@@ -134,5 +136,12 @@ describe("log events (SPEC §10)", () => {
     expect(event({ ...base, event: "would_do", cmd: "x", bogus: 1 })).toBe(false);
     expect(event({ ...base, event: "error", code: "W-NOPE", stage: "lint", message: "m" })).toBe(false);
     expect(event({ ...base, ts: "yesterday", event: "would_do", cmd: "x" })).toBe(false);
+  });
+});
+
+describe("generated TypeScript types", () => {
+  test("src/contracts.gen.ts is up to date with the schemas (run: node scripts/gen-types.mjs)", async () => {
+    const committed = readFileSync(new URL("../src/contracts.gen.ts", import.meta.url), "utf8");
+    expect(committed).toBe(await generate());
   });
 });

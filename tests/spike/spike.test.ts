@@ -10,7 +10,8 @@ import { run } from "../../src/host.js";
 const program: Section = JSON.parse(readFileSync(new URL("../../contracts/examples/spike-program.json", import.meta.url), "utf8"));
 const DF = "df --output=pcent / | tail -1";
 const VACUUM = "journalctl --vacuum-size=500M";
-const section = (body: unknown[], src = 10): Section => ({ name: "Main", src, guidance: null, body });
+// Some tests build deliberately malformed sections, so the body is cast.
+const section = (body: unknown[], src = 10): Section => ({ name: "Main", src, guidance: null, body: body as Section["body"] });
 const runStmt = (src: number, cmd: string) => ({ src, run: { cmd: [{ lit: cmd }] }, else: null });
 const doStmt = (src: number, cmd: string) => ({ src, do: { cmd: [{ lit: cmd }] }, else: null });
 const stop = (src: number) => ({ src, stop: {} });

@@ -14,9 +14,12 @@ const gen: any = require("../core/generated/core.cjs");
 const BigNumber: any = require("bignumber.js");
 const { _dafny, SkopSyntax, SkopLint, SkopInterp } = gen;
 
-// A section of core program JSON (contracts/core-program.schema.json).
-// The Phase 0 spike supports run, do and stop with literal commands.
-export type Section = { name: string; src: number; guidance: string | null; body: unknown[] };
+// A section of core program JSON (contracts/core-program.schema.json). The
+// Phase 0 spike supports run, do and stop with literal commands; the input
+// is untrusted JSON, so everything is still checked at run time.
+import type { Section } from "./contracts.gen.js";
+
+export type { Section };
 
 export type Kind = "run" | "do";
 export type LintError = { code: string; src: number };
@@ -78,7 +81,7 @@ function stmt(s: any) {
 }
 
 function toDafny(section: Section) {
-  if (!Array.isArray(section?.body)) throw new Unsupported("section body must be a list");
+  if (!Array.isArray((section as unknown as { body?: unknown })?.body)) throw new Unsupported("section body must be a list");
   return SkopSyntax.Program.create_Program(nat(section.src, "section src"), _dafny.Seq.of(...section.body.map(stmt)));
 }
 
