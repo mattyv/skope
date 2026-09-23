@@ -2,7 +2,9 @@
 """Checks on SPEC.md and PLAN.md that CI runs on every push.
 
 Usage:
-  check_spec.py docs            error codes defined, JSON examples valid
+  check_spec.py docs            error codes defined, JSON examples valid, fixtures and
+                                contracts/error-codes.json match the spec
+  check_spec.py codes           regenerate contracts/error-codes.json from SPEC §7.1
   check_spec.py mermaid DIR     write every Mermaid diagram to DIR as .mmd files
   check_spec.py coverage        every error code is named in a test file (reference check,
                                 enforced once M2 closes)
@@ -27,6 +29,47 @@ ACCEPTANCE = ROOT / "tests" / "acceptance"
 NOT_PASSING = re.compile(r"\b(test|it|describe)\.(fails|skip|todo|only)\b|\b(xit|xdescribe|xtest)\(|\{:test\s*:skip")
 
 
+FIXTURE_DIRS = {"disk-full": "fixtures", "cert-expiry": "fixtures", "error-triage": "fixtures-next"}
+CODES_FILE = ROOT / "contracts" / "error-codes.json"
+
+
+def spec_code_table() -> list[dict]:
+    """Rows of the error and warning tables in SPEC §7.1, in order."""
+    spec = (ROOT / "SPEC.md").read_text()
+    rows = []
+    for line in spec.splitlines():
+        m = re.match(r"^\| `([EW]-[A-Z-]+)` \|(.*)\|\s*$", line)
+        if not m:
+            continue
+        # Split on unescaped pipes only: meanings contain `yes \| no`.
+        cells = [c.strip().replace("\\|", "|") for c in re.split(r"(?<!\\)\|", m.group(2))]
+        if m.group(1).startswith("E-"):
+            rows.append({"code": m.group(1), "stage": cells[0], "meaning": cells[1]})
+        else:
+            rows.append({"code": m.group(1), "stage": "warning", "meaning": cells[0]})
+    return rows
+
+
+def codes_json() -> str:
+    return json.dumps(spec_code_table(), indent=2, ensure_ascii=False) + "\n"
+
+
+def check_fixtures() -> list[str]:
+    """Each example skill in the spec's appendices matches its fixture file."""
+    errors = []
+    spec = (ROOT / "SPEC.md").read_text()
+    for block in re.findall(r"````markdown\n(.*?)````", spec, re.S):
+        m = re.search(r"^name: ([a-z0-9-]+)", block, re.M)
+        if not m or m.group(1) not in FIXTURE_DIRS:
+            continue
+        path = ROOT / FIXTURE_DIRS[m.group(1)] / m.group(1) / "SKILL.md"
+        if not path.is_file():
+            errors.append(f"{path.relative_to(ROOT)} is missing (copy it from the SPEC appendix)")
+        elif path.read_text() != block:
+            errors.append(f"{path.relative_to(ROOT)} differs from its SPEC appendix")
+    return errors
+
+
 def defined_codes() -> set[str]:
     spec = (ROOT / "SPEC.md").read_text()
     return set(re.findall(r"^\| `([EW]-[A-Z-]+)`", spec, re.M))
@@ -46,6 +89,9 @@ def check_docs() -> list[str]:
                 json.loads(textwrap.dedent(block).replace("…", "x"))
             except json.JSONDecodeError as e:
                 errors.append(f"{doc.name}: JSON example {n} doesn't parse: {e}")
+    errors += check_fixtures()
+    if not CODES_FILE.is_file() or CODES_FILE.read_text() != codes_json():
+        errors.append("contracts/error-codes.json is stale: run scripts/check_spec.py codes")
     return errors
 
 
@@ -102,6 +148,10 @@ def check_milestones() -> list[str]:
 
 def main() -> int:
     cmd = sys.argv[1] if len(sys.argv) > 1 else ""
+    if cmd == "codes":
+        CODES_FILE.write_text(codes_json())
+        print(f"wrote {CODES_FILE.relative_to(ROOT)} ({len(spec_code_table())} codes)")
+        return 0
     if cmd == "mermaid" and len(sys.argv) == 3:
         write_mermaid(pathlib.Path(sys.argv[2]))
         return 0
