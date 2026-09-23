@@ -2,9 +2,10 @@
 
 import { readFileSync } from "node:fs";
 import { describe, expect, test, vi } from "vitest";
-import { askJev, isModelAlias, modelMismatch } from "../../src/ask/jev.js";
+import { askJev, isModelAlias } from "../../src/ask/jev.js";
 import type { AskRequest } from "../../src/ask/types.js";
 import { isFailure } from "../../src/ask/types.js";
+import { expectValidAskOutput } from "./schema-helpers.js";
 
 const recording = (name: string) => readFileSync(new URL(`../recordings/jev/${name}`, import.meta.url), "utf8");
 
@@ -207,9 +208,133 @@ describe("W-MODEL-ALIAS (SPEC §6.2)", () => {
     expect(isModelAlias("jev-1.13.0")).toBe(false);
   });
 
-  test("a response reporting a different model than configured is a mismatch", () => {
-    expect(modelMismatch("jev-1.13.0", "jev-1.14.0")).toBe(true);
-    expect(modelMismatch("jev-1.13.0", "jev-1.13.0")).toBe(false);
+  test("modelMismatch end-to-end: a response reporting a different model than configured is visible to the caller", async () => {
+    const res = {
+      model: "jev-1.14.0",
+      answers: { q: { type: "noul", noul: 0.6 } },
+    };
+    const out = expectValidAskOutput(
+      await askJev(
+        {
+          kind: "yesno",
+          question: "q?",
+          guidance: null,
+          options: [
+            { id: "yes", label: "yes", description: null },
+            { id: "no", label: "no", description: null },
+          ],
+          context: {},
+          timeout_ms: 2000,
+        },
+        { model: "jev-1.13.0", apiKey: "k" },
+        retryCfg,
+        { fetch: fetchReturning(new Response(JSON.stringify(res))), sleep },
+      ),
+    );
+    expect(isFailure(out)).toBe(false);
+    // configured !== responded: the caller can see the mismatch by
+    // comparing what it configured against `out.model`.
+    expect(!isFailure(out) && out.model).toBe("jev-1.14.0");
+    expect(!isFailure(out) && out.model !== "jev-1.13.0").toBe(true);
+  });
+});
+
+describe("jev response model (SPEC §6.2)", () => {
+  test("a missing model in the response is unavailable, not an answer without a model", async () => {
+    const res = {
+      answers: { q: { type: "noul", noul: 0.6 } },
+    };
+    const out = await askJev(
+      {
+        kind: "yesno",
+        question: "q?",
+        guidance: null,
+        options: [
+          { id: "yes", label: "yes", description: null },
+          { id: "no", label: "no", description: null },
+        ],
+        context: {},
+        timeout_ms: 2000,
+      },
+      config,
+      retryCfg,
+      { fetch: fetchReturning(new Response(JSON.stringify(res))), sleep },
+    );
+    expect(isFailure(out) && out.error).toBe("unavailable");
+  });
+
+  test("a non-string model in the response is unavailable", async () => {
+    const res = { model: 42, answers: { q: { type: "noul", noul: 0.6 } } };
+    const out = await askJev(
+      {
+        kind: "yesno",
+        question: "q?",
+        guidance: null,
+        options: [
+          { id: "yes", label: "yes", description: null },
+          { id: "no", label: "no", description: null },
+        ],
+        context: {},
+        timeout_ms: 2000,
+      },
+      config,
+      retryCfg,
+      { fetch: fetchReturning(new Response(JSON.stringify(res))), sleep },
+    );
+    expect(isFailure(out) && out.error).toBe("unavailable");
+  });
+});
+
+describe("jev label lookups use Object.hasOwn (SPEC §6.2)", () => {
+  test("a label named 'constructor' works, rather than resolving to Object.prototype.constructor", async () => {
+    const req: AskRequest = {
+      kind: "choice",
+      question: "q?",
+      guidance: null,
+      options: [
+        { id: "s:ctor", label: "constructor", description: null },
+        { id: "s:other", label: "other", description: null },
+      ],
+      context: {},
+      timeout_ms: 2000,
+    };
+    const res = {
+      model: "jev-1.13.0",
+      answers: {
+        q: { type: "choice", probabilities: { constructor: 0.6, other: 0.4 } },
+      },
+    };
+    const out = expectValidAskOutput(
+      await askJev(req, config, retryCfg, {
+        fetch: fetchReturning(new Response(JSON.stringify(res))),
+        sleep,
+      }),
+    );
+    expect(isFailure(out)).toBe(false);
+    expect(!isFailure(out) && out.probs).toEqual({ "s:ctor": 0.6, "s:other": 0.4 });
+  });
+
+  test("a label named 'constructor' that's actually missing is reported missing, not silently answered", async () => {
+    const req: AskRequest = {
+      kind: "choice",
+      question: "q?",
+      guidance: null,
+      options: [
+        { id: "s:ctor", label: "constructor", description: null },
+        { id: "s:other", label: "other", description: null },
+      ],
+      context: {},
+      timeout_ms: 2000,
+    };
+    const res = {
+      model: "jev-1.13.0",
+      answers: { q: { type: "choice", probabilities: { other: 1 } } },
+    };
+    const out = await askJev(req, config, retryCfg, {
+      fetch: fetchReturning(new Response(JSON.stringify(res))),
+      sleep,
+    });
+    expect(isFailure(out) && out.error).toBe("unavailable");
   });
 });
 
@@ -307,6 +432,29 @@ describe("askJev yes/no and Score questions (SPEC §6.2)", () => {
       sleep,
     });
     expect(out).toMatchObject({ error: "unavailable" });
+  });
+
+  test("408 is retried", async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(new Response("", { status: 408 }))
+      .mockResolvedValueOnce(new Response(recording("noul-success.json"), { status: 200 }));
+    const out = await askJev(yesno, config, retryCfg, {
+      fetch: fetchImpl as any,
+      sleep,
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(isFailure(out)).toBe(false);
+  });
+
+  test("guidance: null is left out of the Jev instructions entirely (not sent as null)", async () => {
+    const { sent, fetchImpl } = capture("noul-success.json");
+    await askJev(yesno, config, retryCfg, {
+      fetch: fetchImpl as any,
+      sleep,
+    });
+    expect(sent[0].questions.q.instructions).toEqual({ question: yesno.question });
+    expect(Object.hasOwn(sent[0].questions.q.instructions, "guidance")).toBe(false);
   });
 
   test("529 overloaded is retried", async () => {

@@ -182,7 +182,7 @@
   {
     "code": "E-FAKE-UNMATCHED",
     "stage": "runtime",
-    "meaning": "`--fake-exec` has no answer for a command (§5.4)"
+    "meaning": "`--fake-exec` has no answer for a command, or `--fake` has none for a question (§5.4)"
   },
   {
     "code": "E-IO",

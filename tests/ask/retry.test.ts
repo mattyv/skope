@@ -90,4 +90,28 @@ describe("fetchWithRetry (SPEC §6.2)", () => {
     expect(res?.status).toBe(413);
     expect(build).toHaveBeenCalledTimes(1);
   });
+
+  test("the per-attempt timeout covers reading the body: a response whose body never ends times out and is retryable", async () => {
+    const build = vi.fn(async () => {
+      const stream = new ReadableStream<Uint8Array>({ start() {} }); // never closes
+      return new Response(stream, { status: 200 });
+    });
+    const { sleep } = fakeSleep();
+    const started = Date.now();
+    const res = await fetchWithRetry(build, { timeoutMs: 20, retries: 1 }, { fetch, sleep });
+    const elapsedMs = Date.now() - started;
+    expect(res).toBeNull();
+    expect(build).toHaveBeenCalledTimes(2);
+    // Bounded by (retries + 1) attempts of ~timeoutMs each, not by the
+    // stream hanging forever.
+    expect(elapsedMs).toBeLessThan(2000);
+  });
+
+  test("a build that never resolves at all still times out (this fails if the per-attempt timeout is removed)", async () => {
+    const build = vi.fn(() => new Promise<Response>(() => {})); // never settles
+    const { sleep } = fakeSleep();
+    const res = await fetchWithRetry(build, { timeoutMs: 20, retries: 0 }, { fetch, sleep });
+    expect(res).toBeNull();
+    expect(build).toHaveBeenCalledTimes(1);
+  });
 });

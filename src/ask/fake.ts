@@ -13,7 +13,12 @@ import type { FakesAnswers } from "../contracts.gen.js";
 import type { AskOutput, AskRequest } from "./types.js";
 
 export class FakeAskUnmatched extends Error {
-  readonly code = "FAKE_ASK_UNMATCHED";
+  // ponytail: SPEC §7.1 currently lists E-FAKE-UNMATCHED only for
+  // --fake-exec (unmatched commands); an unmatched --fake ask is the same
+  // failure shape and should share the code. That row should be widened
+  // to say "--fake or --fake-exec" (not done here: SPEC.md is out of
+  // scope for this change).
+  readonly code = "E-FAKE-UNMATCHED";
 }
 
 export function askFake(answers: FakesAnswers, request: AskRequest, src?: number): AskOutput {

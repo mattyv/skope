@@ -4,6 +4,7 @@ import { describe, expect, test } from "vitest";
 import { askFake, FakeAskUnmatched } from "../../src/ask/fake.js";
 import type { AskRequest } from "../../src/ask/types.js";
 import { isFailure } from "../../src/ask/types.js";
+import { expectValidAskOutput } from "./schema-helpers.js";
 
 const req = (over: Partial<AskRequest> = {}): AskRequest => ({
   kind: "choice",
@@ -20,7 +21,7 @@ const req = (over: Partial<AskRequest> = {}): AskRequest => ({
 
 describe("askFake (SPEC §6.2, contracts/fakes.schema.json)", () => {
   test("keyed by the question text as sent", () => {
-    const out = askFake({ "Given `used`, what next?": { "s:clean_up": 0.7, "s:restart": 0.3 } }, req());
+    const out = expectValidAskOutput(askFake({ "Given `used`, what next?": { "s:clean_up": 0.7, "s:restart": 0.3 } }, req()));
     expect(isFailure(out)).toBe(false);
     expect(!isFailure(out) && out.probs).toEqual({
       "s:clean_up": 0.7,
@@ -57,7 +58,7 @@ describe("askFake (SPEC §6.2, contracts/fakes.schema.json)", () => {
   });
 
   test("unavailable is a backend failure with reason unavailable", () => {
-    const out = askFake({ "line:1": "unavailable" }, req(), 1);
+    const out = expectValidAskOutput(askFake({ "line:1": "unavailable" }, req(), 1));
     expect(isFailure(out) && out.error).toBe("unavailable");
   });
 
@@ -82,5 +83,15 @@ describe("askFake (SPEC §6.2, contracts/fakes.schema.json)", () => {
 
   test("a question with no matching key throws", () => {
     expect(() => askFake({}, req())).toThrow(FakeAskUnmatched);
+  });
+
+  test("an unmatched fake ask uses code E-FAKE-UNMATCHED", () => {
+    try {
+      askFake({}, req());
+      expect.unreachable("askFake should have thrown");
+    } catch (err) {
+      expect(err).toBeInstanceOf(FakeAskUnmatched);
+      expect((err as FakeAskUnmatched).code).toBe("E-FAKE-UNMATCHED");
+    }
   });
 });

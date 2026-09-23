@@ -25,11 +25,6 @@ export function isModelAlias(model: string): boolean {
   return !/^jev-\d+\.\d+\.\d+$/.test(model);
 }
 
-/** A response reporting a different model than configured (SPEC §6.2, W-MODEL-ALIAS). */
-export function modelMismatch(configured: string, responded: string): boolean {
-  return configured !== responded;
-}
-
 interface JevQuestion {
   type: "choice" | "noul" | "score";
   instructions: { question: string; guidance?: string };
@@ -115,11 +110,20 @@ export async function askJev(request: AskRequest, config: JevConfig, retryCfg: R
 
   let json: JevAnswerBody;
   try {
-    json = (await res.json()) as JevAnswerBody;
+    json = JSON.parse(res.text) as JevAnswerBody;
   } catch {
     return {
       error: "unavailable",
       detail: "jev: response wasn't valid JSON",
+      backend: "jev",
+      model: config.model,
+    };
+  }
+
+  if (typeof json.model !== "string" || json.model === "") {
+    return {
+      error: "unavailable",
+      detail: "jev: response has no model",
       backend: "jev",
       model: config.model,
     };
@@ -144,8 +148,8 @@ export async function askJev(request: AskRequest, config: JevConfig, retryCfg: R
     };
   }
 
-  const probabilities = json.answers?.q?.probabilities;
-  if (!probabilities) {
+  const rawProbabilities = json.answers?.q?.probabilities;
+  if (!rawProbabilities) {
     return {
       error: "unavailable",
       detail: "jev: response has no answers.q.probabilities",
@@ -153,13 +157,17 @@ export async function askJev(request: AskRequest, config: JevConfig, retryCfg: R
       model: config.model,
     };
   }
+  // Own-properties only, looked up with Object.hasOwn: a label like
+  // "constructor" or "__proto__" must never resolve to something inherited
+  // from Object.prototype when it's actually missing from the response.
+  const probabilities = Object.fromEntries(Object.entries(rawProbabilities));
 
   const probs: Record<string, number> = {};
   if (request.kind === "score") {
     for (let i = 0; i < request.options.length; i++) {
       const option = request.options[i];
-      const p = probabilities[String(i)];
-      if (option === undefined || p === undefined) {
+      const key = String(i);
+      if (option === undefined || !Object.hasOwn(probabilities, key)) {
         return {
           error: "unavailable",
           detail: `jev: missing probability for level ${i}`,
@@ -167,12 +175,11 @@ export async function askJev(request: AskRequest, config: JevConfig, retryCfg: R
           model: config.model,
         };
       }
-      probs[option.id] = p;
+      probs[option.id] = probabilities[key] as number;
     }
   } else {
     for (const o of request.options) {
-      const p = probabilities[o.label];
-      if (p === undefined) {
+      if (!Object.hasOwn(probabilities, o.label)) {
         return {
           error: "unavailable",
           detail: `jev: missing probability for "${o.label}"`,
@@ -180,7 +187,7 @@ export async function askJev(request: AskRequest, config: JevConfig, retryCfg: R
           model: config.model,
         };
       }
-      probs[o.id] = p;
+      probs[o.id] = probabilities[o.label] as number;
     }
   }
 

@@ -1131,7 +1131,7 @@ and have no codes.
 | `E-CONFIG` | args | the config file is unreadable or invalid | |
 | `E-BACKEND-MODEL` | args | the `openrouter` model doesn't support logprobs, or its reasoning can't be turned off (§6.2) | |
 | `E-BACKEND-LIMIT` | args | the skill exceeds the configured backend's limits: options, Score levels or context (§6.2) | 21 options on `openrouter`; `ask_context: 40k tokens` on `jev` |
-| `E-FAKE-UNMATCHED` | runtime | `--fake-exec` has no answer for a command (§5.4) | |
+| `E-FAKE-UNMATCHED` | runtime | `--fake-exec` has no answer for a command, or `--fake` has none for a question (§5.4) | |
 | `E-IO` | runtime | skop can't write its run directory or lock file | |
 | `E-INTERNAL` | runtime | a runner bug. Unreachable by P6, so always a bug report | |
 
