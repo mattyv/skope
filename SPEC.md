@@ -1,4 +1,4 @@
-# skop (skill op) — Implementation Spec (v1, rev 5)
+# skop (skill op) — Implementation Spec (v1, rev 6)
 
 Audience: an engineer or LLM implementing this from scratch. Everything
 marked **MUST** is normative. Where this spec says "verify against current
@@ -40,7 +40,9 @@ Node.
 - Dry run never runs `do` commands and never pages. Skop can't prove that
   `run` and `check` commands are read-only, so authors must keep them that
   way (§11).
-- Lightweight: one CLI, logs to stdout, dry run by default in a terminal.
+- Lightweight: one CLI, logs to stdout.
+- Explicit: every run names its mode, `--apply` or `--dry-run`. Skop never
+  guesses from how it was started.
 
 ### 1.2 Non-goals (v1)
 - General-purpose programming (no arithmetic, no user functions, no
@@ -179,7 +181,7 @@ ask      = "**ask**" Q " · sure " INT "%" [ELSE]              (* section option
          | "**ask**" Q " → yes | no" [" as " NAME] " · sure " INT "%" [ELSE]
          | "**ask**" Q " → one of [" LIST "] as " NAME " · sure " INT "%" [ELSE]
          | "**ask**" Q " → " INT " to " INT " as " NAME " · sure " INT "%" [ELSE]
-                                                               (* score, v1.1; optional rubric *)
+                                                               (* score, v1.1; rubric required *)
 RUBRIC   = INT ": " TEXT                                       (* one per nested item *)
 
 foreach  = "**for each**" NAME " in [" LIST "]"               (* body = nested list *)
@@ -196,11 +198,10 @@ stop     = "**stop**"
 - Score `ask` (v1.1), `→ LOW to HIGH`. All of these are lint errors:
   - `LOW` and `HIGH` aren't integers with `0 ≤ LOW < HIGH`;
   - the ask has fewer than 2 or more than 10 levels (`HIGH − LOW + 1`).
-    Check Jev's maximum number of score levels and lower this bound if
-    needed;
-  - a rubric item isn't `INT: text`, its level is outside `LOW..HIGH`, or a
-    level appears twice. The rubric is optional, and levels may be left out.
-    Unlisted levels are sent without a description;
+    10 is Jev's documented maximum;
+  - the rubric doesn't give exactly one `INT: text` line for every level in
+    `LOW..HIGH`. It's required and complete because Jev's model sees only the
+    level descriptions, never the numbers or the neighbouring levels;
   - `else skip`. (`else [X]` is allowed.)
 
   Example:
@@ -403,7 +404,7 @@ No such ask → lint error. INLINE runs iff that answer is true. INLINE failure
 
 **`page QUOTED`**: interpolate, escape, invoke the configured pager command,
 end with `paged`. The pager runs under §4.4 with timeout
-`pager.timeout_ms`. If it fails, log it, print the message to stderr, and
+`pager.timeout_ms`, except that it gets the escaped message on stdin. If it fails, log it, print the message to stderr, and
 still end with `paged` (exit 10). In dry run, see §4.5.
 
 **`stop`**: end with `stopped`. Use it when a section has done its work and
@@ -422,7 +423,8 @@ tells whoever picks up the record what to do (§8).
 ### 4.4 Process rules (all commands)
 - Run with `/bin/sh -c` (author-written text; interpolated values passed the
   safe-value check).
-- stdin is `/dev/null`. Environment adds `LC_ALL=C` so output is parseable.
+- stdin is `/dev/null`, except for the pager, which gets its message on
+  stdin. Environment adds `LC_ALL=C` so output is parseable.
 - Each command runs in its own process group. On timeout: `SIGTERM` to the
   group, 5s grace, then `SIGKILL` to the group.
 - stdout and stderr are captured separately, each capped at 1 MiB **at
@@ -430,10 +432,10 @@ tells whoever picks up the record what to do (§8).
   the log.
 - Timeouts are implemented by the host in Node, not with `timeout(1)`.
 
-### 4.5 Dry run (the default in a terminal)
-Dry run is the default only when skop runs interactively. Unattended runs
-must choose a mode explicitly (§7 step 1), so a timer that forgot `--apply`
-fails loudly instead of silently never paging.
+### 4.5 Dry run (`--dry-run`)
+There is no default mode. A run without `--apply` or `--dry-run` refuses to
+start (§7 step 0), so a timer that forgot `--apply` fails loudly instead of
+silently never paging.
 
 - `do`: not executed. Log `would_do` and treat it as success.
 - `page`: pager not invoked. Log `would_page` with the escaped text. The
@@ -486,7 +488,8 @@ shapes here as shape, not copy-paste.
 A Score ask (v1.1) in core JSON:
 ```json
 {"src":22,"ask":{"score":{"low":1,"high":4,
-  "rubric":{"1":"known noise, nothing to do","4":"outage or data at risk"},
+  "rubric":{"1":"known noise, nothing to do","2":"worth a human look, not urgent",
+            "3":"degraded service","4":"outage or data at risk"},
   "as":"severity"},
   "question":[{"lit":"How severe are these errors?"}],
   "sure":75,"else":null}}
@@ -580,14 +583,20 @@ Shipped Dafny code MUST NOT contain `assume`, `{:axiom}` or
     results: true, false, or not a number (failure handling). The core
     returns `Choose(3)` and the handler takes all three.
   - Every `Exec` is answered with each of: ok, fail, timeout.
-  - Every `Ask` is answered with each option confident, plus unsure. A `one
-    of` answer binds the real item, so its value stays known. A Score ask
-    gives one branch per level plus unsure, at most 11. The level is a known
+  - Every `Ask` is answered with each option confident, plus unsure, plus
+    unavailable (Jev down or an invalid response, §4.2). Unsure and
+    unavailable differ: with `else [Page]`, unsure pages but unavailable hands
+    off. A `one of` answer binds the real item, so its value stays known. A
+    Score ask gives one branch per level plus unsure plus unavailable, at
+    most 12. The level is a known
     value, so later `check`s on it are decided, not split three ways.
   - Memoise on abstract state: position, bound names, **known values** (params,
     list items, yes/no answers, Score levels), loop index, counters. Two states that
     differ in a known value are different states. Compute maxima as a
     longest path over the resulting finite graph, not by listing paths.
+  - Out of scope: `deadline` handoffs. The host can end any run between any
+    two steps once time runs out, so the report says that once instead of
+    exploring it.
 
 ### 5.5 Build and packaging
 - Pin the Dafny version in the repo. CI runs `dafny verify`, then translates
@@ -633,7 +642,7 @@ Request:
 - `one of` options: `id` = `label` = the item text, no description.
 - `yesno`: options are `yes` and `no`.
 - `score`: one option per level. `id` = `label` = the level number as a
-  string, `description` = its rubric text, if any. Validation is the
+  string, `description` = its rubric text. Validation is the
   same as for `choice`.
 - `guidance` is the asking section's guidance.
 
@@ -658,11 +667,14 @@ Anything else is invalid and handled as Jev unavailable.
   **Read TypeSafe's current API docs for request format, auth, and model
   names; do not guess.** Each attempt times out after `ask.timeout_ms`. One
   retry on 5xx or timeout, after 500ms.
-  - Map `score` → Jev *Score*, with the rubric as level anchors. Check
-    whether Score returns a probability for every level. If it only returns
-    one level and a confidence, put that confidence on the chosen level and
-    spread the rest evenly over the others. Raise this in §13: ties and
-    neighbouring levels then behave differently from `choice`.
+  - Map `score` → Jev *Score*. Send the rubric as Jev's `criteria` array,
+    lowest level first. Jev numbers levels by array position from 0, so Jev
+    level `i` is skop level `LOW + i`. `jev-ask` converts the ids before the
+    core validates them.
+  - Require Jev's full `probabilities` object; if any level is missing, the
+    response is invalid. Never fill in missing probabilities. The gate uses
+    the top level's probability, not Jev's separate `confidence` figure or
+    its `score`.
 - **`fake`**: reads `--fake answers.yaml`, keyed by question text (after
   interpolation) or by source-map id; value is a probs object or the literal
   `unsure`. Score probabilities are keyed by level id. Used by tests and
@@ -686,7 +698,8 @@ Anything else is invalid and handled as Jev unavailable.
 ~~~
 skop <path/to/SKILL.md> [options]
   --apply                 execute `do` commands and invoke the pager
-  --dry-run               don't; the default in a terminal (§4.5)
+  --dry-run               don't (§4.5); a run needs exactly one of these two
+  --no-page               with --apply: don't page on handoff (§8)
   --param k=v             override a frontmatter param (repeatable, typed, safe-value checked)
   --explain               print sections, transfer graph, and worst-case cost; run nothing
   --verify                run the explore handler and print the verify report; run nothing
@@ -697,10 +710,9 @@ skop <path/to/SKILL.md> [options]
 ~~~
 
 Responsibilities, in order:
-0. Pick the mode. If stdin isn't a terminal and neither `--apply` nor
-   `--dry-run` is given, print why to stderr and exit 40 before anything
-   runs. `--apply` with `--dry-run` is also exit 40. Read-only modes
-   (`--lint`, `--explain`, `--verify`) don't need either flag.
+0. Check the mode. A run needs exactly one of `--apply` and `--dry-run`.
+   Neither or both → print why to stderr and exit 40 before anything runs.
+   Read-only modes (`--lint`, `--explain`, `--verify`) need neither.
 1. Preprocess + lint. On failure, print errors with file:line to stderr, exit 40.
 2. Validate params and built-ins: types, and the safe-value check for any
    value that reaches a `CMD`. On failure, exit 40. This applies whoever the
@@ -761,14 +773,17 @@ Skop never launches an agent in v1. On handoff it writes the record to
 `<run dir>/handoff.json` and prints the record as the final stdout event.
 
 When nobody is watching, nobody would pick that record up. A systemd timer or
-an alert webhook just sees exit 20. So skop also pages a human, per
-`on_handoff` in config (§9):
+an alert webhook just sees exit 20. So with `--apply`, skop also pages a
+human on handoff, unless one of these says not to:
 
-| Caller | Default | Why |
-|---|---|---|
-| unattended (stdin isn't a terminal) | page | otherwise the incident is silently dropped |
-| a person at a terminal | no page | they're reading the output |
-| an agent (`SKOP_CALLER=agent` set) | no page | the agent handles the record |
+| Opt-out | Who uses it |
+|---|---|
+| `--no-page` | a person at a terminal who's reading the output |
+| `SKOP_CALLER=agent` in the environment | an agent that handles the record itself |
+| `on_handoff: none` in config (§9) | a caller that handles exit 20 itself |
+
+Skop decides from these flags and settings only, never from whether it has
+a terminal.
 
 - An agent that runs skop SHOULD set `SKOP_CALLER=agent`.
 - The handoff page says: `{host}: skop {skill} handed off ({reason}) in
@@ -776,8 +791,6 @@ an alert webhook just sees exit 20. So skop also pages a human, per
 - A pager failure is logged and doesn't change the outcome. The outcome
   stays `handoff`, exit 20.
 - In dry run the page is logged as `would_page` (§4.5).
-- `on_handoff: none` turns this off for callers that handle exit 20
-  themselves.
 
 Then skop exits 20.
 
@@ -837,7 +850,7 @@ redact:
   defaults: true          # built-in patterns below
   patterns:
     - 'myco-[0-9a-f]{32}'
-on_handoff: auto          # auto | page | none (§8); auto = page when unattended
+on_handoff: page          # page | none (§8)
 state_dir: $XDG_STATE_HOME/skop   # run directories (§10.1)
 ```
 
@@ -887,7 +900,7 @@ logs a warning on every run):
    valid answer naming an offered option (P5).
 2. Every value in a command passes the safe-value check, including `--param`
    overrides from any caller.
-3. Dry run by default in a terminal; unattended runs must choose (§7).
+3. Every run names its mode; there's no default (§7).
    `do` and `page` only happen with `--apply` (P3).
 4. `run` and `check` commands SHOULD be read-only. Skop can't check this, so
    it's a review rule. Anything that might change the system, including a
@@ -902,8 +915,8 @@ logs a warning on every run):
 8. Page text is escaped. A pager failure never blocks the outcome.
 9. If Jev is down or answers badly, the result is a handoff, never "act
    anyway".
-10. An unattended handoff pages a human by default. Unattended runs must
-    say `--apply` or `--dry-run`; skop won't guess.
+10. A handoff under `--apply` pages a human unless explicitly told not to
+    (§8). Skop never guesses from how it was started.
 
 Deliberately deferred (don't build in v1): dedicated users, sudoers
 generation, skill signing, off-host log shipping, agent launching.
@@ -942,7 +955,7 @@ generation, skill signing, off-host log shipping, agent launching.
 - an empty data list, and a list mixing action and value items
 
 Also: `--param mount='/; rm -rf /'` MUST exit 40 before anything runs. So
-MUST a run with stdin not a terminal and neither `--apply` nor `--dry-run`.
+MUST a run with neither `--apply` nor `--dry-run`, or with both.
 
 Jev response tests (each MUST be rejected as invalid): a missing option, an
 extra option, a value of 1.1, a negative value, `NaN`, and values summing to
@@ -953,6 +966,7 @@ Score tests (v1.1). Each lint case MUST fail with a line number:
 - rubric item `6: …` on a `1 to 5` ask (out of range)
 - two rubric items for level 3 (duplicate)
 - rubric item without a level (`- very bad`)
+- a `1 to 4` ask with no rubric, or with no line for level 2
 - `else skip` on a Score ask
 - a nested instruction (`- **run** …`) under a Score ask
 - a bold rubric line (`- **4**: outage`)
@@ -964,7 +978,7 @@ levels fails the gate, and so does 0.45 / 0.45 / 0.1 at 75%.
 Positive Score tests: `check {severity} == 2` after a Score ask lints and
 runs; a Score answer in a `CMD` lints; the threshold-only warning fires for a
 Score used in one `>=` check; `--verify` on Appendix D reports 4 level
-branches plus 1 unsure at the ask.
+branches, 1 unsure and 1 unavailable at the ask.
 
 Positive: `- **Note:** …` and `- **Warning**: …` in an instruction list are
 prose; `**run**` in a paragraph is prose; a section ending in `**stop**`
@@ -988,8 +1002,9 @@ file paths.
 - **M4 Real Jev + runner features**: lock (held, stale, owner-only delete),
   process rules, timeouts, deadline, redaction defaults, exit codes, config.
 - **M5 Handoff**: record written and printed with the preamble; no agent
-  launched. Unattended handoff pages by default; a terminal run and
-  `SKOP_CALLER=agent` don't; dry run logs `would_page`.
+  launched. A handoff under `--apply` pages; `--no-page`,
+  `SKOP_CALLER=agent` and `on_handoff: none` each stop it; dry run logs
+  `would_page`. The result doesn't depend on whether a terminal is attached.
 - **M6 Packaging**: npm package and container image. The fake-backed test
   suite passes on linux-x64, linux-arm64 and macOS-arm64 with only Node
   installed.
@@ -999,7 +1014,7 @@ file paths.
 
 ### 12.4 Differential check (optional but cheap)
 For each fake scenario, the concrete trace MUST appear among the explore
-handler's paths. This tests the host glue, since both share one interpreter.
+handler's paths. Deadline scenarios are excluded (§5.4). This tests the host glue, since both share one interpreter.
 Run in CI.
 
 ---
@@ -1012,8 +1027,6 @@ Run in CI.
   is the same design in plain TypeScript with property-based tests.
 - Pager integration target (Slack, PagerDuty, etc.).
 - How agent launching should work in v1.1.
-- What Jev Score actually returns (every level, or one level plus a
-  confidence), and its maximum number of levels.
 - Whether to add a cumulative gate, e.g. "level ≥ 3 with 75% confidence".
   Not in v1.1: it's a second gate meaning to prove and explain.
 - Default `sure` values. A four-way ask at 85% may fail the gate on most real
@@ -1286,7 +1299,8 @@ proposals directory, and the LLM fallback. Those lines are kept as history.
 
 ### Rev 4 (Score asks, target v1.1)
 
-- **Score asks added.** `→ 1 to N as name`, with an optional rubric. They're
+- **Score asks added.** `→ 1 to N as name`, with a rubric (made required in
+  rev 6). They're
   validated like `choice`, bind a trusted integer, and branch with ordinary
   `check`s. P5 extended.
 - **Authoring rule.** Use Score only when three or more levels lead to
@@ -1312,6 +1326,28 @@ proposals directory, and the LLM fallback. Those lines are kept as history.
 - **Changelog labelled.** Rev 2 now has a heading and a note on what rev 3
   removed.
 - **Appendix D** sends an unsure rating to a page, not a handoff.
+
+### Rev 6 (no guessing from the terminal)
+
+Rev 5 guessed whether a run was unattended from whether stdin was a
+terminal. That misfires for piped input, `ssh` commands and agents, and
+makes behaviour depend on how skop was started. Rev 6 drops the guess:
+- **Every run names its mode.** `--apply` or `--dry-run` is required; there's
+  no default.
+- **`--apply` pages on handoff.** Opt out with `--no-page`,
+  `SKOP_CALLER=agent`, or `on_handoff: none`.
+
+Also from a review of rev 5:
+- **Pager gets its message on stdin.** §4.4 said every command gets
+  `/dev/null`, which would have lost the text.
+- **Explorer covers unavailable answers.** Each ask gets an unavailable
+  branch, since it can end differently from unsure. Deadline handoffs are
+  scoped out of exploration and the differential check.
+- **Score never invents probabilities.** Jev returns one for every level;
+  anything missing is invalid.
+- **Score levels mapped.** Jev level `i` is skop level `LOW + i`.
+- **Score rubric required** for every level, since Jev's model sees only
+  the descriptions.
 
 ---
 
