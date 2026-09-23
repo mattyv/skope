@@ -121,7 +121,12 @@ def write_mermaid(out: pathlib.Path) -> None:
 def check_coverage() -> list[str]:
     files = [p for p in (ROOT / "tests").rglob("*")
              if p.is_file() and TEST_FILE.search(p.name) and p.relative_to(ROOT).as_posix() not in NOT_COVERAGE]
-    text = "\n".join(p.read_text(errors="ignore") for p in files)
+    # Only lines that actually exercise a code count: a test's title or an
+    # assertion. A code named in passing, e.g. in a comment or as sample
+    # data outside an expect(...), doesn't prove anything is tested.
+    lines = [line for p in files for line in p.read_text(errors="ignore").splitlines()
+             if re.search(r"\b(test|it|describe)\s*\(|\bexpect\s*\(", line)]
+    text = "\n".join(lines)
     closed = set(closed_milestones())
     errors, later = [], 0
     for row in spec_code_table():
