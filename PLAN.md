@@ -466,6 +466,20 @@ One agent, joined by a second once the pieces arrive.
 - Install the package on a clean machine with only Node and run the fake
   test suite on all three platforms.
 - Smoke-test the container image with each example skill in dry run.
+- **Standalone binaries** (SPEC §5.5):
+  - Bundle the CLI, the compiled core and `bignumber.js` into one CommonJS
+    file with esbuild, since Node's single executable applications take one
+    script. The build identity is baked in at bundle time.
+  - Build each platform's binary on that platform's runner, from a pinned
+    Node version, injected with `postject`. Ad-hoc sign the macOS binary
+    (`codesign --sign -`) so it runs.
+  - Test each binary in a clean `debian:stable-slim` container (Linux) or
+    with `node` removed from `PATH` (macOS): `--version`, then the fake
+    scenarios with their expected exit codes.
+- **`install.sh`** (SPEC §5.5): POSIX `sh`, checked by `shellcheck` in CI.
+  Its tests (SPEC §12.3) serve a release directory locally and point
+  `SKOP_DOWNLOAD_URL` at it, including a tampered binary and a missing
+  `SHA256SUMS`.
 
 ---
 
@@ -533,7 +547,12 @@ Versioning follows ply (SPEC §7.2): a hand-edited release version in
    - builds the npm package once;
    - installs it on a clean machine on each platform, checks
      `skop --version`, and lints and dry-runs each example skill with fakes;
-   - creates the GitHub release with the package attached;
+   - builds a binary on each platform, writes `SHA256SUMS`, and adds a
+     build-provenance attestation for each binary;
+   - runs the installer against those files on each platform with no Node
+     on the machine, then the same checks as for the package;
+   - creates the GitHub release with the binaries, `SHA256SUMS`,
+     `install.sh` and the package attached;
    - builds and pushes the container image to
      `ghcr.io/mattyv/skop` for linux/amd64 and linux/arm64;
    - publishes to npm, only if an `NPM_TOKEN` secret is set.

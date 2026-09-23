@@ -67,12 +67,19 @@ instead of an agent session, and every decision is logged.
 ## Install
 
 ```console
-$ npm install -g skop           # Node 20 or newer
+$ curl -fsSL https://github.com/mattyv/skop/releases/latest/download/install.sh | sh
 $ skop --version
 skop 1.0.0 (build identity 3f1c…)
 ```
 
-Or run the container image, `ghcr.io/mattyv/skop`.
+That installs a single self-contained binary for Linux (x64, arm64) or
+macOS (Apple silicon) into `~/.local/bin`. It doesn't need Node. The
+installer checks the download against the release's checksums before
+installing anything. Set `SKOP_VERSION` to pin a version, or
+`SKOP_INSTALL_DIR` to install elsewhere.
+
+Or, with Node 20 or newer, `npm install -g skop`. Or run the container
+image, `ghcr.io/mattyv/skop`.
 
 ## Use
 

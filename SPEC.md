@@ -725,7 +725,37 @@ Shipped Dafny code MUST NOT contain `assume`, `{:axiom}` or
 - A thin adapter, `core.ts`, converts Dafny runtime types (big integers,
   Dafny sequences and maps) to plain JS at the boundary. Nothing else imports
   the generated code.
-- Ship as an npm package and a container image. No native dependencies.
+- Ship three ways, all built from the same commit and stamped with the same
+  build identity (§7.2):
+  - **Standalone binaries**, the default. skop runs on the machine that's
+    having the incident, which may not have Node. Each release has one
+    self-contained executable per platform: `skop-<version>-linux-x64`,
+    `-linux-arm64` and `-darwin-arm64`, built as Node single executable
+    applications, plus a `SHA256SUMS` file. The Linux binaries need glibc
+    2.28 or newer; musl systems such as Alpine use the container.
+  - **An npm package**, for machines that already have Node 20 or newer.
+    No native dependencies.
+  - **A container image**, `ghcr.io/mattyv/skop`, for linux/amd64 and
+    linux/arm64.
+- **`install.sh`** installs a binary: `curl -fsSL
+  https://github.com/mattyv/skop/releases/latest/download/install.sh | sh`.
+  It MUST:
+  - be POSIX `sh`, and pass `shellcheck`;
+  - detect the OS and CPU, and exit non-zero naming the platform if there's
+    no binary for it;
+  - download the binary and `SHA256SUMS` from the same release, check the
+    binary's sha256 against it, and install nothing on a mismatch;
+  - install to `$SKOP_INSTALL_DIR`, default `~/.local/bin`, never use
+    `sudo` itself, and say how to add the directory to `PATH` if it isn't
+    there;
+  - install `$SKOP_VERSION` if set, otherwise the latest release;
+  - download from `$SKOP_DOWNLOAD_URL` if set, for mirrors and tests;
+  - finish by running `skop --version`.
+
+  The checksum catches a corrupt or truncated download, not a compromised
+  release. Each release also carries GitHub build-provenance attestations,
+  so `gh attestation verify` can check a binary came from this repo's
+  release workflow.
 
 ### 5.6 Verify report (`skop --verify`)
 From the explore handler, report the skop release version and build
@@ -1433,10 +1463,11 @@ file paths.
   launched. A handoff under `--apply` pages; `--no-page`,
   `SKOP_CALLER=agent` and `on_handoff: none` each stop it; dry run logs
   `would_page`. The result doesn't depend on whether a terminal is attached.
-- **M6 Packaging**: npm package and container image, with the identity
-  tests below passing. The fake-backed test
-  suite passes on linux-x64, linux-arm64 and macOS-arm64 with only Node
-  installed.
+- **M6 Packaging**: binaries, installer, npm package and container image,
+  with the identity and installer tests below passing. The fake-backed
+  test suite passes on linux-x64, linux-arm64 and macOS-arm64 twice: once
+  through the npm package with only Node installed, and once through the
+  binary with no Node on the machine.
 - **M7 Score asks (v1.1)**: all Score tests in §12.2 pass; P4–P6 still
   verify with the Score additions; the Appendix D fixture passes M1–M3 with
   fakes for each level, unsure, and backend unavailable.
@@ -1450,6 +1481,16 @@ Identity tests (§7.2), in M6:
   outside the inputs doesn't.
 - Removing any input, or setting a non-semver version, fails the build.
 - The release workflow refuses a tag that doesn't match `package.json`.
+
+Installer tests (§5.5), in M6, against a local download server via
+`SKOP_DOWNLOAD_URL`:
+- It installs the binary for the machine's platform into
+  `SKOP_INSTALL_DIR`, and the installed `skop --version` prints the same
+  version and build identity as the npm package from the same commit.
+- A binary whose sha256 doesn't match `SHA256SUMS` fails the install and
+  leaves nothing installed. So does a missing `SHA256SUMS`.
+- `SKOP_VERSION` picks the version; an unknown platform exits non-zero and
+  names it.
 
 ### 12.4 Differential check (optional but cheap)
 For each fake scenario, the concrete trace MUST appear among the explore
@@ -1939,6 +1980,9 @@ Also, where things live in the Markdown:
 - **Events before a run** have `null` run fields.
 - **A failed `ask` event** has `null` answer fields and a `detail`.
 - **A warning's `stage`** is the stage that found it.
+- **Standalone binaries and `install.sh`** (§5.5), so skop can run on a
+  machine without Node. The installer checks each download against the
+  release's `SHA256SUMS`.
 - **A Score rubric in core JSON is a list** of `{src, level, text}`, so
   each line keeps its source line.
 - **The event contract is one shape per event**, with an example of each
