@@ -144,8 +144,11 @@ export async function runSkill(o: RunOptions): Promise<number> {
         message: "built-in redaction patterns are turned off (redact.defaults: false)",
       });
 
+    // Once interrupted (SIGINT, SIGTERM), nothing more runs: a request that comes back waits forever while the signal handler exits.
+    let interrupted = false;
+    const halt = <T>(r: T): Promise<T> => (interrupted ? new Promise<T>(() => {}) : Promise.resolve(r));
     const page = async (message: string): Promise<boolean> => {
-      const ok = config.pager ? (await sendPage(config.pager, message, env)).ok : false;
+      const ok = await halt(config.pager ? (await sendPage(config.pager, message, env)).ok : false);
       if (!ok) process.stderr.write(`skop: the pager ${config.pager ? "failed" : "isn't configured"}; the page was: ${message}\n`);
       return ok;
     };
@@ -197,19 +200,21 @@ export async function runSkill(o: RunOptions): Promise<number> {
 
     // SPEC §4.4: interrupted → stop the command, release the lock, E-INTERRUPTED.
     const onSignal = async (signal: string) => {
+      if (interrupted) return;
+      interrupted = true;
       await stopAll();
       release();
       diag("error", { code: "E-INTERRUPTED", stage: "runtime", message: `interrupted by ${signal}` });
       process.exit(end("error"));
     };
-    process.once("SIGINT", onSignal).once("SIGTERM", onSignal);
+    process.on("SIGINT", onSignal).on("SIGTERM", onSignal);
 
     const clock = createFakeClock();
     const started = Date.now();
     const fakeRun = commands ? fakeExec(commands, clock) : undefined;
     let asks = 0;
     const handlers: Handlers = {
-      exec: (next) => (fakeRun ? fakeRun(next) : execCommand(next.cmd, { timeoutMs: next.timeoutMs, env })),
+      exec: async (next) => halt(await (fakeRun ? fakeRun(next) : execCommand(next.cmd, { timeoutMs: next.timeoutMs, env }))),
       async ask(request, src) {
         const req: AskRequest = {
           ...request,
