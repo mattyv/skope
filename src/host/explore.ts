@@ -88,10 +88,9 @@ function edge(events: CoreEvent[], ms: number, rest: Summary): Summary {
     if (e.at) sections.add(e.at.section);
     if (e.event === "ask") asks++;
     if (e.event === "effect_start") effects++;
-    if (e.event === "transfer") {
-      transfers.add(`${e.from} → ${e.to}`);
-      sections.add(e.to);
-    }
+    // A section entered by a transfer is reached through its own events: at least the outcome, whose
+    // `at` is where the run ended, as for a section that only hands off.
+    if (e.event === "transfer") transfers.add(`${e.from} → ${e.to}`);
   }
   return { ...rest, maxAsks: rest.maxAsks + asks, maxEffects: rest.maxEffects + effects, maxMs: rest.maxMs + ms, sections, transfers };
 }
