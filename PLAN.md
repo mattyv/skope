@@ -23,19 +23,25 @@ piece is proven done.
   writes the milestone tests straight from the spec, independently of the
   agents writing the code. That catches misreadings of the spec on both
   sides.
-- **Red tests are allowed, but only as expected failures.** A test written
-  before its feature is marked expected-to-fail (`test.fails` in Vitest).
-  CI checks that it still fails. When the feature lands, the owner flips it
-  to a normal test in the same PR. Nothing is ever skipped silently.
+- **Red tests are allowed, but only as expected failures, and only until
+  their milestone closes.** A test written before its feature is marked
+  expected-to-fail (`test.fails` in Vitest). CI checks that it still fails.
+  When the feature lands, the owner flips it to a normal test in the same
+  PR. Nothing is ever skipped silently.
+- **Green CI isn't the same as a finished milestone.** An expected failure
+  passes CI. So a milestone is done only when all its acceptance tests, in
+  `tests/acceptance/<milestone>/`, pass as normal tests. Closing it means
+  adding its name to `tests/acceptance/CLOSED`. From then on CI fails if any
+  of its tests is an expected failure, skip or todo.
 - **Build the smallest thing that works.** Every agent writes code with the
   [ponytail](https://github.com/DietrichGebert/ponytail) skill active
   (v4.10.0, MIT, in `.claude/skills/`), and every change is checked by
   `ponytail-review` before it merges. §6.4 says where ponytail doesn't apply.
-- **Nobody reviews their own work.** Every PR is reviewed by a panel of
-  fresh Opus agents that didn't write it, and every milestone gets a
-  whole-repo review (§6).
+- **Nobody reviews their own work.** Every PR gets one independent Opus
+  reviewer, plus a proof reviewer for Dafny changes. Every milestone gets
+  the full panel (§6).
 - **Main is always green.** A PR merges only when the CI gate (§5) passes
-  and the review panel has no open blocking findings (§6). Streams merge
+  and its review has no open blocking findings (§6). Streams merge
   small PRs often rather than one big one at the end.
 
 ---
@@ -103,11 +109,17 @@ scratch):
 - `.dafny-version` holding the pinned Dafny version. The CI workflow reads
   it.
 
-**Spike: Dafny to JavaScript.** This is the riskiest integration, so prove it
-works on day one. Write a tiny Dafny module, verify it, translate it to JS,
-and call it from TypeScript through a first version of the adapter
-`core.ts`. If this is painful, raise it now (SPEC §13), before six agents
-depend on it.
+**Spike: Dafny to JavaScript, end to end.** This is the riskiest
+integration, so prove it works before anything else, and before the
+contracts are frozen or the six parallel streams start:
+1. A tiny Dafny module, verified, translated to JavaScript and called from
+   TypeScript through a first version of the adapter `core.ts`.
+2. One tiny program taken through lint, execution and a fake handler.
+3. A test showing dry run suppresses its effect: the `do` never reaches
+   the handler, and a `would_do` event is emitted instead.
+
+If any step is painful, raise it now (SPEC §13), before six agents depend on
+it. The contracts are frozen, and Phase 1 starts, only after all three work.
 
 **Contracts** (in `contracts/`, owned by the Phase 0 agent, later by the
 integration agent):
@@ -133,11 +145,19 @@ and options nothing in the spec needs (§6).
 **Test harness**
 - A golden-file helper that ignores `ts`, `ms`, `run_id`, `host`,
   `skill_hash` and file paths (SPEC §12.3).
-- The three example skills copied out of the spec into `fixtures/`:
-  disk-full, cert-expiry and error-triage.
-- **Spec coverage check.** A script that reads the code table in SPEC §7.1
-  and fails CI if any code except `E-INTERNAL` and `E-IO` has no test
-  (SPEC §12.2).
+- The example skills copied out of the spec: disk-full and cert-expiry into
+  `fixtures/`, and error-triage into `fixtures-next/`. Only `fixtures/`
+  ships with a release, so the Score example (v1.1) moves across as part of
+  M7. Each fake scenario directory holds `answers.yaml`, `commands.yaml` and
+  `expected-exit`, since paged (10) and handoff (20) are correct results
+  that the release smoke test must not treat as failures.
+- **Spec coverage check.** `scripts/check_spec.py coverage` fails CI if a
+  code in SPEC §7.1, except `E-INTERNAL` and `E-IO`, isn't named in any
+  test file. It's a **reference check** only: it shows a code is mentioned,
+  not that a test exercises it. Reviewers and the milestone check cover the
+  rest.
+- **Milestone check.** `scripts/check_spec.py milestones` enforces the
+  closed-milestone rule in §1.
 - **No-cheating check.** CI fails if Dafny code contains `assume`,
   `{:axiom}` or `{:verify false}` (SPEC §5.3).
 
@@ -162,7 +182,7 @@ follows the same loop:
    and when to revisit it.
 3. **Refactor.** Run `ponytail-review` on your own diff and apply the cuts
    that keep the tests green.
-4. **Open a small PR.** CI runs the full gate (§5), then the review panel
+4. **Open a small PR.** CI runs the full gate (§5), then the review
    runs (§6).
 5. **Merge** when CI is green and no blocking finding is open.
 
@@ -271,7 +291,7 @@ follows the same loop:
 
 The CI workflow is `.github/workflows/ci.yml`. It runs on every push and
 pull request, on linux-x64, linux-arm64 and macOS-arm64. Passing CI is
-necessary but not enough to merge: the review panel (§6) runs after it.
+necessary but not enough to merge: the review (§6) runs after it.
 
 | Check | Fails when |
 |---|---|
@@ -281,7 +301,8 @@ necessary but not enough to merge: the review panel (§6) runs after it.
 | `dafny verify` | any unproven obligation |
 | No-cheating check | `assume`, `{:axiom}` or `{:verify false}` in Dafny code |
 | Contract check | a contract example doesn't validate, or generated types are stale |
-| Spec coverage check | an error code has no test |
+| Spec coverage check (reference only) | an error code isn't named in any test file |
+| Milestone check | a closed milestone has an expected failure, skip or todo, or no tests |
 | Golden files | any mismatch, ignoring the fields in SPEC §12.3 |
 | Differential check (from Phase 2) | a fake run's trace isn't among the explored paths |
 | Platforms | any of the above fails on linux-x64, linux-arm64 or macOS-arm64 |
@@ -290,33 +311,43 @@ necessary but not enough to merge: the review panel (§6) runs after it.
 
 ## 6. Reviews: Opus agents and ponytail
 
-### 6.1 The review panel (every PR)
+### 6.1 Review on every PR
 
 ```mermaid
 flowchart LR
   pr["PR opened"] --> ci{"CI gate<br/>green?"}
   ci -- "no" --> fix["author fixes"]
-  ci -- "yes" --> panel["review panel<br/>(fresh Opus agents,<br/>in parallel)"]
-  panel --> open{"any P1 or P2<br/>open?"}
+  ci -- "yes" --> rev["independent Opus reviewer<br/>(+ proof reviewer<br/>for Dafny changes)"]
+  rev --> open{"any P1 or P2<br/>open?"}
   open -- "yes" --> fix
   fix --> ci
   open -- "no" --> merge["merge"]
-  panel -. "reviewer and author<br/>still disagree" .-> human["human decides"]
+  rev -. "reviewer and author<br/>still disagree" .-> human["human decides"]
 ```
 
-Once CI passes, a panel of review agents runs in parallel. Every reviewer
-is an **Opus** agent in a fresh session that **didn't write the code**. It
-gets the diff, `SPEC.md`, `PLAN.md` and the stream's brief, and nothing from
-the author's session, so it judges the code rather than the reasoning
-behind it. Reviewers are read-only: they comment, and never push.
+Once CI passes, **one independent reviewer** checks the PR. It's an
+**Opus** agent in a fresh session that **didn't write the code**. It gets
+the diff, `SPEC.md`, `PLAN.md` and the stream's brief, and nothing from the
+author's session, so it judges the code rather than the reasoning behind
+it. Reviewers are read-only: they comment, and never push.
 
-| Reviewer | Looks for | Runs on |
-|---|---|---|
-| **Spec conformance** | Does the change do what the cited spec sections say, no more and no less? Does each test check the clause it claims to? | every PR |
-| **Correctness and security** | Bugs, unsafe input handling, taint leaks into commands, shell and process mistakes, races. Uses the `code-review` skill. | every PR |
-| **Ponytail** | Over-engineering, using `ponytail-review`: reinvented standard library, unneeded dependencies, speculative abstractions. Ends with `net: -N lines possible`. | every PR |
-| **Proof** | Do the lemmas say what SPEC P1–P6 mean, not something weaker? Vacuous preconditions, assumptions that can never hold, missing cases. | PRs touching `core/*.dfy` |
-| **Tests** | Would each test fail if the code were wrong? Checks this by breaking the code on purpose and rerunning. Checks goldens against the spec. | PRs from stream F, and any PR that adds tests |
+The one reviewer covers three things, in this order:
+1. **Correctness and security:** bugs, unsafe input handling, taint leaks
+   into commands, shell and process mistakes, races. It uses the
+   `code-review` skill.
+2. **Spec conformance:** the change does what the cited spec sections say,
+   no more and no less, and each test checks the clause it claims to.
+3. **Simplification:** `ponytail-review`, ending with `net: -N lines
+   possible`.
+
+A PR that touches `core/*.dfy` also gets a **proof reviewer**, a second
+Opus agent. It checks that the lemmas say what SPEC P1–P6 mean and not
+something weaker, and looks for vacuous preconditions, assumptions that can
+never hold, and missing cases.
+
+The fuller panel, with a separate test reviewer that breaks the code on
+purpose to see whether tests catch it, runs at milestones (§6.3), where its
+cost is paid once rather than on every small PR.
 
 ### 6.2 Findings and how they're resolved
 
@@ -340,15 +371,21 @@ Findings use the same shape as the outside reviews the spec went through:
 At each checkpoint (end of Phase 0, the stream C proof timebox, end of
 Phase 1, and each milestone):
 
-1. **Whole-milestone review.** One Opus agent reads the merged code
-   against the whole spec, the way the spec itself was reviewed: P1 and P2
-   findings with spec section references.
+1. **Whole-milestone review panel.** Separate Opus agents each read the
+   merged code against the whole spec, the way the spec itself was
+   reviewed, with P1 and P2 findings and spec section references:
+   - spec conformance;
+   - correctness and security;
+   - proofs, when the milestone includes Dafny;
+   - tests: each one is checked by breaking the code on purpose and
+     confirming a test fails.
 2. **`ponytail-audit` at ultra** over the whole repo, ranked biggest cut
    first.
 3. **`ponytail-debt`** lists every `ponytail:` shortcut. Any shortcut with
    no revisit trigger gets one, or gets fixed.
-4. **A human** reads the three reports and decides whether the next phase
-   starts.
+4. **The milestone check** passes: every acceptance test for the
+   milestone runs as a normal test, with none expected to fail (§1).
+5. **A human** reads the reports and decides whether the next phase starts.
 
 ### 6.4 Where ponytail doesn't apply
 
@@ -419,12 +456,13 @@ After v1 ships. The same stream owners pick up their part in parallel:
 - **Each agent gets its stream brief from §4 as its task**, plus the spec
   and the contracts. The brief lists what it owns, what it may read, and
   when it's done.
-- **Small PRs to main,** each passing the CI gate and the review panel
+- **Small PRs to main,** each passing the CI gate and the review
   (§6). A PR that touches another stream's directory also needs that
   owner's review.
 - **Review agents run on Opus,** each in a fresh session or subagent with
   read-only access. They never see the author's session and never review
-  their own stream's code.
+  their own stream's code. One reviewer per PR, plus a proof reviewer for
+  Dafny changes; the full panel only at milestones.
 - **Ponytail is on for every building agent,** at **full** by default and
   **ultra** for audits and contract reviews.
 - **Contract changes are rare and deliberate.** The contract owner makes

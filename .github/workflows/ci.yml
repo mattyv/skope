@@ -9,6 +9,11 @@ on:
     branches: ["**"]
   pull_request:
   workflow_call:
+    inputs:
+      ref:
+        description: "Commit to test. The release workflow passes the release commit."
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -19,6 +24,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -45,6 +52,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
       - name: Check for code
         id: code
         run: |
@@ -70,14 +79,18 @@ jobs:
       - name: Unit, property, golden and acceptance tests
         if: steps.code.outputs.present == 'true'
         run: npm test
-      - name: Every error code has a test (SPEC §12.2)
+      - name: Every error code is named in a test file (reference check)
         run: python3 scripts/check_spec.py coverage
+      - name: Closed milestones have no expected failures or skips
+        run: python3 scripts/check_spec.py milestones
 
   dafny:
     name: Dafny proofs
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
       - name: Check for Dafny code
         id: code
         run: |
