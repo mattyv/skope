@@ -1,4 +1,4 @@
-# skop (skill op) — Implementation Spec (v1, rev 7)
+# skop (skill op) — Implementation Spec (v1, rev 8)
 
 Audience: an engineer or LLM implementing this from scratch. Everything
 marked **MUST** is normative. Where this spec says "verify against current
@@ -17,7 +17,8 @@ normal agent skills (a big LLM can read and follow them) *and* executable by a
 small deterministic runtime.
 
 - The runtime runs commands, checks facts, and asks **small typed questions**
-  to a fast classifier model (**Jev** by TypeSafe) at branch points.
+  to a fast classifier model at branch points: **Jev** by TypeSafe, or a
+  general model through **OpenRouter** (§6.2).
 - When the runtime is unsure (a confidence gate fails) or something
   unexpected happens, it **hands off**: it writes a record of what already
   happened and exits. Whoever called skop (a person, a script, or an agent)
@@ -59,7 +60,8 @@ Node.
   instead of multi-select, and `check` on a measured value instead of a
   model-estimated number. See Appendix E.
 - Launching an agent on handoff (v1.1). v1 writes the record and exits.
-- An LLM fallback when Jev is down (v1.1). v1 hands off instead.
+- Automatic fallback from one backend to another when it's down (v1.1).
+  v1 uses the one backend in config and hands off if it fails.
 
 ---
 
@@ -87,7 +89,7 @@ that answers its requests changes.
 | `preprocess` | TypeScript | Parse Markdown (CommonMark AST), enforce the surface grammar, emit core JSON + source map. No semantic checks. |
 | `core` | Dafny → JS | Core AST types, semantic lint, interpreter step function, proofs |
 | `host` | TypeScript | The three request handlers and the loop that drives the core |
-| `jev-ask` | TypeScript | CLI: one question in, probabilities out. Backends: `jev`, `fake` |
+| `jev-ask` | TypeScript | CLI: one question in, probabilities out. Backends: `jev`, `openrouter`, `fake` |
 | `skop` | TypeScript | CLI wrapper: preprocess, lint, lock, drive the host loop, stream logs, enforce budgets, handoff |
 
 ---
@@ -198,7 +200,8 @@ handoff  = "**hand off**"
 stop     = "**stop**"
 ~~~
 
-- Section-option `ask`: at least 2, at most 255 options.
+- Section-option `ask`: at least 2, at most 255 options. The `openrouter`
+  backend allows at most 20 options per ask (§6.2).
 - `one of [L]`: L MUST be a list of value items.
 - Score `ask` (v1.1), `→ LOW to HIGH`. All of these are lint errors:
   - `LOW` and `HIGH` aren't integers with `0 ≤ LOW < HIGH`;
@@ -667,6 +670,10 @@ only if:
 Anything else is invalid and handled as Jev unavailable.
 
 ### 6.2 Backends (selected by config, §9)
+Exactly one backend is used per run. Elsewhere in this spec, "Jev
+unavailable" means whichever backend is configured. Every backend's answer
+goes through the same validation in the core (§6.1, P5).
+
 - **`jev`**: TypeSafe Jev. Map `choice` → Jev *Choice*, `yesno` → Jev *Noul*
   (a 0–1 "is this true?" probability; derive `{"yes":p,"no":1-p}`).
   **Read TypeSafe's current API docs for request format, auth, and model
@@ -680,6 +687,34 @@ Anything else is invalid and handled as Jev unavailable.
     response is invalid. Never fill in missing probabilities. The gate uses
     the top level's probability, not Jev's separate `confidence` figure or
     its `score`.
+- **`openrouter`**: a general model through OpenRouter. **Read OpenRouter's
+  current API docs for parameter names; do not guess.**
+  - **Probabilities come only from token logprobs.** A chat model's own
+    statement of how sure it is isn't evidence. Never ask for one, and never
+    use one.
+  - Label the options with single letters `A`, `B`, `C`, … in order. The
+    prompt (a fixed template shipped with skop) gives the question,
+    guidance, context and each option's letter and description, and asks
+    for the letter alone. This works the same for `choice`, `yesno`
+    (A = yes, B = no) and `score` (A = LOW).
+  - Request one output token at temperature 0, with logprobs and the top 20
+    alternatives. Ask OpenRouter to route only to providers that support
+    those parameters (historically `provider.require_parameters: true`).
+  - Read the first token's alternatives. Trim whitespace and add together
+    the probabilities of tokens that match each option's letter exactly.
+    Options that don't appear get 0.
+  - If the letters together hold less than `openrouter.min_mass` (default
+    0.5) of the probability, the model mostly answered something else, and
+    the response is invalid. Otherwise divide by that total so the options
+    sum to 1, and pass them on keyed by option id.
+  - A response with no logprobs is invalid. Never fill in missing numbers.
+  - Checked before the run starts, both exit 40:
+    - the model doesn't list logprobs support in OpenRouter's model list →
+      `E-BACKEND-MODEL`;
+    - an ask in the skill has more than 20 options → `E-BACKEND-LIMIT`.
+  - Timeouts and retry are the same as for `jev`.
+  - `sure` values are tuned against one backend. Moving a skill to another
+    model changes how often gates pass, so re-tune before trusting it (§13).
 - **`fake`**: reads `--fake answers.yaml`, keyed by question text (after
   interpolation) or by source-map id; value is a probs object or the literal
   `unsure`. Score probabilities are keyed by level id. Used by tests and
@@ -824,6 +859,8 @@ and have no codes.
 | `E-PARAM-TYPE` | args | a `--param` value has the wrong type | `threshold=high` |
 | `E-PARAM-UNSAFE` | args | a param override or built-in fails the safe-value check | `mount='/; rm -rf /'` |
 | `E-CONFIG` | args | the config file is unreadable or invalid | |
+| `E-BACKEND-MODEL` | args | the `openrouter` model doesn't support logprobs (§6.2) | |
+| `E-BACKEND-LIMIT` | args | an ask has more options than the backend allows (§6.2) | 21 options on `openrouter` |
 | `E-FAKE-UNMATCHED` | runtime | `--fake-exec` has no answer for a command (§5.4) | |
 | `E-IO` | runtime | skop can't write its run directory or lock file | |
 | `E-INTERNAL` | runtime | a runner bug. Unreachable by P6, so always a bug report | |
@@ -914,10 +951,15 @@ details or secrets.
 
 ```yaml
 ask:
-  backend: jev            # jev | fake
+  backend: jev            # jev | openrouter | fake
+  timeout_ms: 2000        # per attempt; one retry (§6.2)
+jev:
   model: <jev model id>
   key_env: TYPESAFE_API_KEY
-  timeout_ms: 2000        # per attempt; one retry (§6.2)
+openrouter:
+  model: <model id>       # must support logprobs (§6.2)
+  key_env: OPENROUTER_API_KEY
+  min_mass: 0.5           # share of probability the option letters must hold
 pager:
   command: <cli that takes a message on stdin>   # e.g. a Slack webhook script
   timeout_ms: 10000
@@ -986,12 +1028,14 @@ logs warning `W-REDACT-OFF` on every run):
    `--reuse-key`.)
 6. Skop never launches an agent. The handoff record marks machine output as
    data.
-7. Redact before Jev and before logging. Built-in patterns are on by
+7. Redact before sending anything to the backend, and before logging. Built-in patterns are on by
    default.
 8. Page text is escaped. A pager failure never blocks the outcome.
-9. If Jev is down or answers badly, the result is a handoff, never "act
+9. Backend probabilities are measured, never self-reported: Jev's own
+   distribution, or token logprobs from OpenRouter.
+10. If Jev is down or answers badly, the result is a handoff, never "act
    anyway".
-10. A handoff under `--apply` pages a human unless explicitly told not to
+11. A handoff under `--apply` pages a human unless explicitly told not to
     (§8). Skop never guesses from how it was started.
 
 Deliberately deferred (don't build in v1): dedicated users, sudoers
@@ -1082,7 +1126,9 @@ file paths.
   max Jev calls. (disk-full: Clean up loop is 5 items, bounded.)
 - **M3 Exec with fakes**: for each scenario, the event stream matches a golden
   JSONL. Dry run issues no `do` and no page.
-- **M4 Real Jev + runner features**: lock (held, stale, owner-only delete),
+- **M4 Real backends + runner features**: both `jev` and `openrouter`
+  against recorded responses (letters mapped to options, low letter mass,
+  missing logprobs, a model without logprobs, too many options); lock (held, stale, owner-only delete),
   process rules, timeouts, deadline, redaction defaults, exit codes, config.
 - **M5 Handoff**: record written and printed with the preamble; no agent
   launched. A handoff under `--apply` pages; `--no-page`,
@@ -1109,6 +1155,12 @@ Run in CI.
 - Proof effort. If P1–P6 stall past an agreed budget, raise it. The fallback
   is the same design in plain TypeScript with property-based tests.
 - Pager integration target (Slack, PagerDuty, etc.).
+- `sure` values on `openrouter`. Token probabilities are measured, but a
+  general model isn't trained for the question the way Jev is. Compare gate
+  pass rates against Jev on the same incidents before trusting a skill on
+  it. If they differ a lot, consider per-backend thresholds.
+- How reliably option letters come out as single tokens across OpenRouter's
+  models, and whether 20 alternatives is always enough.
 - How agent launching should work in v1.1.
 - Answer and resume (§1.2): how to save a run's state, how to re-check
   what changed while the run was paused, and which handoffs can resume
@@ -1442,6 +1494,15 @@ Also from a review of rev 5:
   wording isn't.
 - **Lint reports every error**, not just the first.
 - **Tests match on code and line**, and each negative test names its code.
+
+### Rev 8 (OpenRouter backend)
+
+- **`openrouter` backend added** alongside `jev`, chosen in config. It gets
+  probabilities from token logprobs only, never from what the model says.
+- **Checked before the run.** The model must support logprobs, and no ask
+  may have more than 20 options on this backend.
+- **Config split** into `jev` and `openrouter` blocks.
+- **Automatic fallback** between backends stays out of v1.
 
 ---
 
