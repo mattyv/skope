@@ -1,0 +1,169 @@
+# Release workflow: push a tag like v1.0.0 to build and publish a release.
+# It reruns the full test workflow first, builds the npm package once,
+# installs it on a clean machine on every platform (SPEC M6), then
+# publishes the GitHub release, the container image and, if an NPM_TOKEN
+# secret is set, the npm package.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to release, e.g. v1.0.0"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    uses: ./.github/workflows/ci.yml
+
+  package:
+    name: Build package
+    needs: test
+    runs-on: ubuntu-latest
+    outputs:
+      tarball: ${{ steps.pack.outputs.tarball }}
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+      - name: Refuse to release without code
+        run: |
+          if [ ! -f package.json ]; then
+            echo "No package.json: there's nothing to release yet."; exit 1
+          fi
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - name: Tag matches package version
+        id: version
+        run: |
+          tag="${{ inputs.tag || github.ref_name }}"
+          pkg="v$(node -p "require('./package.json').version")"
+          if [ "$tag" != "$pkg" ]; then
+            echo "Tag $tag doesn't match package.json version $pkg."; exit 1
+          fi
+          echo "version=${pkg#v}" >> "$GITHUB_OUTPUT"
+      - run: npm ci
+      - run: npm run build --if-present
+      - name: Pack
+        id: pack
+        run: |
+          file=$(npm pack --silent | tail -1)
+          echo "tarball=$file" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: package
+          path: ${{ steps.pack.outputs.tarball }}
+
+  install-check:
+    name: Clean install (${{ matrix.os }})
+    needs: package
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm, macos-14]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - uses: actions/download-artifact@v4
+        with:
+          name: package
+          path: dist-pkg
+      - name: Install into an empty directory with only Node
+        run: |
+          mkdir "$RUNNER_TEMP/clean" && cd "$RUNNER_TEMP/clean"
+          npm init -y > /dev/null
+          npm install "$GITHUB_WORKSPACE/dist-pkg/${{ needs.package.outputs.tarball }}"
+          npx skop --version
+      - name: Each example skill lints and dry-runs with fakes
+        run: |
+          cd "$RUNNER_TEMP/clean"
+          for skill in "$GITHUB_WORKSPACE"/fixtures/*/SKILL.md; do
+            dir=$(dirname "$skill")
+            npx skop "$skill" --lint
+            npx skop "$skill" --dry-run --fake "$dir/fakes/happy/answers.yaml" --fake-exec "$dir/fakes/happy/commands.yaml"
+          done
+
+  github-release:
+    name: GitHub release
+    needs: [package, install-check]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: package
+          path: dist-pkg
+      - name: Create release with the package attached
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: gh release create "$TAG" dist-pkg/* --repo "$GITHUB_REPOSITORY" --title "$TAG" --generate-notes
+
+  container:
+    name: Container image
+    needs: [package, install-check]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+      - name: Refuse to release without a Dockerfile
+        run: |
+          if [ ! -f Dockerfile ]; then echo "No Dockerfile yet (PLAN.md §7)."; exit 1; fi
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}:${{ needs.package.outputs.version }}
+            ghcr.io/${{ github.repository }}:latest
+
+  npm-publish:
+    name: Publish to npm
+    needs: [package, install-check]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+      - uses: actions/download-artifact@v4
+        with:
+          name: package
+          path: dist-pkg
+      - name: Publish, if an NPM_TOKEN secret is set
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -z "$NODE_AUTH_TOKEN" ]; then
+            echo "No NPM_TOKEN secret; skipping npm publish."; exit 0
+          fi
+          npm publish "dist-pkg/${{ needs.package.outputs.tarball }}" --provenance --access public

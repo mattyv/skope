@@ -71,11 +71,29 @@ starts wiring against a stand-in interpreter, so it isn't blocked by C
 
 Everything the parallel agents share. Nothing here implements features.
 
+**Already in the repo** (so Phase 0 builds on them rather than from
+scratch):
+- `.github/workflows/ci.yml`: the test workflow (§5). Its build, test and
+  Dafny jobs switch on by themselves once `package.json` and
+  `.dafny-version` exist.
+- `.github/workflows/release.yml`: the release workflow (§10).
+- `scripts/check_spec.py`: spec and plan checks, and the error-code
+  coverage check.
+- `scripts/build-id.mjs`: the build identity (SPEC §7.2).
+- `LICENSE-MIT` and `LICENSE-APACHE`: skop is dual-licensed, like ply.
+
 **Repository and toolchain**
 - Node 20+, TypeScript, Vitest, a formatter and linter.
 - A pinned Dafny version, with `dafny verify` and translation to JavaScript
   running in CI (SPEC §5.5).
-- CI on linux-x64, linux-arm64 and macOS-arm64.
+- `package.json` with `"version": "0.1.0"` and
+  `"license": "MIT OR Apache-2.0"`, and scripts named `typecheck`, `lint`,
+  `build` and `test`, which is what the CI workflow calls.
+- `npm run build` runs `node scripts/build-id.mjs --write
+  dist/build-identity.json` first, and the CLI reads the identity from
+  that one file. There's no other copy of the version anywhere.
+- `.dafny-version` holding the pinned Dafny version. The CI workflow reads
+  it.
 
 **Spike: Dafny to JavaScript.** This is the riskiest integration, so prove it
 works on day one. Write a tiny Dafny module, verify it, translate it to JS,
@@ -111,8 +129,9 @@ breaks the build everywhere it matters.
   `{:axiom}` or `{:verify false}` (SPEC §5.3).
 
 **Done when:** CI is green on all three platforms, the Dafny spike runs from
-TypeScript, and every contract has a schema, a generated type and at least
-one example that validates against it.
+TypeScript, every contract has a schema, a generated type and at least one
+example that validates against it, and `skop --version` prints the release
+version and build identity.
 
 ---
 
@@ -229,8 +248,12 @@ follows the same loop:
 
 ## 5. CI gate (every PR, every stream)
 
+The CI workflow is `.github/workflows/ci.yml`. It runs on every push and
+pull request, on linux-x64, linux-arm64 and macOS-arm64.
+
 | Check | Fails when |
 |---|---|
+| Spec and plan checks | an error code is used but not defined, a JSON example doesn't parse, or a diagram doesn't render |
 | Type check and lint | any error |
 | Unit and property tests | any failure, or an expected failure that starts passing without being flipped |
 | `dafny verify` | any unproven obligation |
@@ -307,3 +330,28 @@ After v1 ships. The same stream owners pick up their part in parallel:
   marks the affected test as an expected failure, and moves on.
 - **Checkpoints:** end of Phase 0, the proof timebox in stream C, end of
   Phase 1, and each milestone. At each one a human reviews what's merged.
+
+---
+
+## 10. Releasing
+
+Versioning follows ply (SPEC §7.2): a hand-edited release version in
+`package.json`, and a build identity hashed from the source.
+
+1. Bump `version` in `package.json` in a normal PR, and merge it once CI is
+   green.
+2. Tag that commit `v` plus the version, for example `v0.1.0`, and push the
+   tag.
+3. `.github/workflows/release.yml` then:
+   - reruns the full test workflow;
+   - refuses to go on if the tag doesn't match `package.json`;
+   - builds the npm package once;
+   - installs it on a clean machine on each platform, checks
+     `skop --version`, and lints and dry-runs each example skill with fakes;
+   - creates the GitHub release with the package attached;
+   - builds and pushes the container image to
+     `ghcr.io/mattyv/skop` for linux/amd64 and linux/arm64;
+   - publishes to npm, only if an `NPM_TOKEN` secret is set.
+
+The release workflow fails on purpose until there's code to release: it
+needs `package.json` for the package and a `Dockerfile` for the image.

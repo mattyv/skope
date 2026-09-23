@@ -1,4 +1,4 @@
-# skop (skill op) — Implementation Spec (v1, rev 16)
+# skop (skill op) — Implementation Spec (v1, rev 17)
 
 Audience: an engineer or LLM implementing this from scratch. Everything
 marked **MUST** is normative. Where this spec says "verify against current
@@ -715,7 +715,8 @@ Shipped Dafny code MUST NOT contain `assume`, `{:axiom}` or
 - Ship as an npm package and a container image. No native dependencies.
 
 ### 5.6 Verify report (`skop --verify`)
-From the explore handler, report:
+From the explore handler, report the skop release version and build
+identity (§7.2), then:
 - total abstract paths; outcomes reachable (`stopped` / `paged` / `handoff`,
   with reasons)
 - **fail** if any path ends without an outcome, or in `error` (impossible by
@@ -957,6 +958,7 @@ skop <path/to/SKILL.md> [options]
   --fake answers.yaml     use the fake backend
   --fake-exec cmds.yaml   use the fake command handler; no real command runs
   --config path           default: $XDG_CONFIG_HOME/skop/config.yaml
+  --version               print the release version and build identity (§7.2)
 ~~~
 
 Responsibilities, in order:
@@ -1093,6 +1095,35 @@ Warnings don't stop a run:
 Parse codes come from the preprocessor. Lint codes come from the Dafny core,
 so `LintError` carries the code. The rest come from the TypeScript host.
 
+### 7.2 Version and build identity
+Skop has two numbers, because they answer different questions. The scheme
+is copied from ply, which learned it the hard way: fourteen fixes shipped
+under one unchanged version string, and results from the broken build kept
+being trusted.
+
+- **Release version**: the semver `version` in `package.json`, edited by
+  hand. It says which release this is. A release tag MUST match it (`v` +
+  version).
+- **Build identity**: a sha256 over the source that decides what skop does,
+  computed at build time by `scripts/build-id.mjs`. The inputs are every
+  file under `src/`, `core/` and `contracts/`, plus `package.json`,
+  `package-lock.json`, `.dafny-version` and the script itself. It answers
+  "is this the same skop?" A comment-only edit changes it too. That errs
+  towards treating results as stale, which is the safe direction.
+
+Rules:
+- The identity is hashed from file contents, not a git commit, so it's the
+  same from a clone, a dirty tree or a release tarball.
+- There's no fallback. If any input can't be read, or the version isn't
+  semver, the build fails. A build that doesn't know its identity must not
+  produce a package.
+- `skop --version` prints `skop 0.1.0 (build identity <sha256>)`.
+- Everything that records which skop produced it stamps **both** numbers,
+  from one shared constant: the `run_start` event, the handoff record, the
+  verify report, and recorded backend fixtures. Anything that compares runs,
+  like goldens, recordings, or a reader asking "was this made by the skop I
+  have?", compares the build identity, never the release version.
+
 ---
 
 ## 8. Handoff
@@ -1133,6 +1164,7 @@ Then skop exits 20.
  "effects":[{"cmd":"journalctl --vacuum-size=500M","status":"done"},
             {"cmd":"docker image prune -af","status":"unknown"}],
  "dry_run":true,
+ "skop":{"version":"0.1.0","build":"sha256:…"},
  "preamble":"You are taking over a run of a runnable skill. …"}
 ```
 - For a Score ask, `detail.probs` is keyed by level
@@ -1209,7 +1241,7 @@ logs warning `W-REDACT-OFF` on every run):
 
 | `event` | Extra fields |
 |---|---|
-| `run_start` | `params`, `dry_run`, `caller`, `run_dir` |
+| `run_start` | `params`, `dry_run`, `caller`, `run_dir`, `skop_version`, `skop_build` (§7.2) |
 | `run` / `check_cmd` | `cmd`, `exit`, `ms`, `timed_out`, `truncated`, `stdout_hash`, `stdout_tail` (redacted, ≤2KB), `after_would_do` |
 | `check` | `expr`, `left`, `right`, `result`, `after_would_do` |
 | `ask` | `question`, `kind`, `probs`, `chosen`, `confidence`, `sure`, `passed`, `backend`, `model`, `ms`, `request_path`, `request_sha256`, `after_would_do`; for `score`, `range`, and `chosen` is an integer |
@@ -1384,12 +1416,23 @@ file paths.
   launched. A handoff under `--apply` pages; `--no-page`,
   `SKOP_CALLER=agent` and `on_handoff: none` each stop it; dry run logs
   `would_page`. The result doesn't depend on whether a terminal is attached.
-- **M6 Packaging**: npm package and container image. The fake-backed test
+- **M6 Packaging**: npm package and container image, with the identity
+  tests below passing. The fake-backed test
   suite passes on linux-x64, linux-arm64 and macOS-arm64 with only Node
   installed.
 - **M7 Score asks (v1.1)**: all Score tests in §12.2 pass; P4–P6 still
   verify with the Score additions; the Appendix D fixture passes M1–M3 with
   fakes for each level, unsure, and backend unavailable.
+
+Identity tests (§7.2), in M6:
+- `skop --version` prints the release version and build identity.
+- The `run_start` event, handoff record and verify report all carry the
+  same build identity `--version` prints. One test sweeps them all, so a
+  new place that stamps a version can't use a different constant.
+- Editing any input file changes the build identity, and editing a file
+  outside the inputs doesn't.
+- Removing any input, or setting a non-semver version, fails the build.
+- The release workflow refuses a tag that doesn't match `package.json`.
 
 ### 12.4 Differential check (optional but cheap)
 For each fake scenario, the concrete trace MUST appear among the explore
@@ -1856,6 +1899,14 @@ Also, where things live in the Markdown:
   text aren't counted, and chars/4 is only an estimate.
 - **A "request too large" error hands off** as `ask_unavailable` with
   detail `request_too_large`, and is never retried. A test covers it.
+
+### Rev 17 (version and build identity)
+
+- **Two numbers, copied from ply** (§7.2). The release version in
+  `package.json` says which release; a build identity hashed from the
+  source says whether it's the same skop. Both are printed by `--version`
+  and stamped into `run_start`, the handoff record and the verify report.
+- **No fallback.** A build that can't hash its inputs fails.
 
 ---
 

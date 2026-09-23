@@ -1,0 +1,105 @@
+# Test workflow: runs on every push and pull request, and is reused by the
+# release workflow. Build, test and Dafny steps switch on once Phase 0 adds
+# package.json and .dafny-version (PLAN.md §3). Until then only the spec
+# checks run.
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  spec:
+    name: Spec and plan checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Error codes defined, JSON examples valid
+        run: python3 scripts/check_spec.py docs
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Every Mermaid diagram renders
+        run: |
+          python3 scripts/check_spec.py mermaid "$RUNNER_TEMP/mmd"
+          echo '{"args":["--no-sandbox"]}' > "$RUNNER_TEMP/puppeteer.json"
+          for f in "$RUNNER_TEMP"/mmd/*.mmd; do
+            echo "rendering $(basename "$f")"
+            npx -y @mermaid-js/mermaid-cli@11 -q -p "$RUNNER_TEMP/puppeteer.json" -i "$f" -o "${f%.mmd}.svg"
+          done
+
+  test:
+    name: Test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm, macos-14]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for code
+        id: code
+        run: |
+          if [ -f package.json ]; then echo "present=true" >> "$GITHUB_OUTPUT"
+          else echo "present=false" >> "$GITHUB_OUTPUT"; echo "No package.json yet; skipping build and tests."; fi
+      - uses: actions/setup-node@v4
+        if: steps.code.outputs.present == 'true'
+        with:
+          node-version: "20"
+          cache: npm
+      - name: Install
+        if: steps.code.outputs.present == 'true'
+        run: npm ci
+      - name: Type check
+        if: steps.code.outputs.present == 'true'
+        run: npm run typecheck --if-present
+      - name: Lint
+        if: steps.code.outputs.present == 'true'
+        run: npm run lint --if-present
+      - name: Build
+        if: steps.code.outputs.present == 'true'
+        run: npm run build --if-present
+      - name: Unit, property, golden and acceptance tests
+        if: steps.code.outputs.present == 'true'
+        run: npm test
+      - name: Every error code has a test (SPEC §12.2)
+        run: python3 scripts/check_spec.py coverage
+
+  dafny:
+    name: Dafny proofs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for Dafny code
+        id: code
+        run: |
+          if [ -f .dafny-version ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+            echo "version=$(tr -d '[:space:]' < .dafny-version)" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"; echo "No .dafny-version yet; skipping."
+          fi
+      - name: No proof shortcuts (SPEC §5.3)
+        if: steps.code.outputs.present == 'true'
+        run: |
+          if grep -rnE '\bassume\b|\{:axiom\}|\{:verify false\}' --include='*.dfy' .; then
+            echo "Dafny code must not use assume, {:axiom} or {:verify false}."; exit 1
+          fi
+      - uses: dafny-lang/setup-dafny-action@v1
+        if: steps.code.outputs.present == 'true'
+        with:
+          dafny-version: ${{ steps.code.outputs.version }}
+      - name: Verify every proof
+        if: steps.code.outputs.present == 'true'
+        run: |
+          files=$(git ls-files '*.dfy')
+          if [ -z "$files" ]; then echo "No .dfy files yet."; exit 0; fi
+          dafny verify $files
