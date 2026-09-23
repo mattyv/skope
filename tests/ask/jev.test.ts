@@ -13,9 +13,21 @@ const diskFullRequest: AskRequest = {
   question: "Given `used`, `errors` and `biggest`, what's the best next step?",
   guidance: "Look at usage, recent errors and what's biggest on disk.",
   options: [
-    { id: "s:clean_up", label: "Clean up", description: "Run cleanups least risky first. Stop as soon as usage is under target." },
-    { id: "s:restart", label: "Restart", description: "Restart the one service most likely behind the growth. Never more than one." },
-    { id: "s:page", label: "Page", description: "Nothing here is safe to try automatically. Tell a human." },
+    {
+      id: "s:clean_up",
+      label: "Clean up",
+      description: "Run cleanups least risky first. Stop as soon as usage is under target.",
+    },
+    {
+      id: "s:restart",
+      label: "Restart",
+      description: "Restart the one service most likely behind the growth. Never more than one.",
+    },
+    {
+      id: "s:page",
+      label: "Page",
+      description: "Nothing here is safe to try automatically. Tell a human.",
+    },
     {
       id: "s:investigate",
       label: "Investigate",
@@ -43,7 +55,10 @@ describe("askJev request shape (SPEC §6.2)", () => {
       sentBody = JSON.parse(init.body as string);
       return new Response(recording("choice-success.json"), { status: 200 });
     });
-    await askJev(diskFullRequest, config, retryCfg, { fetch: fetchImpl as any, sleep });
+    await askJev(diskFullRequest, config, retryCfg, {
+      fetch: fetchImpl as any,
+      sleep,
+    });
 
     expect(sentUrl).toBe("https://api.typesafe.ai/v1/systemone");
     expect(sentBody).toEqual({
@@ -73,14 +88,20 @@ describe("askJev request shape (SPEC §6.2)", () => {
       sentBody = JSON.parse(init.body as string);
       return new Response(recording("choice-success.json"), { status: 200 });
     });
-    await askJev(diskFullRequest, config, retryCfg, { fetch: fetchImpl as any, sleep });
+    await askJev(diskFullRequest, config, retryCfg, {
+      fetch: fetchImpl as any,
+      sleep,
+    });
     expect(sentBody.state).toEqual(diskFullRequest.context);
     expect(Object.keys(sentBody.state)).toHaveLength(3);
   });
 
   test("maps Jev's label keys in answers.q back to option ids", async () => {
     const fetchImpl = fetchReturning(new Response(recording("choice-success.json"), { status: 200 }));
-    const out = await askJev(diskFullRequest, config, retryCfg, { fetch: fetchImpl, sleep });
+    const out = await askJev(diskFullRequest, config, retryCfg, {
+      fetch: fetchImpl,
+      sleep,
+    });
     expect(isFailure(out)).toBe(false);
     expect(!isFailure(out) && out.probs).toEqual({
       "s:clean_up": 0.82,
@@ -91,21 +112,39 @@ describe("askJev request shape (SPEC §6.2)", () => {
   });
 
   test("reads the answer from answers.q; a response without it is invalid (unavailable)", async () => {
-    const fetchImpl = fetchReturning(new Response(JSON.stringify({ model: "jev-1.13.0", answers: {} }), { status: 200 }));
-    const out = await askJev(diskFullRequest, config, retryCfg, { fetch: fetchImpl, sleep });
+    const fetchImpl = fetchReturning(
+      new Response(JSON.stringify({ model: "jev-1.13.0", answers: {} }), {
+        status: 200,
+      }),
+    );
+    const out = await askJev(diskFullRequest, config, retryCfg, {
+      fetch: fetchImpl,
+      sleep,
+    });
     expect(isFailure(out) && out.error).toBe("unavailable");
   });
 
   test("a partial probabilities object (a missing option) is unavailable, never filled in", async () => {
-    const body = { model: "jev-1.13.0", answers: { q: { type: "choice", probabilities: { "Clean up": 0.9, Restart: 0.1 } } } };
+    const body = {
+      model: "jev-1.13.0",
+      answers: {
+        q: { type: "choice", probabilities: { "Clean up": 0.9, Restart: 0.1 } },
+      },
+    };
     const fetchImpl = fetchReturning(new Response(JSON.stringify(body), { status: 200 }));
-    const out = await askJev(diskFullRequest, config, retryCfg, { fetch: fetchImpl, sleep });
+    const out = await askJev(diskFullRequest, config, retryCfg, {
+      fetch: fetchImpl,
+      sleep,
+    });
     expect(isFailure(out) && out.error).toBe("unavailable");
   });
 
   test("reports backend and model on every answer", async () => {
     const fetchImpl = fetchReturning(new Response(recording("choice-success.json"), { status: 200 }));
-    const out = await askJev(diskFullRequest, config, retryCfg, { fetch: fetchImpl, sleep });
+    const out = await askJev(diskFullRequest, config, retryCfg, {
+      fetch: fetchImpl,
+      sleep,
+    });
     expect(!isFailure(out) && out.backend).toBe("jev");
     expect(!isFailure(out) && out.model).toBe("jev-1.13.0");
   });
@@ -135,7 +174,11 @@ describe("askJev retries (SPEC §6.2, ask.retries 0-3)", () => {
     let calls = 0;
     const fetchImpl = vi.fn(async () => {
       calls++;
-      if (calls === 1) return new Response("", { status: 429, headers: { "retry-after": "1" } });
+      if (calls === 1)
+        return new Response("", {
+          status: 429,
+          headers: { "retry-after": "1" },
+        });
       return new Response(recording("choice-success.json"), { status: 200 });
     });
     const out = await askJev(diskFullRequest, config, { timeoutMs: 5000, retries: 2 }, { fetch: fetchImpl, sleep });
@@ -167,5 +210,115 @@ describe("W-MODEL-ALIAS (SPEC §6.2)", () => {
   test("a response reporting a different model than configured is a mismatch", () => {
     expect(modelMismatch("jev-1.13.0", "jev-1.14.0")).toBe(true);
     expect(modelMismatch("jev-1.13.0", "jev-1.13.0")).toBe(false);
+  });
+});
+
+// Wire formats per docs.typesafe.ai: Noul answers with a single P(yes);
+// Score takes the rubric as an array and keys probabilities by position.
+describe("askJev yes/no and Score questions (SPEC §6.2)", () => {
+  const yesno: AskRequest = {
+    kind: "yesno",
+    question: 'Is it worth running "Vacuum the journal"?',
+    guidance: null,
+    options: [
+      { id: "yes", label: "yes", description: null },
+      { id: "no", label: "no", description: null },
+    ],
+    context: {},
+    timeout_ms: 2000,
+  };
+  const score: AskRequest = {
+    kind: "score",
+    question: "How severe are the errors in `errors`?",
+    guidance: null,
+    options: [1, 2, 3, 4].map((l, i) => ({
+      id: String(l),
+      label: String(l),
+      description:
+        ["known noise, nothing to do", "worth a human look, not urgent", "degraded service", "outage or data at risk"][i] ?? null,
+    })) as AskRequest["options"],
+    context: { errors: "…" },
+    timeout_ms: 2000,
+  };
+  const capture = (file: string) => {
+    const sent: any[] = [];
+    const fetchImpl = vi.fn(async (_url: string, init: RequestInit) => {
+      sent.push(JSON.parse(init.body as string));
+      return new Response(recording(file), { status: 200 });
+    });
+    return { sent, fetchImpl };
+  };
+
+  test("a yes/no question is a Noul with no criteria, and noul is P(yes)", async () => {
+    const { sent, fetchImpl } = capture("noul-success.json");
+    const out = await askJev(yesno, config, retryCfg, {
+      fetch: fetchImpl as any,
+      sleep,
+    });
+    expect(sent[0].questions.q).toEqual({
+      type: "noul",
+      instructions: { question: 'Is it worth running "Vacuum the journal"?' },
+    });
+    expect(!isFailure(out) && out.probs).toEqual({ yes: 0.875, no: 0.125 });
+  });
+
+  test("a Noul answer without a noul number is unavailable", async () => {
+    const res = {
+      model: "jev-1.13.0",
+      answers: { q: { type: "noul", probabilities: { yes: 1, no: 0 } } },
+    };
+    const out = await askJev(yesno, config, retryCfg, {
+      fetch: fetchReturning(new Response(JSON.stringify(res))) as any,
+      sleep,
+    });
+    expect(out).toMatchObject({ error: "unavailable", backend: "jev" });
+  });
+
+  test("a Score question sends the rubric lowest first and maps positions back to levels", async () => {
+    const { sent, fetchImpl } = capture("score-success.json");
+    const out = await askJev(score, config, retryCfg, {
+      fetch: fetchImpl as any,
+      sleep,
+    });
+    expect(sent[0].questions.q.type).toBe("score");
+    expect(sent[0].questions.q.criteria).toEqual([
+      "known noise, nothing to do",
+      "worth a human look, not urgent",
+      "degraded service",
+      "outage or data at risk",
+    ]);
+    expect(!isFailure(out) && out.probs).toEqual({
+      "1": 0.05,
+      "2": 0.1,
+      "3": 0.45,
+      "4": 0.4,
+    });
+  });
+
+  test("a Score answer missing a level is unavailable, never filled in", async () => {
+    const res = {
+      model: "jev-1.13.0",
+      answers: {
+        q: { type: "score", probabilities: { "0": 0.5, "1": 0.5, "2": 0 } },
+      },
+    };
+    const out = await askJev(score, config, retryCfg, {
+      fetch: fetchReturning(new Response(JSON.stringify(res))) as any,
+      sleep,
+    });
+    expect(out).toMatchObject({ error: "unavailable" });
+  });
+
+  test("529 overloaded is retried", async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(new Response("overloaded", { status: 529 }))
+      .mockResolvedValueOnce(new Response(recording("noul-success.json"), { status: 200 }));
+    const out = await askJev(yesno, config, retryCfg, {
+      fetch: fetchImpl as any,
+      sleep,
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(isFailure(out)).toBe(false);
   });
 });

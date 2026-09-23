@@ -41,7 +41,12 @@ function logprobResponse(tokenAndAlts: { token: string; top_logprobs: { token: s
   return new Response(
     JSON.stringify({
       model: "test/model",
-      choices: [{ message: { role: "assistant", content: tokenAndAlts.token }, logprobs: { content: [tokenAndAlts] } }],
+      choices: [
+        {
+          message: { role: "assistant", content: tokenAndAlts.token },
+          logprobs: { content: [tokenAndAlts] },
+        },
+      ],
     }),
     { status: 200 },
   );
@@ -66,7 +71,11 @@ describe("buildPrompt (SPEC §6.2)", () => {
     const req: AskRequest = {
       ...servicesRequest,
       options: [
-        { id: "s:clean_up", label: "Clean up", description: "Run cleanups least risky first." },
+        {
+          id: "s:clean_up",
+          label: "Clean up",
+          description: "Run cleanups least risky first.",
+        },
         { id: "rsyslog", label: "rsyslog", description: null },
       ],
     };
@@ -84,7 +93,10 @@ describe("askOpenRouter reading logprobs (SPEC §6.2)", () => {
         { id: "no", label: "no", description: null },
       ],
     };
-    const out = await askOpenRouter(req, config, retryCfg, { fetch: fetchImpl, sleep });
+    const out = await askOpenRouter(req, config, retryCfg, {
+      fetch: fetchImpl,
+      sleep,
+    });
     expect(isFailure(out)).toBe(false);
     const probA = !isFailure(out) ? out.probs.yes : undefined;
     expect(probA).toBeCloseTo(0.971428, 5);
@@ -101,7 +113,10 @@ describe("askOpenRouter reading logprobs (SPEC §6.2)", () => {
       ],
     });
     const fetchImpl = vi.fn(async () => res);
-    const out = await askOpenRouter(yesnoRequest, config, retryCfg, { fetch: fetchImpl, sleep });
+    const out = await askOpenRouter(yesnoRequest, config, retryCfg, {
+      fetch: fetchImpl,
+      sleep,
+    });
     expect(!isFailure(out) && out.probs.yes).toBeCloseTo(0.9, 5);
   });
 
@@ -119,9 +134,18 @@ describe("askOpenRouter reading logprobs (SPEC §6.2)", () => {
   });
 
   test("missing logprobs is unavailable", async () => {
-    const res = new Response(JSON.stringify({ model: "test/model", choices: [{ message: { content: "A" } }] }), { status: 200 });
+    const res = new Response(
+      JSON.stringify({
+        model: "test/model",
+        choices: [{ message: { content: "A" } }],
+      }),
+      { status: 200 },
+    );
     const fetchImpl = vi.fn(async () => res);
-    const out = await askOpenRouter(yesnoRequest, config, retryCfg, { fetch: fetchImpl, sleep });
+    const out = await askOpenRouter(yesnoRequest, config, retryCfg, {
+      fetch: fetchImpl,
+      sleep,
+    });
     expect(isFailure(out) && out.error).toBe("unavailable");
   });
 
@@ -129,12 +153,20 @@ describe("askOpenRouter reading logprobs (SPEC §6.2)", () => {
     const res = new Response(
       JSON.stringify({
         model: "test/model",
-        choices: [{ message: { content: "", reasoning: "thinking it over..." }, logprobs: { content: [] } }],
+        choices: [
+          {
+            message: { content: "", reasoning: "thinking it over..." },
+            logprobs: { content: [] },
+          },
+        ],
       }),
       { status: 200 },
     );
     const fetchImpl = vi.fn(async () => res);
-    const out = await askOpenRouter(yesnoRequest, config, retryCfg, { fetch: fetchImpl, sleep });
+    const out = await askOpenRouter(yesnoRequest, config, retryCfg, {
+      fetch: fetchImpl,
+      sleep,
+    });
     expect(isFailure(out) && out.error).toBe("unavailable");
     expect(isFailure(out) && out.detail).toContain("reasoning");
   });
@@ -143,9 +175,15 @@ describe("askOpenRouter reading logprobs (SPEC §6.2)", () => {
     let sentBody: any;
     const fetchImpl = vi.fn(async (_url, init) => {
       sentBody = JSON.parse(init.body as string);
-      return logprobResponse({ token: "B", top_logprobs: [{ token: "B", logprob: Math.log(0.95) }] });
+      return logprobResponse({
+        token: "B",
+        top_logprobs: [{ token: "B", logprob: Math.log(0.95) }],
+      });
     });
-    const out = await askOpenRouter(servicesRequest, config, retryCfg, { fetch: fetchImpl, sleep });
+    const out = await askOpenRouter(servicesRequest, config, retryCfg, {
+      fetch: fetchImpl,
+      sleep,
+    });
     expect(sentBody.messages[0].content).toContain("A: nginx");
     expect(sentBody.messages[0].content).toContain("B: rsyslog");
     expect(!isFailure(out) && out.probs.rsyslog).toBeCloseTo(0.95, 5);
@@ -157,9 +195,15 @@ describe("askOpenRouter request (SPEC §6.2)", () => {
     let sentBody: any;
     const fetchImpl = vi.fn(async (_url, init) => {
       sentBody = JSON.parse(init.body as string);
-      return logprobResponse({ token: "A", top_logprobs: [{ token: "A", logprob: 0 }] });
+      return logprobResponse({
+        token: "A",
+        top_logprobs: [{ token: "A", logprob: 0 }],
+      });
     });
-    await askOpenRouter(yesnoRequest, config, retryCfg, { fetch: fetchImpl, sleep });
+    await askOpenRouter(yesnoRequest, config, retryCfg, {
+      fetch: fetchImpl,
+      sleep,
+    });
     expect(sentBody.max_tokens).toBe(1);
     expect(sentBody.temperature).toBe(0);
     expect(sentBody.logprobs).toBe(true);
@@ -171,9 +215,20 @@ describe("checkModel (SPEC §6.2, E-BACKEND-MODEL)", () => {
   test("a model without logprobs support is E-BACKEND-MODEL", async () => {
     const fetchImpl = vi.fn(
       async () =>
-        new Response(JSON.stringify({ data: [{ id: "test/model", supported_parameters: ["reasoning"], context_length: 32000 }] }), {
-          status: 200,
-        }),
+        new Response(
+          JSON.stringify({
+            data: [
+              {
+                id: "test/model",
+                supported_parameters: ["reasoning"],
+                context_length: 32000,
+              },
+            ],
+          }),
+          {
+            status: 200,
+          },
+        ),
     );
     const result = await checkModel("test/model", { fetch: fetchImpl, sleep });
     expect(result.ok).toBe(false);
@@ -182,9 +237,20 @@ describe("checkModel (SPEC §6.2, E-BACKEND-MODEL)", () => {
   test("a model whose reasoning can't be turned off is E-BACKEND-MODEL", async () => {
     const fetchImpl = vi.fn(
       async () =>
-        new Response(JSON.stringify({ data: [{ id: "test/model", supported_parameters: ["logprobs"], context_length: 32000 }] }), {
-          status: 200,
-        }),
+        new Response(
+          JSON.stringify({
+            data: [
+              {
+                id: "test/model",
+                supported_parameters: ["logprobs"],
+                context_length: 32000,
+              },
+            ],
+          }),
+          {
+            status: 200,
+          },
+        ),
     );
     const result = await checkModel("test/model", { fetch: fetchImpl, sleep });
     expect(result.ok).toBe(false);
@@ -200,7 +266,15 @@ describe("checkModel (SPEC §6.2, E-BACKEND-MODEL)", () => {
     const fetchImpl = vi.fn(
       async () =>
         new Response(
-          JSON.stringify({ data: [{ id: "test/model", supported_parameters: ["logprobs", "reasoning"], context_length: 32000 }] }),
+          JSON.stringify({
+            data: [
+              {
+                id: "test/model",
+                supported_parameters: ["logprobs", "reasoning"],
+                context_length: 32000,
+              },
+            ],
+          }),
           { status: 200 },
         ),
     );

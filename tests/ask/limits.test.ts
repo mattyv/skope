@@ -8,9 +8,21 @@ import { checkAskLimits } from "../../src/ask/types.js";
 
 describe("checkAskLimits (SPEC §6.2, §12.2)", () => {
   test("declares the limits table from SPEC §6.2", () => {
-    expect(JEV_LIMITS).toEqual({ maxOptions: 255, maxScoreLevels: 10, contextTokens: 30000 });
-    expect(OPENROUTER_LIMITS).toEqual({ maxOptions: 20, maxScoreLevels: 10, contextTokens: null });
-    expect(FAKE_LIMITS).toEqual({ maxOptions: 255, maxScoreLevels: 10, contextTokens: null });
+    expect(JEV_LIMITS).toEqual({
+      maxOptions: 255,
+      maxScoreLevels: 10,
+      contextTokens: 30000,
+    });
+    expect(OPENROUTER_LIMITS).toEqual({
+      maxOptions: 20,
+      maxScoreLevels: 10,
+      contextTokens: null,
+    });
+    expect(FAKE_LIMITS).toEqual({
+      maxOptions: 255,
+      maxScoreLevels: 10,
+      contextTokens: null,
+    });
   });
 
   test("21 options on openrouter is E-BACKEND-LIMIT (max 20)", () => {

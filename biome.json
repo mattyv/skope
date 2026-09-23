@@ -12,7 +12,6 @@
     "rules": {
       "suspicious": {
         "noExplicitAny": "off",
-        // The core program contract has a `then` field (a check's target).
         "noThenProperty": "off"
       }
     }

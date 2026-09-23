@@ -31,14 +31,24 @@ describe("runAsk (SPEC §6.1)", () => {
   test("selects jev and calls out to it", async () => {
     // Stub global fetch since runAsk wires jev to the real `fetch`.
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      new Response(JSON.stringify({ model: "jev-1.13.0", answers: { q: { type: "yesno", probabilities: { yes: 0.7, no: 0.3 } } } }), {
-        status: 200,
-      }),
+      new Response(
+        JSON.stringify({
+          model: "jev-1.13.0",
+          answers: { q: { type: "noul", noul: 0.75 } },
+        }),
+        {
+          status: 200,
+        },
+      ),
     );
     try {
-      const out = await runAsk(JSON.stringify(request), { SKOP_ASK_BACKEND: "jev", TYPESAFE_API_KEY: "k", JEV_MODEL: "jev-1.13.0" });
+      const out = await runAsk(JSON.stringify(request), {
+        SKOP_ASK_BACKEND: "jev",
+        TYPESAFE_API_KEY: "k",
+        JEV_MODEL: "jev-1.13.0",
+      });
       expect(isFailure(out)).toBe(false);
-      expect(!isFailure(out) && out.probs).toEqual({ yes: 0.7, no: 0.3 });
+      expect(!isFailure(out) && out.probs).toEqual({ yes: 0.75, no: 0.25 });
       expect(fetchSpy).toHaveBeenCalledWith("https://api.typesafe.ai/v1/systemone", expect.anything());
     } finally {
       fetchSpy.mockRestore();
@@ -50,7 +60,14 @@ describe("runAsk (SPEC §6.1)", () => {
       new Response(
         JSON.stringify({
           model: "test/model",
-          choices: [{ message: { content: "A" }, logprobs: { content: [{ token: "A", top_logprobs: [{ token: "A", logprob: 0 }] }] } }],
+          choices: [
+            {
+              message: { content: "A" },
+              logprobs: {
+                content: [{ token: "A", top_logprobs: [{ token: "A", logprob: 0 }] }],
+              },
+            },
+          ],
         }),
         { status: 200 },
       ),

@@ -45,7 +45,11 @@ export function checkAskLimits(input: AskLimitInput, limits: BackendLimits): Lim
   const max = input.kind === "score" ? limits.maxScoreLevels : limits.maxOptions;
   if (input.optionCount > max) {
     const what = input.kind === "score" ? "levels" : "options";
-    return { ok: false, code: "E-BACKEND-LIMIT", detail: `${input.optionCount} ${what} exceeds the backend's limit of ${max}` };
+    return {
+      ok: false,
+      code: "E-BACKEND-LIMIT",
+      detail: `${input.optionCount} ${what} exceeds the backend's limit of ${max}`,
+    };
   }
   if (limits.contextTokens !== null && input.declaredContextTokens !== null && input.declaredContextTokens > limits.contextTokens) {
     return {

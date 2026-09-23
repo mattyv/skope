@@ -1,14 +1,9 @@
 // The openrouter backend: a general model through OpenRouter (SPEC §6.2).
 //
-// ponytail: exact OpenRouter parameter names for disabling reasoning and
-// requiring provider parameters aren't fully pinned in SPEC.md (it says
-// "historically provider.require_parameters: true" and just "turn
-// reasoning off"), and this environment has no network access to check
-// OpenRouter's current docs. Implemented as `provider: {
-// require_parameters: true }` and `reasoning: { enabled: false }`,
-// following the OpenAI-compatible chat-completions + logprobs shape.
-// Flagging per PLAN.md §1: verify against OpenRouter's real docs before
-// this ships.
+// Parameters per OpenRouter's docs: `logprobs` + `top_logprobs` (max 20),
+// `reasoning: { effort: "none" }` turns reasoning off, and
+// `provider: { require_parameters: true }` routes only to providers that
+// honour every parameter, so logprobs can't be silently dropped.
 
 import type { HttpDeps, RetryConfig } from "./retry.js";
 import { fetchWithRetry } from "./retry.js";
@@ -51,7 +46,9 @@ interface TopLogprob {
 interface ChatCompletion {
   choices?: {
     message?: { reasoning?: string | null };
-    logprobs?: { content?: { token: string; top_logprobs?: TopLogprob[] }[] } | null;
+    logprobs?: {
+      content?: { token: string; top_logprobs?: TopLogprob[] }[];
+    } | null;
   }[];
 }
 
@@ -73,14 +70,17 @@ export async function askOpenRouter(
     logprobs: true,
     top_logprobs: 20,
     provider: { require_parameters: true },
-    reasoning: { enabled: false },
+    reasoning: { effort: "none" },
   };
 
   const res = await fetchWithRetry(
     (signal) =>
       deps.fetch(url, {
         method: "POST",
-        headers: { "content-type": "application/json", authorization: `Bearer ${config.apiKey}` },
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${config.apiKey}`,
+        },
         body: JSON.stringify(body),
         signal,
       }),
@@ -88,7 +88,12 @@ export async function askOpenRouter(
     deps,
   );
 
-  const fail = (detail: string): AskOutput => ({ error: "unavailable", detail, backend: "openrouter", model: config.model });
+  const fail = (detail: string): AskOutput => ({
+    error: "unavailable",
+    detail,
+    backend: "openrouter",
+    model: config.model,
+  });
 
   if (res === null) return fail("openrouter: no response (timeout or connection error)");
   if (!res.ok) return fail(`openrouter: HTTP ${res.status}`);
@@ -128,7 +133,13 @@ export async function askOpenRouter(
   const probs: Record<string, number> = {};
   for (const o of request.options) probs[o.id] = (letterMass.get(o.id) ?? 0) / denom;
 
-  return { probs, unassigned: H / denom, backend: "openrouter", model: config.model, ms: Date.now() - started };
+  return {
+    probs,
+    unassigned: H / denom,
+    backend: "openrouter",
+    model: config.model,
+    ms: Date.now() - started,
+  };
 }
 
 export interface ModelCheck {
@@ -137,7 +148,11 @@ export interface ModelCheck {
 }
 
 interface ModelsResponse {
-  data?: { id: string; context_length?: number; supported_parameters?: string[] }[];
+  data?: {
+    id: string;
+    context_length?: number;
+    supported_parameters?: string[];
+  }[];
 }
 
 /**
@@ -145,7 +160,9 @@ interface ModelsResponse {
  * logprobs and be able to turn reasoning off, or it's E-BACKEND-MODEL.
  */
 export async function checkModel(model: string, deps: HttpDeps, url = MODELS_URL): Promise<ModelCheck> {
-  const res = await deps.fetch(url, { headers: { accept: "application/json" } });
+  const res = await deps.fetch(url, {
+    headers: { accept: "application/json" },
+  });
   if (!res.ok) return { ok: false };
   const json = (await res.json()) as ModelsResponse;
   const entry = json.data?.find((m) => m.id === model);

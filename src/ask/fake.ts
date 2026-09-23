@@ -25,7 +25,11 @@ export function askFake(answers: FakesAnswers, request: AskRequest, src?: number
   const entry = answers[key];
 
   if (entry === "unavailable") {
-    return { error: "unavailable", detail: "fake: unavailable", backend: "fake" };
+    return {
+      error: "unavailable",
+      detail: "fake: unavailable",
+      backend: "fake",
+    };
   }
   if (entry === "unsure") {
     const p = 1 / request.options.length;
@@ -34,7 +38,12 @@ export function askFake(answers: FakesAnswers, request: AskRequest, src?: number
     return { probs, backend: "fake", model: "fake", ms: 0 };
   }
   const { unassigned, ...probs } = entry as Record<string, number>;
-  const answer: import("./types.js").AskAnswer = { probs, backend: "fake", model: "fake", ms: 0 };
+  const answer: import("./types.js").AskAnswer = {
+    probs,
+    backend: "fake",
+    model: "fake",
+    ms: 0,
+  };
   if (unassigned !== undefined) answer.unassigned = unassigned;
   return answer;
 }

@@ -40,7 +40,9 @@ export async function runAsk(requestJson: string, env: NodeJS.ProcessEnv): Promi
     const model = env.OPENROUTER_MODEL;
     if (!model) throw new ConfigError("openrouter: no openrouter.model configured");
     const minMass = env.OPENROUTER_MIN_MASS !== undefined ? Number(env.OPENROUTER_MIN_MASS) : undefined;
-    return askOpenRouter(request, { model, apiKey, minMass }, retryCfg, { fetch });
+    return askOpenRouter(request, { model, apiKey, minMass }, retryCfg, {
+      fetch,
+    });
   }
   throw new ConfigError(`unknown ask.backend: ${backend}`);
 }

@@ -22,7 +22,10 @@ describe("askFake (SPEC §6.2, contracts/fakes.schema.json)", () => {
   test("keyed by the question text as sent", () => {
     const out = askFake({ "Given `used`, what next?": { "s:clean_up": 0.7, "s:restart": 0.3 } }, req());
     expect(isFailure(out)).toBe(false);
-    expect(!isFailure(out) && out.probs).toEqual({ "s:clean_up": 0.7, "s:restart": 0.3 });
+    expect(!isFailure(out) && out.probs).toEqual({
+      "s:clean_up": 0.7,
+      "s:restart": 0.3,
+    });
   });
 
   test("line:N wins when both the question text and the line key match", () => {
@@ -31,17 +34,26 @@ describe("askFake (SPEC §6.2, contracts/fakes.schema.json)", () => {
       "line:14": { "s:clean_up": 0.9, "s:restart": 0.1 },
     };
     const out = askFake(answers, req(), 14);
-    expect(!isFailure(out) && out.probs).toEqual({ "s:clean_up": 0.9, "s:restart": 0.1 });
+    expect(!isFailure(out) && out.probs).toEqual({
+      "s:clean_up": 0.9,
+      "s:restart": 0.1,
+    });
   });
 
   test("falls back to the question text when line:N has no entry", () => {
     const out = askFake({ "Given `used`, what next?": { "s:clean_up": 1, "s:restart": 0 } }, req(), 99);
-    expect(!isFailure(out) && out.probs).toEqual({ "s:clean_up": 1, "s:restart": 0 });
+    expect(!isFailure(out) && out.probs).toEqual({
+      "s:clean_up": 1,
+      "s:restart": 0,
+    });
   });
 
   test("unsure is a uniform answer over the options, always a tie", () => {
     const out = askFake({ "line:1": "unsure" }, req(), 1);
-    expect(!isFailure(out) && out.probs).toEqual({ "s:clean_up": 0.5, "s:restart": 0.5 });
+    expect(!isFailure(out) && out.probs).toEqual({
+      "s:clean_up": 0.5,
+      "s:restart": 0.5,
+    });
   });
 
   test("unavailable is a backend failure with reason unavailable", () => {
@@ -53,12 +65,18 @@ describe("askFake (SPEC §6.2, contracts/fakes.schema.json)", () => {
     // Deliberately invalid (doesn't sum to 1): the fake backend doesn't
     // validate, per SPEC §6.1's "the answer schema checks shape only".
     const out = askFake({ "line:1": { "s:clean_up": 1.1, "s:restart": -0.2 } }, req(), 1);
-    expect(!isFailure(out) && out.probs).toEqual({ "s:clean_up": 1.1, "s:restart": -0.2 });
+    expect(!isFailure(out) && out.probs).toEqual({
+      "s:clean_up": 1.1,
+      "s:restart": -0.2,
+    });
   });
 
   test("unassigned is passed through when present", () => {
     const out = askFake({ "line:1": { "s:clean_up": 0.5, "s:restart": 0.2, unassigned: 0.3 } }, req(), 1);
-    expect(!isFailure(out) && out.probs).toEqual({ "s:clean_up": 0.5, "s:restart": 0.2 });
+    expect(!isFailure(out) && out.probs).toEqual({
+      "s:clean_up": 0.5,
+      "s:restart": 0.2,
+    });
     expect(!isFailure(out) && out.unassigned).toBe(0.3);
   });
 
