@@ -1,4 +1,4 @@
-# skop (skill op) — Implementation Spec (v1, rev 9)
+# skop (skill op) — Implementation Spec (v1, rev 10)
 
 Audience: an engineer or LLM implementing this from scratch. Everything
 marked **MUST** is normative. Where this spec says "verify against current
@@ -372,7 +372,9 @@ timeout `limits.do_timeout`.
 - Validate the response (§6.1). An invalid response counts as Jev
   unavailable.
 - Chosen = the option with the highest probability. Confidence = that
-  probability. A tie for highest fails the gate.
+  probability. The gate fails on a tie: when any other option, given all
+  of the response's `unassigned` probability (§6.1), would match or beat
+  the chosen one.
 - Confidence ≥ `sure` → proceed:
   - section options: transfer to the chosen section.
   - `yes | no`: bind NAME (default `_yn`) to boolean.
@@ -403,7 +405,8 @@ flowchart TD
   description.
 - Validation is the same as for `choice` (§6.1).
 - Chosen = the level with the highest probability. Confidence = that
-  probability. A tie for highest fails the gate. The gate doesn't combine
+  probability. A tie, counted the same way as for `choice`, fails the gate.
+  The gate doesn't combine
   neighbouring levels.
 - Confidence ≥ `sure` → bind NAME to the chosen level as an integer and
   continue. A Score ask never transfers by itself.
@@ -595,7 +598,9 @@ CI runs `dafny verify` and fails on any unproven obligation.
 - **P4 Taint.** Every `Exec` command string is a concatenation of author
   literals and trusted values that passed the safe-value check. (Score
   answers are trusted integers, so they pass trivially.)
-- **P5 Answers.** A gate passes only on a response that passed validation
+- **P5 Answers.** Confidence never counts `unassigned` probability for the
+  chosen option, and a gate fails if that probability could change the
+  winner. A gate passes only on a response that passed validation
   (§6.1), and only ever selects one of the options the author wrote. A Score
   gate binds an integer in `LOW..HIGH`.
 - **P6 Lint soundness.** If `Lint(prog) == []`, `Step` never hits an unbound
@@ -688,11 +693,17 @@ Response:
 ```
 Exit 0 on success; non-zero on failure.
 
-**Validation (MUST, done in the core so P5 covers it).** A response is valid
-only if:
-- its keys are exactly the offered option ids: none missing, none extra;
-- every value is a finite number between 0 and 1;
-- the values sum to 1 within 1e-3. Then normalise.
+**Validation (MUST, done in the core so P5 covers it).** A response has
+`probs`, keyed by option id, and optionally `unassigned`: probability the
+backend couldn't attribute to any option (default 0). It's valid only if:
+- the `probs` keys are exactly the offered option ids: none missing, none
+  extra;
+- every value, `unassigned` included, is a finite number between 0 and 1;
+- `probs` plus `unassigned` sum to 1 within 1e-3. Then normalise.
+
+`unassigned` is how a backend says "some probability exists that I didn't
+see". The core treats it as possibly belonging to any option (§4.2). Jev
+always reports 0, so it doesn't affect Jev.
 
 Anything else is invalid and handled as Jev unavailable.
 
@@ -719,25 +730,43 @@ goes through the same validation in the core (§6.1, P5).
   - **Probabilities come only from token logprobs.** A chat model's own
     statement of how sure it is isn't evidence. Never ask for one, and never
     use one.
-  - Label the options with single letters `A`, `B`, `C`, … in order. The
-    prompt (a fixed template shipped with skop) gives the question,
-    guidance, context and each option's letter and description, and asks
-    for the letter alone. This works the same for `choice`, `yesno`
-    (A = yes, B = no) and `score` (A = LOW).
-  - Request one output token at temperature 0, with logprobs and the top 20
-    alternatives. Ask OpenRouter to route only to providers that support
-    those parameters (historically `provider.require_parameters: true`).
-  - Read the first token's alternatives. Trim whitespace and add together
-    the probabilities of tokens that match each option's letter exactly.
-    Options that don't appear get 0.
-  - If the letters together hold less than `openrouter.min_mass` (default
-    0.5) of the probability, the model mostly answered something else, and
-    the response is invalid. Otherwise divide by that total so the options
-    sum to 1, and pass them on keyed by option id.
-  - A response with no logprobs is invalid. Never fill in missing numbers.
-  - Checked before the run starts, both exit 40:
-    - the model doesn't list logprobs support in OpenRouter's model list →
-      `E-BACKEND-MODEL`;
+  - **Prompt.** Label the options with single letters `A`, `B`, `C`, … in
+    order. The prompt, a fixed template shipped with skop, gives the
+    question, guidance and context. For each option it gives the letter,
+    the option's **label**, and its description if it has one. It then asks
+    for the letter alone. `one of` options have no description, so the
+    label is what tells the model that `A` means nginx. This works the same
+    for `choice`, `yesno` (A = yes, B = no) and `score` (A = LOW).
+  - **Request.** One output token at temperature 0, with logprobs and the
+    top 20 alternatives. Turn reasoning off, and ask OpenRouter to route
+    only to providers that support all of these parameters (historically
+    `provider.require_parameters: true`). A reasoning model can spend the
+    whole token budget thinking and never produce the letter.
+  - **Reading the answer.** Take the first output token's returned
+    alternatives. For each option, add together the probabilities of the
+    alternatives that are exactly its letter once whitespace is trimmed.
+    Call that option's total its letter mass, and the sum over all options
+    `L`.
+  - **What the alternatives don't show.** OpenRouter returns only the most
+    likely tokens, so a letter missing from the list isn't zero. The
+    probability outside the returned list is `H` = 1 minus the sum of all
+    returned alternatives. Any of it could belong to any option, so it's
+    reported as `unassigned`, never as 0 for the missing letters. Send
+    `probs` = each option's letter mass ÷ (`L` + `H`), and `unassigned` =
+    `H` ÷ (`L` + `H`). Example: A = 0.51, nineteen other tokens at 0.025,
+    B not returned. Then `H` = 0.015, A's confidence is 0.51 ÷ 0.525 ≈ 97.1%,
+    and a 99% gate fails.
+  - **Invalid responses.** Any of these counts as Jev unavailable (§4.2):
+    - `L` is below `openrouter.min_mass` (default 0.5), so the model mostly
+      answered something else;
+    - there are no logprobs;
+    - there's no visible first token, or the response reports reasoning
+      tokens.
+
+    Never fill in missing numbers.
+  - **Checked before the run starts**, both exit 40:
+    - the model doesn't list logprobs support in OpenRouter's model list, or
+      its reasoning can't be turned off → `E-BACKEND-MODEL`;
     - an ask in the skill has more than 20 options → `E-BACKEND-LIMIT`.
   - Timeouts and retry are the same as for `jev`.
   - `sure` values are tuned against one backend. Moving a skill to another
@@ -888,7 +917,7 @@ and have no codes.
 | `E-PARAM-TYPE` | args | a `--param` value has the wrong type | `threshold=high` |
 | `E-PARAM-UNSAFE` | args | a param override or built-in fails the safe-value check | `mount='/; rm -rf /'` |
 | `E-CONFIG` | args | the config file is unreadable or invalid | |
-| `E-BACKEND-MODEL` | args | the `openrouter` model doesn't support logprobs (§6.2) | |
+| `E-BACKEND-MODEL` | args | the `openrouter` model doesn't support logprobs, or its reasoning can't be turned off (§6.2) | |
 | `E-BACKEND-LIMIT` | args | an ask has more options than the backend allows (§6.2) | 21 options on `openrouter` |
 | `E-FAKE-UNMATCHED` | runtime | `--fake-exec` has no answer for a command (§5.4) | |
 | `E-IO` | runtime | skop can't write its run directory or lock file | |
@@ -1122,7 +1151,8 @@ both, MUST exit 40 with `E-MODE`.
 
 Jev response tests (each MUST be rejected as invalid): a missing option, an
 extra option, a value of 1.1, a negative value, `NaN`, and values summing to
-0.9. A tie for highest MUST fail the gate.
+0.9. A tie for highest MUST fail the gate. So MUST A = 0.6, B = 0.3,
+`unassigned` = 0.3 before normalising, since B could reach 0.6.
 
 Score tests (v1.1). Each lint case MUST fail with the listed code and line:
 - `→ 5 to 1` (LOW ≥ HIGH), `→ 1 to 1` (one level), `→ 1 to 11` (too many): `E-SCORE-RANGE`
@@ -1166,9 +1196,14 @@ file paths.
 - **M3 Exec with fakes**: for each scenario, the event stream matches a golden
   JSONL. Dry run issues no `do` and no page.
 - **M4 Real backends + runner features**: both `jev` and `openrouter`
-  against recorded responses (letters mapped to options, low letter mass,
-  missing logprobs, a model without logprobs, too many options); lock (held, stale, owner-only delete),
-  process rules, timeouts, deadline, redaction defaults, exit codes, config.
+  against recorded responses. For `openrouter` that covers letters mapped
+  to options, the missing-letter example in §6.2 failing a 99% gate, low
+  letter mass, missing logprobs, a reasoning-only response, a model without
+  logprobs, and too many options. A recorded request for disk-full's
+  Restart ask MUST contain the labels nginx, rsyslog, myapp-worker and
+  myapp-api next to their letters. Runner features: lock (held, stale,
+  owner-only delete), process rules, timeouts, deadline, redaction defaults,
+  exit codes, config.
 - **M5 Handoff**: record written and printed with the preamble; no agent
   launched. A handoff under `--apply` pages; `--no-page`,
   `SKOP_CALLER=agent` and `on_handoff: none` each stop it; dry run logs
@@ -1565,6 +1600,18 @@ Also, where things live in the Markdown:
   (`E-DATA-ITEM`).
 - **Link anchors checked** against the section's slug.
 - **Nested loops allowed.**
+
+### Rev 10 (after a review of the OpenRouter backend)
+
+- **Unseen probability isn't zero.** OpenRouter's missing alternatives are
+  reported as `unassigned`, and the core counts them against the top
+  option. Proven as part of P5.
+- **Option labels reach the model.** The prompt gives each letter's label,
+  so `one of` options like service names aren't bare letters.
+- **Reasoning turned off.** Models whose reasoning can't be turned off are
+  refused, and a response with no visible letter is invalid.
+- The reviewer suggested deferring OpenRouter. It stays, per the decision to
+  support both backends, gated by the recorded-response tests in M4.
 
 ---
 
