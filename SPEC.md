@@ -55,21 +55,19 @@ Node.
 
 ## 2. Architecture
 
-~~~
-SKILL.md ──▶ preprocess (TS) ──▶ core program (JSON) + source map
-                                        │
-                                        ▼
-                          core (Dafny → JS): lint + interpreter
-                    pure: (state, response) → (state, events, request)
-                                        │
-             ┌──────────────────────────┼──────────────────────────┐
-             ▼                          ▼                          ▼
-     real handler (TS)          fake handler (TS)         explore handler (TS)
-     shell, Jev, pager          answer files; tests       every outcome; --verify
-             │
-             ▼
-     skop wrapper (TS): logs, lock, config, budgets, handoff
-~~~
+```mermaid
+flowchart TD
+  md["SKILL.md"] --> pre["preprocess (TS)"]
+  pre --> json["core program (JSON)<br/>+ source map"]
+  json --> core["core (Dafny → JS)<br/>lint + interpreter"]
+  subgraph skop["skop wrapper (TS): logs, lock, config, deadline, handoff"]
+    loop["host loop"]
+  end
+  core <-->|"state, response ⇄<br/>state, events, request"| loop
+  loop <--> real["real handler<br/>shell, Jev, pager"]
+  loop <--> fake["fake handler<br/>answer files, tests"]
+  loop <--> explore["explore handler<br/>every path, --verify"]
+```
 
 One interpreter serves real runs, tests and verification. Only the handler
 that answers its requests changes.
@@ -317,6 +315,18 @@ timeout `limits.do_timeout`.
 - Jev unavailable (after one retry, §6.2) or invalid response → `handoff`
   (reason `ask_unavailable`).
 
+```mermaid
+flowchart TD
+  ask["ask"] --> jev{"valid answer from Jev?<br/>(one retry)"}
+  jev -- "no" --> h1(["handoff: ask_unavailable"])
+  jev -- "yes" --> gate{"one clear top option<br/>and confidence ≥ sure?"}
+  gate -- "yes" --> go["transfer, or bind the answer"]
+  gate -- "no" --> els{"else?"}
+  els -- "none" --> h2(["handoff: gate_failed"])
+  els -- "else skip (yes/no only)" --> skip["bind false, continue"]
+  els -- "else [X]" --> x["transfer to X"]
+```
+
 **`for each NAME in [L]`**: run the nested body once per item, in order,
 with NAME bound to the item. A transfer or `stop` inside the body leaves the
 loop and the section. After the last item, continue after the loop.
@@ -423,6 +433,22 @@ Next = Exec(cmd, kind: run | do | check, timeoutMs)
      | Choose(n)        // explore mode only (§5.4)
      | Done(outcome)
 ~~~
+
+```mermaid
+sequenceDiagram
+  participant S as skop (host loop)
+  participant C as core (Dafny)
+  participant H as handler
+  S->>C: Start(prog, runConfig)
+  loop until Done
+    S->>C: Step(state, response)
+    C-->>S: state, events, Next
+    S->>S: write events to stdout
+    S->>H: Exec / Ask / Page / Choose
+    H-->>S: response
+  end
+  Note over S,C: Done(outcome) ends the loop
+```
 
 - The core is pure. No IO in Dafny. The host loop calls `Step`, emits the
   events, answers `Next` with a handler, and feeds the response back until
@@ -588,6 +614,16 @@ Responsibilities, in order:
      take over or delete a lock you don't own; two runs could race to do it.
    - On exit, delete the lock only if it still holds this run's pid and start
      time.
+
+   ```mermaid
+   flowchart TD
+     create["create lock file<br/>(exclusive)"] --> made{"created?"}
+     made -- "yes" --> run["run the skill"]
+     run --> del["on exit: delete it if it still<br/>holds our pid and start time"]
+     made -- "no, it exists" --> alive{"holder alive?"}
+     alive -- "yes" --> locked(["locked: exit 30, no page"])
+     alive -- "no" --> stale(["stale_lock: page a human<br/>unless dry run, exit 31"])
+   ```
 4. Create the run directory (§10.1). Emit `run_start`. Drive the host loop.
    Stream events to stdout.
 5. Enforce `limits.deadline`. Check it between steps only, never in the
@@ -916,6 +952,23 @@ Notes:
 - The commands are GNU/Linux-specific. That's fine for the skill; CI runs the
   fixture through fakes (§12.1).
 
+Transfer graph. Any command failure or failed gate without an else also ends in handoff. Those edges aren't drawn.
+
+```mermaid
+flowchart LR
+  triage["Triage"] -- "under threshold" --> stopped(["stopped"])
+  triage -- "ask" --> clean["Clean up"]
+  triage -- "ask" --> restart["Restart"]
+  triage -- "ask" --> page["Page"]
+  triage -- "ask" --> inv["Investigate"]
+  clean -- "under target" --> stopped
+  clean -- "then" --> page
+  restart -- "under target" --> stopped
+  restart -- "then" --> page
+  page --> paged(["paged"])
+  inv --> handoff(["handoff"])
+```
+
 ---
 
 ## Appendix B — `cert-expiry/SKILL.md`
@@ -986,9 +1039,26 @@ When you're done, suggest an edit to this skill as a diff. Don't edit the file.
 - haproxy
 ````
 
+Transfer graph. Any command failure or failed gate without an else also ends in handoff. Those edges aren't drawn.
+
+```mermaid
+flowchart LR
+  triage["Triage"] -- "served cert fine" --> stopped(["stopped"])
+  triage -- "cert on disk fresh" --> reload["Reload"]
+  triage -- "ask" --> renew["Renew"]
+  triage -- "ask" --> page["Page"]
+  triage -- "ask" --> inv["Investigate"]
+  renew -- "dry run fails" --> inv
+  renew -- "then" --> reload
+  reload -- "served cert fine" --> stopped
+  reload -- "then" --> page
+  page --> paged(["paged"])
+  inv --> handoff(["handoff"])
+```
+
 ---
 
-## Appendix C — Changes since the previous draft
+## Appendix C — Changes by revision
 
 - **K replaced by Dafny.** The core compiles to JavaScript, so the tool needs
   only Node. One pure interpreter serves real runs, fakes and verification.
