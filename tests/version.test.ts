@@ -17,7 +17,7 @@ test("skop --version prints the release version and build identity", () => {
   expect(out.trim()).toBe(`skop ${pkg.version} (build identity ${identity.build})`);
 });
 
-test("anything but exactly --version exits 50", () => {
+test("anything but exactly --version is a usage error: exit 40, nothing runs", () => {
   const cli = fileURLToPath(new URL("../dist/cli.js", import.meta.url));
   for (const args of [[], ["--verbose"], ["--version", "x"], ["--versionx"]]) {
     let status = 0;
@@ -26,6 +26,6 @@ test("anything but exactly --version exits 50", () => {
     } catch (e) {
       status = (e as { status: number }).status;
     }
-    expect(status, args.join(" ")).toBe(50);
+    expect(status, args.join(" ")).toBe(40);
   }
 });
