@@ -1,16 +1,22 @@
 {
   "skill": "disk-full",
   "format": 1,
-  "entry": "s:triage",
+  "entry": {
+    "section": "s:triage",
+    "src": 20
+  },
   "params": {
     "mount": {
-      "str": "/"
+      "str": "/",
+      "src": 6
     },
     "threshold": {
-      "int": 85
+      "int": 85,
+      "src": 7
     },
     "target": {
-      "int": 80
+      "int": 80,
+      "src": 8
     }
   },
   "limits": {
@@ -18,91 +24,6 @@
     "do_timeout_ms": 600000,
     "deadline_ms": 900000,
     "ask_context_tokens": 4000
-  },
-  "lists": {
-    "l:cleanups": {
-      "name": "Cleanups",
-      "src": 67,
-      "items": [
-        {
-          "src": 70,
-          "action": {
-            "label": "Vacuum the journal to 500MB",
-            "cmd": [
-              {
-                "lit": "journalctl --vacuum-size=500M"
-              }
-            ]
-          }
-        },
-        {
-          "src": 71,
-          "action": {
-            "label": "Clear the apt cache",
-            "cmd": [
-              {
-                "lit": "apt-get clean"
-              }
-            ]
-          }
-        },
-        {
-          "src": 72,
-          "action": {
-            "label": "Delete rotated logs older than 7 days",
-            "cmd": [
-              {
-                "lit": "find /var/log -name '*.gz' -mtime +7 -delete"
-              }
-            ]
-          }
-        },
-        {
-          "src": 73,
-          "action": {
-            "label": "Delete /tmp files older than 7 days",
-            "cmd": [
-              {
-                "lit": "find /tmp -type f -mtime +7 -delete"
-              }
-            ]
-          }
-        },
-        {
-          "src": 74,
-          "action": {
-            "label": "Prune unused docker images",
-            "cmd": [
-              {
-                "lit": "docker image prune -af"
-              }
-            ]
-          }
-        }
-      ]
-    },
-    "l:services": {
-      "name": "Services",
-      "src": 76,
-      "items": [
-        {
-          "src": 77,
-          "value": "nginx"
-        },
-        {
-          "src": 78,
-          "value": "rsyslog"
-        },
-        {
-          "src": 79,
-          "value": "myapp-worker"
-        },
-        {
-          "src": 80,
-          "value": "myapp-api"
-        }
-      ]
-    }
   },
   "sections": {
     "s:triage": {
@@ -233,7 +154,9 @@
           "src": 36,
           "for_each": {
             "var": "step",
-            "list": "l:cleanups",
+            "list": {
+              "section": "s:cleanups"
+            },
             "body": [
               {
                 "src": 37,
@@ -358,7 +281,9 @@
             "sure": 90,
             "else": null,
             "one_of": {
-              "list": "l:services",
+              "list": {
+                "section": "s:services"
+              },
               "as": "service"
             }
           }
@@ -467,6 +392,99 @@
         {
           "src": 58,
           "hand_off": {}
+        }
+      ]
+    },
+    "s:cleanups": {
+      "name": "Cleanups",
+      "src": 67,
+      "lists": [
+        {
+          "src": 70,
+          "items": [
+            {
+              "src": 70,
+              "action": {
+                "label": "Vacuum the journal to 500MB",
+                "cmd": [
+                  {
+                    "lit": "journalctl --vacuum-size=500M"
+                  }
+                ]
+              }
+            },
+            {
+              "src": 71,
+              "action": {
+                "label": "Clear the apt cache",
+                "cmd": [
+                  {
+                    "lit": "apt-get clean"
+                  }
+                ]
+              }
+            },
+            {
+              "src": 72,
+              "action": {
+                "label": "Delete rotated logs older than 7 days",
+                "cmd": [
+                  {
+                    "lit": "find /var/log -name '*.gz' -mtime +7 -delete"
+                  }
+                ]
+              }
+            },
+            {
+              "src": 73,
+              "action": {
+                "label": "Delete /tmp files older than 7 days",
+                "cmd": [
+                  {
+                    "lit": "find /tmp -type f -mtime +7 -delete"
+                  }
+                ]
+              }
+            },
+            {
+              "src": 74,
+              "action": {
+                "label": "Prune unused docker images",
+                "cmd": [
+                  {
+                    "lit": "docker image prune -af"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "s:services": {
+      "name": "Services",
+      "src": 76,
+      "lists": [
+        {
+          "src": 77,
+          "items": [
+            {
+              "src": 77,
+              "value": "nginx"
+            },
+            {
+              "src": 78,
+              "value": "rsyslog"
+            },
+            {
+              "src": 79,
+              "value": "myapp-worker"
+            },
+            {
+              "src": 80,
+              "value": "myapp-api"
+            }
+          ]
         }
       ]
     }

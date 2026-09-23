@@ -1,13 +1,18 @@
 {
   "skill": "cert-expiry",
   "format": 1,
-  "entry": "s:triage",
+  "entry": {
+    "section": "s:triage",
+    "src": 20
+  },
   "params": {
     "domain": {
-      "str": "example.com"
+      "str": "example.com",
+      "src": 6
     },
     "warn_seconds": {
-      "int": 1209600
+      "int": 1209600,
+      "src": 7
     }
   },
   "limits": {
@@ -15,22 +20,6 @@
     "do_timeout_ms": 300000,
     "deadline_ms": 900000,
     "ask_context_tokens": 2000
-  },
-  "lists": {
-    "l:servers": {
-      "name": "Servers",
-      "src": 64,
-      "items": [
-        {
-          "src": 65,
-          "value": "nginx"
-        },
-        {
-          "src": 66,
-          "value": "haproxy"
-        }
-      ]
-    }
   },
   "sections": {
     "s:triage": {
@@ -247,7 +236,9 @@
             "sure": 90,
             "else": null,
             "one_of": {
-              "list": "l:servers",
+              "list": {
+                "section": "s:servers"
+              },
               "as": "server"
             }
           }
@@ -340,6 +331,25 @@
         {
           "src": 56,
           "hand_off": {}
+        }
+      ]
+    },
+    "s:servers": {
+      "name": "Servers",
+      "src": 64,
+      "lists": [
+        {
+          "src": 65,
+          "items": [
+            {
+              "src": 65,
+              "value": "nginx"
+            },
+            {
+              "src": 66,
+              "value": "haproxy"
+            }
+          ]
         }
       ]
     }

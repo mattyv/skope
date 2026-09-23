@@ -12,7 +12,7 @@
   {
     "code": "E-DUP-SECTION",
     "stage": "parse",
-    "meaning": "two sections share a name, ignoring case"
+    "meaning": "two sections have the same slug (§3.4)"
   },
   {
     "code": "E-SECTION-KIND",

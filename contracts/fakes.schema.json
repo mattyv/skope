@@ -2,33 +2,80 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/mattyv/skop/contracts/fakes.schema.json",
   "title": "Fakes",
-  "description": "The fake handlers' files (SPEC §5.4, §6.2), after YAML parsing. Keys are the question or command text after interpolation, or `line:N` for the statement on line N of SKILL.md. Each fake scenario directory also holds `expected-exit`: the exit code the run must end with (PLAN.md §3).",
+  "description": "The fake handlers' files (SPEC §5.4, §6.2), after YAML parsing. A key is the question or command text after interpolation, exactly as it would be sent: a question has run outputs named in backticks (SPEC §3.5). Or it's `line:N` for the statement on line N of SKILL.md, which wins when both match. Each fake scenario directory also holds `expected-exit`: the exit code the run must end with (PLAN.md §3).",
   "$defs": {
-    "key": { "type": "string", "minLength": 1 },
+    "key": {
+      "type": "string",
+      "minLength": 1
+    },
     "answers": {
-      "description": "answers.yaml: a probs object keyed by option id (with optional `unassigned`), or `unsure`, `unavailable` or `invalid` to force that path.",
+      "description": "answers.yaml. A probs object keyed by option id, with optional `unassigned`, is passed to the core as the backend's answer, valid or not. `unsure` is a uniform answer over the options, which is always a tie, so the gate fails. `unavailable` is a backend failure (ask_unavailable).",
       "type": "object",
-      "propertyNames": { "$ref": "#/$defs/key" },
+      "propertyNames": {
+        "$ref": "#/$defs/key"
+      },
       "additionalProperties": {
         "oneOf": [
-          { "enum": ["unsure", "unavailable", "invalid"] },
-          { "type": "object", "minProperties": 1, "additionalProperties": { "type": "number" } }
+          {
+            "enum": ["unsure", "unavailable"]
+          },
+          {
+            "type": "object",
+            "minProperties": 1,
+            "additionalProperties": {
+              "type": "number"
+            }
+          }
         ]
       }
     },
     "commands": {
-      "description": "commands.yaml: how each command ends. An unmatched command is E-FAKE-UNMATCHED; no real command ever runs.",
+      "description": "commands.yaml: how each command ends. A list is used in order, one result per run of the command, with the last repeating: a loop that re-reads usage can see it fall. An unmatched command is E-FAKE-UNMATCHED; no real command ever runs.",
       "type": "object",
-      "propertyNames": { "$ref": "#/$defs/key" },
+      "propertyNames": {
+        "$ref": "#/$defs/key"
+      },
       "additionalProperties": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["exit"],
-        "properties": {
-          "exit": { "type": ["integer", "null"], "description": "null when it timed out." },
-          "stdout": { "type": "string", "default": "" },
-          "stderr": { "type": "string", "default": "" },
-          "timed_out": { "type": "boolean", "default": false }
+        "oneOf": [
+          {
+            "$ref": "#/$defs/result"
+          },
+          {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "$ref": "#/$defs/result"
+            }
+          }
+        ]
+      }
+    },
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["exit"],
+      "properties": {
+        "exit": {
+          "type": ["integer", "null"],
+          "description": "null when it timed out."
+        },
+        "stdout": {
+          "type": "string",
+          "default": ""
+        },
+        "stderr": {
+          "type": "string",
+          "default": ""
+        },
+        "timed_out": {
+          "type": "boolean",
+          "default": false
+        },
+        "ms": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Simulated duration. Under --fake-exec the host's clock advances by it, so deadline scenarios can be written."
         }
       }
     }

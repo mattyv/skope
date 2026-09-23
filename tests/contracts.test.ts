@@ -26,6 +26,12 @@ describe("core program schema (SPEC §5.1)", () => {
     });
   }
 
+  test("a prose-only section, with no lists, is valid", () => {
+    const p = read("examples/disk-full.core.json");
+    p.sections["s:background"] = { name: "Background", src: 90, lists: [] };
+    expect(validate(p), JSON.stringify(validate.errors)).toBe(true);
+  });
+
   // Each case breaks the disk-full example in one way.
   const base = () => read("examples/disk-full.core.json");
   const triage = (p: any) => p.sections["s:triage"].body;
@@ -33,7 +39,17 @@ describe("core program schema (SPEC §5.1)", () => {
     ["an unknown statement", (p) => triage(p).push({ src: 99, frobnicate: {} })],
     ["an ask with two forms", (p) => (triage(p)[4].ask.yesno = { as: "_yn" })],
     ["an ask with no form", (p) => delete triage(p)[4].ask.sections],
-    ["a section id without the s: prefix", (p) => (p.entry = "triage")],
+    ["a section id without the s: prefix", (p) => (p.entry.section = "triage")],
+    ["an id that isn't a slug", (p) => (p.entry.section = "s:Triage")],
+    ["a list reference as a bare id", (p) => (p.sections["s:clean_up"].body[0].for_each.list = "s:cleanups")],
+    // biome-ignore lint/suspicious/noThenProperty: `then` is the check's target field in the core program
+    ["a check with neither a target nor an else", (p) => (triage(p)[1].check.then = null)],
+    [
+      "an if_yes run with a binding",
+      (p) => (p.sections["s:clean_up"].body[0].for_each.body[1].if_yes = { run: { cmd: [], as: "x" }, else: null }),
+    ],
+    ["a param without its line", (p) => delete p.params.mount.src],
+    ["a section with both a body and lists", (p) => (p.sections["s:triage"].lists = [])],
     ["an if_yes with both run and do", (p) => (p.sections["s:clean_up"].body[0].for_each.body[1].if_yes.run = { cmd: [] })],
     ["a run with no else", (p) => delete triage(p)[0].else],
     ["a src of zero", (p) => (triage(p)[0].src = 0)],
@@ -72,6 +88,7 @@ describe("the spike example is a valid core program section", () => {
 describe("backend request and answer (SPEC §6.1)", () => {
   const request = schema("ask", "#/$defs/request");
   const answer = schema("ask", "#/$defs/answer");
+  const output = schema("ask", "#/$defs/output");
   const req = {
     kind: "choice",
     question: "Given `used`, what's the best next step?",
@@ -94,6 +111,13 @@ describe("backend request and answer (SPEC §6.1)", () => {
     expect(answer({ probs: { yes: 1.1, no: -0.1 }, backend: "jev", model: "m", ms: 1 })).toBe(true);
   });
 
+  test("skop-ask prints an answer or a failure, never both", () => {
+    expect(output({ error: "request_too_large", detail: "413 from jev", backend: "jev", model: "jev-1.13.0" })).toBe(true);
+    expect(output({ probs: { yes: 1, no: 0 }, backend: "jev", model: "m", ms: 1 })).toBe(true);
+    expect(output({ error: "timeout", detail: "", backend: "jev" })).toBe(false);
+    expect(output({ probs: { yes: 1 }, backend: "jev", model: "m", ms: 1, error: "unavailable", detail: "" })).toBe(false);
+  });
+
   test("malformed shapes are rejected", () => {
     expect(request({ ...req, kind: "multi" })).toBe(false);
     expect(request({ ...req, options: [req.options[0]] })).toBe(false);
@@ -109,11 +133,21 @@ describe("fake files (SPEC §5.4, §6.2)", () => {
 
   test("valid answers and commands", () => {
     expect(answers({ "line:27": { "s:clean_up": 0.9, "s:page": 0.1 }, "Is it worth it?": "unsure", "line:46": "unavailable" })).toBe(true);
-    expect(commands({ "df -h": { exit: 0, stdout: "91%" }, "line:47": { exit: null, timed_out: true } })).toBe(true);
+    expect(commands({ "df -h": { exit: 0, stdout: "91%" }, "line:47": { exit: null, timed_out: true, ms: 30000 } })).toBe(true);
+    expect(
+      commands({
+        "df -h": [
+          { exit: 0, stdout: "91%" },
+          { exit: 0, stdout: "78%" },
+        ],
+      }),
+    ).toBe(true);
   });
 
   test("malformed fakes are rejected", () => {
     expect(answers({ q: "maybe" })).toBe(false);
+    expect(answers({ q: "invalid" })).toBe(false);
+    expect(commands({ "df -h": [] })).toBe(false);
     expect(answers({ q: {} })).toBe(false);
     expect(commands({ "df -h": { stdout: "91%" } })).toBe(false);
     expect(commands({ "df -h": { exit: 0, colour: "red" } })).toBe(false);
@@ -136,6 +170,36 @@ describe("log events (SPEC §10)", () => {
     expect(event({ ...base, event: "would_do", cmd: "x", bogus: 1 })).toBe(false);
     expect(event({ ...base, event: "error", code: "W-NOPE", stage: "lint", message: "m" })).toBe(false);
     expect(event({ ...base, ts: "yesterday", event: "would_do", cmd: "x" })).toBe(false);
+    expect(event({ ...base, event: "warning", code: "W-SECTION-UNREACHED", stage: "warning", message: "m" })).toBe(false);
+    expect(
+      event({
+        ...base,
+        event: "run_start",
+        params: {},
+        dry_run: true,
+        caller: "person",
+        run_dir: "d",
+        skop_version: "0.1.0",
+        skop_build: `sha256:${"a".repeat(64)}`,
+      }),
+    ).toBe(false);
+    const end = { ...base, event: "outcome", outcome: "handoff", ask_calls: 0, effects: 0, dry_run: true };
+    expect(event({ ...end, reason: "gave_up" })).toBe(false);
+    expect(event({ ...end, reason: "gate_failed" })).toBe(true);
+  });
+
+  const examples = readFileSync(new URL("../contracts/examples/events.jsonl", import.meta.url), "utf8")
+    .trim()
+    .split("\n")
+    .map((l) => JSON.parse(l));
+
+  test("every example in contracts/examples/events.jsonl is valid", () => {
+    for (const e of examples) expect(event(e), JSON.stringify(e)).toBe(true);
+  });
+
+  test("the examples cover every event kind in the schema", () => {
+    const kinds = read("event.schema.json").oneOf.map((r: { $ref: string }) => r.$ref.split("/").pop());
+    expect(new Set(examples.map((e) => e.event))).toEqual(new Set(kinds));
   });
 });
 

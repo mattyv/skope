@@ -1,7 +1,10 @@
 {
   "skill": "error-triage",
   "format": 1,
-  "entry": "s:triage",
+  "entry": {
+    "section": "s:triage",
+    "src": 15
+  },
   "params": {},
   "limits": {
     "run_timeout_ms": 30000,
@@ -9,7 +12,6 @@
     "deadline_ms": 900000,
     "ask_context_tokens": 4000
   },
-  "lists": {},
   "sections": {
     "s:triage": {
       "name": "Triage",

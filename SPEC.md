@@ -1,4 +1,4 @@
-# skop (skill op) — Implementation Spec (v1, rev 17)
+# skop (skill op) — Implementation Spec (v1, rev 18)
 
 Audience: an engineer or LLM implementing this from scratch. Everything
 marked **MUST** is normative. Where this spec says "verify against current
@@ -193,7 +193,10 @@ Rules:
 Whitespace between tokens is one or more spaces. `CMD` is exactly one inline
 code span. `Q` is question text: free text that MUST NOT contain `→`, `->`,
 or ` · `. `NAME` is `[a-z_][a-z0-9_]*`. `[X]` names a section or list,
-resolved case-insensitively. It may also be a real link `[text](#anchor)`.
+resolved by **slug**: lowercased, with every run of characters that aren't
+letters or digits turned into one `_`, so case, spacing and punctuation
+don't matter (`[Clean-Up]` finds `## Clean up`). Two sections whose names
+have the same slug are `E-DUP-SECTION`. It may also be a real link `[text](#anchor)`.
 It resolves by its link text, and `#anchor` MUST be the GitHub-style slug of
 that section's heading, or it's `E-UNRESOLVED`.
 
@@ -572,19 +575,17 @@ shapes here as shape, not copy-paste.
 ### 5.1 Core program (JSON), emitted by the preprocessor
 
 ```json
-{"skill":"disk-full","format":1,"entry":"s:triage",
- "params":{"mount":{"str":"/"},"threshold":{"int":85},"target":{"int":80}},
- "limits":{"run_timeout_ms":30000,"do_timeout_ms":300000},
- "lists":{
-   "l:cleanups":[{"action":{"label":"Vacuum the journal to 500MB",
-                             "cmd":[{"lit":"journalctl --vacuum-size=500M"}]}}],
-   "l:services":[{"value":"nginx"},{"value":"rsyslog"}]},
+{"skill":"disk-full","format":1,"entry":{"section":"s:triage","src":20},
+ "params":{"mount":{"str":"/","src":6},"threshold":{"int":85,"src":7},"target":{"int":80,"src":8}},
+ "limits":{"run_timeout_ms":30000,"do_timeout_ms":600000,"deadline_ms":900000,"ask_context_tokens":4000},
  "sections":{
-   "s:triage":{"name":"Triage","guidance":"Look at usage, recent errors and what's biggest on disk.",
+   "s:triage":{"name":"Triage","src":20,"guidance":"Look at usage, recent errors and what's biggest on disk.",
      "body":[
-       {"src":12,"run":{"cmd":[{"lit":"df --output=pcent "},{"var":"mount"},{"lit":" | tail -1"}],"as":"used"}},
-       {"src":13,"check":{"cmp":{"op":"<","l":{"var":"used"},"r":{"var":"threshold"}},
-                          "then":{"stop":{}}}}]}}}
+       {"src":23,"run":{"cmd":[{"lit":"df --output=pcent "},{"var":"mount"},{"lit":" | tail -1"}],"as":"used"},"else":null},
+       {"src":24,"check":{"cond":{"cmp":{"op":"<","l":{"var":"used"},"r":{"var":"threshold"}}},
+                          "then":{"stop":{}},"else":null}}]},
+   "s:cleanups":{"name":"Cleanups","src":67,"lists":[{"src":70,"items":[
+     {"src":70,"action":{"label":"Vacuum the journal to 500MB","cmd":[{"lit":"journalctl --vacuum-size=500M"}]}}]}]}}}
 ```
 
 A Score ask (v1.1) in core JSON:
@@ -602,11 +603,21 @@ Bound variables can hold an `int` (params already can).
   the core never scans strings for `{`. The preprocessor emits every name as
   a plain `var`. It never decides whether a name holds command output; the
   core does, from the value's origin tag (§3.5).
-- Section and list ids are prefixed (`s:`, `l:`) and targets are tagged
-  (`{"stop":{}}` vs `{"section":"s:page"}`), so a section named "Page" or
-  "Stop" can't collide with a keyword.
-- Every statement carries `src`, a source-map id, so errors and log events
-  point at the Markdown line.
+- **Every `##` section is emitted**, under one id namespace: `s:` plus its
+  slug (§3.4). An instruction section has a `body`. Any other section has
+  `lists`: all its lists, possibly none. Every reference, whether a target
+  or a list, is `{"section": id}`, so the core decides `E-UNRESOLVED` (no
+  such section), `E-REF-KIND` (a target that isn't an instruction section)
+  and `E-SECTION-KIND` (a list reference to a section without exactly one
+  list).
+- Targets are tagged (`{"stop":{}}` vs `{"section":"s:page"}`), so a
+  section named "Page" or "Stop" can't collide with a keyword.
+- `entry` and each param carry the frontmatter line they came from, so
+  errors about them have a line. A defaulted `entry` points at the first
+  instruction section's heading.
+- Every statement carries `src`, its line in SKILL.md, so errors and log
+  events point at the Markdown line. `contracts/core-program.schema.json`
+  is the full shape.
 - The preprocessor only parses. All semantic checks live in the core, where
   the proofs cover them.
 
@@ -1042,7 +1053,7 @@ and have no codes.
 |---|---|---|---|
 | `E-NOT-RUNNABLE` | parse | no `format: 1` in the frontmatter (§3.1) | a plain agent skill |
 | `E-FRONTMATTER` | parse | a frontmatter field is missing or invalid | no `description`; `run_timeout: soon` |
-| `E-DUP-SECTION` | parse | two sections share a name, ignoring case | `## Page` twice |
+| `E-DUP-SECTION` | parse | two sections have the same slug (§3.4) | `## Page` twice; `## Clean up` and `## Clean-up` |
 | `E-SECTION-KIND` | lint | a section used as a list doesn't contain exactly one list (§3.2) | `[Notes]` where Notes has two lists |
 | `E-MISPLACED` | parse | a list item starting with a keyword where instructions aren't recognised (§3.3 rule 7) | `- **run** …` in a blockquote |
 | `E-DATA-ITEM` | parse | a data list item isn't a plain-text value or ``Label — `command` `` (§3.6) | value item `` `nginx` `` |
@@ -1120,9 +1131,10 @@ Rules:
 - `skop --version` prints `skop 0.1.0 (build identity <sha256>)`.
 - Everything that records which skop produced it stamps **both** numbers,
   from one shared constant: the `run_start` event, the handoff record, the
-  verify report, and recorded backend fixtures. Anything that compares runs,
-  like goldens, recordings, or a reader asking "was this made by the skop I
-  have?", compares the build identity, never the release version.
+  verify report, and recorded backend fixtures. Anything that asks "was this
+  made by the skop I have?" compares the build identity, never the release
+  version. Golden files are the exception: they ignore both numbers, since
+  the build identity changes on every source edit (§12.3).
 
 ---
 
@@ -1164,7 +1176,7 @@ Then skop exits 20.
  "effects":[{"cmd":"journalctl --vacuum-size=500M","status":"done"},
             {"cmd":"docker image prune -af","status":"unknown"}],
  "dry_run":true,
- "skop":{"version":"0.1.0","build":"sha256:…"},
+ "skop":{"version":"0.1.0","build":"1bfd…"},
  "preamble":"You are taking over a run of a runnable skill. …"}
 ```
 - For a Score ask, `detail.probs` is keyed by level
@@ -1237,22 +1249,25 @@ logs warning `W-REDACT-OFF` on every run):
   diagnostics only. Command output is never passed through; it's captured,
   redacted, and logged as fields.
 - Every event has: `ts`, `run_id`, `skill`, `skill_hash`, `host`, `event`,
-  and where applicable `section`, `line`.
+  and where applicable `section` (the display name), `line`. Before a run
+  exists (an argument or parse error), `run_id`, `skill` and `skill_hash`
+  are `null`. `contracts/event.schema.json` is the full shape.
 
 | `event` | Extra fields |
 |---|---|
 | `run_start` | `params`, `dry_run`, `caller`, `run_dir`, `skop_version`, `skop_build` (§7.2) |
 | `run` / `check_cmd` | `cmd`, `exit`, `ms`, `timed_out`, `truncated`, `stdout_hash`, `stdout_tail` (redacted, ≤2KB), `after_would_do` |
 | `check` | `expr`, `left`, `right`, `result`, `after_would_do` |
-| `ask` | `question`, `kind`, `probs`, `chosen`, `confidence`, `sure`, `passed`, `backend`, `model`, `ms`, `request_path`, `request_sha256`, `after_would_do`; for `score`, `range`, and `chosen` is an integer |
+| `ask` | `question`, `kind`, `probs`, `chosen`, `confidence`, `sure`, `passed`, `backend`, `model`, `ms`, `request_path`, `request_sha256`, `after_would_do`; for `score`, `range`, and `chosen` is an integer. If the backend failed, `probs`, `chosen` and `confidence` are `null` and `detail` is `unavailable` or `request_too_large` |
 | `effect_start` / `effect_end` | `cmd`, `exit`, `ms`, `timed_out` (end only) |
 | `would_do` | `cmd` |
+| `page` | `text`, `ok` (did the pager command succeed) |
 | `would_page` | `text` |
 | `handoff_page` | `text`, `ok` (did the pager command succeed) |
 | `transfer` | `from`, `to` |
-| `outcome` | `outcome`, `reason`, `ask_calls`, `effects`, `dry_run` |
+| `outcome` | `outcome`, `reason` (a §8.1 reason, or `null`), `ask_calls`, `effects`, `dry_run` (`null` if the mode was never set) |
 | `handoff_record` | `path`, `record` |
-| `error` / `warning` | `code`, `stage`, `file`, `line`, `message` (§7.1) |
+| `error` / `warning` | `code`, `stage`, `file`, `line`, `message` (§7.1). A warning's `stage` is the stage that found it: `parse`, `lint`, `args` or `runtime` |
 | `locked` | `holder_pid` |
 | `stale_lock` | `path`, `holder_pid` |
 
@@ -1907,6 +1922,23 @@ Also, where things live in the Markdown:
   source says whether it's the same skop. Both are printed by `--version`
   and stamped into `run_start`, the handoff record and the verify report.
 - **No fallback.** A build that can't hash its inputs fails.
+
+### Rev 18 (after the Phase 0 contract review)
+
+- **References resolve by slug**, ignoring case, spacing and punctuation.
+  Two names with the same slug are `E-DUP-SECTION`.
+- **Every section is in the core program**, under one `s:` namespace, so
+  the core can tell a missing section, a wrong-kind reference and a list
+  section with the wrong number of lists apart.
+- **`entry` and params carry their frontmatter line.**
+- **Goldens ignore skop's version and build identity**; nothing else
+  compares runs by them.
+- **A `page` event** records a real page and whether the pager succeeded.
+- **Events before a run** have `null` run fields.
+- **A failed `ask` event** has `null` answer fields and a `detail`.
+- **A warning's `stage`** is the stage that found it.
+- **The event contract is one shape per event**, with an example of each
+  in `contracts/examples/events.jsonl`.
 
 ---
 
