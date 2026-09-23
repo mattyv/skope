@@ -1,4 +1,4 @@
-# skop (skill op) — Implementation Spec (v1, rev 12)
+# skop (skill op) — Implementation Spec (v1, rev 13)
 
 Audience: an engineer or LLM implementing this from scratch. Everything
 marked **MUST** is normative. Where this spec says "verify against current
@@ -405,12 +405,12 @@ timeout `limits.do_timeout`.
   - `else skip` → allowed **only** on `yes | no`: bind `false`, continue.
     On other forms it's a lint error.
   - `else [X]` → transfer to X.
-- Jev unavailable (after one retry, §6.2) or invalid response → `handoff`
+- Jev unavailable (after `ask.retries` retries, §6.2) or invalid response → `handoff`
   (reason `ask_unavailable`).
 
 ```mermaid
 flowchart TD
-  ask["ask"] --> jev{"valid answer from Jev?<br/>(one retry)"}
+  ask["ask"] --> jev{"valid answer from Jev?<br/>(after retries)"}
   jev -- "no" --> h1(["handoff: ask_unavailable"])
   jev -- "yes" --> gate{"one clear top option<br/>and confidence ≥ sure?"}
   gate -- "yes" --> go["transfer, or bind the answer"]
@@ -679,7 +679,7 @@ From the explore handler, report:
   P6; checked anyway)
 - max Jev calls on any path; max `do` effects on any path
 - worst-case duration estimate, for information only. It includes command
-  timeouts plus kill grace, Jev timeouts with the retry and its wait, and the pager
+  timeouts plus kill grace, every Jev attempt allowed by `ask.retries` with its wait, and the pager
   timeout. The enforced limit is `limits.deadline` (§7).
 - sections never reached (warning `W-SECTION-UNREACHED`)
 
@@ -784,9 +784,11 @@ goes through the same validation in the core (§6.1, P5).
     `W-MODEL-ALIAS` on every run, and so does a response whose `model`
     differs from the one configured.
   - **Timeouts and retry.** Each attempt times out after `ask.timeout_ms`.
-    Retry once on a timeout, a connection error, 408, 429 or 5xx, after
-    500ms. On 429, wait for `retry-after` instead, if it's no longer than
-    `ask.timeout_ms`; otherwise don't retry. `jev-ask` MAY use TypeSafe's
+    Retry up to `ask.retries` times (default 1, allowed 0–3) on a timeout,
+    a connection error, 408, 429 or 5xx. Wait 500ms before the first retry,
+    doubling each time. On 429, wait for `retry-after` instead, if it's no
+    longer than `ask.timeout_ms`; otherwise stop retrying. A value outside
+    0–3 is `E-CONFIG`. The cap keeps the worst-case time bounded. `jev-ask` MAY use TypeSafe's
     JavaScript SDK (`@typesafe-ai/sdk`), with its own retries turned off so
     skop's time budget stays exact.
   - Map `score` → Jev *Score*. Send the rubric as Jev's `criteria` array,
@@ -1092,7 +1094,8 @@ details or secrets.
 ```yaml
 ask:
   backend: jev            # jev | openrouter | fake
-  timeout_ms: 2000        # per attempt; one retry (§6.2)
+  timeout_ms: 2000        # per attempt (§6.2)
+  retries: 1              # 0–3; applies to both backends (§6.2)
 jev:
   model: jev-1.13.0       # a versioned id, not an alias (§6.2)
   key_env: TYPESAFE_API_KEY
@@ -1292,7 +1295,8 @@ file paths.
   against recorded responses. For `jev` that covers option labels (not
   ids) as Choice keys, mapped back to ids; context holding only the named
   `run` outputs; a 429 with `retry-after` within and beyond the timeout;
-  and `W-MODEL-ALIAS` for `jev-latest`. For `openrouter` that covers letters mapped
+  `W-MODEL-ALIAS` for `jev-latest`; and `ask.retries` of 0 and 3 making
+  exactly 1 and 4 attempts, with 4 rejected as `E-CONFIG`. For `openrouter` that covers letters mapped
   to options, the missing-letter example in §6.2 failing a 99% gate, low
   letter mass, missing logprobs, a reasoning-only response, a model without
   logprobs, and too many options. A recorded request for disk-full's
@@ -1741,6 +1745,12 @@ Also, where things live in the Markdown:
   on another, so the preprocessor can't decide it from syntax.
 - **Unassigned-probability test fixed.** The old one summed to 1.2 and was
   rejected before reaching the gate.
+
+### Rev 13 (configurable retries)
+
+- **`ask.retries`** sets how many times a failed backend call is retried:
+  default 1, allowed 0–3, with backoff doubling from 500ms. The worst-case
+  time estimate counts every allowed attempt.
 
 ---
 
