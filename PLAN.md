@@ -27,16 +27,16 @@ piece is proven done.
   before its feature is marked expected-to-fail (`test.fails` in Vitest).
   CI checks that it still fails. When the feature lands, the owner flips it
   to a normal test in the same PR. Nothing is ever skipped silently.
-- **Build the smallest thing that works.** The repo carries the
-  [ponytail](https://github.com/DietrichGebert/ponytail) skills (v4.10.0,
-  MIT) in `.claude/skills/`: `ponytail` while writing code,
-  `ponytail-review` on each PR, `ponytail-audit` before each milestone, and
-  `ponytail-debt` to list the shortcuts marked with `ponytail:` comments.
-  One exception: ponytail's "one self-check, no test suites unless asked"
-  rule doesn't apply here. This plan asks for the full test suites, so
-  ponytail must never trim them.
-- **Main is always green.** Every PR runs the full CI gate (§5). Streams
-  merge small PRs often rather than one big one at the end.
+- **Build the smallest thing that works.** Every agent writes code with the
+  [ponytail](https://github.com/DietrichGebert/ponytail) skill active
+  (v4.10.0, MIT, in `.claude/skills/`), and every change is checked by
+  `ponytail-review` before it merges. §6.4 says where ponytail doesn't apply.
+- **Nobody reviews their own work.** Every PR is reviewed by a panel of
+  fresh Opus agents that didn't write it, and every milestone gets a
+  whole-repo review (§6).
+- **Main is always green.** A PR merges only when the CI gate (§5) passes
+  and the review panel has no open blocking findings (§6). Streams merge
+  small PRs often rather than one big one at the end.
 
 ---
 
@@ -71,7 +71,7 @@ flowchart TD
 
 The critical path is **C** (the Dafny interpreter and its proofs). Phase 2
 starts wiring against a stand-in interpreter, so it isn't blocked by C
-(§4, stream G).
+(§7, stream G).
 
 ---
 
@@ -84,7 +84,7 @@ scratch):
 - `.github/workflows/ci.yml`: the test workflow (§5). Its build, test and
   Dafny jobs switch on by themselves once `package.json` and
   `.dafny-version` exist.
-- `.github/workflows/release.yml`: the release workflow (§10).
+- `.github/workflows/release.yml`: the release workflow (§11).
 - `scripts/check_spec.py`: spec and plan checks, and the error-code
   coverage check.
 - `scripts/build-id.mjs`: the build identity (SPEC §7.2).
@@ -125,6 +125,11 @@ integration agent):
 Each schema gets a TypeScript type generated from it, so a contract change
 breaks the build everywhere it matters.
 
+Contracts are the hardest thing to change later, so they get the strictest
+review before Phase 1 starts. An Opus spec-conformance reviewer checks each
+one against the spec, and `ponytail-review` at **ultra** hunts for fields
+and options nothing in the spec needs (§6).
+
 **Test harness**
 - A golden-file helper that ignores `ts`, `ms`, `run_id`, `host`,
   `skill_hash` and file paths (SPEC §12.3).
@@ -138,8 +143,9 @@ breaks the build everywhere it matters.
 
 **Done when:** CI is green on all three platforms, the Dafny spike runs from
 TypeScript, every contract has a schema, a generated type and at least one
-example that validates against it, and `skop --version` prints the release
-version and build identity.
+example that validates against it, `skop --version` prints the release
+version and build identity, and the Phase 0 milestone review (§6.3) has no
+open blocking findings.
 
 ---
 
@@ -149,9 +155,16 @@ Each stream below is a self-contained brief for one agent. Every stream
 follows the same loop:
 
 1. **Red.** Turn the listed spec sections into failing tests.
-2. **Green.** Write the least code that passes them.
-3. **Refactor**, with the tests still green.
-4. **Merge** a small PR. CI runs the full gate.
+2. **Green.** Write the least code that passes them, with `ponytail` active
+   at **full**. Climb its ladder before writing anything new: reuse what's
+   in the repo, then the standard library, then an installed dependency.
+   Mark any deliberate shortcut with a `ponytail:` comment naming its limit
+   and when to revisit it.
+3. **Refactor.** Run `ponytail-review` on your own diff and apply the cuts
+   that keep the tests green.
+4. **Open a small PR.** CI runs the full gate (§5), then the review panel
+   runs (§6).
+5. **Merge** when CI is green and no blocking finding is open.
 
 ### A. Preprocessor (TypeScript)
 - **Owns:** `src/preprocess/`, `tests/preprocess/`.
@@ -221,9 +234,9 @@ follows the same loop:
 ### E. Runner infrastructure (TypeScript)
 - **Owns:** `src/runner/`, `tests/runner/`.
 - **Scope:** everything that touches the machine, behind plain interfaces:
-  running commands (SPEC §4.4), the fake command handler, the lock (§7),
-  redaction (§9), config loading, the pager, and error and event output
-  (§7.1, §10).
+  running commands (SPEC §4.4), the fake command handler, the lock (SPEC §7),
+  redaction (SPEC §9), config loading, the pager, and error and event output
+  (SPEC §7.1, §10).
 - **Tests first:**
   - process rules with real child processes: `/dev/null` stdin,
     `LC_ALL=C`, process-group kill after the grace period, output capped at
@@ -257,7 +270,8 @@ follows the same loop:
 ## 5. CI gate (every PR, every stream)
 
 The CI workflow is `.github/workflows/ci.yml`. It runs on every push and
-pull request, on linux-x64, linux-arm64 and macOS-arm64.
+pull request, on linux-x64, linux-arm64 and macOS-arm64. Passing CI is
+necessary but not enough to merge: the review panel (§6) runs after it.
 
 | Check | Fails when |
 |---|---|
@@ -274,7 +288,84 @@ pull request, on linux-x64, linux-arm64 and macOS-arm64.
 
 ---
 
-## 6. Phase 2: integration (stream G)
+## 6. Reviews: Opus agents and ponytail
+
+### 6.1 The review panel (every PR)
+
+```mermaid
+flowchart LR
+  pr["PR opened"] --> ci{"CI gate<br/>green?"}
+  ci -- "no" --> fix["author fixes"]
+  ci -- "yes" --> panel["review panel<br/>(fresh Opus agents,<br/>in parallel)"]
+  panel --> open{"any P1 or P2<br/>open?"}
+  open -- "yes" --> fix
+  fix --> ci
+  open -- "no" --> merge["merge"]
+  panel -. "reviewer and author<br/>still disagree" .-> human["human decides"]
+```
+
+Once CI passes, a panel of review agents runs in parallel. Every reviewer
+is an **Opus** agent in a fresh session that **didn't write the code**. It
+gets the diff, `SPEC.md`, `PLAN.md` and the stream's brief, and nothing from
+the author's session, so it judges the code rather than the reasoning
+behind it. Reviewers are read-only: they comment, and never push.
+
+| Reviewer | Looks for | Runs on |
+|---|---|---|
+| **Spec conformance** | Does the change do what the cited spec sections say, no more and no less? Does each test check the clause it claims to? | every PR |
+| **Correctness and security** | Bugs, unsafe input handling, taint leaks into commands, shell and process mistakes, races. Uses the `code-review` skill. | every PR |
+| **Ponytail** | Over-engineering, using `ponytail-review`: reinvented standard library, unneeded dependencies, speculative abstractions. Ends with `net: -N lines possible`. | every PR |
+| **Proof** | Do the lemmas say what SPEC P1–P6 mean, not something weaker? Vacuous preconditions, assumptions that can never hold, missing cases. | PRs touching `core/*.dfy` |
+| **Tests** | Would each test fail if the code were wrong? Checks this by breaking the code on purpose and rerunning. Checks goldens against the spec. | PRs from stream F, and any PR that adds tests |
+
+### 6.2 Findings and how they're resolved
+
+Findings use the same shape as the outside reviews the spec went through:
+
+| Severity | Meaning | Before merge |
+|---|---|---|
+| **P1** | Wrong behaviour, a spec violation, an unsound or vacuous proof, a security hole | must be fixed |
+| **P2** | A real problem that isn't blocking on its own. Ponytail `delete` and `yagni` findings on production code count as P2. | fix, or reply with a reason the reviewer accepts |
+| **nit** | Optional. Ponytail `shrink` findings count as nits. | one-line reply; fix if it's cheap |
+
+- The author fixes or replies on each finding. The **same reviewer**
+  re-checks the new head, since a fresh reviewer would re-litigate.
+- A disagreement the reviewer won't drop goes to a human, never to a
+  vote between agents.
+- A reviewer's finding is a claim to check, not an order. The author
+  verifies it against the spec before acting on it.
+
+### 6.3 Milestone reviews
+
+At each checkpoint (end of Phase 0, the stream C proof timebox, end of
+Phase 1, and each milestone):
+
+1. **Whole-milestone review.** One Opus agent reads the merged code
+   against the whole spec, the way the spec itself was reviewed: P1 and P2
+   findings with spec section references.
+2. **`ponytail-audit` at ultra** over the whole repo, ranked biggest cut
+   first.
+3. **`ponytail-debt`** lists every `ponytail:` shortcut. Any shortcut with
+   no revisit trigger gets one, or gets fixed.
+4. **A human** reads the three reports and decides whether the next phase
+   starts.
+
+### 6.4 Where ponytail doesn't apply
+
+Ponytail's own rules already exempt some of these; they're listed here so
+no agent has to guess:
+- **Tests this plan asks for.** Ponytail's "one self-check, no test suites
+  unless asked" rule doesn't apply: this plan asks for the full suites.
+- **Anything the spec marks MUST.** Validation, redaction, the taint rule,
+  the safe-value check and error handling are never simplified away.
+- **Proofs.** A proof isn't shortened by proving less. The proof reviewer
+  treats a dropped obligation as a P1.
+- **Contracts,** once frozen. Cutting a field is a contract change (§10),
+  not a refactor.
+
+---
+
+## 7. Phase 2: integration (stream G)
 
 One agent, joined by a second once the pieces arrive.
 
@@ -296,7 +387,7 @@ One agent, joined by a second once the pieces arrive.
 
 ---
 
-## 7. Phase 3: packaging (M6)
+## 8. Phase 3: packaging (M6)
 
 - Build the npm package and container image.
 - Install the package on a clean machine with only Node and run the fake
@@ -305,7 +396,7 @@ One agent, joined by a second once the pieces arrive.
 
 ---
 
-## 8. Phase 4: Score asks (M7, v1.1)
+## 9. Phase 4: Score asks (M7, v1.1)
 
 After v1 ships. The same stream owners pick up their part in parallel:
 
@@ -321,15 +412,21 @@ After v1 ships. The same stream owners pick up their part in parallel:
 
 ---
 
-## 9. Running the agents
+## 10. Running the agents
 
 - **One agent per stream**, each in its own git worktree and branch, named
   after the stream (for example `stream/a-preprocessor`).
 - **Each agent gets its stream brief from §4 as its task**, plus the spec
   and the contracts. The brief lists what it owns, what it may read, and
   when it's done.
-- **Small PRs to main,** each passing the CI gate. A PR that touches another
-  stream's directory needs that owner's review.
+- **Small PRs to main,** each passing the CI gate and the review panel
+  (§6). A PR that touches another stream's directory also needs that
+  owner's review.
+- **Review agents run on Opus,** each in a fresh session or subagent with
+  read-only access. They never see the author's session and never review
+  their own stream's code.
+- **Ponytail is on for every building agent,** at **full** by default and
+  **ultra** for audits and contract reviews.
 - **Contract changes are rare and deliberate.** The contract owner makes
   the change and updates the examples. Every affected stream fixes its side
   in the same PR or the next one.
@@ -337,11 +434,12 @@ After v1 ships. The same stream owners pick up their part in parallel:
   finds the spec ambiguous or wrong, it opens an issue quoting the section,
   marks the affected test as an expected failure, and moves on.
 - **Checkpoints:** end of Phase 0, the proof timebox in stream C, end of
-  Phase 1, and each milestone. At each one a human reviews what's merged.
+  Phase 1, and each milestone. At each one the milestone review runs
+  (§6.3) and a human decides whether to go on.
 
 ---
 
-## 10. Releasing
+## 11. Releasing
 
 Versioning follows ply (SPEC §7.2): a hand-edited release version in
 `package.json`, and a build identity hashed from the source.
