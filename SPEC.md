@@ -316,7 +316,7 @@ continue. Non-zero or timeout → failure handling (§4.3). Runs in dry run too
 
 **`do CMD | do NAME [else]`**: side-effecting command. Executed per §4.4 with
 timeout `limits.do_timeout`.
-- In dry run (the default), MUST NOT execute (§4.5).
+- In dry run, MUST NOT execute (§4.5).
 - Logged as an **effect** with `effect_start` before and `effect_end` after,
   so a crash between them leaves "effect unknown" in the log.
 - A `do` that times out has effect status `unknown`, then goes to failure
