@@ -150,6 +150,11 @@
     "meaning": "Score rubric missing, incomplete, out of range or duplicated (v1.1)"
   },
   {
+    "code": "E-USAGE",
+    "stage": "args",
+    "meaning": "an unknown flag, a missing flag value, or a missing skill path (§7)"
+  },
+  {
     "code": "E-MODE",
     "stage": "args",
     "meaning": "neither or both of `--apply` and `--dry-run` (§7 step 0)"

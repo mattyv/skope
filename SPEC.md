@@ -1051,7 +1051,8 @@ skop <path/to/SKILL.md> [options]
   --no-page               with --apply: don't page on handoff (§8)
   --param k=v             override a frontmatter param (repeatable, typed, safe-value checked)
   --explain               print sections, transfer graph, and worst-case cost; run nothing
-  --verify                run the explore handler and print the verify report; run nothing
+  --verify                run the explore handler and print the verify report; run nothing.
+                          The report is the last stdout line; warning events come before it
   --trace events.jsonl    with --verify: check that one run's path is one the explorer can take (§12.4)
   --lint                  parse + static checks only
   --fake answers.yaml     use the fake backend
@@ -1102,7 +1103,9 @@ Responsibilities, in order:
    middle of a command: each command already has its own timeout, and
    killing a `do` halfway leaves the system in an unknown state. Past the
    deadline → `handoff` with reason `deadline`. Its `section` and `line`
-   are the instruction the run would have started next.
+   are those of the next request the host would have started (the core
+   runs pure steps, like a comparison, within one `Step`, so the deadline
+   can't fall between them).
 6. On `handoff`, write the handoff record, page if §8 says to, and exit 20.
 7. Exit with the outcome's code.
 
@@ -1177,6 +1180,7 @@ and have no codes.
 | `E-LIST-DUP` | lint | two items in a data list have the same label, ignoring case (§3.6) | `nginx` twice |
 | `E-SCORE-RANGE` | lint | Score bounds invalid, or not 2–10 levels (v1.1) | `→ 5 to 1`; `→ 1 to 11` |
 | `E-SCORE-RUBRIC` | lint | Score rubric missing, incomplete, out of range or duplicated (v1.1) | no line for level 2 |
+| `E-USAGE` | args | an unknown flag, a missing flag value, or a missing skill path (§7) | `--aply` |
 | `E-MODE` | args | neither or both of `--apply` and `--dry-run` (§7 step 0) | |
 | `E-PARAM-UNKNOWN` | args | `--param` names a param the skill doesn't declare | |
 | `E-PARAM-TYPE` | args | a `--param` value has the wrong type | `threshold=high` |
@@ -1383,7 +1387,7 @@ backend with no config block. `state_dir` expands a leading
 | `run_start` | `params`, `dry_run`, `caller`, `run_dir`, `skop_version`, `skop_build` (§7.2) |
 | `run` / `check_cmd` | `cmd`, `exit`, `ms`, `timed_out`, `truncated`, `stdout_hash`, `stdout_tail` (redacted, ≤2KB), `after_would_do` |
 | `check` | `expr`, `left`, `right`, `result`, `after_would_do`. `expr` is rendered from the core program: operands as `{name}` or the number, e.g. `{used} < {threshold}` (a decorative `%` is gone by then) |
-| `ask` | `question` (as sent, §3.5: trusted values pasted in, `run` outputs named in backticks), `kind`, `probs`, `chosen`, `confidence`, `sure`, `passed`, `backend`, `model`, `ms`, `request_path`, `request_sha256`, `after_would_do`; for `score`, `range`, and `chosen` is an integer. If the backend failed, `probs`, `chosen` and `confidence` are `null` and `detail` is `unavailable` or `request_too_large` |
+| `ask` | `probs` keyed by option id only; unassigned probability stays in the request file. `question` (as sent, §3.5: trusted values pasted in, `run` outputs named in backticks), `kind`, `probs`, `chosen`, `confidence`, `sure`, `passed`, `backend`, `model`, `ms`, `request_path`, `request_sha256`, `after_would_do`; for `score`, `range`, and `chosen` is an integer. If the backend failed, `probs`, `chosen` and `confidence` are `null` and `detail` is `unavailable` or `request_too_large` |
 | `effect_start` / `effect_end` | `cmd`, `exit`, `ms`, `timed_out` (end only) |
 | `would_do` | `cmd` |
 | `page` | `text`, `ok` (did the pager command succeed) |
@@ -2083,6 +2087,9 @@ Also, where things live in the Markdown:
 - **Standalone binaries and `install.sh`** (§5.5), so skop can run on a
   machine without Node. The installer checks each download against the
   release's `SHA256SUMS`.
+- **Integration details:** a deadline handoff points at the next request
+  the host would have started; `ask.probs` holds option ids only; an unknown
+  flag is `E-USAGE`; `--verify` prints its report as the last stdout line.
 - **Unreachable sections aren't flow-checked:** they get
   `W-SECTION-UNREACHED`, but no `E-UNBOUND` or `E-TAINT`, since no path
   reaches them, and their transfers don't affect what reachable sections
