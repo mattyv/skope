@@ -1,258 +1,204 @@
-// Per-keyword grammar (SPEC §3.4), built on the Cursor from grammar.ts.
-// Each parser consumes `rest` (the text after the leading `**keyword**`,
-// trimmed) and returns either the statement's fields or GRAMMAR_ERROR.
-// Nested-list content (ask options, Score rubric, for-each body) isn't
-// parsed here: the caller supplies it once the sibling list block is known.
+// Per-keyword grammar (SPEC §3.4), on the Cursor from grammar.ts. Each parser
+// takes the text after the leading `**keyword**` and returns the statement's
+// fields or GRAMMAR_ERROR. Nested lists (ask options, Score rubric, for-each
+// body) aren't parsed here; the caller has them.
 
-import {
-  type BracketRef,
-  Cursor,
-  type Else,
-  eatOp,
-  eatOperand,
-  eatTarget,
-  GRAMMAR_ERROR,
-  type GrammarError,
-  type Operand,
-  type Part,
-  parseElse,
-  type SectionRefRaw,
-  splitParts,
-  type Target,
-} from "./grammar.js";
+import { type BracketRef, Cursor, GRAMMAR_ERROR, type GrammarError, type Part, splitParts, T } from "./grammar.js";
 
-type Resolve = (b: BracketRef) => SectionRefRaw;
-
-interface RunParsed {
-  cmd: Part[];
-  as?: string;
-  else: Else;
-}
-export function parseRun(rest: string, resolve: Resolve): RunParsed | GrammarError {
-  const cur = new Cursor(rest);
-  const cmd = cur.eatCodeSpan();
-  if (cmd === null) return GRAMMAR_ERROR;
-  let as: string | undefined;
-  if (cur.eat(" as ")) {
-    const name = cur.eatName();
-    if (name === null) return GRAMMAR_ERROR;
-    as = name;
-  }
-  const elseR = parseElse(cur, resolve);
-  if (elseR === GRAMMAR_ERROR) return GRAMMAR_ERROR;
-  if (!cur.atEnd()) return GRAMMAR_ERROR;
-  return { cmd: splitParts(cmd), as, else: elseR };
-}
-
+export type Ref = { section: string; anchor?: { given: string; expected: string } };
+export type Resolve = (b: BracketRef) => Ref;
+export type Else = null | { skip: Record<string, never> } | Ref;
 export type DoBody = { cmd: Part[] } | { item: string };
-interface DoParsed {
-  do: DoBody;
-  else: Else;
-}
-export function parseDo(rest: string, resolve: Resolve): DoParsed | GrammarError {
-  const cur = new Cursor(rest);
-  let doBody: DoBody;
-  const cmd = cur.eatCodeSpan();
-  if (cmd !== null) {
-    doBody = { cmd: splitParts(cmd) };
-  } else {
-    const name = cur.eatName();
-    if (name === null) return GRAMMAR_ERROR;
-    doBody = { item: name };
-  }
-  const elseR = parseElse(cur, resolve);
-  if (elseR === GRAMMAR_ERROR) return GRAMMAR_ERROR;
-  if (!cur.atEnd()) return GRAMMAR_ERROR;
-  return { do: doBody, else: elseR };
-}
+export type Operand = { var: string } | { num: string };
+export type Op = "<" | "<=" | ">" | ">=" | "==" | "!=";
+export type Cond = { succeeds: Part[] } | { cmp: { op: Op; l: Operand; r: Operand } };
 
-export type Cond = { succeeds: Part[] } | { cmp: { op: string; l: Operand; r: Operand } };
-interface CheckParsed {
-  cond: Cond;
-  then: Target | null;
-  else: Else;
-}
-export function parseCheck(rest: string, resolve: Resolve): CheckParsed | GrammarError {
-  const cur = new Cursor(rest);
-  const cond = parseCond(cur);
-  if (cond === GRAMMAR_ERROR) return GRAMMAR_ERROR;
+const fail = (): GrammarError => GRAMMAR_ERROR;
 
-  if (cur.eat(" → ") || cur.eat(" -> ")) {
-    const target = eatTarget(cur, resolve);
-    if (target === null) return GRAMMAR_ERROR;
-    const elseR = parseElse(cur, resolve);
-    if (elseR === GRAMMAR_ERROR) return GRAMMAR_ERROR;
-    if (!cur.atEnd()) return GRAMMAR_ERROR;
-    return { cond, then: target, else: elseR };
-  }
-  const elseR = parseElse(cur, resolve);
-  if (elseR === GRAMMAR_ERROR || elseR === null) return GRAMMAR_ERROR;
-  if (!cur.atEnd()) return GRAMMAR_ERROR;
-  return { cond, then: null, else: elseR };
-}
-
-function parseCond(cur: Cursor): Cond | GrammarError {
-  const cmd = cur.eatCodeSpan();
-  if (cmd !== null) {
-    if (!cur.eat(" succeeds")) return GRAMMAR_ERROR;
-    return { succeeds: splitParts(cmd) };
-  }
-  const l = eatOperand(cur);
-  if (l === null) return GRAMMAR_ERROR;
-  if (!cur.eat(" ")) return GRAMMAR_ERROR;
-  const op = eatOp(cur);
-  if (op === null) return GRAMMAR_ERROR;
-  if (!cur.eat(" ")) return GRAMMAR_ERROR;
-  const r = eatOperand(cur);
-  if (r === null) return GRAMMAR_ERROR;
-  return { cmp: { op, l, r } };
-}
-
-interface ForEachParsed {
-  var: string;
-  list: BracketRef;
-}
-export function parseForEach(rest: string): ForEachParsed | GrammarError {
-  const cur = new Cursor(rest);
-  const name = cur.eatName();
-  if (name === null) return GRAMMAR_ERROR;
-  if (!cur.eat(" in ")) return GRAMMAR_ERROR;
-  const br = cur.eatBracketRef();
-  if (!br) return GRAMMAR_ERROR;
-  if (!cur.atEnd()) return GRAMMAR_ERROR;
-  return { var: name, list: br };
-}
-
-interface IfYesParsed {
-  run?: { cmd: Part[] };
-  do?: DoBody;
-  else: Else;
-}
-export function parseIfYes(rest: string, resolve: Resolve): IfYesParsed | GrammarError {
-  const cur = new Cursor(rest);
-  let run: { cmd: Part[] } | undefined;
-  let doBody: DoBody | undefined;
-  if (cur.eat("run ")) {
-    const cmd = cur.eatCodeSpan();
-    if (cmd === null) return GRAMMAR_ERROR;
-    run = { cmd: splitParts(cmd) };
-  } else if (cur.eat("do ")) {
-    const cmd = cur.eatCodeSpan();
-    if (cmd !== null) doBody = { cmd: splitParts(cmd) };
+/** `[ELSE]` then the end of the text; the parsers' common tail. */
+function elseThenEnd(cur: Cursor, resolve: Resolve): Else | GrammarError {
+  let e: Else = null;
+  if (cur.eat(T.else)) {
+    if (cur.eat(T.skip)) e = { skip: {} };
     else {
-      const name = cur.eatName();
-      if (name === null) return GRAMMAR_ERROR;
-      doBody = { item: name };
+      const br = cur.bracketRef();
+      if (!br) return GRAMMAR_ERROR;
+      e = resolve(br);
     }
-  } else {
-    return GRAMMAR_ERROR;
   }
-  const elseR = parseElse(cur, resolve);
-  if (elseR === GRAMMAR_ERROR) return GRAMMAR_ERROR;
-  if (!cur.atEnd()) return GRAMMAR_ERROR;
-  return { run, do: doBody, else: elseR };
+  return cur.atEnd() ? e : GRAMMAR_ERROR;
 }
 
-export function parseThen(rest: string, resolve: Resolve): SectionRefRaw | GrammarError {
+/** ` as NAME`: the name, or null when there's no ` as `. */
+function optionalAs(cur: Cursor): string | null | GrammarError {
+  return cur.eat(T.as) ? (cur.name() ?? GRAMMAR_ERROR) : null;
+}
+
+/** ` as NAME`, which must be there. */
+function requiredAs(cur: Cursor): string | GrammarError {
+  return optionalAs(cur) ?? GRAMMAR_ERROR;
+}
+
+function cmdOrItem(cur: Cursor): DoBody | null {
+  const cmd = cur.codeSpan();
+  if (cmd !== null) return { cmd: splitParts(cmd) };
+  const name = cur.name();
+  return name === null ? null : { item: name };
+}
+
+export function parseRun(rest: string, resolve: Resolve) {
   const cur = new Cursor(rest);
-  const br = cur.eatBracketRef();
-  if (!br) return GRAMMAR_ERROR;
-  if (!cur.atEnd()) return GRAMMAR_ERROR;
-  return resolve(br);
+  if (!cur.eat(T.sp)) return fail();
+  const cmd = cur.codeSpan();
+  if (cmd === null) return fail();
+  const as = optionalAs(cur);
+  const e = as === GRAMMAR_ERROR ? as : elseThenEnd(cur, resolve);
+  if (as === GRAMMAR_ERROR || e === GRAMMAR_ERROR) return fail();
+  return { run: { cmd: splitParts(cmd), ...(as === null ? {} : { as }) }, else: e };
+}
+
+export function parseDo(rest: string, resolve: Resolve) {
+  const cur = new Cursor(rest);
+  if (!cur.eat(T.sp)) return fail();
+  const body = cmdOrItem(cur);
+  if (body === null) return fail();
+  const e = elseThenEnd(cur, resolve);
+  if (e === GRAMMAR_ERROR) return fail();
+  return { do: body, else: e };
+}
+
+function operand(cur: Cursor): Operand | null {
+  const v = cur.match(T.varOperand);
+  if (v) return { var: v[1] as string };
+  const n = cur.match(T.numOperand);
+  return n ? { num: n[1] as string } : null; // the `%` is decoration (SPEC §3.4)
+}
+
+export function parseCheck(rest: string, resolve: Resolve) {
+  const cur = new Cursor(rest);
+  if (!cur.eat(T.sp)) return fail();
+  let cond: Cond;
+  const cmd = cur.codeSpan();
+  if (cmd !== null) {
+    if (!cur.eat(T.succeeds)) return fail();
+    cond = { succeeds: splitParts(cmd) };
+  } else {
+    const l = operand(cur);
+    const op = l && cur.eat(T.sp) ? (cur.match(T.op)?.[0] as Op | undefined) : undefined;
+    const r = op && cur.eat(T.sp) ? operand(cur) : null;
+    if (!l || !op || !r) return fail();
+    cond = { cmp: { op, l, r } };
+  }
+  let then: { stop: Record<string, never> } | Ref | null = null;
+  if (cur.eat(T.arrow)) {
+    if (cur.eat(T.stop)) then = { stop: {} };
+    else {
+      const br = cur.bracketRef();
+      if (!br) return fail();
+      then = resolve(br);
+    }
+  }
+  const e = elseThenEnd(cur, resolve);
+  if (e === GRAMMAR_ERROR || (then === null && e === null)) return fail();
+  return { check: { cond, then, else: e } };
+}
+
+export function parseForEach(rest: string) {
+  const cur = new Cursor(rest);
+  if (!cur.eat(T.sp)) return fail();
+  const name = cur.name();
+  if (name === null || !cur.eat(T.in)) return fail();
+  const list = cur.bracketRef();
+  if (!list || !cur.atEnd()) return fail();
+  return { var: name, list };
+}
+
+export function parseIfYes(rest: string, resolve: Resolve) {
+  const cur = new Cursor(rest);
+  if (!cur.eat(T.sp)) return fail();
+  let inline: { run: { cmd: Part[] } } | { do: DoBody };
+  if (cur.eat(T.runInline)) {
+    const cmd = cur.codeSpan();
+    if (cmd === null) return fail();
+    inline = { run: { cmd: splitParts(cmd) } };
+  } else if (cur.eat(T.doInline)) {
+    const body = cmdOrItem(cur);
+    if (body === null) return fail();
+    inline = { do: body };
+  } else return fail();
+  const e = elseThenEnd(cur, resolve);
+  if (e === GRAMMAR_ERROR) return fail();
+  return { ...inline, else: e };
+}
+
+export function parseThen(rest: string, resolve: Resolve): Ref | GrammarError {
+  const cur = new Cursor(rest);
+  if (!cur.eat(T.sp)) return fail();
+  const br = cur.bracketRef();
+  return br && cur.atEnd() ? resolve(br) : fail();
 }
 
 export function parsePage(rest: string): Part[] | GrammarError {
-  if (rest[0] !== '"') return GRAMMAR_ERROR;
-  const close = rest.lastIndexOf('"');
-  if (close <= 0) return GRAMMAR_ERROR;
-  const content = rest.slice(1, close);
-  if (rest.slice(close + 1).trim() !== "") return GRAMMAR_ERROR;
-  return splitParts(content);
+  const m = /^ +"(.*)"$/s.exec(rest);
+  return m ? splitParts(m[1] as string) : fail();
 }
 
 export function parseNoArg(rest: string): true | GrammarError {
-  return rest.trim() === "" ? true : GRAMMAR_ERROR;
+  return rest === "" ? true : fail();
 }
 
 // --- ask ---------------------------------------------------------------
 
-type AskForm = "sections" | "yesno" | "one_of" | "score";
-interface AskParsed {
-  question: Part[];
-  sure: number;
-  else: Else;
-  form: AskForm;
-  yesnoAs?: string;
-  oneOfList?: BracketRef;
-  oneOfAs?: string;
-  scoreLow?: number;
-  scoreHigh?: number;
-  scoreAs?: string;
-}
+export type AskForm =
+  | { sections: true }
+  | { yesno: { as: string } }
+  | { one_of: { list: BracketRef; as: string } }
+  | { score: { low: number; high: number; as: string } };
 
-function findQEnd(s: string): number {
-  const candidates = [s.indexOf(" → "), s.indexOf(" -> "), s.indexOf(" · ")].filter((i) => i !== -1);
-  return candidates.length === 0 ? -1 : Math.min(...candidates);
-}
+/** An integer the core can hold exactly (SPEC §5.1: JSON numbers). */
+const safeInt = (s: string | undefined): number | null => {
+  const n = Number(s);
+  return Number.isSafeInteger(n) ? n : null;
+};
 
-export function parseAsk(rest: string, resolve: Resolve): AskParsed | GrammarError {
-  const qEnd = findQEnd(rest);
-  if (qEnd === -1) return GRAMMAR_ERROR;
-  const qText = rest.slice(0, qEnd);
-  if (qText.length === 0) return GRAMMAR_ERROR;
-
-  const cur = new Cursor(rest);
-  cur.pos = qEnd;
-
-  let form: AskForm;
-  let yesnoAs: string | undefined;
-  let oneOfList: BracketRef | undefined;
-  let oneOfAs: string | undefined;
-  let scoreLow: number | undefined;
-  let scoreHigh: number | undefined;
-  let scoreAs: string | undefined;
-
-  if (cur.eat(" → ") || cur.eat(" -> ")) {
-    if (cur.eat("yes | no")) {
-      form = "yesno";
-      if (cur.eat(" as ")) {
-        const n = cur.eatName();
-        if (n === null) return GRAMMAR_ERROR;
-        yesnoAs = n;
-      }
-    } else if (cur.startsWith("one of ")) {
-      cur.eat("one of ");
-      const br = cur.eatBracketRef();
-      if (!br) return GRAMMAR_ERROR;
-      if (!cur.eat(" as ")) return GRAMMAR_ERROR;
-      const n = cur.eatName();
-      if (n === null) return GRAMMAR_ERROR;
-      form = "one_of";
-      oneOfList = br;
-      oneOfAs = n;
-    } else {
-      const m = /^(\d+) to (\d+) as ([a-z_][a-z0-9_]*)/.exec(cur.rest());
-      if (!m) return GRAMMAR_ERROR;
-      cur.pos += m[0].length;
-      form = "score";
-      scoreLow = Number(m[1]);
-      scoreHigh = Number(m[2]);
-      scoreAs = m[3];
-    }
-  } else {
-    form = "sections";
+/** What follows ` → ` in an ask: `yes | no`, `one of [L]` or a Score range. */
+function askForm(cur: Cursor): AskForm | GrammarError {
+  if (cur.eat(T.yesNo)) {
+    const as = optionalAs(cur);
+    return as === GRAMMAR_ERROR ? as : { yesno: { as: as ?? "_yn" } };
   }
+  if (cur.eat(T.oneOf)) {
+    const list = cur.bracketRef();
+    const as = list ? requiredAs(cur) : GRAMMAR_ERROR;
+    return list && as !== GRAMMAR_ERROR ? { one_of: { list, as } } : GRAMMAR_ERROR;
+  }
+  const m = cur.match(T.score);
+  const low = safeInt(m?.[1]);
+  const high = safeInt(m?.[2]);
+  const as = low !== null && high !== null ? requiredAs(cur) : GRAMMAR_ERROR;
+  return low !== null && high !== null && as !== GRAMMAR_ERROR ? { score: { low, high, as } } : GRAMMAR_ERROR;
+}
 
-  if (!cur.eat(" · sure ")) return GRAMMAR_ERROR;
-  const sureM = /^(\d+)%/.exec(cur.rest());
-  if (!sureM) return GRAMMAR_ERROR;
-  const sure = Number(sureM[1]);
-  if (sure < 0 || sure > 100) return GRAMMAR_ERROR;
-  cur.pos += sureM[0].length;
+export function parseAsk(rest: string, resolve: Resolve) {
+  const cur = new Cursor(rest);
+  if (!cur.eat(T.sp)) return fail();
+  // Q runs to the first ` → `, ` -> ` or ` · `, and may contain none of them (SPEC §3.4).
+  const qEnd = / +(?:→|->) +| +· /g;
+  qEnd.lastIndex = cur.pos;
+  const end = qEnd.exec(rest)?.index ?? -1;
+  if (end === -1) return fail();
+  const q = rest.slice(cur.pos, end);
+  if (q === "" || q.includes("→") || q.includes("->")) return fail();
+  cur.pos = end;
 
-  const elseR = parseElse(cur, resolve);
-  if (elseR === GRAMMAR_ERROR) return GRAMMAR_ERROR;
-  if (!cur.atEnd()) return GRAMMAR_ERROR;
+  let form: AskForm | GrammarError = { sections: true };
+  if (cur.eat(T.arrow)) form = askForm(cur);
+  if (form === GRAMMAR_ERROR) return fail();
 
-  return { question: splitParts(qText), sure, else: elseR, form, yesnoAs, oneOfList, oneOfAs, scoreLow, scoreHigh, scoreAs };
+  const sureM = cur.match(T.sure);
+  const sure = safeInt(sureM?.[1]);
+  if (sure === null || sure > 100) return fail();
+  const e = elseThenEnd(cur, resolve);
+  if (e === GRAMMAR_ERROR) return fail();
+  return { question: splitParts(q), sure, else: e, form };
 }

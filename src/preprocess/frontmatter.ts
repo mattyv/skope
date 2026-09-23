@@ -1,15 +1,12 @@
-// Frontmatter parsing (SPEC §3.1). Duration/token units and per-field line
-// numbers are decisions the contracts README makes explicit (durations in
-// ms, `4k tokens` = 4000).
+// Frontmatter parsing (SPEC §3.1). Durations are in ms and `4k tokens` is
+// 4000 (contracts/README.md). Every error points at its field's line.
 
 import { load as yamlLoad } from "js-yaml";
 import type { ParseError } from "./errors.js";
 import { mkErr } from "./errors.js";
+import { sectionId } from "./slug.js";
 
-export interface ParamDef {
-  name: string;
-  value: { str: string; src: number } | { int: number; src: number };
-}
+export type ParamValue = { str: string; src: number } | { int: number; src: number };
 
 export interface Limits {
   run_timeout_ms: number;
@@ -21,145 +18,129 @@ export interface Limits {
 export interface Frontmatter {
   notRunnable: boolean;
   skill?: string;
-  description?: string;
-  entryName?: string;
-  entryLine?: number;
-  params: ParamDef[];
+  entry?: { section: string; src: number };
+  params: [string, ParamValue][];
   limits: Limits;
   bodyStart: number; // 0-based index into `lines` where the body begins
 }
 
-function findLine(fmLines: string[], predicate: (line: string) => boolean): number | undefined {
-  for (let i = 0; i < fmLines.length; i++) {
-    if (predicate(fmLines[i] ?? "")) return i + 2; // fmLines[0] is absolute line 2
-  }
-  return undefined;
-}
+const DURATIONS: Record<string, keyof Limits> = { run_timeout: "run_timeout_ms", do_timeout: "do_timeout_ms", deadline: "deadline_ms" };
+const UNIT_MS: Record<string, number> = { s: 1000, m: 60_000, h: 3_600_000 };
+
+/** A positive integer the core can hold exactly, or null. */
+const positive = (n: number): number | null => (Number.isSafeInteger(n) && n >= 1 ? n : null);
 
 function parseDurationMs(s: unknown): number | null {
-  if (typeof s !== "string") return null;
-  const m = /^(\d+)(s|m|h)$/.exec(s.trim());
-  if (!m) return null;
-  const mult = m[2] === "s" ? 1000 : m[2] === "m" ? 60_000 : 3_600_000;
-  return Number(m[1]) * mult;
+  const m = typeof s === "string" ? /^(\d+)(s|m|h)$/.exec(s.trim()) : null;
+  return m ? positive(Number(m[1]) * (UNIT_MS[m[2] as string] as number)) : null;
 }
 
 function parseTokens(s: unknown): number | null {
-  if (typeof s !== "string") return null;
-  const m = /^(\d+)(k)?\s*tokens$/.exec(s.trim());
-  if (!m) return null;
-  return m[2] ? Number(m[1]) * 1000 : Number(m[1]);
+  const m = typeof s === "string" ? /^(\d+)(k)? *tokens$/.exec(s.trim()) : null;
+  return m ? positive(Number(m[1]) * (m[2] ? 1000 : 1)) : null;
 }
+
+/** The 1-based line of each top-level key (`name`) and of each key one level
+ * under it (`params.mount`), from the frontmatter's own lines. Block style
+ * only; flow-style values fall back to their parent's line. */
+function keyLines(fmLines: string[]): Map<string, number> {
+  const KEY = /^( *)(?:"([^"]*)"|'([^']*)'|([^\s#'"][^:#]*?)) *:(?: |$)/;
+  const lines = new Map<string, number>();
+  let parent: string | null = null;
+  let childIndent: number | null = null;
+  fmLines.forEach((l, i) => {
+    const m = KEY.exec(l);
+    if (!m) return;
+    const indent = (m[1] as string).length;
+    const key = (m[2] ?? m[3] ?? m[4]) as string;
+    if (indent === 0) {
+      parent = key;
+      childIndent = null;
+      lines.set(key, i + 2); // fmLines[0] is line 2
+    } else if (parent !== null) {
+      childIndent ??= indent;
+      if (indent === childIndent && !lines.has(`${parent}.${key}`)) lines.set(`${parent}.${key}`, i + 2);
+    }
+  });
+  return lines;
+}
+
+const isMapping = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 
 export function parseFrontmatter(lines: string[], errors: ParseError[]): Frontmatter {
   const limits: Limits = { run_timeout_ms: 30_000, do_timeout_ms: 300_000, deadline_ms: 900_000, ask_context_tokens: 4000 };
-  const result: Frontmatter = { notRunnable: false, params: [], limits, bodyStart: 0 };
+  const result: Frontmatter = { notRunnable: true, params: [], limits, bodyStart: 0 };
 
   if ((lines[0] ?? "").trim() !== "---") {
-    result.notRunnable = true;
     errors.push(mkErr("E-NOT-RUNNABLE", 1, "no `format: 1` in the frontmatter (the file has none)"));
     return result;
   }
-  let end = -1;
-  for (let i = 1; i < lines.length; i++) {
-    if ((lines[i] ?? "").trim() === "---") {
-      end = i;
-      break;
-    }
-  }
+  const end = lines.findIndex((l, i) => i > 0 && l.trim() === "---");
   if (end === -1) {
     errors.push(mkErr("E-FRONTMATTER", 1, "frontmatter isn't closed with `---`"));
-    result.notRunnable = true;
     return result;
   }
   const fmLines = lines.slice(1, end);
   let doc: unknown;
   try {
     doc = yamlLoad(fmLines.join("\n"));
-  } catch {
-    errors.push(mkErr("E-FRONTMATTER", 1, "frontmatter isn't valid YAML"));
-    result.notRunnable = true;
+  } catch (e) {
+    const line = (e as { mark?: { line?: number } }).mark?.line;
+    errors.push(mkErr("E-FRONTMATTER", typeof line === "number" ? Math.min(line + 2, end) : 1, "frontmatter isn't valid YAML"));
     return result;
   }
-  result.bodyStart = end + 1;
-  if (doc === null || typeof doc !== "object") {
+  if (!isMapping(doc)) {
     errors.push(mkErr("E-FRONTMATTER", 1, "frontmatter isn't a YAML mapping"));
-    result.notRunnable = true;
     return result;
   }
-  const fm = doc as Record<string, unknown>;
-
-  if (fm.format !== 1) {
-    result.notRunnable = true;
+  if (doc.format !== 1) {
     errors.push(mkErr("E-NOT-RUNNABLE", 1, "no `format: 1` in the frontmatter"));
     return result;
   }
+  result.notRunnable = false;
+  result.bodyStart = end + 1;
+  const at = keyLines(fmLines);
+  const lineOf = (key: string, parent?: string) => at.get(key) ?? (parent === undefined ? undefined : at.get(parent)) ?? 1;
+  const bad = (key: string, message: string, parent?: string) => errors.push(mkErr("E-FRONTMATTER", lineOf(key, parent), message));
 
-  if (typeof fm.name !== "string" || !/^[a-z0-9-]+$/.test(fm.name)) {
-    errors.push(mkErr("E-FRONTMATTER", 1, "`name` is required and must match [a-z0-9-]+"));
-  } else {
-    result.skill = fm.name;
+  if (typeof doc.name === "string" && /^[a-z0-9-]+$/.test(doc.name)) result.skill = doc.name;
+  else bad("name", "`name` is required and must match [a-z0-9-]+");
+
+  if (typeof doc.description !== "string" || doc.description.trim() === "" || doc.description.includes("\n")) {
+    bad("description", "`description` is required and must be one line");
   }
 
-  if (typeof fm.description !== "string" || fm.description.length === 0 || fm.description.includes("\n")) {
-    errors.push(mkErr("E-FRONTMATTER", 1, "`description` is required and must be one line"));
-  } else {
-    result.description = fm.description;
+  if (doc.entry !== undefined) {
+    const section = typeof doc.entry === "string" ? sectionId(doc.entry) : "s:";
+    if (section === "s:") bad("entry", "`entry` must name a section");
+    else result.entry = { section, src: lineOf("entry") };
   }
 
-  if (fm.entry !== undefined) {
-    if (typeof fm.entry !== "string") {
-      errors.push(mkErr("E-FRONTMATTER", 1, "`entry` must be a string"));
-    } else {
-      result.entryName = fm.entry;
-      result.entryLine = findLine(fmLines, (l) => /^entry:/.test(l)) ?? 1;
-    }
-  }
-
-  if (fm.params !== undefined) {
-    if (typeof fm.params !== "object" || fm.params === null) {
-      errors.push(mkErr("E-FRONTMATTER", 1, "`params` must be a mapping"));
-    } else {
-      for (const [name, value] of Object.entries(fm.params as Record<string, unknown>)) {
-        const line = findLine(fmLines, (l) => l.startsWith(`  ${name}:`)) ?? 1;
-        if (!/^[a-z_][a-z0-9_]*$/.test(name)) {
-          errors.push(mkErr("E-FRONTMATTER", line, `param name "${name}" doesn't match [a-z_][a-z0-9_]*`));
-          continue;
-        }
-        if (typeof value === "number" && Number.isInteger(value)) {
-          result.params.push({ name, value: { int: value, src: line } });
-        } else if (typeof value === "string") {
-          result.params.push({ name, value: { str: value, src: line } });
-        } else {
-          errors.push(mkErr("E-FRONTMATTER", line, `param "${name}" must be an int or a string`));
-        }
+  if (doc.params !== undefined) {
+    if (!isMapping(doc.params)) bad("params", "`params` must be a mapping");
+    else {
+      for (const [name, value] of Object.entries(doc.params)) {
+        const src = lineOf(`params.${name}`, "params");
+        if (!/^[a-z_][a-z0-9_]*$/.test(name)) bad(`params.${name}`, `param name "${name}" doesn't match [a-z_][a-z0-9_]*`, "params");
+        else if (typeof value === "number" && Number.isSafeInteger(value)) result.params.push([name, { int: value, src }]);
+        else if (typeof value === "string") result.params.push([name, { str: value, src }]);
+        else bad(`params.${name}`, `param "${name}" must be a string or an integer within ±(2^53 − 1)`, "params");
       }
     }
   }
 
-  if (fm.limits !== undefined) {
-    if (typeof fm.limits !== "object" || fm.limits === null) {
-      errors.push(mkErr("E-FRONTMATTER", 1, "`limits` must be a mapping"));
-    } else {
-      const l = fm.limits as Record<string, unknown>;
-      const durField = (key: string, target: keyof Limits) => {
-        if (l[key] === undefined) return;
-        const ms = parseDurationMs(l[key]);
-        const line = findLine(fmLines, (line2) => line2.startsWith(`  ${key}:`)) ?? 1;
-        if (ms === null) errors.push(mkErr("E-FRONTMATTER", line, `\`${key}\` isn't a valid duration (e.g. "30s")`));
-        else limits[target] = ms;
-      };
-      durField("run_timeout", "run_timeout_ms");
-      durField("do_timeout", "do_timeout_ms");
-      durField("deadline", "deadline_ms");
-      if (l.ask_context !== undefined) {
-        const tokens = parseTokens(l.ask_context);
-        const line = findLine(fmLines, (line2) => line2.startsWith("  ask_context:")) ?? 1;
-        if (tokens === null) errors.push(mkErr("E-FRONTMATTER", line, '`ask_context` isn\'t a valid size (e.g. "4k tokens")'));
-        else limits.ask_context_tokens = tokens;
+  if (doc.limits !== undefined) {
+    if (!isMapping(doc.limits)) bad("limits", "`limits` must be a mapping");
+    else {
+      for (const [key, value] of Object.entries(doc.limits)) {
+        const target = Object.hasOwn(DURATIONS, key) ? DURATIONS[key] : undefined;
+        const n = target ? parseDurationMs(value) : key === "ask_context" ? parseTokens(value) : null;
+        if (n !== null) limits[target ?? "ask_context_tokens"] = n;
+        else if (target) bad(`limits.${key}`, `\`${key}\` must be a positive duration, like "30s", "5m" or "1h"`, "limits");
+        else if (key === "ask_context") bad(`limits.${key}`, '`ask_context` must be a positive size, like "4k tokens"', "limits");
+        else bad(`limits.${key}`, `unknown limit \`${key}\` (run_timeout, do_timeout, deadline, ask_context)`, "limits");
       }
     }
   }
-
   return result;
 }

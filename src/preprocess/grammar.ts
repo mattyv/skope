@@ -1,48 +1,69 @@
-// Instruction-line grammar (SPEC §3.3, §3.4): the leading bold-span
-// classifier, and a small hand-written recursive-descent parser per
-// keyword. A combinator/regex-per-line approach was tried and discarded:
-// the ELSE suffix is shared by six different forms and a Cursor makes that
-// sharing trivial, where one regex per form duplicates it six times.
+// Instruction-line grammar (SPEC §3.3, §3.4): the leading-bold classifier,
+// and a Cursor the per-keyword parsers in statements.ts share. A regex per
+// form was tried and discarded: the ELSE suffix is shared by six forms, and
+// a Cursor makes that sharing trivial.
+
+import { sectionId } from "./slug.js";
 
 export const KEYWORDS = ["run", "do", "check", "ask", "for each", "if yes", "then", "page", "hand off", "stop"] as const;
 export type Keyword = (typeof KEYWORDS)[number];
 
-export interface LeadingBold {
-  content: string;
-  rest: string;
-  endsWithColon: boolean;
-}
+export type Lead =
+  | { kind: "keyword"; keyword: Keyword; colon: boolean; rest: string }
+  | { kind: "note" } // bold ending in `:`, e.g. `**Note:**`: prose
+  | { kind: "unknown"; content: string }; // any other bold: E-UNKNOWN-BOLD
 
-/** Extracts a `**...**` span at the very start of `text`, if there is one. */
-export function extractLeadingBold(text: string): LeadingBold | null {
-  if (!text.startsWith("**")) return null;
-  const close = text.indexOf("**", 2);
+/** Classifies an item by its leading `**bold**` or `__bold__` span (SPEC §3.3
+ * rule 3), or returns null when the item doesn't start with bold. Emphasis
+ * markers just inside the bold (`***run***`, `**_run_**`) don't hide a
+ * keyword. */
+export function classifyLead(text: string): Lead | null {
+  const delim = text.slice(0, 2);
+  if (delim !== "**" && delim !== "__") return null;
+  const close = text.indexOf(delim, 3);
   if (close === -1) return null;
   const content = text.slice(2, close);
-  if (content.length === 0) return null;
-  let rest = text.slice(close + 2);
-  let endsWithColon = false;
-  if (content.endsWith(":")) {
-    endsWithColon = true;
-  } else if (rest.startsWith(":")) {
-    endsWithColon = true;
-    rest = rest.slice(1);
+  const rest = text.slice(close + 2);
+  const bare = content.replace(/^[*_]+|[*_]+$/g, "");
+  const colon = bare.endsWith(":") || rest.startsWith(":");
+  const word = (bare.endsWith(":") ? bare.slice(0, -1) : bare).toLowerCase();
+  const keyword = KEYWORDS.find((k) => k === word);
+  if (keyword) return { kind: "keyword", keyword, colon, rest };
+  return colon ? { kind: "note" } : { kind: "unknown", content };
+}
+
+/** The keyword an item starts with, colon or not (SPEC §3.3 rules 3 and 7). */
+export function leadingKeyword(text: string): Keyword | null {
+  const lead = classifyLead(text);
+  return lead?.kind === "keyword" ? lead.keyword : null;
+}
+
+/** "did you mean **for each**?" for a near-miss keyword (SPEC §3.3 rule 5),
+ * after normalising case, `_`, `-` and spacing; "" when nothing is close. */
+export function suggestKeyword(content: string): string {
+  const norm = content
+    .toLowerCase()
+    .replace(/[*_:]+/g, " ")
+    .replace(/[-\s]+/g, " ")
+    .trim();
+  let best: { k: Keyword; d: number } | null = null;
+  for (const k of KEYWORDS) {
+    const d = Math.min(distance(norm, k), distance(norm.replace(/ /g, ""), k.replace(/ /g, "")));
+    if (best === null || d < best.d) best = { k, d };
   }
-  return { content, rest, endsWithColon };
+  return best && best.d <= 2 && best.d < norm.length ? `; did you mean **${best.k}**?` : "";
 }
 
-export function matchKeyword(content: string): Keyword | null {
-  const lc = content.toLowerCase();
-  return (KEYWORDS as readonly string[]).includes(lc) ? (lc as Keyword) : null;
-}
-
-/** SPEC §3.3 rule 7: does this list item start with a real keyword (not a
- * `**Note:**`-style prose lead-in)? Used wherever instructions aren't
- * recognised, to flag E-MISPLACED. */
-export function isKeywordLed(text: string): boolean {
-  const bold = extractLeadingBold(text);
-  if (!bold || bold.endsWithColon) return false;
-  return matchKeyword(bold.content) !== null;
+function distance(a: string, b: string): number {
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    for (let j = 1; j <= b.length; j++) {
+      cur[j] = Math.min((prev[j] as number) + 1, (cur[j - 1] as number) + 1, (prev[j - 1] as number) + (a[i - 1] === b[j - 1] ? 0 : 1));
+    }
+    prev = cur;
+  }
+  return prev[b.length] as number;
 }
 
 // --- Parts (interpolation) -------------------------------------------------
@@ -67,108 +88,75 @@ export function splitParts(text: string): Part[] {
 
 export const GRAMMAR_ERROR = Symbol("grammar_error");
 export type GrammarError = typeof GRAMMAR_ERROR;
+export type BracketRef = { text: string; anchor?: string };
+
+// Token separators (SPEC §3.4: whitespace between tokens is one or more spaces).
+export const T = {
+  sp: / +/y,
+  arrow: / +(?:→|->) +/y,
+  else: / +· +else +/y,
+  sure: / +· +sure +(\d+)%/y,
+  as: / +as +/y,
+  in: / +in +/y,
+  succeeds: / +succeeds/y,
+  oneOf: /one +of +/y,
+  score: /(\d+) +to +(\d+)/y,
+  yesNo: /yes \| no/y,
+  op: /<=|>=|==|!=|<|>/y,
+  varOperand: /\{([a-z_][a-z0-9_]*)\}%?/y,
+  numOperand: /(-?[0-9]+(?:\.[0-9]+)?)%?/y,
+  name: /[a-z_][a-z0-9_]*/y,
+  stop: /stop/y,
+  skip: /skip/y,
+  runInline: /run +/y,
+  doInline: /do +/y,
+};
 
 export class Cursor {
   pos = 0;
-  constructor(public s: string) {}
+  constructor(readonly s: string) {}
 
-  rest(): string {
-    return this.s.slice(this.pos);
-  }
   atEnd(): boolean {
     return this.pos >= this.s.length;
   }
-  startsWith(lit: string): boolean {
-    return this.s.startsWith(lit, this.pos);
+  /** Matches a sticky regex here, and moves past it on success. */
+  match(re: RegExp): RegExpExecArray | null {
+    re.lastIndex = this.pos;
+    const m = re.exec(this.s);
+    if (m) this.pos = re.lastIndex;
+    return m;
   }
-  eat(lit: string): boolean {
-    if (this.startsWith(lit)) {
-      this.pos += lit.length;
-      return true;
+  eat(re: RegExp): boolean {
+    return this.match(re) !== null;
+  }
+  name(): string | null {
+    return this.match(T.name)?.[0] ?? null;
+  }
+  /** One CommonMark code span: a run of n backticks, closed by a run of
+   * exactly n; one space is stripped from each end if both have one. */
+  codeSpan(): string | null {
+    const open = /`+/y;
+    open.lastIndex = this.pos;
+    const o = open.exec(this.s);
+    if (!o) return null;
+    const run = /`+/g;
+    run.lastIndex = open.lastIndex;
+    for (let c = run.exec(this.s); c; c = run.exec(this.s)) {
+      if (c[0].length !== o[0].length) continue;
+      let content = this.s.slice(open.lastIndex, c.index);
+      if (/^ .*[^ ].* $/s.test(content)) content = content.slice(1, -1);
+      this.pos = run.lastIndex;
+      return content;
     }
-    return false;
+    return null;
   }
-  eatCodeSpan(): string | null {
-    if (this.s[this.pos] !== "`") return null;
-    const close = this.s.indexOf("`", this.pos + 1);
-    if (close === -1) return null;
-    const content = this.s.slice(this.pos + 1, close);
-    this.pos = close + 1;
-    return content;
+  /** `[text]` or `[text](#anchor)`; the text must have a slug (SPEC §3.4). */
+  bracketRef(): BracketRef | null {
+    const m = /\[([^\]]+)\](?:\(#([^)]*)\))?/y;
+    m.lastIndex = this.pos;
+    const r = m.exec(this.s);
+    if (!r || sectionId(r[1] as string) === "s:") return null;
+    this.pos = m.lastIndex;
+    return r[2] === undefined ? { text: r[1] as string } : { text: r[1] as string, anchor: r[2] };
   }
-  eatName(): string | null {
-    const m = /^[a-z_][a-z0-9_]*/.exec(this.rest());
-    if (!m) return null;
-    this.pos += m[0].length;
-    return m[0];
-  }
-  eatBracketRef(): { text: string; anchor?: string } | null {
-    if (this.s[this.pos] !== "[") return null;
-    const close = this.s.indexOf("]", this.pos + 1);
-    if (close === -1) return null;
-    const text = this.s.slice(this.pos + 1, close);
-    if (text.length === 0) return null;
-    let p = close + 1;
-    let anchor: string | undefined;
-    if (this.s.slice(p, p + 2) === "(#") {
-      const closeParen = this.s.indexOf(")", p + 2);
-      if (closeParen === -1) return null;
-      anchor = this.s.slice(p + 2, closeParen);
-      p = closeParen + 1;
-    }
-    this.pos = p;
-    return { text, anchor };
-  }
-}
-
-// --- SectionRef / Target / Else -----------------------------------------
-
-export interface SectionRefRaw {
-  section: string; // section id, computed by the caller from `text`
-  anchor?: { given: string; expected: string };
-}
-export type BracketRef = { text: string; anchor?: string };
-
-export type Target = { stop: Record<string, never> } | SectionRefRaw;
-export type Else = null | { skip: Record<string, never> } | SectionRefRaw;
-
-export function eatTarget(cur: Cursor, resolve: (b: BracketRef) => SectionRefRaw): Target | null {
-  if (cur.eat("stop")) return { stop: {} };
-  const br = cur.eatBracketRef();
-  if (br) return resolve(br);
-  return null;
-}
-
-export function parseElse(cur: Cursor, resolve: (b: BracketRef) => SectionRefRaw): Else | GrammarError {
-  if (!cur.startsWith(" · else ")) return null;
-  cur.eat(" · else ");
-  if (cur.eat("skip")) return { skip: {} };
-  const br = cur.eatBracketRef();
-  if (br) return resolve(br);
-  return GRAMMAR_ERROR;
-}
-
-// --- Operands / comparisons (§3.4 COND) ---------------------------------
-
-export type Operand = { var: string } | { num: string };
-const OPERATORS = ["<=", ">=", "==", "!=", "<", ">"] as const;
-
-export function eatOperand(cur: Cursor): Operand | null {
-  const varM = /^\{([a-z_][a-z0-9_]*)\}%?/.exec(cur.rest());
-  if (varM) {
-    cur.pos += varM[0].length;
-    return { var: varM[1] ?? "" };
-  }
-  const numM = /^-?[0-9]+(\.[0-9]+)?%?/.exec(cur.rest());
-  if (numM) {
-    cur.pos += numM[0].length;
-    const raw = numM[0];
-    return { num: raw.endsWith("%") ? raw.slice(0, -1) : raw };
-  }
-  return null;
-}
-
-export function eatOp(cur: Cursor): string | null {
-  for (const op of OPERATORS) if (cur.eat(op)) return op;
-  return null;
 }

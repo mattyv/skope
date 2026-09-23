@@ -23,7 +23,7 @@ describe("preprocess produces the exact M1 golden core JSON", () => {
     test(name, () => {
       const md = read(skill);
       const expected = JSON.parse(read(golden));
-      const result = preprocess(md, skill);
+      const result = preprocess(md);
       if ("errors" in result) {
         throw new Error(`expected a program, got errors: ${JSON.stringify(result.errors, null, 2)}`);
       }

@@ -6,7 +6,7 @@ import { preprocess } from "../../src/preprocess/index.js";
 import { skillMd } from "./helpers.js";
 
 function program(md: string): CoreProgram {
-  const result = preprocess(md, "test.md");
+  const result = preprocess(md);
   if ("errors" in result) throw new Error(`expected a program, got errors: ${JSON.stringify(result.errors, null, 2)}`);
   return result.program;
 }

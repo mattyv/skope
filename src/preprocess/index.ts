@@ -1,430 +1,308 @@
 // The preprocessor (SPEC §2, §3): Markdown skill -> core program JSON. Parses
 // only; every semantic check (references resolve, taint, bound names, ...)
 // is the core's job (SPEC §5.1).
+//
+// Its one safety property (SPEC §3.3 rules 4 and 7): a list item that starts
+// with a keyword is an instruction or an error, never prose. Block structure
+// comes from markdown-it (blocks.ts), so what runs is what renders.
 
-import type { CoreProgram, List, OtherSection, ParamValue, Section, Stmt } from "../contracts.gen.js";
-import { type Block, type ListBlock, type ListItem, parseBlockquoteInner, parseBlocks } from "./blocks.js";
-import type { ParseError } from "./errors.js";
-import { mkErr } from "./errors.js";
+import type { CoreProgram, List, OtherSection, Section, Stmt } from "../contracts.gen.js";
+import { type Block, type Item, isPlainText, parseBlocks, plainText } from "./blocks.js";
+import { mkErr, type ParseError } from "./errors.js";
 import { parseFrontmatter } from "./frontmatter.js";
-import {
-  type BracketRef,
-  Cursor,
-  extractLeadingBold,
-  GRAMMAR_ERROR,
-  isKeywordLed,
-  matchKeyword,
-  type SectionRefRaw,
-  splitParts,
-} from "./grammar.js";
+import { type BracketRef, Cursor, classifyLead, GRAMMAR_ERROR, leadingKeyword, splitParts, suggestKeyword } from "./grammar.js";
 import { githubSlug, sectionId } from "./slug.js";
-import { parseAsk, parseCheck, parseDo, parseForEach, parseIfYes, parseNoArg, parsePage, parseRun, parseThen } from "./statements.js";
+import {
+  parseAsk,
+  parseCheck,
+  parseDo,
+  parseForEach,
+  parseIfYes,
+  parseNoArg,
+  parsePage,
+  parseRun,
+  parseThen,
+  type Ref,
+} from "./statements.js";
 
 export type PreprocessResult = { program: CoreProgram } | { errors: ParseError[] };
 
-export function preprocess(markdown: string, _file: string): PreprocessResult {
+export function preprocess(markdown: string): PreprocessResult {
   try {
-    return run(markdown);
+    return new Preprocessor().run(markdown);
   } catch (e) {
-    // ponytail: a defensive catch-all so a parser bug degrades to a
-    // reported error instead of crashing the caller (fuzz-tested). Anything
-    // caught here is, by definition, a preprocessor bug to fix.
+    // A parser bug degrades to a reported error instead of crashing the
+    // caller. The fuzz test fails if it's ever reached.
     return { errors: [mkErr("E-INTERNAL", 1, `preprocessor crashed: ${e instanceof Error ? e.message : String(e)}`)] };
   }
 }
 
-function run(markdown: string): PreprocessResult {
-  const lines = markdown.split("\n");
-  const errors: ParseError[] = [];
+interface RawSection {
+  name: string;
+  src: number;
+  id: string | null; // null when the heading has no slug or repeats one
+  blocks: Block[];
+}
 
-  const fm = parseFrontmatter(lines, errors);
-  if (fm.notRunnable) return { errors };
+const hasKeywordItem = (blocks: Block[]) => blocks.some((b) => b.kind === "list" && b.items.some((i) => leadingKeyword(i.text)));
+const lists = (blocks: Block[]) => blocks.filter((b): b is Block & { kind: "list" } => b.kind === "list");
 
-  const resolve = (b: BracketRef): SectionRefRaw => {
-    const ref: SectionRefRaw = { section: sectionId(b.text) };
-    if (b.anchor !== undefined) ref.anchor = { given: b.anchor, expected: githubSlug(b.text) };
+class Preprocessor {
+  errors: ParseError[] = [];
+  headings = new Map<string, string>(); // section id -> heading text
+  listRefs = new Set<string>(); // ids used in list position: `for each … in [X]`, `one of [X]`
+
+  err(code: string, line: number, message: string): void {
+    this.errors.push(mkErr(code, line, message));
+  }
+
+  run(markdown: string): PreprocessResult {
+    const lines = markdown
+      .replace(/^\uFEFF/, "")
+      .replace(/\r\n?/g, "\n")
+      .split("\n");
+    const fm = parseFrontmatter(lines, this.errors);
+    if (fm.notRunnable) return { errors: this.errors };
+
+    const parsed = parseBlocks(lines.slice(fm.bodyStart).join("\n"), fm.bodyStart);
+    if (parsed.tooDeep !== null) {
+      this.err("E-NESTED-LIST", parsed.tooDeep, "lists and blockquotes nest too deeply to read reliably");
+    }
+
+    // Split at top-level `##` headings (setext too); anything before the first is prose.
+    const raws: RawSection[] = [];
+    const preamble: Block[] = [];
+    for (const b of parsed.blocks) {
+      if (b.kind === "heading" && b.level === 2) raws.push({ name: b.text.trim(), src: b.line, id: null, blocks: [] });
+      else (raws.at(-1)?.blocks ?? preamble).push(b);
+    }
+    this.scanMisplaced(preamble);
+
+    // Names first, so a link's anchor is checked against the heading it
+    // resolves to (SPEC §3.4) whatever order sections come in.
+    for (const rs of raws) {
+      const id = sectionId(rs.name);
+      if (id === "s:") this.err("E-SECTION-NAME", rs.src, `"${rs.name}" has no letters or digits, so it has no id`);
+      else if (this.headings.has(id)) this.err("E-DUP-SECTION", rs.src, `"${rs.name}" has the same slug as an earlier section`);
+      else {
+        this.headings.set(id, rs.name);
+        rs.id = id;
+      }
+    }
+
+    // Instruction sections first: they say which sections are used as lists.
+    const built = new Map<RawSection, Section | OtherSection>();
+    const instruction = raws.filter((rs) => hasKeywordItem(rs.blocks));
+    for (const rs of instruction) built.set(rs, this.instructionSection(rs));
+    for (const rs of raws) if (!built.has(rs)) built.set(rs, this.otherSection(rs));
+
+    if (this.errors.length > 0) return { errors: this.errors };
+
+    const first = instruction.find((rs) => rs.id !== null);
+    // A defaulted entry with no instruction section names an id no heading
+    // can have (slugs never start with `_`), so the core reports it unresolved.
+    const entry = fm.entry ?? (first ? { section: first.id as string, src: first.src } : { section: "s:_entry", src: 1 });
+    const program: CoreProgram = {
+      skill: fm.skill as string,
+      format: 1,
+      entry,
+      params: Object.fromEntries(fm.params), // own properties, even for `__proto__`
+      limits: fm.limits,
+      sections: Object.fromEntries(raws.flatMap((rs) => (rs.id === null ? [] : [[rs.id, built.get(rs) as Section | OtherSection]]))),
+    };
+    return { program };
+  }
+
+  resolve = (b: BracketRef): Ref => {
+    const section = sectionId(b.text);
+    if (b.anchor === undefined) return { section };
+    return { section, anchor: { given: b.anchor, expected: githubSlug(this.headings.get(section) ?? b.text) } };
+  };
+
+  resolveList = (b: BracketRef): Ref => {
+    const ref = this.resolve(b);
+    this.listRefs.add(ref.section);
     return ref;
   };
 
-  const blocks = parseBlocks(lines, fm.bodyStart, lines.length);
-
-  interface RawSection {
-    name: string;
-    src: number;
-    blocks: Block[];
-    isInstruction: boolean;
-  }
-  const rawSections: RawSection[] = [];
-  let current: RawSection | null = null;
-
-  for (const b of blocks) {
-    if (b.type === "heading" && b.level === 2) {
-      current = { name: b.text, src: b.line, blocks: [], isInstruction: false };
-      rawSections.push(current);
-      continue;
-    }
-    if (b.type === "heading") continue; // level 1 or 3+: doesn't split a section
-    if (b.type === "blockquote") {
-      checkMisplaced(parseBlockquoteInner(lines, b.start, b.end), errors);
-      continue;
-    }
-    if (current) {
-      current.blocks.push(b);
-    } else if (b.type === "list") {
-      checkMisplaced([b], errors); // before the first section
+  /** SPEC §3.3 rule 7: a keyword item anywhere instructions aren't recognised. */
+  scanMisplaced(blocks: Block[]): void {
+    for (const b of blocks) {
+      if (b.kind === "quote") this.scanMisplaced(b.blocks);
+      if (b.kind !== "list") continue;
+      for (const item of b.items) {
+        if (leadingKeyword(item.text)) this.err("E-MISPLACED", item.line, "a keyword item where instructions aren't recognised");
+        this.scanMisplaced(item.blocks);
+      }
     }
   }
 
-  for (const rs of rawSections) {
-    const firstList = rs.blocks.find((b): b is ListBlock => b.type === "list");
-    rs.isInstruction = firstList !== undefined && (firstList.items[0]?.text ?? "").startsWith("**");
+  // --- instruction sections -----------------------------------------------
+
+  instructionSection(rs: RawSection): Section {
+    const body: Stmt[] = [];
+    for (const b of rs.blocks) {
+      if (b.kind === "list") body.push(...this.instructions(b.items));
+      else this.scanMisplaced([b]);
+    }
+    // Guidance (SPEC §3.2): the first paragraph before the first list, else the first anywhere.
+    const firstList = rs.blocks.findIndex((b) => b.kind === "list");
+    const isPara = (b: Block) => b.kind === "paragraph";
+    const para = (rs.blocks.slice(0, firstList === -1 ? undefined : firstList).find(isPara) ?? rs.blocks.find(isPara)) as
+      | (Block & { kind: "paragraph" })
+      | undefined;
+    return { name: rs.name, src: rs.src, guidance: para ? plainText(para.inline) : null, body };
   }
 
-  // Duplicate sections (SPEC §3.4: same slug, case-insensitive).
-  const seenSlugs = new Set<string>();
-  const sections: Record<string, Section | OtherSection> = {};
-  for (const rs of rawSections) {
-    const id = sectionId(rs.name);
-    if (seenSlugs.has(id)) {
-      errors.push(mkErr("E-DUP-SECTION", rs.src, `"${rs.name}" has the same slug as an earlier section`));
-      continue;
-    }
-    seenSlugs.add(id);
-    sections[id] = rs.isInstruction ? buildInstructionSection(rs, resolve, errors) : buildOtherSection(rs, errors);
+  instructions(items: Item[]): Stmt[] {
+    return items.flatMap((item) => this.instruction(item) ?? []);
   }
 
-  // entry: from frontmatter, or the first instruction section by default.
-  let entrySection: string;
-  let entrySrc: number;
-  if (fm.entryName !== undefined) {
-    entrySection = sectionId(fm.entryName);
-    entrySrc = fm.entryLine ?? 1;
-  } else {
-    const first = rawSections.find((rs) => rs.isInstruction);
-    if (first) {
-      entrySection = sectionId(first.name);
-      entrySrc = first.src;
-    } else {
-      entrySection = "s:entry";
-      entrySrc = 1;
+  instruction(item: Item): Stmt | null {
+    const lead = classifyLead(item.text);
+    if (lead?.kind !== "keyword") {
+      if (lead?.kind === "unknown") {
+        this.err("E-UNKNOWN-BOLD", item.line, `**${lead.content}** isn't a keyword${suggestKeyword(lead.content)}`);
+      }
+      this.scanMisplaced(item.blocks); // prose, subject to rule 7
+      return null;
+    }
+    const { keyword, rest } = lead;
+    const grammarError = (form: string) => {
+      this.err(
+        "E-GRAMMAR",
+        item.line,
+        lead.colon ? `**${keyword}** is a keyword, so it can't take a ':'` : `**${keyword}** must be ${form}`,
+      );
+      return null;
+    };
+    if (lead.colon) return grammarError("");
+
+    const nested = lists(item.blocks);
+    this.scanMisplaced(item.blocks.filter((b) => b.kind !== "list"));
+    const noNested = () => {
+      if (nested[0]) this.err("E-NESTED-LIST", nested[0].line, `**${keyword}** doesn't take a nested list`);
+    };
+    const src = item.line;
+    switch (keyword) {
+      case "run": {
+        const r = parseRun(rest, this.resolve);
+        if (r === GRAMMAR_ERROR) return grammarError("`**run** CMD [as NAME] [ELSE]`");
+        noNested();
+        return { src, ...r };
+      }
+      case "do": {
+        const r = parseDo(rest, this.resolve);
+        if (r === GRAMMAR_ERROR) return grammarError("`**do** CMD [ELSE]` or `**do** NAME [ELSE]`");
+        noNested();
+        return { src, ...r };
+      }
+      case "check": {
+        const r = parseCheck(rest, this.resolve);
+        if (r === GRAMMAR_ERROR) return grammarError("`**check** COND → TARGET [ELSE]` or `**check** COND ELSE`");
+        noNested();
+        return { src, ...r };
+      }
+      case "ask": {
+        const r = parseAsk(rest, this.resolve);
+        if (r === GRAMMAR_ERROR) return grammarError("one of the §3.4 ask forms, ending `· sure N%`");
+        const ask = { question: r.question, sure: r.sure, else: r.else };
+        const children = nested.flatMap((l) => l.items);
+        if ("sections" in r.form) return { src, ask: { ...ask, sections: this.options(children) } };
+        if ("score" in r.form) return { src, ask: { ...ask, score: { ...r.form.score, rubric: this.rubric(children) } } };
+        noNested();
+        if ("yesno" in r.form) return { src, ask: { ...ask, yesno: r.form.yesno } };
+        return { src, ask: { ...ask, one_of: { list: this.resolveList(r.form.one_of.list), as: r.form.one_of.as } } };
+      }
+      case "for each": {
+        const r = parseForEach(rest);
+        if (r === GRAMMAR_ERROR) return grammarError("`**for each** NAME in [LIST]`");
+        const list = this.resolveList(r.list);
+        return { src, for_each: { var: r.var, list, body: nested.flatMap((l) => this.instructions(l.items)) } };
+      }
+      case "if yes": {
+        const r = parseIfYes(rest, this.resolve);
+        if (r === GRAMMAR_ERROR) return grammarError("`**if yes** run CMD [ELSE]` or `**if yes** do (CMD|NAME) [ELSE]`");
+        noNested();
+        return { src, if_yes: r };
+      }
+      case "then": {
+        const r = parseThen(rest, this.resolve);
+        if (r === GRAMMAR_ERROR) return grammarError("`**then** [SECTION]`");
+        noNested();
+        return { src, then: r };
+      }
+      case "page": {
+        const r = parsePage(rest);
+        if (r === GRAMMAR_ERROR) return grammarError('`**page** "text"`');
+        noNested();
+        return { src, page: r };
+      }
+      case "hand off":
+      case "stop": {
+        if (parseNoArg(rest) === GRAMMAR_ERROR) return grammarError(`\`**${keyword}**\` with nothing after it`);
+        noNested();
+        return keyword === "stop" ? { src, stop: {} } : { src, hand_off: {} };
+      }
     }
   }
 
-  if (errors.length > 0) return { errors };
-
-  const params: Record<string, ParamValue> = {};
-  for (const p of fm.params) params[p.name] = p.value;
-
-  const program: CoreProgram = {
-    skill: fm.skill as string,
-    format: 1,
-    entry: { section: entrySection, src: entrySrc },
-    params,
-    limits: fm.limits,
-    sections,
-  };
-  anchorsToHeadings(program);
-  return { program };
-}
-
-// A link's `#anchor` must be the GitHub slug of the heading its text
-// resolves to (SPEC §3.4), so `[Clean_Up](#clean-up)` finds `## Clean up`.
-// References are built before every heading is known, so this runs last;
-// a reference to no section keeps the slug of its own text.
-function anchorsToHeadings(program: CoreProgram): void {
-  const visit = (v: unknown): void => {
-    if (Array.isArray(v)) {
-      for (const x of v) visit(x);
-      return;
-    }
-    if (v === null || typeof v !== "object") return;
-    const o = v as { section?: unknown; anchor?: { expected: string } };
-    if (typeof o.section === "string" && o.anchor) {
-      const target = program.sections[o.section];
-      if (target) o.anchor.expected = githubSlug(target.name);
-    }
-    for (const x of Object.values(o)) visit(x);
-  };
-  visit(program.sections);
-}
-
-// --- misplaced-instruction scan (SPEC §3.3 rule 7) ----------------------
-
-function checkMisplaced(blocks: Block[], errors: ParseError[]): void {
-  for (const b of blocks) {
-    if (b.type !== "list") continue;
-    for (const item of b.items) {
-      if (isKeywordLed(item.text)) {
-        errors.push(mkErr("E-MISPLACED", item.line, "an instruction-looking item where instructions aren't recognised"));
-      }
-      if (item.children) checkMisplaced([item.children], errors);
-    }
+  /** Items of a strict nested list (options, rubric): each must match `form`
+   * exactly and have nothing nested; anything nested is still scanned. */
+  strictItems<T>(items: Item[], code: string, message: string, form: (item: Item) => T | null): T[] {
+    return items.flatMap((item) => {
+      const parsed = item.blocks.length === 0 ? form(item) : null;
+      if (parsed === null) this.err(code, item.line, message);
+      this.scanMisplaced(item.blocks);
+      return parsed === null ? [] : [parsed];
+    });
   }
-}
 
-// --- instruction sections -------------------------------------------------
-
-function guidance(blocks: Block[]): string | null {
-  let beforeList: string | null = null;
-  let anywhere: string | null = null;
-  let seenList = false;
-  for (const b of blocks) {
-    if (b.type === "list") {
-      seenList = true;
-      continue;
-    }
-    if (b.type === "paragraph") {
-      if (anywhere === null) anywhere = inlinePlainText(b.text);
-      if (!seenList && beforeList === null) beforeList = inlinePlainText(b.text);
-    }
+  options(items: Item[]) {
+    return this.strictItems(items, "E-OPTION-ITEM", "an option item must be exactly one [Section] link", (item) => {
+      const cur = new Cursor(item.text);
+      const br = cur.bracketRef();
+      return br && cur.atEnd() ? { src: item.line, ...this.resolve(br) } : null;
+    });
   }
-  return beforeList ?? anywhere;
-}
 
-function inlinePlainText(s: string): string {
-  return s
-    .replace(/\*\*([^*]+)\*\*/g, "$1")
-    .replace(/`([^`]+)`/g, "$1")
-    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
-    .replace(/\[([^\]]+)\]/g, "$1");
-}
-
-function buildInstructionSection(
-  rs: { name: string; src: number; blocks: Block[] },
-  resolve: (b: BracketRef) => SectionRefRaw,
-  errors: ParseError[],
-): Section {
-  const body: Stmt[] = [];
-  for (const b of rs.blocks) {
-    if (b.type !== "list") continue;
-    body.push(...parseInstructionItems(b.items, resolve, errors));
+  rubric(items: Item[]) {
+    return this.strictItems(items, "E-RUBRIC-ITEM", "a rubric line must be `INT: text`", (item) => {
+      const m = /^(\d+): +(.+)$/s.exec(item.text);
+      const level = Number(m?.[1]);
+      return m && Number.isSafeInteger(level) ? { src: item.line, level, text: m[2] as string } : null;
+    });
   }
-  return { name: rs.name, src: rs.src, guidance: guidance(rs.blocks), body };
-}
 
-function parseInstructionItems(items: ListItem[], resolve: (b: BracketRef) => SectionRefRaw, errors: ParseError[]): Stmt[] {
-  const out: Stmt[] = [];
-  for (const item of items) {
-    const s = processInstructionItem(item, resolve, errors);
-    if (s) out.push(s);
-  }
-  return out;
-}
+  // --- other sections (SPEC §3.2, §3.6) ------------------------------------
 
-function checkNestedDisallowed(item: ListItem, errors: ParseError[]): void {
-  if (item.children) {
-    errors.push(mkErr("E-NESTED-LIST", item.children.line, "a nested list isn't allowed under this instruction"));
-  }
-}
-
-function processInstructionItem(item: ListItem, resolve: (b: BracketRef) => SectionRefRaw, errors: ParseError[]): Stmt | null {
-  const bold = extractLeadingBold(item.text);
-  if (!bold || bold.endsWithColon) {
-    if (item.children) checkMisplaced([item.children], errors); // prose, subject to rule 7
-    return null;
-  }
-  const kw = matchKeyword(bold.content);
-  if (!kw) {
-    errors.push(mkErr("E-UNKNOWN-BOLD", item.line, `"${bold.content}" isn't a keyword`));
-    if (item.children) checkMisplaced([item.children], errors);
-    return null;
-  }
-  const rest = bold.rest.trim();
-
-  switch (kw) {
-    case "run": {
-      const r = parseRun(rest, resolve);
-      checkNestedDisallowed(item, errors);
-      if (r === GRAMMAR_ERROR) {
-        errors.push(mkErr("E-GRAMMAR", item.line, "**run** doesn't match `**run** CMD [as NAME] [ELSE]`"));
-        return null;
-      }
-      const run: Stmt = { src: item.line, run: { cmd: r.cmd, ...(r.as !== undefined ? { as: r.as } : {}) }, else: r.else };
-      return run;
+  /** A section with no instructions. Used as a list, its items are held to
+   * §3.6 (E-DATA-ITEM); otherwise it's prose, and `lists` keeps only the
+   * items that happen to be data items, leaving out lists with none. */
+  otherSection(rs: RawSection): OtherSection {
+    const strict = rs.id !== null && this.listRefs.has(rs.id);
+    this.scanMisplaced(rs.blocks);
+    const out: List[] = [];
+    for (const list of lists(rs.blocks)) {
+      const items = list.items.flatMap((item) => {
+        const d = item.blocks.length === 0 ? dataItem(item) : null;
+        if (d === null && strict) this.err("E-DATA-ITEM", item.line, "a data item must be plain text, or `Label — `command``");
+        return d === null ? [] : [d];
+      });
+      if (strict || items.length > 0) out.push({ src: list.line, items });
     }
-    case "do": {
-      const r = parseDo(rest, resolve);
-      checkNestedDisallowed(item, errors);
-      if (r === GRAMMAR_ERROR) {
-        errors.push(mkErr("E-GRAMMAR", item.line, "**do** doesn't match `**do** (CMD|NAME) [ELSE]`"));
-        return null;
-      }
-      return { src: item.line, do: r.do, else: r.else } as Stmt;
-    }
-    case "check": {
-      const r = parseCheck(rest, resolve);
-      checkNestedDisallowed(item, errors);
-      if (r === GRAMMAR_ERROR) {
-        errors.push(mkErr("E-GRAMMAR", item.line, "**check** doesn't match its grammar"));
-        return null;
-      }
-      return { src: item.line, check: { cond: r.cond, then: r.then, else: r.else } } as Stmt;
-    }
-    case "ask": {
-      const r = parseAsk(rest, resolve);
-      if (r === GRAMMAR_ERROR) {
-        errors.push(mkErr("E-GRAMMAR", item.line, "**ask** doesn't match its grammar"));
-        checkNestedDisallowed(item, errors);
-        return null;
-      }
-      if (r.form === "sections") {
-        const options = parseOptionsList(item.children, resolve, errors);
-        return { src: item.line, ask: { question: r.question, sure: r.sure, else: r.else, sections: options } } as Stmt;
-      }
-      if (r.form === "score") {
-        const rubric = parseRubricList(item.children, errors);
-        return {
-          src: item.line,
-          ask: {
-            question: r.question,
-            sure: r.sure,
-            else: r.else,
-            score: { low: r.scoreLow as number, high: r.scoreHigh as number, as: r.scoreAs as string, rubric },
-          },
-        } as Stmt;
-      }
-      checkNestedDisallowed(item, errors);
-      if (r.form === "yesno") {
-        return {
-          src: item.line,
-          ask: { question: r.question, sure: r.sure, else: r.else, yesno: { as: r.yesnoAs ?? "_yn" } },
-        } as Stmt;
-      }
-      return {
-        src: item.line,
-        ask: {
-          question: r.question,
-          sure: r.sure,
-          else: r.else,
-          one_of: { list: resolve(r.oneOfList as BracketRef), as: r.oneOfAs as string },
-        },
-      } as Stmt;
-    }
-    case "for each": {
-      const r = parseForEach(rest);
-      if (r === GRAMMAR_ERROR) {
-        errors.push(mkErr("E-GRAMMAR", item.line, "**for each** doesn't match `**for each** NAME in [LIST]`"));
-        return null;
-      }
-      const body = item.children ? parseInstructionItems(item.children.items, resolve, errors) : [];
-      return { src: item.line, for_each: { var: r.var, list: resolve(r.list), body } } as Stmt;
-    }
-    case "if yes": {
-      const r = parseIfYes(rest, resolve);
-      checkNestedDisallowed(item, errors);
-      if (r === GRAMMAR_ERROR) {
-        errors.push(mkErr("E-GRAMMAR", item.line, "**if yes** doesn't match its grammar"));
-        return null;
-      }
-      return { src: item.line, if_yes: { ...(r.run ? { run: r.run } : {}), ...(r.do ? { do: r.do } : {}), else: r.else } } as Stmt;
-    }
-    case "then": {
-      const r = parseThen(rest, resolve);
-      checkNestedDisallowed(item, errors);
-      if (r === GRAMMAR_ERROR) {
-        errors.push(mkErr("E-GRAMMAR", item.line, "**then** doesn't match `**then** [SECTION]`"));
-        return null;
-      }
-      return { src: item.line, then: r } as Stmt;
-    }
-    case "page": {
-      const r = parsePage(rest);
-      checkNestedDisallowed(item, errors);
-      if (r === GRAMMAR_ERROR) {
-        errors.push(mkErr("E-GRAMMAR", item.line, "**page** doesn't match `**page** QUOTED`"));
-        return null;
-      }
-      return { src: item.line, page: r } as Stmt;
-    }
-    case "hand off": {
-      checkNestedDisallowed(item, errors);
-      if (parseNoArg(rest) === GRAMMAR_ERROR) {
-        errors.push(mkErr("E-GRAMMAR", item.line, "**hand off** takes no text"));
-        return null;
-      }
-      return { src: item.line, hand_off: {} } as Stmt;
-    }
-    case "stop": {
-      checkNestedDisallowed(item, errors);
-      if (parseNoArg(rest) === GRAMMAR_ERROR) {
-        errors.push(mkErr("E-GRAMMAR", item.line, "**stop** takes no text"));
-        return null;
-      }
-      return { src: item.line, stop: {} } as Stmt;
-    }
+    return { name: rs.name, src: rs.src, lists: out };
   }
 }
 
-function parseOptionsList(
-  children: ListBlock | null,
-  resolve: (b: BracketRef) => SectionRefRaw,
-  errors: ParseError[],
-): { src: number; section: string; anchor?: { given: string; expected: string } }[] {
-  if (!children) return [];
-  const out: { src: number; section: string; anchor?: { given: string; expected: string } }[] = [];
-  for (const item of children.items) {
-    const cur = new Cursor(item.text.trim());
-    const br = cur.eatBracketRef();
-    if (!br || !cur.atEnd()) {
-      errors.push(mkErr("E-OPTION-ITEM", item.line, "an option item must be exactly one [Section] link"));
-      continue;
-    }
-    const ref = resolve(br);
-    out.push({ src: item.line, section: ref.section, ...(ref.anchor ? { anchor: ref.anchor } : {}) });
-  }
-  return out;
-}
-
-function parseRubricList(children: ListBlock | null, errors: ParseError[]): { src: number; level: number; text: string }[] {
-  if (!children) return [];
-  const out: { src: number; level: number; text: string }[] = [];
-  for (const item of children.items) {
-    const m = /^(\d+):\s(.+)$/.exec(item.text);
-    if (!m) {
-      errors.push(mkErr("E-RUBRIC-ITEM", item.line, "a rubric line must be `INT: text`"));
-      continue;
-    }
-    out.push({ src: item.line, level: Number(m[1]), text: m[2] as string });
-  }
-  return out;
-}
-
-// --- data / prose sections -------------------------------------------------
-
-function buildOtherSection(rs: { name: string; src: number; blocks: Block[] }, errors: ParseError[]): OtherSection {
-  const lists = rs.blocks.filter((b): b is ListBlock => b.type === "list").map((lb) => parseDataList(lb, errors));
-  return { name: rs.name, src: rs.src, lists };
-}
-
-function parseDataList(lb: ListBlock, errors: ParseError[]): List {
-  const items: List["items"] = [];
-  for (const item of lb.items) {
-    const parsed = parseDataItemText(item.text);
-    if (parsed.kind === "action") {
-      items.push({ src: item.line, action: { label: parsed.label, cmd: splitParts(parsed.cmd) } });
-    } else if (parsed.kind === "value") {
-      items.push({ src: item.line, value: parsed.value });
-    } else {
-      errors.push(mkErr("E-DATA-ITEM", item.line, "must be plain text, or `Label — \\`command\\``"));
-    }
-    if (item.children) checkMisplaced([item.children], errors);
-  }
-  return { src: lb.items[0]?.line ?? lb.line, items };
-}
-
-type DataItemParsed = { kind: "action"; label: string; cmd: string } | { kind: "value"; value: string } | { kind: "error" };
-
-function parseDataItemText(text: string): DataItemParsed {
-  const emdash = text.indexOf("—");
-  const hyphenSep = text.indexOf(" - ");
-  const sep = emdash !== -1 ? { idx: emdash, len: 1 } : hyphenSep !== -1 ? { idx: hyphenSep, len: 3 } : null;
+function dataItem(item: Item): List["items"][number] | null {
+  const { text, line: src } = item;
+  const sep = /—/.exec(text) ?? / - /.exec(text); // an em dash wins over ` - `
   if (sep) {
-    const label = text.slice(0, sep.idx).trim();
-    const rest = text.slice(sep.idx + sep.len).trim();
-    const m = /^`([^`]*)`$/.exec(rest);
-    if (label.length > 0 && m) return { kind: "action", label, cmd: m[1] as string };
-    return { kind: "error" };
+    const label = text.slice(0, sep.index).trim();
+    const cur = new Cursor(text.slice(sep.index + sep[0].length).trim());
+    const cmd = cur.codeSpan();
+    return label && isPlainText(label) && cmd !== null && cur.atEnd() ? { src, action: { label, cmd: splitParts(cmd) } } : null;
   }
-  if (/[`*[\]]/.test(text)) return { kind: "error" };
-  return { kind: "value", value: text.trim() };
+  return text && isPlainText(text) ? { src, value: text } : null;
 }

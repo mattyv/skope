@@ -1,6 +1,8 @@
 // Slug helpers (SPEC §3.4).
 
-/** `s:` + slug: lowercased, every run of non letter/digit chars -> one `_`. */
+/** `s:` + slug: lowercased, every run of non letter/digit chars -> one `_`,
+ * with any `_` at either end dropped (`## _Triage_` is `s:triage`). A name
+ * with no letters or digits gives just `s:`, which callers reject. */
 export function sectionId(name: string): string {
   const slug = name
     .toLowerCase()
@@ -9,11 +11,11 @@ export function sectionId(name: string): string {
   return `s:${slug}`;
 }
 
-/** GitHub-style heading slug, for `#anchor` link checks. */
+/** GitHub-style heading slug, for `#anchor` link checks. Keeps Unicode letters. */
 export function githubSlug(text: string): string {
   return text
     .toLowerCase()
     .trim()
-    .replace(/[^\w\- ]/g, "")
+    .replace(/[^\p{L}\p{M}\p{N}_\- ]/gu, "")
     .replace(/ /g, "-");
 }

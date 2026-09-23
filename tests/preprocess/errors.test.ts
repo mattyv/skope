@@ -7,7 +7,7 @@ import { preprocess } from "../../src/preprocess/index.js";
 import { BODY_START, skillMd } from "./helpers.js";
 
 function codesAt(md: string): { code: string; line: number }[] {
-  const result = preprocess(md, "test.md");
+  const result = preprocess(md);
   if (!("errors" in result)) throw new Error(`expected errors, got a program: ${JSON.stringify(result)}`);
   return result.errors.map((e) => ({ code: e.code, line: e.line }));
 }
@@ -67,10 +67,25 @@ describe("E-MISPLACED (parse): a keyword item where instructions aren't recognis
   });
 });
 
+describe("E-SECTION-NAME (parse): a ## heading with no letters or digits", () => {
+  test("## 🔥", () => {
+    expect(codesAt(skillMd("## 🔥", "- **stop**"))).toEqual([{ code: "E-SECTION-NAME", line: BODY_START }]);
+  });
+});
+
 describe("E-DATA-ITEM (parse): a data list item isn't a plain value or `Label — command`", () => {
-  test("value item `nginx` (a code span, not plain text)", () => {
-    const md = skillMd("## Services", "- `nginx`", "- rsyslog");
-    expect(codesAt(md)).toEqual([{ code: "E-DATA-ITEM", line: BODY_START + 1 }]);
+  test("value item `nginx` (a code span, not plain text) in a section used as a list", () => {
+    const md = skillMd(
+      "## Triage",
+      "- **for each** s in [Services]",
+      "  - **run** `echo {s}`",
+      "- **stop**",
+      "",
+      "## Services",
+      "- `nginx`",
+      "- rsyslog",
+    );
+    expect(codesAt(md)).toEqual([{ code: "E-DATA-ITEM", line: BODY_START + 6 }]);
   });
 });
 

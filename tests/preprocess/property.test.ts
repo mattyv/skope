@@ -1,24 +1,58 @@
-// Property test (PLAN §4 A): for any generated Markdown, a list item that
-// starts with a bold keyword parses as an instruction or produces an error,
-// never prose. That's the core safety property of the surface format
-// (SPEC §3.3 rule 4: "Never fall back to treating it as prose").
-//
-// Known spec tension, not something to silently "fix" here: SPEC §3.3 rule 3
-// says a bold span ending in ':' (inside or right after the `**`) is always
-// prose, *before* the keyword check runs — so `**run**:x` (a real keyword
-// immediately followed by a colon) is prose by the letter of rule 3, which
-// is in tension with this very safety property. The generator below avoids
-// producing that byte (no ':' right after the closing `**`) so it tests the
-// property as intended rather than tripping over that edge; see the final
-// report for the spec citation.
+// Property test (PLAN §4 A): a list item that starts with a bold keyword is
+// an instruction or an error, never prose, wherever it sits (SPEC §3.3 rules
+// 3, 4 and 7). The keyword item goes in every kind of place: after prose
+// items, in a second list, nested under prose, option, rubric and data
+// items, in blockquotes of depth 1-3, before the first section, in a data
+// section, and in a for-each body. Its suffix may contain `:`, `\r` and `\t`.
 
 import { describe, expect, test } from "vitest";
 import { preprocess } from "../../src/preprocess/index.js";
-import { FRONTMATTER } from "./helpers.js";
+import { FRONTMATTER, schemaErrors, stmtLines } from "./helpers.js";
 
 const KEYWORDS = ["run", "do", "check", "ask", "for each", "if yes", "then", "page", "hand off", "stop"];
-// No ':' (see the tension noted above) and no newline (a suffix is always one line).
-const ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789 `[]{}()·→"_.,%=<>|-'.split("");
+const ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789 `[]{}()·→"_.,%=<>|-:\r\t*#'.split("");
+
+// Each context is body lines with one `%K%`, where the keyword item's text goes.
+const CONTEXTS: Record<string, string[]> = {
+  "after prose items": ["## Triage", "- look first", "- then think", "- %K%", "- **stop**"],
+  "in a second list": ["## Triage", "- **run** `df`", "", "Then:", "", "* %K%", "", "- **stop**"],
+  "nested under a prose item": ["## Triage", "- a note", "  - %K%", "- **stop**"],
+  "nested under an option item": [
+    "## Triage",
+    "- **ask** Pick · sure 80%",
+    "  - [Page]",
+    "    - %K%",
+    "  - [Triage]",
+    "",
+    "## Page",
+    "- **stop**",
+  ],
+  "as an option item": ["## Triage", "- **ask** Pick · sure 80%", "  - [Page]", "  - %K%", "", "## Page", "- **stop**"],
+  "nested under a rubric item": [
+    "## Triage",
+    "- **ask** Bad? → 1 to 2 as x · sure 75%",
+    "  - 1: fine",
+    "    - %K%",
+    "  - 2: bad",
+    "- **stop**",
+  ],
+  "nested under a data item": [
+    "## Triage",
+    "- **for each** s in [Items]",
+    "  - **run** `echo {s}`",
+    "- **stop**",
+    "",
+    "## Items",
+    "- a",
+    "  - %K%",
+  ],
+  "in a data section": ["## Triage", "- **for each** s in [Items]", "  - **run** `echo {s}`", "- **stop**", "", "## Items", "- a", "- %K%"],
+  "in a for-each body": ["## Triage", "- **for each** s in [Items]", "  - %K%", "- **stop**", "", "## Items", "- a"],
+  "in a blockquote": ["## Triage", "> - %K%", "", "- **stop**"],
+  "in a depth-2 blockquote": ["## Triage", "> > - %K%", "", "- **stop**"],
+  "in a depth-3 blockquote": ["## Triage", "> text", "> > > * %K%", "", "- **stop**"],
+  "before the first section": ["# Title", "", "1. %K%", "", "## Triage", "- **stop**"],
+};
 
 function lcg(seed: number): () => number {
   let s = seed >>> 0;
@@ -27,29 +61,47 @@ function lcg(seed: number): () => number {
     return s / 4294967296;
   };
 }
+const pick = <T>(rand: () => number, xs: readonly T[]): T => xs[Math.floor(rand() * xs.length)] as T;
 
-function randomSuffix(rand: () => number, maxLen: number): string {
-  const len = Math.floor(rand() * maxLen);
-  let out = "";
-  for (let i = 0; i < len; i++) out += ALPHABET[Math.floor(rand() * ALPHABET.length)];
-  return out;
+function keywordItem(rand: () => number): string {
+  const kw = pick(rand, KEYWORDS);
+  const cased = rand() < 0.3 ? kw.toUpperCase() : rand() < 0.5 ? kw[0]?.toUpperCase() + kw.slice(1) : kw;
+  const delim = rand() < 0.2 ? "__" : "**";
+  const inner = rand() < 0.15 ? `${cased}:` : cased;
+  let suffix = rand() < 0.15 ? ":" : "";
+  const len = Math.floor(rand() * 24);
+  for (let i = 0; i < len; i++) suffix += pick(rand, ALPHABET);
+  return `${delim}${inner}${delim}${suffix}`;
 }
 
-describe("property: a bold-keyword list item never comes out as prose", () => {
+describe("the contexts are valid skills without the keyword item", () => {
+  for (const [name, lines] of Object.entries(CONTEXTS)) {
+    test(name, () => {
+      const md = [FRONTMATTER, ...lines.filter((l) => !l.includes("%K%"))].join("\n");
+      expect(preprocess(md)).toHaveProperty("program");
+    });
+  }
+});
+
+describe("property: a bold-keyword list item is an instruction or an error, never prose", () => {
   const rand = lcg(20260923);
-  for (let i = 0; i < 300; i++) {
-    const kw = KEYWORDS[Math.floor(rand() * KEYWORDS.length)] as string;
-    const suffix = randomSuffix(rand, 24);
-    test(`case ${i}: **${kw}**${JSON.stringify(suffix)}`, () => {
-      const item = `- **${kw}**${suffix}`;
-      const md = [FRONTMATTER, "", "## Triage", item, ""].join("\n");
-      const itemLine = md.split("\n").indexOf(item) + 1; // 1-based
-      const result = preprocess(md, "test.md");
+  const names = Object.keys(CONTEXTS);
+  for (let i = 0; i < 600; i++) {
+    const where = pick(rand, names);
+    const item = keywordItem(rand);
+    test(`case ${i}, ${where}: ${JSON.stringify(item)}`, () => {
+      const lines = [FRONTMATTER, ...(CONTEXTS[where] as string[])];
+      const at = lines.findIndex((l) => l.includes("%K%"));
+      lines[at] = (lines[at] as string).replace("%K%", item);
+      const itemLine = FRONTMATTER.split("\n").length + at; // 1-based: FRONTMATTER is one element of `lines`
+      const extraLines = (item.match(/\r/g) ?? []).length; // a \r in the suffix starts a new line
+      const result = preprocess(lines.join("\n"));
       if ("errors" in result) {
-        expect(result.errors.some((e) => e.line === itemLine)).toBe(true);
+        expect(result.errors.map((e) => e.code)).not.toContain("E-INTERNAL");
+        expect(result.errors.some((e) => e.line >= itemLine && e.line <= itemLine + extraLines)).toBe(true);
       } else {
-        const stmts = Object.values(result.program.sections).flatMap((s) => ("body" in s ? s.body : []));
-        expect(stmts.some((s) => s.src === itemLine)).toBe(true);
+        expect(schemaErrors(result.program)).toBeNull();
+        expect(stmtLines(result.program)).toContain(itemLine);
       }
     });
   }
