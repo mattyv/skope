@@ -2,12 +2,15 @@
 
 **Runbooks that an agent can read and a proven runtime can run.**
 
-A skop skill is an ordinary Markdown file. A large language model can read
-it and follow it like any agent skill. skop can also *execute* it: it runs
-the commands, checks the results, and asks a fast classifier small,
-multiple-choice questions at the branch points. When it isn't sure, it
-stops and hands the incident to a human or an agent, with a record of
-everything it already did.
+A skop skill is an ordinary Markdown file. A person or a language model can
+read it and follow it. skop can also *execute* it: it runs the commands,
+checks the results, and at the branch points asks
+**[Jev](https://docs.typesafe.ai)**, TypeSafe's fast decision model, small
+multiple-choice questions. When Jev isn't sure enough, skop stops and hands
+the incident to a human or an agent, with a record of everything it already
+did.
+
+This is what you write:
 
 ```markdown
 ## Triage
@@ -24,40 +27,176 @@ Look at usage, recent errors and what's biggest on disk.
   - [Investigate]
 ```
 
-Bold keywords are the program. Everything else is guidance for whoever
-reads it, human or model. That section comes from
+And this is what a reader sees:
+
+> #### Triage
+> Look at usage, recent errors and what's biggest on disk.
+>
+> - **run** `df --output=pcent {mount} | tail -1` as used
+> - **check** {used} < {threshold}% → stop
+> - **run** `journalctl -p err -n 100 --no-pager` as errors
+> - **run** `du -xh -d2 /var /tmp /home | sort -h` as biggest · else skip
+> - **ask** Given {used}, {errors} and {biggest}, what's the best next step? · sure 85%
+>   - [Clean up]
+>   - [Restart]
+>   - [Page]
+>   - [Investigate]
+
+The bold keywords are the program. Everything else is guidance for whoever
+reads it, human or model. The whole skill is
 [`fixtures/disk-full/SKILL.md`](fixtures/disk-full/SKILL.md).
 
 ---
 
 ## Why
 
-Incidents at 3am follow runbooks. Runbooks are either prose, which only a
-person or an expensive agent can follow, or scripts, which can't use
-judgement. skop keeps one file for both, and decides who runs each step:
+Runbooks are either prose, which only a person or an expensive agent can
+follow, or scripts, which can't use judgement. skop keeps one file for both,
+and decides who does each step:
 
-- **Code runs what's certain:** measurements, comparisons, commands.
-- **A classifier makes the small judgement calls,** choosing only between
-  options the author wrote, and only when it's confident enough.
-- **A human or agent takes over the rest,** with a record of what already
-  happened.
+- **Code does what's certain:** measurements, comparisons and commands.
+- **Jev makes the small judgement calls.** It only ever chooses between
+  options the author wrote, and skop only acts when Jev is confident
+  enough.
+- **A person or an agent takes over the rest,** with a record of what
+  already happened.
 
-The common case costs about a tenth of a second of classifier time per
-question instead of an agent session, and every decision is logged.
+The common case costs about a tenth of a second of Jev time per question,
+instead of an agent session, and every decision is logged.
+
+## Install
+
+```console
+$ npm install -g skop           # Node 20 or newer
+$ skop --version
+skop 1.0.0 (build identity 3f1c…)
+```
+
+Or run the container image, `ghcr.io/mattyv/skop`.
+
+## Use
+
+Check a skill before it ever runs. Lint catches dead ends, cycles, dangling
+links, and command output that could leak into a command:
+
+```console
+$ skop disk-full/SKILL.md --lint
+$ skop disk-full/SKILL.md --explain    # sections, transfer graph, worst-case cost
+$ skop disk-full/SKILL.md --verify     # every path the run can take, and how each ends
+```
+
+Rehearse it with fake command results and fake answers. Nothing real runs:
+
+```console
+$ skop disk-full/SKILL.md --dry-run --fake answers.yaml --fake-exec commands.yaml
+```
+
+Then run it for real. A dry run runs the read-only `run` and `check`
+commands, but never a `do` and never a page. Every run must say which it is:
+
+```console
+$ skop disk-full/SKILL.md --dry-run                  # look, don't touch
+$ skop disk-full/SKILL.md --apply --param mount=/var # do it
+```
+
+Every step is one line of JSON on stdout:
+
+```json
+{"ts":"2026-09-23T03:12:44Z","run_id":"r-8f2c","skill":"disk-full","skill_hash":"sha256:…","host":"hk-app-03","event":"would_do","section":"Clean up","line":38,"cmd":"journalctl --vacuum-size=500M"}
+```
+
+## The language
+
+A skill is Markdown with YAML frontmatter and `format: 1`. Each `##` heading
+is a section, and a run moves from section to section until it ends.
+
+| Keyword | Does |
+|---|---|
+| **run** `cmd` as x | Runs a read-only command, optionally keeping its output as `x` |
+| **do** `cmd` | Runs a command that changes something. Skipped in a dry run. |
+| **check** {x} < 80 → [Section] | Compares measured values, or checks that a command succeeds |
+| **ask** question · sure 85% | Asks Jev to pick a section, yes or no, one item from a list, or a level from 1 to N |
+| **for each** item in [List] | Repeats the nested steps for each item in a list |
+| **if yes** do … | Acts on the answer to the yes-or-no question just asked |
+| **then** [Section] | Moves to another section |
+| **page** "…" | Pages a human and ends the run |
+| **hand off** | Hands the incident to a person or agent, with the section's prose as instructions |
+| **stop** | Ends the run |
+
+A bold word that looks like a keyword but isn't one is an error, never
+prose, so a typo can't silently skip a step. The full grammar is in
+[`SPEC.md`](SPEC.md).
+
+## How a run ends
+
+| Outcome | Why | Exit code |
+|---|---|---|
+| stopped | the skill finished | 0 |
+| paged | the skill paged a human | 10 |
+| handed off | Jev wasn't sure enough, a command failed, or the skill said to | 20 |
+| locked | another run of this skill is in progress | 30 |
+| stale lock | an earlier run died holding the lock | 31 |
+| invalid | the skill failed its checks, so nothing ran | 40 |
+| error | something went wrong inside skop | 50 |
+
+A handoff writes a record of what ran, what each command returned and why
+skop stopped. With `--apply`, skop also pages someone about it, so an
+unattended alert never ends in a record nobody reads. An agent calling skop
+sets `SKOP_CALLER=agent` and takes the record itself.
+
+## Built on TypeSafe's Jev
+
+skop's questions are answered by **[Jev](https://docs.typesafe.ai)**,
+TypeSafe's System One model. Jev isn't a chatbot: it's trained to make fast,
+narrow decisions and to return a calibrated probability for every possible
+answer, which is exactly what skop's confidence thresholds need. It answers
+in about a tenth of a second.
+
+Each of skop's question forms maps onto one of Jev's three question types:
+
+| In a skill | Jev question type | What skop does with the answer |
+|---|---|---|
+| `ask` with a list of `[Section]` options | Choice | moves to the chosen section |
+| `→ one of [List] as x` | Choice | keeps the chosen item as `x` |
+| `→ yes \| no` | Noul | keeps yes or no, for `if yes` |
+| `→ 1 to 4 as x` | Score | keeps the level as `x`, for `check` |
+
+skop sends Jev only the evidence a question names. It pins a Jev version,
+because a threshold like `sure 85%` is tuned against a particular model, and
+it checks every answer against the options the author wrote before acting on
+it. Get an API key from [TypeSafe](https://docs.typesafe.ai) and set
+`TYPESAFE_API_KEY`.
+
+```yaml
+# ~/.config/skop/config.yaml
+ask:
+  backend: jev
+jev:
+  model: jev-1.13.0     # pin a version: thresholds are tuned against it
+  key_env: TYPESAFE_API_KEY
+pager:
+  command: /usr/local/bin/page-oncall   # reads the message on stdin
+```
+
+**OpenRouter is the alternative.** Any model on
+[OpenRouter](https://openrouter.ai) that exposes token probabilities can
+answer instead. skop reads the model's probability for each option's
+letter, never a confidence the model writes about itself. A general model
+isn't trained for these decisions the way Jev is, so re-tune your
+thresholds before trusting a skill on it.
+
+Secrets are redacted before anything leaves the machine or reaches a log.
 
 ## What skop guarantees
 
-These are the design's guarantees, from [`SPEC.md`](SPEC.md). The last
-column says what exists today.
-
-| Guarantee | How | Today |
-|---|---|---|
-| The model only ever picks one of the author's options. It never writes a command. | The grammar has no way to express anything else; proven as P5. | specified |
-| Command output never becomes part of a command. | Lint's taint rule, proven as P4. | specified |
-| Dry run never executes a `do`. | Proven in Dafny over a whole run (P3). | proven for the spike |
-| Every run ends, with exactly one outcome. | Proven in Dafny (P1, P2). | proven for the spike |
-| Every skill is checked before it runs: no dead ends, cycles or dangling links. | The core's lint, in Dafny (P6). | two checks so far |
-| A confidence number is measured, never self-reported by a model. | Jev's own distribution, or token probabilities via OpenRouter. | specified |
+| Guarantee | How |
+|---|---|
+| The model only ever picks one of the author's options. It never writes a command. | The grammar can't express anything else, and it's proven. |
+| Command output never becomes part of a command. | The taint rule, checked by lint and proven. |
+| A dry run never executes a `do`. | Proven over every possible run. |
+| Every run ends, with exactly one outcome. | Proven. |
+| Every skill is checked before it runs. | Lint, proven sound: a skill that passes can't hit an internal error. |
+| Confidence is measured, never self-reported. | Jev's calibrated distribution, or token probabilities. |
 
 ## How it works
 
@@ -67,53 +206,29 @@ flowchart LR
   pre --> core["core: lint + interpreter<br/>(Dafny, proven,<br/>compiled to JavaScript)"]
   core <--> host["host loop"]
   host <--> sh["shell commands"]
-  host <--> cls["classifier<br/>(Jev or OpenRouter)"]
+  host <--> cls["TypeSafe Jev<br/>(or OpenRouter)"]
   host --> out(["stopped · paged · handed off"])
 ```
 
 The core is a pure step function written in [Dafny](https://dafny.org):
-given the state and the last result, it returns the next state and the
-next request. The safety properties above are proven about that function,
-then it's compiled to JavaScript and driven by a small TypeScript host. The
-same interpreter runs real incidents, test fakes, and the path explorer
-behind `skop --verify`.
-
-## Status
-
-**Early.** The language is fully specified and has been through many rounds
-of outside review. Building has just started.
-
-| Milestone | What | State |
-|---|---|---|
-| Phase 0 | Toolchain, CI, the Dafny → JavaScript spike, shared contracts | nearly done |
-| M1 | Markdown preprocessor | next |
-| M2 | Full lint and interpreter, with proofs | next |
-| M3 | Runs against fake commands and answers | |
-| M4 | Real backends and runner: commands, locks, redaction | |
-| M5 | Handoff and paging | |
-| M6 | Packaging | |
-| M7 | Score questions (v1.1) | |
-
-Today `skop --version` works, and so does the spike: a small core that
-lints, runs and dry-runs `run`, `do` and `stop`, with its dry-run guarantee
-proven.
+given the state and the last result, it returns the next state and the next
+request. The guarantees above are proven about that function. It's then
+compiled to JavaScript and driven by a small TypeScript host, so the same
+interpreter runs real incidents, rehearsals with fakes, and the path
+explorer behind `--verify`.
 
 ## Develop
-
-Node 20 or newer.
 
 ```console
 $ npm ci
 $ npm test            # builds, then runs every test
 $ npm run lint        # Biome: lint and formatting
 $ npx tsc --noEmit    # type check
-$ node dist/cli.js --version
-skop 0.1.0 (build identity 3f1c…)
 ```
 
 Changing the Dafny core needs Dafny 4.11.0, the version pinned in
 `.dafny-version`. The compiled JavaScript is committed, so nothing else
-does.
+does:
 
 ```console
 $ DAFNY=/path/to/dafny npm run core   # verify the proofs and rebuild core/generated
@@ -123,7 +238,7 @@ $ DAFNY=/path/to/dafny npm run core   # verify the proofs and rebuild core/gener
 
 - [`SPEC.md`](SPEC.md) is the language: syntax, semantics, proofs, backends
   and the CLI.
-- [`PLAN.md`](PLAN.md) is how it's being built: phases, parallel agents,
+- [`PLAN.md`](PLAN.md) is how it's built: phases, parallel agents,
   test-first streams, reviews and releases.
 - [`contracts/`](contracts/) holds the shapes the parts of skop agree on,
   with worked examples.
