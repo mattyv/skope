@@ -18,7 +18,7 @@ import { allScenarios, readExpectedExit, readYaml } from "../lib/scenarios.js";
 const ERROR_TRIAGE = new URL("../../../fixtures-next/error-triage/SKILL.md", import.meta.url).pathname;
 
 describe("M1 (v1.1 slice): --lint on error-triage (SPEC §7, §12.3)", () => {
-  test.fails("error-triage/SKILL.md lints clean and exits 0", async () => {
+  test("error-triage/SKILL.md lints clean and exits 0", async () => {
     const r = await runSkop([ERROR_TRIAGE, "--lint"]);
     expect(r.code).toBe(0);
     expect(r.events.some((e: { event: string }) => e.event === "error")).toBe(false);

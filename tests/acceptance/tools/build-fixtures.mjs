@@ -59,7 +59,7 @@ function buildRecord({ skill, section, line, reason, detail, variables = {}, eff
     section,
     line,
     reason,
-    ...(detail ? { detail } : {}),
+    detail: detail ?? null, // SPEC §8.1: "for `explicit` and `deadline`, `null`"
     variables,
     effects,
     dry_run,

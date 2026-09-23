@@ -132,8 +132,8 @@ Known caveats still open:
     isn't pinned by SPEC §8.1 the way `gate_failed`/`ask_unavailable`'s
     is (there's no worked example). For `command_failed` this pass uses
     `{cmd, exit, timed_out, stderr_tail}` (matching §4.3's "exit code,
-    stderr tail, timeout flag"); `deadline` gets no `detail` at all
-    (`buildRecord` already omits it when absent). Confirm this shape
+    stderr tail, timeout flag"); `explicit` and `deadline` get `detail: null`
+    (SPEC §8.1; stream G changed this from omitting it). Confirm this shape
     against the real core's output once it exists.
   - The redaction replacement text (`"[REDACTED]"` in
     `secret-redaction`) isn't specified by SPEC §9 either; that section

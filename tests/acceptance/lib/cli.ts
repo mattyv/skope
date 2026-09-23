@@ -39,6 +39,8 @@ function cleanEnv(args: string[], extra: Record<string, string> | undefined): Re
     XDG_RUNTIME_DIR: runtimeDir,
   };
   delete env.SKOP_CALLER;
+  // XDG_RUNTIME_DIR, when set, is a directory that exists (XDG Base Directory spec); skop doesn't create it.
+  mkdirSync(runtimeDir, { mode: 0o700 });
 
   if (!args.includes("--config")) {
     mkdirSync(join(configHome, "skop"), { recursive: true });
