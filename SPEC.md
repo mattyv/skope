@@ -501,13 +501,23 @@ tells whoever picks up the record what to do (§8).
 - Run with `/bin/sh -c` (author-written text; interpolated values passed the
   safe-value check).
 - stdin is `/dev/null`, except for the pager, which gets its message on
-  stdin. Environment adds `LC_ALL=C` so output is parseable.
+  stdin. The environment is skop's own, minus the backend key variables
+  (`jev.key_env`, `openrouter.key_env`), plus `LC_ALL=C` so output is
+  parseable. Skill commands never see the backend's key, and the key's
+  value is also redacted like any secret (§9).
 - Each command runs in its own process group. On timeout: `SIGTERM` to the
   group, 5s grace, then `SIGKILL` to the group.
 - stdout and stderr are captured separately, each capped at 1 MiB **at
   capture time**, keeping the tail. A capped stream sets `truncated: true` in
   the log.
 - Timeouts are implemented by the host in Node, not with `timeout(1)`.
+  Every timeout, from a skill or config, is 1 ms to 2³¹−1 ms (about 24
+  days); anything else is `E-FRONTMATTER` or `E-CONFIG`.
+- **If skop itself is interrupted** (SIGINT or SIGTERM) while a command
+  runs, it sends that command's group `SIGTERM`, waits the grace period,
+  sends `SIGKILL`, releases the lock, and ends with outcome `error`,
+  `E-INTERRUPTED`, exit 50. A `do` interrupted this way has effect status
+  `unknown`.
 
 ### 4.5 Dry run (`--dry-run`)
 There is no default mode. A run without `--apply` or `--dry-run` refuses to
@@ -1039,9 +1049,16 @@ Responsibilities, in order:
 2. Validate params and built-ins: types, and the safe-value check for any
    value that reaches a `CMD`. On failure, exit 40. This applies whoever the
    caller is, agents included.
-3. Acquire the lock at `$XDG_RUNTIME_DIR/skop/<name>.lock` (fallback: the OS
-   temp dir). No native modules.
-   - Create it with exclusive create (`wx`), writing pid and start time.
+3. Acquire the lock at `$XDG_RUNTIME_DIR/skop/<name>.lock`. Without
+   `XDG_RUNTIME_DIR`, as under a systemd system unit, use a per-user
+   directory `<OS temp dir>/skop-<uid>`, created with mode 0700; skop
+   refuses it (`E-IO`) unless it's a real directory, not a symlink, owned
+   by this user and not writable by anyone else. No native modules.
+   - Create it atomically (write a temporary file, then hard-link it into
+     place, which fails if it exists), holding pid and start time.
+   - A holder is alive only if its pid is running and started when the
+     lock says, so a reused pid doesn't keep a dead run's lock. A lock
+     that can't be read or parsed is stale, with an unknown holder.
    - It exists and the holder is alive → emit `locked`, exit 30. Don't page.
      Another run is already on it.
    - It exists and the holder is dead → emit `stale_lock`, print the lock
@@ -1149,6 +1166,7 @@ and have no codes.
 | `E-BACKEND-LIMIT` | args | the skill exceeds the configured backend's limits: options, Score levels or context (§6.2) | 21 options on `openrouter`; `ask_context: 40k tokens` on `jev` |
 | `E-FAKE-UNMATCHED` | runtime | `--fake-exec` has no answer for a command, or `--fake` has none for a question (§5.4) | |
 | `E-IO` | runtime | skop can't write its run directory or lock file | |
+| `E-INTERRUPTED` | runtime | skop was interrupted (SIGINT or SIGTERM); it stopped the running command and released the lock (§4.4) | Ctrl-C during a `do` |
 | `E-INTERNAL` | runtime | a runner bug. Unreachable by P6, so always a bug report | |
 
 Warnings don't stop a run:
@@ -1300,8 +1318,28 @@ logs warning `W-REDACT-OFF` on every run):
 - private key blocks: `-----BEGIN [A-Z ]*PRIVATE KEY-----` through the matching END line
 - bearer tokens: `(?i)bearer\s+\S+`
 - JWTs: `eyJ[\w-]+\.[\w-]+\.[\w-]+`
-- key-value secrets: `(?i)(password|passwd|secret|token|api[_-]?key)\s*[=:]\s*\S+`
+- key-value secrets, including JSON and prefixed names such as
+  `aws_secret_access_key`:
+  `(?i)[a-z_]*(password|passwd|secret|token|api[_-]?key)[a-z_]*["']?\s*[=:]\s*("[^"]*"|'[^']*'|\S+)`
+- the values of the backend key variables (§4.4), literally
 - credentials in URLs: `://[^/\s:@]+:[^/\s@]+@`
+
+Patterns MUST run in linear time on hostile input (anyone who can write a
+log line can write to skop's input, §11), and a test redacts 1 MiB of
+each pattern's worst case within a time bound. Redaction runs on the
+whole captured text before anything is cut from it: a tail cut from
+unredacted text could start mid-secret. When the 1 MiB capture cap cut the
+start, the partial first line is dropped before redacting, and a private
+key block missing its BEGIN or END line is redacted to the edge of the
+text. Custom patterns may start with `(?i)`; one that matches the empty
+string is `E-CONFIG`.
+
+**Config errors.** A missing config file at the default path means
+defaults. Anything else is `E-CONFIG`: a file that can't be read, a
+`--config` path that doesn't exist, invalid YAML, an unknown key at any
+level, a wrong type or out-of-range value, or `ask.backend` naming a
+backend with no config block. `state_dir` expands a leading
+`$XDG_STATE_HOME` or `~`, and must then be absolute.
 
 ---
 
@@ -1331,7 +1369,7 @@ logs warning `W-REDACT-OFF` on every run):
 | `handoff_record` | `path`, `record` |
 | `error` / `warning` | `code`, `stage`, `file`, `line`, `message` (§7.1). A warning's `stage` is the stage that found it: `parse`, `lint`, `args` or `runtime` |
 | `locked` | `holder_pid` |
-| `stale_lock` | `path`, `holder_pid` |
+| `stale_lock` | `path`, `holder_pid` (`null` if the lock can't be read) |
 
 ### 10.1 Run directory
 `<state_dir>/runs/<run_id>/` holds `ask-<n>.json` and `handoff.json`. Retention is out of scope for v1.
@@ -2020,6 +2058,12 @@ Also, where things live in the Markdown:
 - **Standalone binaries and `install.sh`** (§5.5), so skop can run on a
   machine without Node. The installer checks each download against the
   release's `SHA256SUMS`.
+- **Runner hardening:** skill commands don't get the backend keys;
+  timeouts are bounded; an interrupted run stops its command and releases
+  the lock (`E-INTERRUPTED`); the lock's fallback directory is per-user
+  and checked, is created atomically, and a reused pid or unreadable lock
+  counts as stale; redaction is linear-time, runs before cutting, and
+  covers JSON and prefixed keys; config errors are never silent defaults.
 - **A keyword with a colon is still a keyword** (`**run**:` is an
   instruction or an error, never prose), `__bold__` counts as bold, and
   what counts as a list item follows CommonMark: code and HTML blocks are

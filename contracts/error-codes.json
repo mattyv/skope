@@ -195,6 +195,11 @@
     "meaning": "skop can't write its run directory or lock file"
   },
   {
+    "code": "E-INTERRUPTED",
+    "stage": "runtime",
+    "meaning": "skop was interrupted (SIGINT or SIGTERM); it stopped the running command and released the lock (§4.4)"
+  },
+  {
     "code": "E-INTERNAL",
     "stage": "runtime",
     "meaning": "a runner bug. Unreachable by P6, so always a bug report"

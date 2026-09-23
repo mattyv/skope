@@ -977,5 +977,8 @@ export interface StaleLockEvent {
   line?: number;
   event: "stale_lock";
   path: string;
-  holder_pid: number;
+  /**
+   * null when the lock can't be read or parsed (SPEC §7).
+   */
+  holder_pid: number | null;
 }
