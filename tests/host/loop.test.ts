@@ -82,7 +82,8 @@ describe("host loop", () => {
       section: "Triage",
       line: 3,
       truncated: false,
-      stdout_hash: `sha256:${createHash("sha256").update(raw).digest("hex")}`,
+      // Of the redacted output (SPEC §10), so a log can't test guesses of the secret.
+      stdout_hash: `sha256:${createHash("sha256").update("ok [REDACTED]\n").digest("hex")}`,
       stdout_tail: "ok [REDACTED]\n",
     });
     expect(emitted[0]?.ms).toBeTypeOf("number");
@@ -178,6 +179,13 @@ describe("host loop", () => {
       probs: { yes: 0.5, no: 0.25 },
     });
     expect(r.lastAsk).toEqual({ question: "q?", probs: { yes: 0.5, no: 0.25 }, sure: 90 });
+  });
+
+  test("page escaping breaks bare domains, markdown links and mentions, and leaves plain text alone", () => {
+    expect(escapePage("see www.evil.com or evil.example")).toBe("see www.\u200bevil.\u200bcom or evil.\u200bexample");
+    expect(escapePage("[x](http://e.io)")).toBe("\\[x\\](http:/\u200b/e.\u200bio)");
+    expect(escapePage("@channel a & b")).toBe("@\u200bchannel a &amp; b");
+    expect(escapePage("/ at 91%. Run r-1 now")).toBe("/ at 91%. Run r-1 now");
   });
 
   test("page text is escaped in the event and to the pager: no mentions, no links", async () => {

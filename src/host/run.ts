@@ -5,6 +5,7 @@
 
 import { createHash, randomBytes } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { hostname } from "node:os";
 import { join } from "node:path";
 import { load as loadYaml } from "js-yaml";
@@ -13,7 +14,9 @@ import { askFake } from "../ask/fake.js";
 import { JEV_LIMITS, OPENROUTER_LIMITS } from "../ask/limits.js";
 import { checkModel } from "../ask/openrouter.js";
 import { type AskOutput, checkAskLimits, isFailure } from "../ask/types.js";
+import IDENTITY from "../build-identity.js";
 import type { CoreProgram, FakesAnswers, FakesCommands, Section } from "../contracts.gen.js";
+import { CODE_MEANINGS, FAKES_SCHEMA } from "../contracts.gen.js";
 import { Interp, unsafeInputs } from "../interp.js";
 import { lint } from "../lint.js";
 import { preprocess } from "../preprocess/index.js";
@@ -25,7 +28,6 @@ import { acquireLock, LockError } from "../runner/lock.js";
 import { sendPage } from "../runner/pager.js";
 import { buildRedactor } from "../runner/redact.js";
 import type { AskRequest, Response, RunConfig, Val } from "../step.js";
-import { identity } from "./identity.js";
 import { escapePage, type Handlers, type LoopResult, runLoop } from "./loop.js";
 import { readOnly } from "./verify.js";
 
@@ -60,7 +62,7 @@ class End extends Error {
 }
 
 const sha256hex = (s: string | Buffer) => createHash("sha256").update(s).digest("hex");
-const SAFE = /^[A-Za-z0-9._/:@%+=,-]+$/;
+const meaning = (code: string) => CODE_MEANINGS[code] ?? code;
 
 export async function runSkill(o: RunOptions): Promise<number> {
   const host = hostname();
@@ -76,11 +78,21 @@ export async function runSkill(o: RunOptions): Promise<number> {
     if (e.event === "effect_start") effects++;
     process.stdout.write(`${JSON.stringify({ ts: new Date().toISOString(), ...run, host, ...e })}\n`);
   };
-  const diag = (kind: "error" | "warning", d: Diagnostic) => {
+  // Warnings about a run that goes ahead are emitted after run_start, so they carry its run_id (SPEC §10).
+  const held: Diagnostic[] = [];
+  const flush = () => {
+    for (const d of held.splice(0)) diag("warning", d, true);
+  };
+  const diag = (kind: "error" | "warning", d: Diagnostic, now = false) => {
+    if (kind === "warning" && !now && o.mode === "run" && run.run_id === null) {
+      held.push(d);
+      return;
+    }
     emit({ event: kind, ...Object.fromEntries(Object.entries(d).filter(([, v]) => v !== undefined)) });
     process.stderr.write(`${diagnosticLine(d)}\n`);
   };
   const end = (ending: Ending, reason: string | null = null) => {
+    flush();
     emit({ event: "outcome", outcome: ending, reason, ask_calls: askCalls, effects, dry_run: dryRun });
     return EXIT[ending];
   };
@@ -90,6 +102,7 @@ export async function runSkill(o: RunOptions): Promise<number> {
   };
 
   let release = () => {};
+  let onSignal: ((signal: string) => Promise<void>) | undefined;
   try {
     if (o.usage !== undefined) fail("E-USAGE", "args", o.usage);
     // Step 0: a run names its mode (SPEC §7).
@@ -108,7 +121,7 @@ export async function runSkill(o: RunOptions): Promise<number> {
     try {
       text = readFileSync(o.file);
     } catch (err) {
-      return fail("E-IO", "args", `can't read ${o.file}: ${(err as Error).message}`);
+      return fail("E-USAGE", "args", `can't read ${o.file}: ${(err as Error).message}`);
     }
     const parsed = preprocess(text.toString("utf8"));
     if ("errors" in parsed) {
@@ -124,13 +137,13 @@ export async function runSkill(o: RunOptions): Promise<number> {
     }
     if (o.mode === "lint") return 0;
     if (o.mode === "verify" || o.mode === "explain") {
-      return readOnly(o.mode === "verify" ? { verify: true, trace: o.trace } : { explain: true }, {
+      const trace = o.trace === undefined ? undefined : readTrace(o.trace, fail);
+      return readOnly(o.mode === "verify" ? { verify: true, trace } : { explain: true }, {
         program,
         config,
         params: params(program, o.params, fail),
         start: (c) => new Interp(program, c),
         emit: (e) => process.stdout.write(`${JSON.stringify(e)}\n`),
-        warn: (code, message, line) => diag("warning", { code, stage: "lint", file: o.file, line, message }),
       });
     }
 
@@ -143,12 +156,11 @@ export async function runSkill(o: RunOptions): Promise<number> {
       mode: "concrete",
     };
     const unsafe = unsafeInputs(program, cfg);
-    if (unsafe.length > 0)
-      fail("E-PARAM-UNSAFE", "args", `${unsafe.join(", ")} fails the safe-value check (${SAFE.source}, not starting with -)`);
+    if (unsafe.length > 0) fail("E-PARAM-UNSAFE", "args", `${unsafe.join(", ")} fails the safe-value check (§3.5)`);
 
     const backend = await checkBackend(program, config, o, fail, diag);
-    const answers = o.fake ? (readFakes(o.fake, fail) as FakesAnswers) : undefined;
-    const commands = o.fakeExec ? (readFakes(o.fakeExec, fail) as FakesCommands) : undefined;
+    const answers = o.fake ? (readFakes(o.fake, "answers", fail) as FakesAnswers) : undefined;
+    const commands = o.fakeExec ? (readFakes(o.fakeExec, "commands", fail) as FakesCommands) : undefined;
 
     const keyVars = [config.jev?.key_env ?? "TYPESAFE_API_KEY", config.openrouter?.key_env ?? "OPENROUTER_API_KEY"];
     const env = commandEnv(process.env, keyVars);
@@ -198,16 +210,19 @@ export async function runSkill(o: RunOptions): Promise<number> {
       return end("stale_lock");
     }
     release = lock.release;
+    // Whatever ends the process (an uncaught error included), the lock goes with it.
+    process.once("exit", release);
 
     // Step 4: run directory, run_start, the loop.
     const runDir = join(config.state_dir, "runs", runId);
     try {
-      mkdirSync(runDir, { recursive: true, mode: 0o700 });
+      mkdirSync(join(config.state_dir, "runs"), { recursive: true, mode: 0o700 });
+      mkdirSync(runDir, { mode: 0o700 }); // a fresh directory, never someone else's
     } catch (err) {
       return fail("E-IO", "runtime", `can't create run directory ${runDir}: ${(err as Error).message}`);
     }
     Object.assign(run, { run_id: runId, skill: program.skill, skill_hash: `sha256:${sha256hex(text)}` });
-    const { version, build } = identity();
+    const { version, build } = IDENTITY;
     emit({
       event: "run_start",
       params: Object.fromEntries(Object.entries(cfg.params).map(([k, v]) => [k, String(v)])),
@@ -217,9 +232,10 @@ export async function runSkill(o: RunOptions): Promise<number> {
       skop_version: version,
       skop_build: build,
     });
+    flush();
 
     // SPEC §4.4: interrupted → stop the command, release the lock, E-INTERRUPTED.
-    const onSignal = async (signal: string) => {
+    onSignal = async (signal: string) => {
       interrupted = true;
       await stopAll();
       release();
@@ -243,12 +259,13 @@ export async function runSkill(o: RunOptions): Promise<number> {
         const body = JSON.stringify(req);
         const path = join(runDir, `ask-${++asks}.json`);
         try {
-          writeFileSync(path, body, { mode: 0o600 });
+          writeFileSync(path, body, { flag: "wx", mode: 0o600 });
         } catch (err) {
           fail("E-IO", "runtime", `can't write ${path}: ${(err as Error).message}`);
         }
         const t = Date.now();
         const out: AskOutput = answers ? askFake(answers, req, src) : await askBackend(body, backend);
+        if (isFailure(out)) process.stderr.write(`skop: the backend was unavailable: ${out.detail}\n`);
         if (!answers && !isFailure(out) && config.jev && backend.SKOP_ASK_BACKEND === "jev" && out.model !== config.jev.model)
           diag("warning", {
             code: "W-MODEL-ALIAS",
@@ -277,7 +294,9 @@ export async function runSkill(o: RunOptions): Promise<number> {
 
     // Step 6: handoff (SPEC §8).
     if (result.outcome.kind === "handoff") {
-      const at = result.at ?? { section: (program.sections[program.entry.section] as Section).name, line: program.entry.src };
+      // The core says where the run ended, or for a deadline the request it would have started next.
+      const at = result.at;
+      if (!at) throw new Error("the core ended a handoff without saying where");
       const path = join(runDir, "handoff.json");
       const record = {
         ...run,
@@ -293,7 +312,7 @@ export async function runSkill(o: RunOptions): Promise<number> {
         preamble: PREAMBLE,
       };
       try {
-        writeFileSync(path, `${JSON.stringify(record, null, 2)}\n`, { mode: 0o600 });
+        writeFileSync(path, `${JSON.stringify(record, null, 2)}\n`, { flag: "wx", mode: 0o600 });
       } catch (err) {
         fail("E-IO", "runtime", `can't write ${path}: ${(err as Error).message}`);
       }
@@ -315,6 +334,7 @@ export async function runSkill(o: RunOptions): Promise<number> {
     return end("error");
   } finally {
     release();
+    if (onSignal) process.off("SIGINT", onSignal).off("SIGTERM", onSignal);
   }
 }
 
@@ -336,7 +356,8 @@ function params(program: CoreProgram, overrides: string[], fail: Fail): Record<s
     const i = kv.indexOf("=");
     const [k, v] = i < 0 ? [kv, ""] : [kv.slice(0, i), kv.slice(i + 1)];
     const decl = Object.hasOwn(program.params, k) ? program.params[k] : undefined;
-    if (!decl || i < 0) fail("E-PARAM-UNKNOWN", "args", i < 0 ? `--param ${kv} isn't k=v` : `the skill has no param ${k}`);
+    if (i < 0) fail("E-USAGE", "args", `--param ${kv} isn't k=v`);
+    if (!decl) fail("E-PARAM-UNKNOWN", "args", `the skill has no param ${k}`);
     if (decl && "int" in decl) {
       if (!/^-?\d+$/.test(v) || !Number.isSafeInteger(Number(v))) fail("E-PARAM-TYPE", "args", `${k} must be an integer, got ${v}`);
       out[k] = Number(v);
@@ -452,29 +473,37 @@ export function fitContext(context: Record<string, string>, maxChars: number): R
   return out;
 }
 
-function readFakes(path: string, fail: Fail): unknown {
+// ajv is the one validator that reads contracts/fakes.schema.json exactly as the contract tests do.
+const Ajv2020 = createRequire(import.meta.url)("ajv/dist/2020").default;
+let fakesAjv: { getSchema(ref: string): ((v: unknown) => boolean) & { errors?: unknown } } | undefined;
+
+/** A --fake or --fake-exec file, checked against contracts/fakes.schema.json before the run (SPEC §7.1 E-CONFIG). */
+function readFakes(path: string, def: "answers" | "commands", fail: Fail): unknown {
+  let doc: unknown;
   try {
-    // JSON is YAML; the fake files are written either way (contracts/fakes.schema.json).
-    return loadYaml(readFileSync(path, "utf8"));
+    // JSON is YAML; the fake files are written either way.
+    doc = loadYaml(readFileSync(path, "utf8"));
   } catch (err) {
     return fail("E-CONFIG", "args", `can't read ${path}: ${(err as Error).message}`);
   }
+  fakesAjv ??= new Ajv2020({ strict: false }).addSchema(FAKES_SCHEMA);
+  const check = fakesAjv?.getSchema(`${FAKES_SCHEMA.$id}#/$defs/${def}`);
+  if (!check?.(doc)) fail("E-CONFIG", "args", `${path} isn't a valid fake ${def} file: ${JSON.stringify(check?.errors ?? null)}`);
+  return doc;
 }
 
-let codes: Record<string, string> | undefined;
-/** A lint code's meaning, from the SPEC §7.1 table (contracts/error-codes.json). */
-function meaning(code: string): string {
+/** A run's events.jsonl for --verify --trace; unreadable or malformed is E-USAGE (SPEC §7.1). */
+function readTrace(path: string, fail: Fail): Record<string, unknown>[] {
   try {
-    codes ??= Object.fromEntries(
-      (
-        JSON.parse(readFileSync(new URL("../../contracts/error-codes.json", import.meta.url), "utf8")) as {
-          code: string;
-          meaning: string;
-        }[]
-      ).map((c) => [c.code, c.meaning]),
-    );
-  } catch {
-    codes = {};
+    return readFileSync(path, "utf8")
+      .split("\n")
+      .filter(Boolean)
+      .map((l) => {
+        const e = JSON.parse(l);
+        if (typeof e !== "object" || e === null || typeof e.event !== "string") throw new Error(`not an event: ${l}`);
+        return e as Record<string, unknown>;
+      });
+  } catch (err) {
+    return fail("E-USAGE", "args", `can't read the trace ${path}: ${(err as Error).message}`);
   }
-  return codes[code] ?? code;
 }

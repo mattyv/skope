@@ -137,10 +137,9 @@ const mk = {
       ...(range ? { range } : {}),
       ...(detail ? { detail } : {}),
     }),
-  // Same shape as `run`, but `stdout_hash` is computed from the raw (unredacted) fake stdout
-  // (SPEC §9: redaction runs before logging, so the captured text a hash identifies is the
-  // pre-redaction one) while `stdout_tail` is the redacted text a reader would actually see.
-  runRedacted: (skill, { section, line, cmd, exit, rawStdout, redactedStdout, after_would_do = false }) =>
+  // Same shape as `run`, for output holding a secret: `stdout_hash` and `stdout_tail` both come
+  // from the redacted text (SPEC §10), so a log can't be used to test guesses of the secret.
+  runRedacted: (skill, { section, line, cmd, exit, redactedStdout, after_would_do = false }) =>
     wrap(skill, {
       event: "run",
       section,
@@ -150,7 +149,7 @@ const mk = {
       ms: 1,
       timed_out: false,
       truncated: false,
-      stdout_hash: sha256(rawStdout),
+      stdout_hash: sha256(redactedStdout),
       stdout_tail: redactedStdout,
       after_would_do,
     }),
@@ -158,15 +157,30 @@ const mk = {
   effectEnd: (skill, { section, line, cmd, exit, timed_out = false }) =>
     wrap(skill, { event: "effect_end", section, line, cmd, exit, ms: 1, timed_out }),
   wouldDo: (skill, { section, line, cmd }) => wrap(skill, { event: "would_do", section, line, cmd }),
-  page: (skill, { section, line, text, ok = true }) => wrap(skill, { event: "page", section, line, text, ok }),
-  wouldPage: (skill, { section, line, text }) => wrap(skill, { event: "would_page", section, line, text }),
-  handoffPage: (skill, { section, line, text, ok = true }) => wrap(skill, { event: "handoff_page", section, line, text, ok }),
+  page: (skill, { section, line, text, ok = true }) => wrap(skill, { event: "page", section, line, text: escapePage(text), ok }),
+  wouldPage: (skill, { section, line, text }) => wrap(skill, { event: "would_page", section, line, text: escapePage(text) }),
+  handoffPage: (skill, { section, line, text, ok = true }) =>
+    wrap(skill, { event: "handoff_page", section, line, text: escapePage(text), ok }),
   transfer: (skill, { section, line, from, to }) => wrap(skill, { event: "transfer", section, line, from, to }),
   outcome: (skill, { outcome, reason, ask_calls, effects, dry_run }) =>
     wrap(skill, { event: "outcome", outcome, reason, ask_calls, effects, dry_run }),
   handoffRecord: (skill, { section, line, record }) =>
     wrap(skill, { event: "handoff_record", section, line, path: `${RUN_DIR}/handoff.json`, record }),
 };
+
+// Page text as skop escapes it for the pager (SPEC §3.5: no mentions, no links): entities for
+// & < >, backslashes before [ ], and a zero-width space after @, inside ://, and after a dot
+// inside a word, so `example.com` or `handoff.json` can't become a link.
+function escapePage(t) {
+  return t
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/[[\]]/g, "\\$&")
+    .replace(/@/g, "@\u200b")
+    .replace(/:\/\//g, ":/\u200b/")
+    .replace(/\.(?=[\p{L}\p{N}])/gu, ".\u200b");
+}
 
 const EXIT = { stopped: 0, paged: 10, handoff: 20, locked: 30, stale_lock: 31, invalid: 40, error: 50 };
 
@@ -1002,7 +1016,6 @@ function dfRunStart(dry_run) {
       line: 25,
       cmd: "journalctl -p err -n 100 --no-pager",
       exit: 0,
-      rawStdout: rawErrors,
       redactedStdout: redactedErrors,
     }),
     mk.run(DF, { section: "Triage", line: 26, cmd: "du -xh -d2 /var /tmp /home | sort -h", exit: 0, stdout: "ambiguous\n" }),

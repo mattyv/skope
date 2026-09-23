@@ -87,7 +87,10 @@ export function normalise(events: object[]): object[] {
         [runStart.host ?? "", "<host>"],
       ]
     : [];
-  return events.map((e) => replaceStrings(normaliseEvent(e), replacements) as object);
+  // Page text is escaped (a zero-width space after a dot inside a word), so a host or path in it
+  // appears escaped too: replace that spelling as well.
+  const escaped = replacements.map(([from, to]): [string, string] => [from.replace(/\.(?=[\p{L}\p{N}])/gu, ".\u200b"), to]);
+  return events.map((e) => replaceStrings(normaliseEvent(e), [...escaped, ...replacements]) as object);
 }
 
 export function toJsonl(events: object[]): string {
