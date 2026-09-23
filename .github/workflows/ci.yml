@@ -110,9 +110,16 @@ jobs:
         if: steps.code.outputs.present == 'true'
         with:
           dafny-version: ${{ steps.code.outputs.version }}
-      - name: Verify every proof
+      - uses: actions/setup-node@v4
+        if: steps.code.outputs.present == 'true'
+        with:
+          node-version: "20"
+      - name: Verify every proof and rebuild the JavaScript
+        if: steps.code.outputs.present == 'true'
+        run: node scripts/build-core.mjs
+      - name: Committed JavaScript matches the proofs
         if: steps.code.outputs.present == 'true'
         run: |
-          files=$(git ls-files '*.dfy')
-          if [ -z "$files" ]; then echo "No .dfy files yet."; exit 0; fi
-          dafny verify $files
+          if ! git diff --exit-code core/generated; then
+            echo "core/generated is stale: run 'npm run core' and commit the result."; exit 1
+          fi

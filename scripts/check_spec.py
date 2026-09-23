@@ -4,7 +4,8 @@
 Usage:
   check_spec.py docs            error codes defined, JSON examples valid
   check_spec.py mermaid DIR     write every Mermaid diagram to DIR as .mmd files
-  check_spec.py coverage        every error code is named in a test file (reference check)
+  check_spec.py coverage        every error code is named in a test file (reference check,
+                                enforced once M2 closes)
   check_spec.py milestones      closed milestones have no expected failures or skips
 
 The coverage check is a reference check only: it proves a code is named in
@@ -66,6 +67,13 @@ def check_coverage() -> list[str]:
     files = [p for p in tests.rglob("*") if p.is_file() and TEST_FILE.search(p.name)]
     text = "\n".join(p.read_text(errors="ignore") for p in files)
     missing = sorted(c for c in defined_codes() - UNTESTABLE if c not in text)
+    # Enforced once M2 closes: that's when every parse and lint code is due
+    # (SPEC §12.3). Before that, list what's still missing.
+    closed = ACCEPTANCE / "CLOSED"
+    if "M2" not in (closed.read_text().split() if closed.is_file() else []):
+        if missing:
+            print(f"coverage: {len(missing)} codes have no test yet (enforced once M2 closes): {', '.join(missing)}")
+        return []
     return [f"{c} has no test (SPEC §12.2 requires one)" for c in missing]
 
 

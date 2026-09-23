@@ -121,6 +121,26 @@ contracts are frozen or the six parallel streams start:
 If any step is painful, raise it now (SPEC §13), before six agents depend on
 it. The contracts are frozen, and Phase 1 starts, only after all three work.
 
+**Spike result: all three work** (`core/`, `src/`, `tests/spike/`). What
+the next agents need to know:
+- **Dafny 4.11.0**, pinned in `.dafny-version`. `npm run core` verifies the
+  core and writes `core/generated/core.cjs`, which is committed, so tests
+  and releases never need Dafny. CI rebuilds it and fails if the committed
+  file is stale.
+- Dafny's JavaScript bundles its runtime with `--include-runtime`, needs
+  the `bignumber.js` package, and exports nothing, so the build appends an
+  export line.
+- The build turns off `--optimize-erasable-datatype-wrapper`. With it on,
+  a one-field datatype like `Program(body)` is erased to its field inside
+  functions but not in its constructor, so values built by the adapter
+  don't match what the compiled functions expect.
+- Numbers cross the boundary as `BigNumber`, strings as Dafny sequences.
+  Only `src/core.ts` converts them; nothing else imports the generated
+  code.
+- Dry run is guarded twice: Dafny proves P3 for the spike, and a
+  randomised test checks the compiled code agrees. Deliberately breaking
+  either one makes it fail.
+
 **Contracts** (in `contracts/`, owned by the Phase 0 agent, later by the
 integration agent):
 
