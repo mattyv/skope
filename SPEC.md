@@ -127,11 +127,15 @@ limits:                         # optional; defaults shown
 - Level 3+ headings are prose. They don't split a section: everything up to
   the next `##` belongs to the enclosing section.
 - A section is one of:
-  - an **instruction section**: contains at least one instruction (§3.3);
+  - an **instruction section**: contains at least one instruction (§3.3),
+    wherever it appears among the section's lists;
   - any other section, which is prose. Prose-only sections, like
-    `## Background`, are fine. A section used as a list (`[List]`) is a
-    **data section** and MUST contain exactly one list (§3.6), or it's
-    `E-SECTION-KIND`.
+    `## Background`, are fine, whatever lists they contain. A section used
+    as a list (`[List]`) is a **data section** and MUST contain exactly one
+    list (§3.6), or it's `E-SECTION-KIND`. Only a data section's items are
+    held to §3.6's forms (`E-DATA-ITEM`).
+- A heading with no letters or digits has no slug, so no id: it's
+  `E-SECTION-NAME`.
 - An instruction section's **guidance** is its first paragraph before its
   first list. If there's none, it's the first paragraph anywhere in the
   section. If there's none at all, the section has no guidance. Guidance is
@@ -166,10 +170,13 @@ Rules:
    item that doesn't match its form exactly is a parse error: `**4**: outage`
    in a rubric is an error, not prose. In an instruction list, an item that
    starts with bold text is classified as follows:
-   - bold text ending in `:` (inside or right after the bold, e.g.
+   - a keyword, even with a `:` inside or right after the bold
+     (`**run**:`, `**Stop:**`) → instruction, so a colon can never turn a
+     keyword into prose (it then fails the grammar, rule 4);
+   - other bold text ending in `:` (inside or right after the bold, e.g.
      `**Note:**` or `**Note**:`) → prose;
-   - a keyword → instruction;
    - anything else → **parse error**. This catches typos like `**rn**`.
+   `__bold__` counts as bold, the same as `**bold**`.
 
    Items that don't start with bold text are prose.
 4. A keyword item whose remaining text does **not** match the grammar in §3.4
@@ -185,9 +192,17 @@ Rules:
    separator. `yes | no` is a fixed token, not a separator.
 7. **Misplaced instructions.** A list item that starts with a keyword
    anywhere rule 1 doesn't cover is `E-MISPLACED`, never prose. That
-   includes before the first section, inside a blockquote, and in a list
-   nested under a prose item. Skop must never quietly skip something that
-   looks like an instruction.
+   includes before the first section, inside a blockquote (at any depth),
+   in a list nested under a prose, option, rubric or data item, and in a
+   data section. Skop must never quietly skip something that looks like an
+   instruction.
+8. **What counts as a list item** is what CommonMark renders as one:
+   `-`, `*`, `+`, `1.` and `1)` markers, tab or space indentation, CRLF or
+   LF line endings. Code blocks (fenced with backticks or tildes, or
+   indented) and HTML blocks, including `<!-- comments -->`, are opaque:
+   nothing inside them is an instruction, because nothing inside them
+   renders as a list item. The preprocessor uses a CommonMark parser, so
+   what runs is what a reader sees.
 
 ### 3.4 Instruction grammar (surface)
 Whitespace between tokens is one or more spaces. `CMD` is exactly one inline
@@ -1100,6 +1115,7 @@ and have no codes.
 | `E-DUP-SECTION` | parse | two sections have the same slug (§3.4) | `## Page` twice; `## Clean up` and `## Clean-up` |
 | `E-SECTION-KIND` | lint | a section used as a list doesn't contain exactly one list (§3.2) | `[Notes]` where Notes has two lists |
 | `E-MISPLACED` | parse | a list item starting with a keyword where instructions aren't recognised (§3.3 rule 7) | `- **run** …` in a blockquote |
+| `E-SECTION-NAME` | parse | a `##` heading has no letters or digits, so it has no slug (§3.2) | `## 🔥`; `## ---` |
 | `E-DATA-ITEM` | parse | a data list item isn't a plain-text value or ``Label — `command` `` (§3.6) | value item `` `nginx` `` |
 | `E-UNKNOWN-BOLD` | parse | bold text that isn't a keyword and doesn't end in `:`, including a misspelled keyword (§3.3 rules 3 and 5) | ``**rn** `df -h` `` |
 | `E-GRAMMAR` | parse | a keyword item doesn't match §3.4 | `**Run** the tests first`; `**run** df -h` |
@@ -2004,6 +2020,13 @@ Also, where things live in the Markdown:
 - **Standalone binaries and `install.sh`** (§5.5), so skop can run on a
   machine without Node. The installer checks each download against the
   release's `SHA256SUMS`.
+- **A keyword with a colon is still a keyword** (`**run**:` is an
+  instruction or an error, never prose), `__bold__` counts as bold, and
+  what counts as a list item follows CommonMark: code and HTML blocks are
+  opaque (§3.3 rules 3, 7, 8).
+- **A section is an instruction section if any item is an instruction**,
+  and only data sections' items are held to §3.6 (`E-SECTION-NAME` for a
+  heading with no slug).
 - **Goldens list what they ignore**, including `request_sha256`, whose
   exact bytes are an implementation detail.
 - **A deadline handoff points at the next instruction** it didn't start.

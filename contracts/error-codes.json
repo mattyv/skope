@@ -25,6 +25,11 @@
     "meaning": "a list item starting with a keyword where instructions aren't recognised (§3.3 rule 7)"
   },
   {
+    "code": "E-SECTION-NAME",
+    "stage": "parse",
+    "meaning": "a `##` heading has no letters or digits, so it has no slug (§3.2)"
+  },
+  {
     "code": "E-DATA-ITEM",
     "stage": "parse",
     "meaning": "a data list item isn't a plain-text value or ``Label — `command` `` (§3.6)"
