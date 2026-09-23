@@ -19,6 +19,10 @@ const schema = (f: string, def = "") => {
 };
 const validate = schema("core-program");
 
+// Shared by every describe block that needs to break the disk-full example in one way.
+const base = () => read("examples/disk-full.core.json");
+const triage = (p: any) => p.sections["s:triage"].body;
+
 describe("core program schema (SPEC §5.1)", () => {
   for (const name of ["disk-full", "cert-expiry", "error-triage"]) {
     test(`${name} example is valid`, () => {
@@ -33,8 +37,6 @@ describe("core program schema (SPEC §5.1)", () => {
   });
 
   // Each case breaks the disk-full example in one way.
-  const base = () => read("examples/disk-full.core.json");
-  const triage = (p: any) => p.sections["s:triage"].body;
   const broken: [string, (p: any) => void][] = [
     ["an unknown statement", (p) => triage(p).push({ src: 99, frobnicate: {} })],
     ["an ask with two forms", (p) => (triage(p)[4].ask.yesno = { as: "_yn" })],
@@ -56,6 +58,19 @@ describe("core program schema (SPEC §5.1)", () => {
     ["a percent sign left on a number", (p) => (triage(p)[1].check.cond.cmp.r = { num: "85%" })],
     ["a sure above 100", (p) => (triage(p)[4].ask.sure = 101)],
     ["a format other than 1", (p) => (p.format = 2)],
+    // Mutation-testing regression cases (skop-h review): each of these pins a rule a broader
+    // schema would still satisfy, so it only fails if that rule is loosened.
+    ["a skill name with an uppercase letter", (p) => (p.skill = "Disk-Full")],
+    ["a run_timeout_ms of zero", (p) => (p.limits.run_timeout_ms = 0)],
+    ["a param name that isn't a valid identifier", (p) => (p.params["1bad"] = { str: "x", src: 1 })],
+    ["a src that isn't an integer", (p) => (triage(p)[0].src = 23.5)],
+    ["a for_each list reference that isn't a slug", (p) => (p.sections["s:clean_up"].body[0].for_each.list = { section: "s:Not_Valid!" })],
+    ["a lit part with an extra property", (p) => (triage(p)[0].run.cmd[0] = { lit: "df --output=pcent ", extra: true })],
+    ["a sure below zero", (p) => (triage(p)[4].ask.sure = -1)],
+    ["an if_yes with neither run nor do", (p) => (p.sections["s:clean_up"].body[0].for_each.body[1].if_yes = { else: null })],
+    ["a hand_off with extra properties", (p) => (p.sections["s:investigate"].body[0].hand_off = { extra: 1 })],
+    ["a skip with extra properties", (p) => (triage(p)[3].else = { skip: { extra: 1 } })],
+    ["an unknown top-level key", (p) => (p.bogus = 1)],
   ];
   for (const [what, breakIt] of broken) {
     test(`rejects ${what}`, () => {
@@ -64,6 +79,34 @@ describe("core program schema (SPEC §5.1)", () => {
       expect(validate(p)).toBe(false);
     });
   }
+});
+
+describe("ask.score fragment (SPEC §3.4, §4.7 v1.1)", () => {
+  const askSchema = schema("core-program", "#/$defs/ask");
+  // A valid score-kind ask, lifted from the error-triage example (question/sure/else/score).
+  const scoreAsk = () => structuredClone(read("examples/error-triage.core.json").sections["s:triage"].body[1].ask);
+
+  test("the score ask is valid as-is", () => {
+    expect(askSchema(scoreAsk()), JSON.stringify(askSchema.errors)).toBe(true);
+  });
+
+  test("rejects a score.low below zero", () => {
+    const a = scoreAsk();
+    a.score.low = -1;
+    expect(askSchema(a)).toBe(false);
+  });
+});
+
+describe("the standalone stop statement (SPEC §4.x)", () => {
+  const stmtStop = schema("core-program", "#/$defs/stmtStop");
+
+  test("a bare stop statement is valid", () => {
+    expect(stmtStop({ src: 1, stop: {} }), JSON.stringify(stmtStop.errors)).toBe(true);
+  });
+
+  test("rejects a stop with extra properties", () => {
+    expect(stmtStop({ src: 1, stop: { extra: 1 } })).toBe(false);
+  });
 });
 
 describe("error-code contract (SPEC §7.1)", () => {
@@ -125,6 +168,18 @@ describe("backend request and answer (SPEC §6.1)", () => {
     expect(answer({ probs: { yes: "high" }, backend: "jev", model: "m", ms: 1 })).toBe(false);
     expect(answer({ probs: {}, backend: "jev", model: "m" })).toBe(false);
   });
+
+  test("rejects a zero timeout_ms on the request", () => {
+    expect(request({ ...req, timeout_ms: 0 })).toBe(false);
+  });
+
+  test("rejects a negative ms on the answer", () => {
+    expect(answer({ probs: { yes: 1 }, backend: "jev", model: "m", ms: -1 })).toBe(false);
+  });
+
+  test("rejects an unknown property on the request", () => {
+    expect(request({ ...req, bogus: 1 })).toBe(false);
+  });
 });
 
 describe("fake files (SPEC §5.4, §6.2)", () => {
@@ -151,6 +206,15 @@ describe("fake files (SPEC §5.4, §6.2)", () => {
     expect(answers({ q: {} })).toBe(false);
     expect(commands({ "df -h": { stdout: "91%" } })).toBe(false);
     expect(commands({ "df -h": { exit: 0, colour: "red" } })).toBe(false);
+  });
+
+  test("rejects an empty key", () => {
+    expect(commands({ "": { exit: 0 } })).toBe(false);
+    expect(answers({ "": "unsure" })).toBe(false);
+  });
+
+  test("rejects a non-boolean timed_out", () => {
+    expect(commands({ "df -h": { exit: 0, timed_out: "yes" } })).toBe(false);
   });
 });
 
@@ -200,6 +264,58 @@ describe("log events (SPEC §10)", () => {
   test("the examples cover every event kind in the schema", () => {
     const kinds = read("event.schema.json").oneOf.map((r: { $ref: string }) => r.$ref.split("/").pop());
     expect(new Set(examples.map((e) => e.event))).toEqual(new Set(kinds));
+  });
+
+  // Mutation-testing regression cases (skop-h review): each pins a rule a looser schema would
+  // still satisfy.
+  test("rejects a skill_hash that isn't 64 lowercase hex digits", () => {
+    expect(event({ ...base, skill_hash: "sha256:zz", event: "would_do", cmd: "x" })).toBe(false);
+  });
+
+  test("an error's stage can't be 'warning' (that's the warning event's business)", () => {
+    expect(event({ ...base, event: "error", code: "E-TAINT", stage: "warning", message: "m" })).toBe(false);
+  });
+
+  test("stdout_tail over 2048 chars is rejected, for run and check_cmd", () => {
+    const long = "x".repeat(2049);
+    const runFields = {
+      cmd: "x",
+      exit: 0,
+      ms: 1,
+      timed_out: false,
+      truncated: false,
+      stdout_hash: `sha256:${"a".repeat(64)}`,
+      after_would_do: false,
+    };
+    expect(event({ ...base, event: "run", ...runFields, stdout_tail: long })).toBe(false);
+    expect(event({ ...base, event: "check_cmd", ...runFields, stdout_tail: long })).toBe(false);
+  });
+
+  test("an outcome with an unknown reason", () => {
+    expect(event({ ...base, event: "outcome", outcome: "handoff", reason: "gave_up", ask_calls: 0, effects: 0, dry_run: true })).toBe(
+      false,
+    );
+  });
+
+  test("an outcome with an unknown outcome value is rejected", () => {
+    expect(event({ ...base, event: "outcome", outcome: "bogus", reason: null, ask_calls: 0, effects: 0, dry_run: null })).toBe(false);
+  });
+
+  describe("every required field, for every event kind, is enforced", () => {
+    const eventSchema = read("event.schema.json");
+    const kinds: string[] = eventSchema.oneOf.map((r: { $ref: string }) => r.$ref.split("/").pop());
+    for (const kind of kinds) {
+      const def = eventSchema.$defs[kind];
+      const sample = examples.find((e) => e.event === kind);
+      if (!sample) throw new Error(`no example in events.jsonl for event kind ${kind}`);
+      for (const field of def.required as string[]) {
+        test(`${kind} rejects a missing ${field}`, () => {
+          const e = { ...sample };
+          delete e[field];
+          expect(event(e), `${kind} without ${field} should be rejected`).toBe(false);
+        });
+      }
+    }
   });
 });
 
