@@ -13,10 +13,11 @@ export interface PageResult {
   ok: boolean;
 }
 
-export async function sendPage(cfg: PagerConfig, text: string): Promise<PageResult> {
+/** `env` is the command environment (`commandEnv`, SPEC §4.4). */
+export async function sendPage(cfg: PagerConfig, text: string, env: NodeJS.ProcessEnv): Promise<PageResult> {
   try {
-    const r = await execCommand(cfg.command, { timeoutMs: cfg.timeout_ms, input: text });
-    return { ok: r.exit === 0 && !r.timedOut };
+    // A timed-out pager has exit null.
+    return { ok: (await execCommand(cfg.command, { timeoutMs: cfg.timeout_ms, input: text, env })).exit === 0 };
   } catch {
     return { ok: false };
   }

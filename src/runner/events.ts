@@ -30,25 +30,27 @@ function withoutUndefined<T extends object>(o: T): T {
   return Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as T;
 }
 
-export function errorEvent(ctx: EventContext, d: Diagnostic) {
-  return withoutUndefined({ ts: nowIso(), event: "error" as const, ...ctx, ...d });
-}
-
-export function warningEvent(ctx: EventContext, d: Diagnostic) {
-  return withoutUndefined({ ts: nowIso(), event: "warning" as const, ...ctx, ...d });
+export function diagnosticEvent<K extends "error" | "warning">(kind: K, ctx: EventContext, d: Diagnostic) {
+  return withoutUndefined({ ts: nowIso(), event: kind, ...ctx, ...d });
 }
 
 export function lockedEvent(ctx: EventContext, holderPid: number) {
   return withoutUndefined({ ts: nowIso(), event: "locked" as const, ...ctx, holder_pid: holderPid });
 }
 
-export function staleLockEvent(ctx: EventContext, path: string, holderPid: number) {
+/** `holderPid` is null when the lock can't be read or parsed (SPEC §7 step 3). */
+export function staleLockEvent(ctx: EventContext, path: string, holderPid: number | null) {
   return withoutUndefined({ ts: nowIso(), event: "stale_lock" as const, ...ctx, path, holder_pid: holderPid });
 }
 
-/** The readable stderr line for an error or warning (SPEC §7.1). */
+/**
+ * The readable stderr line for an error or warning (SPEC §7.1). Control
+ * characters are escaped, so a message is always exactly one line.
+ */
 export function diagnosticLine(d: Pick<Diagnostic, "code" | "message" | "file" | "line">): string {
-  return d.file !== undefined && d.line !== undefined ? `${d.file}:${d.line}: ${d.code}: ${d.message}` : `${d.code}: ${d.message}`;
+  const line = d.file !== undefined && d.line !== undefined ? `${d.file}:${d.line}: ${d.code}: ${d.message}` : `${d.code}: ${d.message}`;
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: escaping them is the point.
+  return line.replace(/[\u0000-\u0008\u000a-\u001f\u007f]/g, (c) => JSON.stringify(c).slice(1, -1));
 }
 
 export interface EventSink {
@@ -64,14 +66,14 @@ export function stdoutSink(write: (s: string) => void = (s) => process.stdout.wr
   };
 }
 
-export function reportError(sink: EventSink, stderrWrite: (s: string) => void, ctx: EventContext, d: Diagnostic): void {
-  const ev = errorEvent(ctx, d);
-  sink.emit(ev);
-  stderrWrite(`${diagnosticLine(d)}\n`);
-}
-
-export function reportWarning(sink: EventSink, stderrWrite: (s: string) => void, ctx: EventContext, d: Diagnostic): void {
-  const ev = warningEvent(ctx, d);
-  sink.emit(ev);
+/** Reports an error or warning twice: one JSON event, one readable stderr line (SPEC §7.1). */
+export function report(
+  sink: EventSink,
+  stderrWrite: (s: string) => void,
+  kind: "error" | "warning",
+  ctx: EventContext,
+  d: Diagnostic,
+): void {
+  sink.emit(diagnosticEvent(kind, ctx, d));
   stderrWrite(`${diagnosticLine(d)}\n`);
 }

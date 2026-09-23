@@ -1,15 +1,20 @@
-// Helper process for lock.test.ts: acquires the lock, prints the result as
-// JSON, and (if acquired) holds it briefly before releasing, so a sibling
-// process racing for the same lock sees it held.
-import { acquireLock } from "../../../src/runner/lock.ts";
+// Helper process for lock.test.ts. argv: <lock module .mjs> <dir> <name>.
+// Loads the lock module, says "ready", acquires on "go" and reports the
+// result, and releases and exits on "release". The parent sends "go" to
+// every racer at once and "release" only after every result is in, so the
+// winner holds the lock for as long as the others are looking.
+import { pathToFileURL } from "node:url";
 
-const [dir, name] = process.argv.slice(2);
-const r = acquireLock(name, dir);
-if (r.status === "acquired") {
-  process.stdout.write(`${JSON.stringify({ status: r.status })}\n`);
-  // Hold the lock briefly so a racing sibling reliably observes it held.
-  await new Promise((res) => setTimeout(res, 200));
-  r.release();
-} else {
-  process.stdout.write(`${JSON.stringify({ status: r.status })}\n`);
-}
+const [modPath, dir, name] = process.argv.slice(2);
+const { acquireLock } = await import(pathToFileURL(modPath).href);
+let held;
+process.on("message", (m) => {
+  if (m === "go") {
+    held = acquireLock(name, dir);
+    process.send({ pid: process.pid, status: held.status, holderPid: held.holderPid ?? null });
+  } else if (m === "release") {
+    held?.release?.();
+    process.exit(0);
+  }
+});
+process.send("ready");

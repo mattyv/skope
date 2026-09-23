@@ -2,11 +2,18 @@
 // commands.yaml (contracts/fakes.schema.json) keyed by command text (after
 // interpolation) or `line:N`, which wins when both match. A list of
 // results is used in order, with the last repeating. No real command ever
-// runs. An unmatched command is E-FAKE-UNMATCHED.
+// runs. An unmatched command is E-FAKE-UNMATCHED. Output is capped at
+// 1 MiB like a real capture (SPEC §4.4).
 
 import type { FakesCommands, Result } from "../contracts.gen.js";
+import { CAP_BYTES, type ExecResult } from "./exec.js";
 
 export class FakeUnmatchedCommand extends Error {
+  readonly code = "E-FAKE-UNMATCHED";
+}
+
+/** An answer no real command could give: timed out, yet with an exit status. */
+export class FakeInvalidResult extends Error {
   readonly code = "E-FAKE-UNMATCHED";
 }
 
@@ -24,14 +31,15 @@ export function createFakeClock(): FakeClock {
   };
 }
 
-export interface FakeExecResult {
-  exit: number | null;
-  stdout: string;
-  stderr: string;
-  timedOut: boolean;
-}
+export type FakeExecHandler = (req: { cmd: string; src: number }) => Promise<ExecResult>;
 
-export type FakeExecHandler = (req: { cmd: string; src: number }) => Promise<FakeExecResult>;
+/** The last CAP_BYTES bytes, as the real capture keeps them. */
+function capture(s: string): { text: string; truncated: boolean } {
+  const b = Buffer.from(s, "utf8");
+  return b.length > CAP_BYTES
+    ? { text: b.subarray(b.length - CAP_BYTES).toString("utf8"), truncated: true }
+    : { text: s, truncated: false };
+}
 
 export function fakeExec(commands: FakesCommands, clock?: FakeClock): FakeExecHandler {
   const counts = new Map<string, number>();
@@ -44,12 +52,20 @@ export function fakeExec(commands: FakesCommands, clock?: FakeClock): FakeExecHa
     const n = counts.get(key) ?? 0;
     counts.set(key, n + 1);
     const result = list[Math.min(n, list.length - 1)] as Result;
+    const timedOut = result.timed_out ?? false;
+    if (timedOut && result.exit !== null) {
+      throw new FakeInvalidResult(`--fake-exec answer for ${key} has timed_out: true, so its exit must be null, not ${result.exit}`);
+    }
     clock?.advance(result.ms ?? 0);
+    const stdout = capture(result.stdout ?? "");
+    const stderr = capture(result.stderr ?? "");
     return {
       exit: result.exit,
-      stdout: result.stdout ?? "",
-      stderr: result.stderr ?? "",
-      timedOut: result.timed_out ?? false,
+      signal: null,
+      stdout: stdout.text,
+      stderr: stderr.text,
+      timedOut,
+      truncated: stdout.truncated || stderr.truncated,
     };
   };
 }

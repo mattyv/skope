@@ -5,15 +5,13 @@ import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { describe, expect, test } from "vitest";
 import {
+  diagnosticEvent,
   diagnosticLine,
   type EventContext,
-  errorEvent,
   lockedEvent,
-  reportError,
-  reportWarning,
+  report,
   staleLockEvent,
   stdoutSink,
-  warningEvent,
 } from "../../src/runner/events.js";
 
 const require = createRequire(import.meta.url);
@@ -26,8 +24,8 @@ const ctx: EventContext = { run_id: "r-1", skill: "disk-full", skill_hash: `sha2
 const ctxNoRun: EventContext = { run_id: null, skill: null, skill_hash: null, host: "hk-app-03" };
 
 describe("error and warning events (SPEC §7.1, §10)", () => {
-  test("errorEvent with file and line validates against event.schema.json", () => {
-    const ev = errorEvent(ctx, { code: "E-TAINT", stage: "lint", file: "disk-full/SKILL.md", line: 14, message: "boom" });
+  test("diagnosticEvent error with file and line validates against event.schema.json", () => {
+    const ev = diagnosticEvent("error", ctx, { code: "E-TAINT", stage: "lint", file: "disk-full/SKILL.md", line: 14, message: "boom" });
     expect(validate(ev), JSON.stringify(validate.errors)).toBe(true);
     expect(ev).toEqual({
       ts: expect.any(String),
@@ -44,15 +42,15 @@ describe("error and warning events (SPEC §7.1, §10)", () => {
     });
   });
 
-  test("errorEvent with no source line (E-MODE) validates and omits file/line", () => {
-    const ev = errorEvent(ctxNoRun, { code: "E-MODE", stage: "args", message: "neither --apply nor --dry-run" });
+  test("diagnosticEvent error with no source line (E-MODE) validates and omits file/line", () => {
+    const ev = diagnosticEvent("error", ctxNoRun, { code: "E-MODE", stage: "args", message: "neither --apply nor --dry-run" });
     expect(validate(ev), JSON.stringify(validate.errors)).toBe(true);
     expect("file" in ev).toBe(false);
     expect("line" in ev).toBe(false);
   });
 
-  test("warningEvent validates against event.schema.json", () => {
-    const ev = warningEvent(ctx, { code: "W-REDACT-OFF", stage: "runtime", message: "built-in redaction is off" });
+  test("diagnosticEvent warning validates against event.schema.json", () => {
+    const ev = diagnosticEvent("warning", ctx, { code: "W-REDACT-OFF", stage: "runtime", message: "built-in redaction is off" });
     expect(validate(ev), JSON.stringify(validate.errors)).toBe(true);
     expect(ev.event).toBe("warning");
   });
@@ -65,6 +63,12 @@ describe("error and warning events (SPEC §7.1, §10)", () => {
     const stale = staleLockEvent(ctxNoRun, "/run/skop/disk-full.lock", 4242);
     expect(validate(stale), JSON.stringify(validate.errors)).toBe(true);
     expect(stale).toMatchObject({ event: "stale_lock", path: "/run/skop/disk-full.lock", holder_pid: 4242 });
+  });
+
+  test("staleLockEvent with an unreadable lock has holder_pid null and validates", () => {
+    const stale = staleLockEvent(ctxNoRun, "/run/skop/disk-full.lock", null);
+    expect(validate(stale), JSON.stringify(validate.errors)).toBe(true);
+    expect(stale.holder_pid).toBeNull();
   });
 
   test("diagnosticLine matches the spec's stderr format (SPEC §7.1)", () => {
@@ -82,21 +86,26 @@ describe("error and warning events (SPEC §7.1, §10)", () => {
     expect(line).toBe("E-MODE: neither --apply nor --dry-run");
   });
 
-  test("reportError writes one JSON event to the sink and one readable line to stderr", () => {
+  test("a message with newlines or control characters stays one line on stderr", () => {
+    const line = diagnosticLine({ code: "E-CONFIG", file: "a\nb.yaml", line: 2, message: "bad value:\nnext line\r\u001b[31m" });
+    expect(line).toBe("a\\nb.yaml:2: E-CONFIG: bad value:\\nnext line\\r\\u001b[31m");
+  });
+
+  test("report error writes one JSON event to the sink and one readable line to stderr", () => {
     const emitted: object[] = [];
     const sink = { emit: (e: object) => emitted.push(e) };
     const stderrLines: string[] = [];
-    reportError(sink, (s) => stderrLines.push(s), ctx, { code: "E-TAINT", stage: "lint", file: "s.md", line: 1, message: "m" });
+    report(sink, (s) => stderrLines.push(s), "error", ctx, { code: "E-TAINT", stage: "lint", file: "s.md", line: 1, message: "m" });
     expect(emitted).toHaveLength(1);
     expect(validate(emitted[0]), JSON.stringify(validate.errors)).toBe(true);
     expect(stderrLines).toEqual(["s.md:1: E-TAINT: m\n"]);
   });
 
-  test("reportWarning writes one JSON event to the sink and one readable line to stderr", () => {
+  test("report warning writes one JSON event to the sink and one readable line to stderr", () => {
     const emitted: object[] = [];
     const sink = { emit: (e: object) => emitted.push(e) };
     const stderrLines: string[] = [];
-    reportWarning(sink, (s) => stderrLines.push(s), ctx, { code: "W-REDACT-OFF", stage: "runtime", message: "off" });
+    report(sink, (s) => stderrLines.push(s), "warning", ctx, { code: "W-REDACT-OFF", stage: "runtime", message: "off" });
     expect(emitted).toHaveLength(1);
     expect(validate(emitted[0]), JSON.stringify(validate.errors)).toBe(true);
     expect(stderrLines).toEqual(["W-REDACT-OFF: off\n"]);

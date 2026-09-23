@@ -4,14 +4,14 @@
 
 import { describe, expect, test } from "vitest";
 import type { FakesCommands } from "../../src/contracts.gen.js";
-import { createFakeClock, FakeUnmatchedCommand, fakeExec } from "../../src/runner/fakeExec.js";
+import { createFakeClock, FakeInvalidResult, FakeUnmatchedCommand, fakeExec } from "../../src/runner/fakeExec.js";
 
 describe("fakeExec (SPEC §5.4, contracts/fakes.schema.json)", () => {
   test("matches a command by its text after interpolation", async () => {
     const commands: FakesCommands = { "df -h /": { exit: 0, stdout: "91%\n" } };
     const handler = fakeExec(commands);
     const r = await handler({ cmd: "df -h /", src: 5 });
-    expect(r).toEqual({ exit: 0, stdout: "91%\n", stderr: "", timedOut: false });
+    expect(r).toEqual({ exit: 0, signal: null, stdout: "91%\n", stderr: "", timedOut: false, truncated: false });
   });
 
   test("matches by line:N when the text isn't a key", async () => {
@@ -88,6 +88,34 @@ describe("fakeExec (SPEC §5.4, contracts/fakes.schema.json)", () => {
     expect(clock.elapsedMs).toBe(4000);
     await handler({ cmd: "slow", src: 1 });
     expect(clock.elapsedMs).toBe(8000);
+  });
+
+  test("a result without ms doesn't advance the clock", async () => {
+    const clock = createFakeClock();
+    const handler = fakeExec({ quick: { exit: 0 } }, clock);
+    await handler({ cmd: "quick", src: 1 });
+    expect(clock.elapsedMs).toBe(0);
+  });
+
+  test("output over 1 MiB is capped like a real capture, keeping the tail, and sets truncated", async () => {
+    const MiB = 1024 * 1024;
+    const handler = fakeExec({
+      big: { exit: 0, stdout: `A${"B".repeat(MiB)}` },
+      bigerr: { exit: 0, stderr: `A${"C".repeat(MiB)}` },
+      exact: { exit: 0, stdout: "B".repeat(MiB) },
+    });
+    const out = await handler({ cmd: "big", src: 1 });
+    expect(out.truncated).toBe(true);
+    expect(out.stdout).toBe("B".repeat(MiB));
+    const err = await handler({ cmd: "bigerr", src: 1 });
+    expect(err.truncated).toBe(true);
+    expect(err.stderr).toBe("C".repeat(MiB));
+    expect((await handler({ cmd: "exact", src: 1 })).truncated).toBe(false);
+  });
+
+  test("timed_out with a non-null exit is an invalid answer, not silently accepted", async () => {
+    const handler = fakeExec({ bad: { exit: 0, timed_out: true } });
+    await expect(handler({ cmd: "bad", src: 3 })).rejects.toThrow(FakeInvalidResult);
   });
 
   test("no real command ever runs under --fake-exec", async () => {

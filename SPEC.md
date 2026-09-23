@@ -1191,6 +1191,7 @@ Warnings don't stop a run:
 | `W-ASK-NO-CONTEXT` | an `ask` question names nothing that could hold `run` output, so the model gets no evidence (§6.3) |
 | `W-MODEL-ALIAS` | `jev.model` is an alias, or a response came from a different model than configured (§6.2) |
 | `W-NO-GUIDANCE` | a section offered as an `ask` option has no guidance paragraph (§3.2) |
+| `W-CONFIG-PERMS` | the config file is group-writable or owned by someone other than this user or root; `pager.command` runs through `sh`, so whoever can write the file can run commands (§9). A world-writable config is `E-CONFIG`. |
 | `W-REDACT-OFF` | built-in redaction patterns are turned off (§9) |
 
 Parse codes come from the preprocessor. Lint codes come from the Dafny core,
@@ -1331,7 +1332,8 @@ logs warning `W-REDACT-OFF` on every run):
 - bearer tokens: `(?i)bearer\s+\S+`
 - JWTs: `eyJ[\w-]+\.[\w-]+\.[\w-]+`
 - key-value secrets, including JSON and prefixed names such as
-  `aws_secret_access_key`:
+  `aws_secret_access_key`, matching what this pattern matches (written
+  so it runs in linear time, e.g. anchored at the start of a name):
   `(?i)[a-z_]*(password|passwd|secret|token|api[_-]?key)[a-z_]*["']?\s*[=:]\s*("[^"]*"|'[^']*'|\S+)`
 - the values of the backend key variables (§4.4), literally
 - credentials in URLs: `://[^/\s:@]+:[^/\s@]+@`
