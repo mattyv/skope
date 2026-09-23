@@ -415,8 +415,10 @@ timeout `limits.do_timeout`.
 **`check COND → TARGET [else]`**:
 - `CMD succeeds`: run CMD per §4.4 with `limits.run_timeout`. True iff exit 0.
   Timeout → failure handling, not false.
-- Comparison: operands coerced to numbers: trim, strip one trailing `%`,
-  parse as decimal. Coercion failure → failure handling.
+- Comparison: operands coerced to numbers: trim spaces, tabs, `\r` and
+  `\n`, strip one trailing `%`, parse as `-?DIGITS(.DIGITS)?`. Coercion
+  failure → failure handling; the handoff record's detail is then
+  `{expr, left, right}`, not a command's exit.
 - True → transfer to TARGET (`stop` ends the run with `stopped`).
 - False → if `else [X]`, transfer to X; `else skip` or no else → continue.
 - `check COND else …` (no arrow): true → continue; false → else.
@@ -436,7 +438,7 @@ timeout `limits.do_timeout`.
   the chosen one.
 - Confidence ≥ `sure` → proceed:
   - section options: transfer to the chosen section.
-  - `yes | no`: bind NAME (default `_yn`) to boolean.
+  - `yes | no`: bind NAME (default `_yn`) to the string `yes` or `no`.
   - `one of [L] as NAME`: bind NAME to the chosen list item.
 - Confidence < `sure`, or a tie → gate failed:
   - no else → outcome `handoff` (reason `gate_failed`).
@@ -1289,7 +1291,8 @@ Then skop exits 20.
 ```
 - `detail` depends on the reason: for `gate_failed` and `ask_unavailable`,
   the question as above; for `command_failed`, `{cmd, exit, timed_out,
-  stderr_tail}` (redacted); for `explicit` and `deadline`, `null`.
+  stderr_tail}` (redacted), or `{expr, left, right}` when a comparison
+  couldn't coerce its operands; for `explicit` and `deadline`, `null`.
 - For a Score ask, `detail.probs` is keyed by level
   (`{"1":0.05,"2":0.1,"3":0.45,"4":0.4}`) and `detail` adds `"range":[1,4]`.
 - `reason` is one of `explicit`, `gate_failed`, `command_failed`,
