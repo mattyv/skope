@@ -12,6 +12,6 @@ const findings = (s: any): Finding[] =>
 /** Lint errors and warnings. Throws Unsupported on JSON the core program contract doesn't allow. */
 export function lint(program: unknown): { errors: Finding[]; warnings: Finding[] } {
   const p = toAst(program);
-  const check = gen.SkopCheck.__default;
-  return { errors: findings(check.Lint(p)), warnings: findings(check.Warnings(p)) };
+  const [errors, warnings] = gen.SkopCheck.__default.LintAll(p);
+  return { errors: findings(errors), warnings: findings(warnings) };
 }

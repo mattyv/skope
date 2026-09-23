@@ -8,6 +8,7 @@
 
 import { readFileSync } from "node:fs";
 import { describe, expect, test } from "vitest";
+import { _dafny, BigNumber, gen } from "../../src/core.js";
 import { lint } from "../../src/lint.js";
 
 type J = any;
@@ -159,6 +160,10 @@ describe("data lists (SPEC §3.6)", () => {
     expect(errors(over(data(60, [value(61, "nginx"), action(62, "Vacuum")])))).toEqual([E("E-LIST-MIXED", 62)]);
   });
 
+  test("E-LIST-MIXED: at the items of the minority kind", () => {
+    expect(errors(over(data(60, [value(61, "nginx"), action(62, "Vacuum"), action(63, "Clean")])))).toEqual([E("E-LIST-MIXED", 61)]);
+  });
+
   test("E-LIST-DUP: two nginx items, ignoring case, at the second", () => {
     expect(errors(over(data(60, [value(61, "nginx"), value(62, "a"), value(63, "NGINX")])))).toEqual([E("E-LIST-DUP", 63)]);
   });
@@ -250,8 +255,17 @@ describe("every path ends, every instruction runs (SPEC §4.1)", () => {
     expect(errors(prog([cmp(11, { num: "1" }, "<", { num: "2" })]))).toEqual([E("E-FALLS-OFF", 11)]);
   });
 
-  test("E-FALLS-OFF: a section ending in a for each", () => {
-    expect(errors(prog([forEach(11, "x", "s:services", [stop(12)])], SERVICES))).toEqual([E("E-FALLS-OFF", 11)]);
+  test("E-FALLS-OFF: a section ending in a for each whose body can finish", () => {
+    expect(errors(prog([forEach(11, "x", "s:services", [run(12, DF)])], SERVICES))).toEqual([E("E-FALLS-OFF", 11)]);
+  });
+
+  test("a section ending in a for each whose body always ends lints: lists are never empty", () => {
+    expect(errors(prog([forEach(11, "x", "s:services", [run(12, DF), stop(13)])], SERVICES))).toEqual([]);
+  });
+
+  test("E-UNREACHABLE: an instruction after a for each whose body always transfers", () => {
+    const p = prog([forEach(11, "x", "s:services", [then(12, "s:b")]), stop(13)], { ...SERVICES, "s:b": section(20, [stop(21)]) });
+    expect(errors(p)).toEqual([E("E-UNREACHABLE", 13)]);
   });
 
   test("a section ending in check … → stop · else [X] lints: every way out ends", () => {
@@ -306,17 +320,33 @@ describe("ask forms (SPEC §3.4, §4.2)", () => {
     expect(errors(prog([ask(11, [lit("Which?")], options([12, "s:b"]))], targets))).toEqual([E("E-OPTION-COUNT", 11)]);
   });
 
-  // Two sections offered over and over: each repeat is its own
-  // E-OPTION-COUNT, at its line, so only the ask's line is checked. Sorting
-  // ~250 findings is slow, hence the timeout.
-  const many = (n: number) => Array.from({ length: n }, (_, i) => [100 + i, i % 2 ? "s:b" : "s:c"] as [number, string]);
+  // n distinct options, each a section of its own.
+  const distinct = (n: number) => {
+    const more: Record<string, J> = {};
+    const opts: [number, string][] = [];
+    for (let i = 0; i < n; i++) {
+      more[`s:o${i}`] = section(1000 + 2 * i, [stop(1001 + 2 * i)]);
+      opts.push([12 + i, `s:o${i}`]);
+    }
+    return prog([run(11, DF, "x"), ask(11, [v("x")], options(...opts))], more);
+  };
 
-  test("E-OPTION-COUNT: an ask with 256 options", () => {
-    expect(errors(prog([ask(11, [lit("Which?")], options(...many(256)))], targets))).toContainEqual(E("E-OPTION-COUNT", 11));
+  test("E-OPTION-COUNT: an ask with 256 distinct options", () => {
+    expect(errors(distinct(256))).toEqual([E("E-OPTION-COUNT", 11)]);
   }, 60_000);
 
-  test("an ask with 255 options is within the limit", () => {
-    expect(errors(prog([ask(11, [lit("Which?")], options(...many(255)))], targets))).not.toContainEqual(E("E-OPTION-COUNT", 11));
+  test("an ask with 255 distinct options lints, within 5 s", () => {
+    const t = Date.now();
+    expect(lint(distinct(255))).toEqual({ errors: [], warnings: [] });
+    expect(Date.now() - t).toBeLessThan(5000);
+  }, 60_000);
+
+  test("a chain of 100 sections lints, within 5 s", () => {
+    const more: Record<string, J> = {};
+    for (let i = 1; i < 100; i++) more[`s:c${i}`] = section(100 + 2 * i, [i < 99 ? then(101 + 2 * i, `s:c${i + 1}`) : stop(101 + 2 * i)]);
+    const t = Date.now();
+    expect(lint(prog([then(11, "s:c1")], more))).toEqual({ errors: [], warnings: [] });
+    expect(Date.now() - t).toBeLessThan(5000);
   }, 60_000);
 
   test("E-OPTION-COUNT: the same section offered twice, at the repeat", () => {
@@ -442,6 +472,10 @@ describe("taint (SPEC §3.5)", () => {
     expect(errors(p)).toEqual([E("E-TAINT", 13)]);
   });
 
+  test("a yes | no answer may go in a command: it's trusted", () => {
+    expect(errors(prog([ask(11, [lit("Ok?")], yesno("ok")), run(12, cmd("echo ", v("ok"))), stop(13)]))).toEqual([]);
+  });
+
   test("run output may go in question and page text", () => {
     const p = prog([run(11, DF, "used"), ask(12, [lit("Is "), v("used"), lit(" bad?")], yesno()), page(13, [v("used")])]);
     expect(errors(p)).toEqual([]);
@@ -463,6 +497,41 @@ describe("taint (SPEC §3.5)", () => {
   test("an action item may go in question text", () => {
     const body = [ask(12, [lit("Run "), v("step"), lit("?")], yesno()), ifYesDo(13, "step", skip)];
     expect(errors(prog([forEach(11, "step", "s:cleanups", body), stop(14)], CLEANUPS))).toEqual([]);
+  });
+});
+
+describe("action-item commands (SPEC §3.5)", () => {
+  const tidy = (c: J[], main: J[] = []) =>
+    prog(
+      [...main, forEach(20, "step", "s:cleanups", [doItem(21, "step")]), stop(22)],
+      {
+        "s:cleanups": data(60, [{ src: 61, action: { label: "Tidy up", cmd: c } }]),
+      },
+      { mount: { str: "/", src: 3 }, bad: { str: "a b", src: 4 } },
+    );
+
+  test("E-TAINT: an action item's command naming run output, at the item", () => {
+    expect(errors(tidy(cmd("sh -c ", v("payload")), [run(11, cmd("curl x"), "payload")]))).toEqual([E("E-TAINT", 61)]);
+  });
+
+  test("E-UNBOUND: an action item's command naming something bound nowhere, at the item", () => {
+    expect(errors(tidy(cmd("rm -rf ", v("nope"))))).toEqual([E("E-UNBOUND", 61)]);
+  });
+
+  test("E-TAINT: an action item's command naming a param something rebinds", () => {
+    expect(errors(tidy(cmd("df ", v("mount")), [run(11, DF, "mount")]))).toEqual([E("E-TAINT", 61)]);
+  });
+
+  test("E-TAINT: an action item's command naming a loop variable", () => {
+    expect(errors(tidy(cmd("echo ", v("step"))))).toEqual([E("E-TAINT", 61)]);
+  });
+
+  test("E-UNSAFE-VALUE: an action item's command naming an unsafe param default, at the default", () => {
+    expect(errors(tidy(cmd("df ", v("bad"))))).toEqual([E("E-UNSAFE-VALUE", 4)]);
+  });
+
+  test("an action item's command may name params and built-ins nothing rebinds", () => {
+    expect(errors(tidy(cmd("df ", v("mount"), " ", v("host"))))).toEqual([]);
   });
 });
 
@@ -572,6 +641,29 @@ describe("bound names (SPEC §3.5)", () => {
     expect(errors(p)).toEqual([]);
   });
 
+  test("an unreachable section's transfer doesn't weaken what a reachable one binds", () => {
+    const p = prog([run(11, DF, "y"), then(12, "s:t")], {
+      "s:u": section(20, [then(21, "s:t")]),
+      "s:t": section(30, [cmp(31, v("y"), "<", { num: "1" }), stop(32)]),
+    });
+    expect(lint(p)).toEqual({ errors: [], warnings: [E("W-SECTION-UNREACHED", 20)] });
+  });
+
+  test("E-UNBOUND: a loop variable after a transfer out of its loop", () => {
+    const p = prog([forEach(11, "svc", "s:services", [run(12, DF, undefined, ref("s:b"))]), stop(13)], {
+      ...SERVICES,
+      "s:b": section(20, [run(21, cmd("status ", v("svc"))), stop(22)]),
+    });
+    expect(errors(p)).toEqual([E("E-UNBOUND", 21)]);
+  });
+
+  test("E-UNBOUND: a loop variable that shadows a param is unbound after the loop", () => {
+    const p = prog([forEach(11, "mount", "s:services", [run(12, DF)]), run(13, cmd("df ", v("mount"))), stop(14)], SERVICES, {
+      mount: { str: "/", src: 3 },
+    });
+    expect(errors(p)).toEqual([E("E-UNBOUND", 13)]);
+  });
+
   test("a name bound inside a loop is bound after it: lists are never empty", () => {
     expect(
       errors(prog([forEach(11, "svc", "s:services", [run(12, DF, "x")]), cmp(13, v("x"), ">", { num: "1" }), stop(14)], SERVICES)),
@@ -599,8 +691,38 @@ describe("if yes (SPEC §4.2)", () => {
     expect(errors(prog([ask(11, [lit("Ok?")], yesno("ok")), run(12, DF, "ok"), ifYesRun(13, DF), stop(14)]))).toEqual([E("E-IF-YES", 13)]);
   });
 
+  test("E-IF-YES: a loop between may rebind the answer", () => {
+    const p = prog(
+      [
+        ask(11, [lit("A?")], yesno("ok"), skip),
+        forEach(12, "i", "s:services", [ask(13, [lit("B?")], yesno("ok"), skip)]),
+        ifYesRun(14, cmd("true")),
+        stop(15),
+      ],
+      SERVICES,
+    );
+    expect(errors(p)).toEqual([E("E-IF-YES", 14)]);
+  });
+
   test("if yes after a yes | no ask, with other instructions between, lints", () => {
     expect(errors(prog([ask(11, [lit("Ok?")], yesno("ok")), run(12, DF), ifYesRun(13, DF), stop(14)]))).toEqual([]);
+  });
+});
+
+describe("checks (SPEC §3.4)", () => {
+  // src/ast.ts refuses this JSON, so the statement is built directly.
+  test("E-GRAMMAR: a check with neither target nor else, at lint time", () => {
+    const { SkopAst } = gen;
+    const stmt = SkopAst.Stmt.create_Check(
+      new BigNumber(11),
+      SkopAst.Cond.create_Succeeds(_dafny.Seq.of()),
+      SkopAst.Option.create_None(),
+      SkopAst.Else.create_NoElse(),
+    );
+    const found = [...gen.SkopCheck.__default.CheckFindings(stmt)].map((e: any) =>
+      E(e.dtor_code.toVerbatimString(false), e.dtor_src.toNumber()),
+    );
+    expect(found).toEqual([E("E-GRAMMAR", 11)]);
   });
 });
 

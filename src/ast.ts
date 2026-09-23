@@ -49,15 +49,21 @@ function int(v: unknown, at: string, min = Number.NEGATIVE_INFINITY): D {
 }
 const nat = (v: unknown, at: string) => int(v, at, 0);
 
+// NAME (SPEC §3.4): every variable, binding and param.
+function name(v: unknown, at: string): D {
+  if (typeof v !== "string" || !/^[a-z_][a-z0-9_]*$/.test(v)) throw new Unsupported(`${at}: not a name: ${JSON.stringify(v)}`);
+  return str(v, at);
+}
+
 function seq<T>(v: unknown, at: string, f: (x: unknown, at: string) => T): D {
   if (!Array.isArray(v)) throw new Unsupported(`${at}: expected a list`);
   return _dafny.Seq.of(...v.map((x, i) => f(x, `${at}[${i}]`)));
 }
 
-function map(v: unknown, at: string, f: (x: unknown, at: string) => D): D {
+function map(v: unknown, at: string, f: (x: unknown, at: string) => D, key = str): D {
   if (!isObj(v)) throw new Unsupported(`${at}: expected an object`);
   let m = _dafny.Map.Empty;
-  for (const [k, x] of Object.entries(v)) m = m.update(str(k, at), f(x, `${at}.${k}`));
+  for (const [k, x] of Object.entries(v)) m = m.update(key(k, at), f(x, `${at}.${k}`));
   return m;
 }
 
@@ -67,7 +73,7 @@ const none = () => SkopAst.Option.create_None();
 function parts(v: unknown, at: string): D {
   return seq(v, at, (p, at) => {
     const [k, o] = tag(p, at, ["lit", "var"]);
-    return k === "lit" ? SkopAst.Part.create_Lit(str(o.lit, at)) : SkopAst.Part.create_Var(str(o.var, at));
+    return k === "lit" ? SkopAst.Part.create_Lit(str(o.lit, at)) : SkopAst.Part.create_Var(name(o.var, at));
   });
 }
 
@@ -102,14 +108,14 @@ function target(v: unknown, at: string): D {
 
 function doBody(v: unknown, at: string): D {
   const [k, o] = tag(v, at, ["cmd", "item"]);
-  return k === "cmd" ? SkopAst.DoBody.create_DoCmd(parts(o.cmd, `${at}.cmd`)) : SkopAst.DoBody.create_DoItem(str(o.item, at));
+  return k === "cmd" ? SkopAst.DoBody.create_DoCmd(parts(o.cmd, `${at}.cmd`)) : SkopAst.DoBody.create_DoItem(name(o.item, at));
 }
 
 const OPS: Record<string, string> = { "<": "Lt", "<=": "Le", ">": "Gt", ">=": "Ge", "==": "Eq", "!=": "Ne" };
 
 function operand(v: unknown, at: string): D {
   const [k, o] = tag(v, at, ["var", "num"]);
-  return k === "var" ? SkopAst.Operand.create_VarOp(str(o.var, at)) : SkopAst.Operand.create_Num(str(o.num, at));
+  return k === "var" ? SkopAst.Operand.create_VarOp(name(o.var, at)) : SkopAst.Operand.create_Num(str(o.num, at));
 }
 
 function cond(v: unknown, at: string): D {
@@ -133,10 +139,10 @@ function askForm(a: J, at: string): D {
         }),
       );
     case "yesno":
-      return SkopAst.AskForm.create_YesNo(str(obj(o.yesno, `${at}.yesno`, ["as"]).as, at));
+      return SkopAst.AskForm.create_YesNo(name(obj(o.yesno, `${at}.yesno`, ["as"]).as, at));
     case "one_of": {
       const x = obj(o.one_of, `${at}.one_of`, ["list", "as"]);
-      return SkopAst.AskForm.create_OneOf(ref(x.list, `${at}.one_of.list`), str(x.as, at));
+      return SkopAst.AskForm.create_OneOf(ref(x.list, `${at}.one_of.list`), name(x.as, at));
     }
     default: {
       const x = obj(o.score, `${at}.score`, ["low", "high", "rubric", "as"]);
@@ -144,7 +150,7 @@ function askForm(a: J, at: string): D {
         const r = obj(y, at, ["src", "level", "text"]);
         return SkopAst.RubricLine.create_RubricLine(nat(r.src, at), int(r.level, at), str(r.text, at));
       });
-      return SkopAst.AskForm.create_Score(int(x.low, at), int(x.high, at), rubric, str(x.as, at));
+      return SkopAst.AskForm.create_Score(int(x.low, at), int(x.high, at), rubric, name(x.as, at));
     }
   }
 }
@@ -161,7 +167,7 @@ function stmt(v: unknown, at: string): D {
       return SkopAst.Stmt.create_Run(
         src,
         parts(r.cmd, `${where}.run.cmd`),
-        "as" in r ? some(str(r.as, where)) : none(),
+        "as" in r ? some(name(r.as, where)) : none(),
         els(s.else, `${where}.else`),
       );
     }
@@ -169,6 +175,8 @@ function stmt(v: unknown, at: string): D {
       return SkopAst.Stmt.create_Do(src, doBody(s.do, `${where}.do`), els(s.else, `${where}.else`));
     case "check": {
       const c = obj(s.check, `${where}.check`, ["cond", "then", "else"]);
+      // SPEC §3.4: `check COND` needs a target, an else, or both.
+      if (c.then === null && c.else === null) throw new Unsupported(`${where}: a check needs a target or an else`);
       const onTrue = c.then === null ? none() : some(target(c.then, `${where}.check.then`));
       return SkopAst.Stmt.create_Check(src, cond(c.cond, `${where}.check.cond`), onTrue, els(c.else, `${where}.check.else`));
     }
@@ -188,7 +196,7 @@ function stmt(v: unknown, at: string): D {
       const f = obj(s.for_each, `${where}.for_each`, ["var", "list", "body"]);
       return SkopAst.Stmt.create_ForEach(
         src,
-        str(f.var, where),
+        name(f.var, where),
         ref(f.list, `${where}.for_each.list`),
         seq(f.body, `${where}.for_each.body`, stmt),
       );
@@ -254,7 +262,7 @@ export function toAst(json: CoreProgram | unknown): D {
   return SkopAst.Program.create_Program(
     str(p.skill, "skill"),
     SkopAst.Entry.create_Entry(str(e.section, "entry"), nat(e.src, "entry.src")),
-    map(p.params, "params", param),
+    map(p.params, "params", param, name),
     SkopAst.Limits.create_Limits(
       nat(l.run_timeout_ms, "limits"),
       nat(l.do_timeout_ms, "limits"),

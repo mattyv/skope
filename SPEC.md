@@ -2083,6 +2083,10 @@ Also, where things live in the Markdown:
 - **Standalone binaries and `install.sh`** (§5.5), so skop can run on a
   machine without Node. The installer checks each download against the
   release's `SHA256SUMS`.
+- **Unreachable sections aren't flow-checked:** they get
+  `W-SECTION-UNREACHED`, but no `E-UNBOUND` or `E-TAINT`, since no path
+  reaches them, and their transfers don't affect what reachable sections
+  may assume. A `check` with neither a target nor an else is `E-GRAMMAR`.
 - **Action-item commands are checked:** they may interpolate only params
   and built-ins that nothing rebinds (§3.5). Yes/no answers are trusted
   values. A loop variable is dropped when its loop ends or a transfer

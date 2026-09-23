@@ -62,30 +62,64 @@ module SkopCheck {
   }
 
   function Lint(p: Program): seq<LintError> {
-    Sorted(Errors(p))
+    Sorted(Errors(p, Analyse(p)))
   }
 
-  function Errors(p: Program): set<LintError> {
-    var cycles := CycleErrs(p);
-    EntryErrs(p) + RefErrs(p) + ListErrs(p) + cycles + StructErrs(p) + AskErrs(p) + NameErrs(p)
+  function Warnings(p: Program): seq<LintError> {
+    Sorted(WarningsWith(p, Analyse(p)))
+  }
+
+  // Both at once, sharing one analysis: what src/lint.ts calls.
+  function LintAll(p: Program): (seq<LintError>, seq<LintError>) {
+    var f := Analyse(p);
+    (Sorted(Errors(p, f)), Sorted(WarningsWith(p, f)))
+  }
+
+  // What several checks share, computed once.
+  datatype Facts = Facts(reach: map<SectionId, set<SectionId>>, In: map<SectionId, Env>)
+
+  function Analyse(p: Program): Facts {
+    var reach := Reaches(p);
+    Facts(reach, InEnvs(p, reach))
+  }
+
+  function Errors(p: Program, f: Facts): set<LintError> {
+    var cycles := CycleErrs(p, f.reach);
+    var actions := ActionErrs(p);
+    EntryErrs(p) + RefErrs(p) + ListErrs(p) + cycles + StructErrs(p) + ChecksErrs(p) + AskErrs(p)
+    + NameErrs(p) + actions
     // Bindings flow along transfers, so they're only followed once the
     // transfer graph is known to be acyclic.
-    + (if cycles == {} then FlowErrs(p) else {})
+    + (if cycles == {} then FlowErrs(p, f.In, actions == {}) else {})
   }
 
-  lemma LintSound(p: Program)
+  // Split per check, so each fact verifies on its own.
+  lemma {:vcs_split_on_every_assert} LintSound(p: Program)
     ensures Lint(p) == [] ==> WellFormed(p)
   {
     if Lint(p) == [] {
-      assert Errors(p) == {};
+      var f := Analyse(p);
+      assert Errors(p, f) == {};
+      assert EntryErrs(p) == {};
+      assert RefErrs(p) == {};
+      assert ListErrs(p) == {};
+      assert CycleErrs(p, f.reach) == {};
+      assert StructErrs(p) == {};
+      assert ChecksErrs(p) == {};
+      assert AskErrs(p) == {};
+      assert NameErrs(p) == {};
+      assert ActionErrs(p) == {};
+      assert FlowErrs(p, f.In, true) == {};
       EntrySound(p);
       RefsSound(p);
       ListsSound(p);
       CycleSound(p);
       StructSound(p);
+      ChecksSound(p);
       AsksSound(p);
       NamesSound(p);
-      FlowSound(p);
+      ActionSound(p);
+      FlowSound(p, f.In);
     }
   }
 
@@ -155,8 +189,19 @@ module SkopCheck {
   function DataListErrs(l: List): set<LintError> {
     if |l.items| == 0 then {Err("E-LIST-EMPTY", l.src)}
     else
-      (set i <- l.items | i.Action? != l.items[0].Action? :: Err("E-LIST-MIXED", i.src))
+      (var odd := MinorityIsAction(l.items);
+       if forall i <- l.items :: i.Action? == l.items[0].Action? then {}
+       else set i <- l.items | i.Action? == odd :: Err("E-LIST-MIXED", i.src))
       + (set a, b | 0 <= a < b < |l.items| && Lower(Label(l.items[a])) == Lower(Label(l.items[b])) :: Err("E-LIST-DUP", l.items[b].src))
+  }
+
+  // In a mixed list, the kind fewer items have; on a tie, the kind the
+  // first item doesn't have.
+  function MinorityIsAction(items: seq<Item>): bool
+    requires |items| > 0
+  {
+    var actions := |set k | 0 <= k < |items| && items[k].Action?|;
+    if 2 * actions == |items| then !items[0].Action? else 2 * actions < |items|
   }
 
   function StmtListErrs(p: Program, s: Stmt): set<LintError> {
@@ -180,8 +225,10 @@ module SkopCheck {
     ensures DataListOk(l)
   {
     if |l.items| > 0 {
-      forall i | i in l.items ensures i.Action? == l.items[0].Action? {
-        if i.Action? != l.items[0].Action? { assert Err("E-LIST-MIXED", i.src) in DataListErrs(l); }
+      if exists i <- l.items :: i.Action? != l.items[0].Action? {
+        var i :| i in l.items && i.Action? != l.items[0].Action?;
+        var odd := if i.Action? == MinorityIsAction(l.items) then i else l.items[0];
+        assert Err("E-LIST-MIXED", odd.src) in DataListErrs(l);
       }
       forall a, b | 0 <= a < b < |l.items| ensures Lower(Label(l.items[a])) != Lower(Label(l.items[b])) {
         if Lower(Label(l.items[a])) == Lower(Label(l.items[b])) { assert Err("E-LIST-DUP", l.items[b].src) in DataListErrs(l); }
@@ -235,20 +282,28 @@ module SkopCheck {
     if flat[0] != s { InAllJumps(flat[1..], s, j); }
   }
 
-  function Succs(p: Program, v: set<SectionId>): set<SectionId> {
-    set id, t | id in v && IsInstr(p, id) && t in Succ(p, id) :: t
+  function SuccMap(p: Program): map<SectionId, set<SectionId>> {
+    var ids := Ids(p);
+    map id | id in ids :: Succ(p, id)
   }
 
-  // The sections reachable from v, v included.
-  function Closure(p: Program, v: set<SectionId>): set<SectionId>
-    requires v <= Ids(p)
+  // The sections reachable from v: a breadth-first search, where only
+  // `frontier`'s successors can be new.
+  function Closure(p: Program, succ: map<SectionId, set<SectionId>>, v: set<SectionId>, frontier: set<SectionId>): set<SectionId>
+    requires succ == SuccMap(p) && frontier <= v <= Ids(p)
     decreases |Ids(p) - v|
   {
-    var n := v + Succs(p, v);
-    if n == v then v
+    var n := (set id, t | id in frontier && t in succ[id] :: t) - v;
+    if n == {} then v
     else
-      Smaller(Ids(p) - n, Ids(p) - v);
-      Closure(p, n)
+      Smaller(Ids(p) - (v + n), Ids(p) - v);
+      Closure(p, succ, v + n, n)
+  }
+
+  function Reach(p: Program, succ: map<SectionId, set<SectionId>>, id: SectionId): set<SectionId>
+    requires succ == SuccMap(p) && IsInstr(p, id)
+  {
+    Closure(p, succ, {id}, {id})
   }
 
   lemma Smaller<T>(a: set<T>, b: set<T>)
@@ -262,32 +317,46 @@ module SkopCheck {
     forall id | id in c && IsInstr(p, id) :: Succ(p, id) <= c
   }
 
-  // Closure(p, v) is the least closed set containing v.
-  lemma ClosureLeast(p: Program, v: set<SectionId>)
-    requires v <= Ids(p)
-    ensures v <= Closure(p, v) && Closed(p, Closure(p, v))
-    ensures forall c | v <= c && Closed(p, c) :: Closure(p, v) <= c
+  // Closure is the least closed set containing v.
+  lemma ClosureLeast(p: Program, succ: map<SectionId, set<SectionId>>, v: set<SectionId>, frontier: set<SectionId>)
+    requires succ == SuccMap(p) && frontier <= v <= Ids(p)
+    requires forall id | id in v - frontier :: Succ(p, id) <= v
+    ensures v <= Closure(p, succ, v, frontier) && Closed(p, Closure(p, succ, v, frontier))
+    ensures forall c | v <= c && Closed(p, c) :: Closure(p, succ, v, frontier) <= c
     decreases |Ids(p) - v|
   {
-    var n := v + Succs(p, v);
-    if n == v {
-      forall id | id in v && IsInstr(p, id) ensures Succ(p, id) <= v {
-        forall t | t in Succ(p, id) ensures t in v { assert t in Succs(p, v); }
-      }
-    } else {
-      Smaller(Ids(p) - n, Ids(p) - v);
-      ClosureLeast(p, n);
-      forall c | v <= c && Closed(p, c) ensures n <= c {
-        forall t | t in Succs(p, v) ensures t in c {
-          var id :| id in v && IsInstr(p, id) && t in Succ(p, id);
+    var n := (set id, t | id in frontier && t in succ[id] :: t) - v;
+    forall id | id in frontier ensures Succ(p, id) <= v + n {
+      forall t | t in Succ(p, id) ensures t in v + n { assert t in succ[id]; }
+    }
+    if n != {} {
+      Smaller(Ids(p) - (v + n), Ids(p) - v);
+      ClosureLeast(p, succ, v + n, n);
+      forall c | v <= c && Closed(p, c) ensures v + n <= c {
+        forall t | t in n ensures t in c {
+          var id :| id in frontier && t in succ[id];
         }
       }
     }
   }
 
+  lemma ReachLeast(p: Program, id: SectionId)
+    requires IsInstr(p, id)
+    ensures id in Reach(p, SuccMap(p), id) && Closed(p, Reach(p, SuccMap(p), id))
+    ensures forall c | id in c && Closed(p, c) :: Reach(p, SuccMap(p), id) <= c
+  {
+    ClosureLeast(p, SuccMap(p), {id}, {id});
+  }
+
+  // What each instruction section reaches, itself included.
+  function Reaches(p: Program): map<SectionId, set<SectionId>> {
+    var ids := Ids(p);
+    var succ := SuccMap(p);
+    map id | id in ids :: Reach(p, succ, id)
+  }
+
   // A transfer is on a cycle when its source is reachable from its target.
-  function CycleErrs(p: Program): set<LintError> {
-    var reach := Reaches(p);
+  function CycleErrs(p: Program, reach: map<SectionId, set<SectionId>>): set<LintError> {
     var jumps := SectionJumps(p);
     set id, j | id in jumps && j in jumps[id] && j.ref.id in reach && id in reach[j.ref.id] :: Err("E-CYCLE", j.src)
   }
@@ -297,34 +366,29 @@ module SkopCheck {
     map id | id in ids :: AllJumps(Flat(Body(p, id)))
   }
 
-  // What each instruction section reaches.
-  function Reaches(p: Program): map<SectionId, set<SectionId>> {
-    var ids := Ids(p);
-    map id | id in ids :: Closure(p, {id})
-  }
-
   // The rank that witnesses Acyclic: how many sections are reachable.
-  function Ranks(p: Program): map<SectionId, nat> {
-    var reach := Reaches(p);
+  function Ranks(reach: map<SectionId, set<SectionId>>): map<SectionId, nat> {
     map id | id in reach :: |reach[id]|
   }
 
   lemma CycleSound(p: Program)
-    requires CycleErrs(p) == {}
+    requires CycleErrs(p, Reaches(p)) == {}
     ensures Acyclic(p)
   {
-    var rank := Ranks(p);
+    var reach := Reaches(p);
+    var rank := Ranks(reach);
     forall id, s, j | IsInstr(p, id) && s in Flat(Body(p, id)) && j in Jumps(s) && IsInstr(p, j.ref.id)
       ensures rank[j.ref.id] < rank[id]
     {
       var t := j.ref.id;
+      assert id in Ids(p) && t in Ids(p);
       InAllJumps(Flat(Body(p, id)), s, j);
-      assert j in SectionJumps(p)[id] && Reaches(p)[t] == Closure(p, {t});
-      if id in Closure(p, {t}) { assert Err("E-CYCLE", j.src) in CycleErrs(p); }
-      ClosureLeast(p, {id});
-      ClosureLeast(p, {t});
+      assert j in SectionJumps(p)[id];
+      if id in reach[t] { assert Err("E-CYCLE", j.src) in CycleErrs(p, reach); }
+      ReachLeast(p, id);
+      ReachLeast(p, t);
       assert t in Succ(p, id);
-      Smaller(Closure(p, {t}), Closure(p, {id}));
+      Smaller(reach[t], reach[id]);
     }
     assert Ranked(p, rank);
   }
@@ -380,6 +444,25 @@ module SkopCheck {
         if e :| e in DeadErrs(s.body) { InUnionSeq(Flat(Body(p, id)), LoopDead, s, e); assert e in errs; }
         DeadSound(s.body);
       }
+    }
+  }
+
+  // ---- checks ----
+
+  function CheckFindings(s: Stmt): set<LintError> {
+    if s.Check? && s.onTrue.None? && s.els.NoElse? then {Err("E-GRAMMAR", s.src)} else {}
+  }
+
+  function ChecksErrs(p: Program): set<LintError> {
+    OverStmts(p, CheckFindings)
+  }
+
+  lemma ChecksSound(p: Program)
+    requires ChecksErrs(p) == {}
+    ensures ChecksOk(p)
+  {
+    forall s | s in Stmts(p) && s.Check? ensures s.onTrue.Some? || !s.els.NoElse? {
+      if s.onTrue.None? && s.els.NoElse? { InOverStmts(p, CheckFindings, s, Err("E-GRAMMAR", s.src)); }
     }
   }
 
@@ -464,18 +547,63 @@ module SkopCheck {
     }
   }
 
+  // ---- action-item commands ----
+
+  // At the item's line: a name bound nowhere is E-UNBOUND, a rebound one
+  // E-TAINT; an unsafe param default is E-UNSAFE-VALUE at the default.
+  function ActionVarErrs(p: Program, rebound: set<Name>, y: Name, src: Src): set<LintError> {
+    if y !in p.params.Keys + Builtins then {Err(if y in rebound then "E-TAINT" else "E-UNBOUND", src)}
+    else if y in rebound then {Err("E-TAINT", src)}
+    else if y in p.params && !SafeParam(p.params[y]) then {Err("E-UNSAFE-VALUE", p.params[y].src)}
+    else {}
+  }
+
+  function ActionFindings(p: Program, rebound: set<Name>): Stmt -> set<LintError> {
+    (s: Stmt) => if s.ForEach? && IsData(p, s.list.id)
+         then set i, y, e | i in DataList(p, s.list.id).items && i.Action? && y in PartVars(i.cmd)
+                            && e in ActionVarErrs(p, rebound, y, i.src) :: e
+         else {}
+  }
+
+  function ActionErrs(p: Program): set<LintError> {
+    OverStmts(p, ActionFindings(p, Rebound(p)))
+  }
+
+  lemma ActionSound(p: Program)
+    requires ActionErrs(p) == {}
+    ensures ActionCmdsOk(p)
+  {
+    var rebound := Rebound(p);
+    forall s, i, y | s in Stmts(p) && s.ForEach? && IsData(p, s.list.id) && i in DataList(p, s.list.id).items
+                     && i.Action? && y in PartVars(i.cmd)
+      ensures y in p.params.Keys + Builtins && y !in rebound && (y in p.params ==> SafeParam(p.params[y]))
+    {
+      var errs := ActionVarErrs(p, rebound, y, i.src);
+      if e :| e in errs { InOverStmts(p, ActionFindings(p, rebound), s, e); }
+    }
+  }
+
   // ---- bound names, taint and kinds, along every path ----
 
-  // The env each transfer carries, with its target.
-  function Outs(p: Program, body: seq<Stmt>, e: Env, lv: set<Name>): set<(SectionId, Env)>
+  // The envs transfers carry, by target.
+  type Incoming = map<SectionId, set<Env>>
+
+  function AddIn(a: Incoming, b: Incoming): Incoming {
+    map t | t in a.Keys + b.Keys :: (if t in a then a[t] else {}) + (if t in b then b[t] else {})
+  }
+
+  function Outs(p: Program, body: seq<Stmt>, e: Env, lv: set<Name>): Incoming
     decreases body
   {
-    if |body| == 0 then {}
+    if |body| == 0 then map[]
     else
       var s := body[0];
-      (var jumps := Jumps(s); var out := Forget(e, lv + BindingSet(s)); set j <- jumps :: (j.ref.id, out))
-      + (if s.ForEach? then Outs(p, s.body, LoopEntry(p, s, e), lv + {s.loopVar}) else {})
-      + Outs(p, body[1..], After(p, s, e), lv)
+      var jumps := Jumps(s);
+      var out := Forget(e, lv + BindingSet(s));
+      var targets := set j | j in jumps :: j.ref.id;
+      var here := map t | t in targets :: {out};
+      AddIn(AddIn(here, if s.ForEach? then Outs(p, s.body, LoopEntry(p, s, e), lv + {s.loopVar}) else map[]),
+            Outs(p, body[1..], After(p, s, e), lv))
   }
 
   // What holds on every one of es: bound on all, any kind any allows.
@@ -485,33 +613,44 @@ module SkopCheck {
         map x | x in names :: set e, k | e in es && x in e.kinds && k in e.kinds[x] :: k)
   }
 
-  // The env on entry to each section, a layer at a time: a section's rank
-  // is above every section it transfers to, so its predecessors are done
-  // first. A section nothing transfers to starts like the entry.
-  // Returns the envs so far, and what their sections' transfers carry.
-  function InLayers(p: Program, rank: map<SectionId, nat>, n: nat, k: nat): (map<SectionId, Env>, set<(SectionId, Env)>)
+  // The env on entry to each section the entry reaches, a layer at a time:
+  // a section's rank is above every section it transfers to, so its
+  // predecessors are done first. Unreachable sections' transfers don't
+  // count: no run takes them. Returns the envs so far, and what their
+  // sections' transfers carry.
+  function InLayers(p: Program, byRank: map<nat, set<SectionId>>, n: nat, k: nat): (map<SectionId, Env>, Incoming)
     decreases n + 1 - k
   {
-    if k > n then (map[], {})
+    if k > n then (map[], map[])
     else
-      var (done, outs) := InLayers(p, rank, n, k + 1);
-      var layer := map t | t in rank && rank[t] == k ::
-        var es := (set o | o in outs && o.0 == t :: o.1) + (if t == p.entry.section then {EntryEnv(p)} else {});
+      var (done, incoming) := InLayers(p, byRank, n, k + 1);
+      if k !in byRank then (done, incoming)
+      else
+      var layer := map t | t in byRank[k] ::
+        var es := (if t in incoming then incoming[t] else {}) + (if t == p.entry.section then {EntryEnv(p)} else {});
         if es == {} then EntryEnv(p) else Meet(es);
-      var more := set t, o | t in layer && IsInstr(p, t) && o in Outs(p, Body(p, t), layer[t], {}) :: o;
-      (done + layer, outs + more)
+      var outsOf := map t | t in layer && IsInstr(p, t) :: Outs(p, Body(p, t), layer[t], {});
+      var targets := set u, t | u in outsOf && t in outsOf[u] :: t;
+      var more := map t | t in targets :: set u, e | u in outsOf && t in outsOf[u] && e in outsOf[u][t] :: e;
+      (done + layer, AddIn(incoming, more))
   }
 
-  function InEnvs(p: Program): map<SectionId, Env> {
-    var layers := InLayers(p, Ranks(p), |Ids(p)|, 1).0;
-    map id | id in Ids(p) :: if id in layers then layers[id] else EntryEnv(p)
+  // The layers' order and choices aren't proved: FlowErrs checks every
+  // transfer against the result.
+  function InEnvs(p: Program, reach: map<SectionId, set<SectionId>>): map<SectionId, Env> {
+    var live := if p.entry.section in reach then reach[p.entry.section] else {};
+    var rank := map id | id in live && id in reach :: |reach[id]|;
+    var ranks := set id | id in rank :: rank[id];
+    var byRank := map k | k in ranks :: set id | id in rank && rank[id] == k;
+    var layers := InLayers(p, byRank, |live|, 1).0;
+    map id | id in live :: if id in layers then layers[id] else EntryEnv(p)
   }
 
   function CmdVarErrs(p: Program, e: Env, x: Name, src: Src): set<LintError> {
     var ks := KindsOf(e, x);
     (if x !in e.bound then {Err("E-UNBOUND", src)} else {})
     + (if KRun in ks then {Err("E-TAINT", src)} else {})
-    + (if KAction in ks then {Err("E-ACTION-IN-CMD", src)} else {})
+    + (if exists k <- ks :: k.KAction? then {Err("E-ACTION-IN-CMD", src)} else {})
     + (if KParam in ks && !(x in p.params && SafeParam(p.params[x]))
        then {Err("E-UNSAFE-VALUE", if x in p.params then p.params[x].src else src)} else {})
     + (set k, i | k in ks && k.KValue? && IsData(p, k.list) && i in DataList(p, k.list).items && i.Value? && !SafeValue(i.value)
@@ -521,35 +660,47 @@ module SkopCheck {
   // The transfer checks can't fail when `In` comes from InEnvs, since each
   // target's env is the meet of what its transfers carry. They're checked
   // anyway, so the proof needn't follow the layering.
-  function StmtErrs(p: Program, In: map<SectionId, Env>, s: Stmt, e: Env, lv: set<Name>, gov: Option<Name>): set<LintError>
+  function StmtErrs(p: Program, act: bool, In: map<SectionId, Env>, s: Stmt, e: Env, lv: set<Name>, gov: Option<Name>): set<LintError>
     decreases s, 1
   {
     (set x, err | x in CmdVars(s) && err in CmdVarErrs(p, e, x, s.src) :: err)
     + (set x | x in OperandVars(s) && x !in e.bound :: Err("E-UNBOUND", s.src))
     + (set x | x in DoItems(s) && x !in e.bound :: Err("E-UNBOUND", s.src))
-    + (set x | x in DoItems(s) && x in e.bound && KindsOf(e, x) != {KAction} :: Err("E-LIST-KIND", s.src))
+    + (set x, k | x in DoItems(s) && k in KindsOf(e, x) && !k.KAction? :: Err("E-LIST-KIND", s.src))
+    // The item's own command runs here. Checked at the item's line only
+    // when ActionErrs found nothing there: it reports the same problems.
+    + (set x, k, err | act && x in DoItems(s) && k in KindsOf(e, x) && k.KAction? && err in DoneCmdErrs(p, e, k.list) :: err)
     + (if (s.IfYesRun? || s.IfYesDo?) && !(gov.Some? && gov.value in e.bound && KindsOf(e, gov.value) == {KYesNo})
        then {Err("E-IF-YES", s.src)} else {})
     + (var jumps := Jumps(s); var out := Forget(e, lv + BindingSet(s));
        set j | j in jumps && j.ref.id in In && !Approx(In[j.ref.id], out) :: Err("E-UNBOUND", j.src))
-    + (if s.ForEach? then SeqErrs(p, In, s.body, LoopEntry(p, s, e), lv + {s.loopVar}, None) else {})
+    + (if !s.ForEach? then {}
+       // Reported by ListErrs and RefErrs too; the same findings, so once.
+       else if !IsData(p, s.list.id) then ListRefErrs(p, s.list, s.src)
+       else if |DataList(p, s.list.id).items| == 0 then DataListErrs(DataList(p, s.list.id))
+       else SeqErrs(p, act, In, s.body, LoopEntry(p, s, e), lv + {s.loopVar}, None))
   }
 
-  function SeqErrs(p: Program, In: map<SectionId, Env>, body: seq<Stmt>, e: Env, lv: set<Name>, gov: Option<Name>): set<LintError>
+  function DoneCmdErrs(p: Program, e: Env, list: SectionId): set<LintError> {
+    if IsData(p, list)
+    then set i, y, err | i in DataList(p, list).items && i.Action? && y in PartVars(i.cmd) && err in CmdVarErrs(p, e, y, i.src) :: err
+    else {}
+  }
+
+  function SeqErrs(p: Program, act: bool, In: map<SectionId, Env>, body: seq<Stmt>, e: Env, lv: set<Name>, gov: Option<Name>): set<LintError>
     decreases body, 0
   {
     if |body| == 0 then {}
-    else StmtErrs(p, In, body[0], e, lv, gov) + SeqErrs(p, In, body[1..], After(p, body[0], e), lv, NextGov(body[0], gov))
+    else StmtErrs(p, act, In, body[0], e, lv, gov) + SeqErrs(p, act, In, body[1..], After(p, body[0], e), lv, NextGov(body[0], gov))
   }
 
-  function FlowErrs(p: Program): set<LintError> {
-    var In := InEnvs(p);
-    OverSections(p, FlowOf(p, In))
+  function FlowErrs(p: Program, In: map<SectionId, Env>, act: bool): set<LintError> {
+    OverSections(p, FlowOf(p, In, act))
     + (if p.entry.section in In && !Approx(In[p.entry.section], EntryEnv(p)) then {Err("E-UNBOUND", p.entry.src)} else {})
   }
 
-  function FlowOf(p: Program, In: map<SectionId, Env>): SectionId -> set<LintError> {
-    id => if IsInstr(p, id) && id in In then SeqErrs(p, In, Body(p, id), In[id], {}, None) else {}
+  function FlowOf(p: Program, In: map<SectionId, Env>, act: bool): SectionId -> set<LintError> {
+    id => if IsInstr(p, id) && id in In then SeqErrs(p, act, In, Body(p, id), In[id], {}, None) else {}
   }
 
   ghost predicate JumpsIn(In: map<SectionId, Env>, body: seq<Stmt>) {
@@ -568,46 +719,70 @@ module SkopCheck {
   lemma StmtSound(p: Program, In: map<SectionId, Env>, s: Stmt, e: Env, lv: set<Name>, gov: Option<Name>)
     requires forall j <- Jumps(s) :: j.ref.id in In
     requires s.ForEach? ==> JumpsIn(In, s.body)
-    requires StmtErrs(p, In, s, e, lv, gov) == {}
+    requires StmtErrs(p, true, In, s, e, lv, gov) == {}
     ensures StmtOk(p, In, s, e, lv, gov)
     decreases s, 1
   {
-    var errs := StmtErrs(p, In, s, e, lv, gov);
+    var errs := StmtErrs(p, true, In, s, e, lv, gov);
     forall x | x in CmdVars(s) ensures CmdVarOk(p, e, x) {
       if err :| err in CmdVarErrs(p, e, x, s.src) { assert err in errs; }
-      var ks := KindsOf(e, x);
-      if x !in e.bound { assert Err("E-UNBOUND", s.src) in CmdVarErrs(p, e, x, s.src); }
-      if KRun in ks { assert Err("E-TAINT", s.src) in CmdVarErrs(p, e, x, s.src); }
-      if KAction in ks { assert Err("E-ACTION-IN-CMD", s.src) in CmdVarErrs(p, e, x, s.src); }
-      if KParam in ks && !(x in p.params && SafeParam(p.params[x])) {
-        assert Err("E-UNSAFE-VALUE", if x in p.params then p.params[x].src else s.src) in CmdVarErrs(p, e, x, s.src);
-      }
-      forall k | k in ks && k.KValue? ensures ValuesSafe(p, k.list) {
-        if IsData(p, k.list) {
-          forall i | i in DataList(p, k.list).items && i.Value? ensures SafeValue(i.value) {
-            if !SafeValue(i.value) { assert Err("E-UNSAFE-VALUE", i.src) in CmdVarErrs(p, e, x, s.src); }
-          }
-        }
-      }
+      CmdVarSound(p, e, x, s.src);
     }
     forall x | x in OperandVars(s) ensures x in e.bound {
       if x !in e.bound { assert Err("E-UNBOUND", s.src) in errs; }
     }
-    forall x | x in DoItems(s) ensures x in e.bound && KindsOf(e, x) == {KAction} {
+    forall x | x in DoItems(s)
+      ensures x in e.bound
+      ensures forall k <- KindsOf(e, x) :: k.KAction? && forall y <- ActionVars(p, k.list) :: CmdVarOk(p, e, y)
+    {
       if x !in e.bound { assert Err("E-UNBOUND", s.src) in errs; }
-      else if KindsOf(e, x) != {KAction} { assert Err("E-LIST-KIND", s.src) in errs; }
+      forall k | k in KindsOf(e, x) ensures k.KAction? && forall y <- ActionVars(p, k.list) :: CmdVarOk(p, e, y) {
+        if !k.KAction? { assert Err("E-LIST-KIND", s.src) in errs; }
+        else {
+          forall y | y in ActionVars(p, k.list) ensures CmdVarOk(p, e, y) {
+            var i :| i in DataList(p, k.list).items && i.Action? && y in PartVars(i.cmd);
+            if err :| err in CmdVarErrs(p, e, y, i.src) { assert err in DoneCmdErrs(p, e, k.list); assert err in errs; }
+            CmdVarSound(p, e, y, i.src);
+          }
+        }
+      }
     }
     forall j | j in Jumps(s) ensures Approx(In[j.ref.id], Forget(e, lv + BindingSet(s))) {
       if !Approx(In[j.ref.id], Forget(e, lv + BindingSet(s))) { assert Err("E-UNBOUND", j.src) in errs; }
     }
     if s.ForEach? {
+      if !IsData(p, s.list.id) {
+        assert ListRefErrs(p, s.list, s.src) != {};
+      } else if |DataList(p, s.list.id).items| == 0 {
+        assert Err("E-LIST-EMPTY", DataList(p, s.list.id).src) in errs;
+      }
       SeqSound(p, In, s.body, LoopEntry(p, s, e), lv + {s.loopVar}, None);
+    }
+  }
+
+  lemma CmdVarSound(p: Program, e: Env, x: Name, src: Src)
+    requires CmdVarErrs(p, e, x, src) == {}
+    ensures CmdVarOk(p, e, x)
+  {
+    var errs := CmdVarErrs(p, e, x, src);
+    if x !in e.bound { assert Err("E-UNBOUND", src) in errs; }
+    forall k | k in KindsOf(e, x) ensures CmdKindOk(p, x, k) {
+      if k.KRun? { assert Err("E-TAINT", src) in errs; }
+      if k.KAction? { assert Err("E-ACTION-IN-CMD", src) in errs; }
+      if k == KParam && !(x in p.params && SafeParam(p.params[x])) {
+        assert Err("E-UNSAFE-VALUE", if x in p.params then p.params[x].src else src) in errs;
+      }
+      if k.KValue? && IsData(p, k.list) {
+        forall i | i in DataList(p, k.list).items && i.Value? ensures SafeValue(i.value) {
+          if !SafeValue(i.value) { assert Err("E-UNSAFE-VALUE", i.src) in errs; }
+        }
+      }
     }
   }
 
   lemma SeqSound(p: Program, In: map<SectionId, Env>, body: seq<Stmt>, e: Env, lv: set<Name>, gov: Option<Name>)
     requires JumpsIn(In, body)
-    requires SeqErrs(p, In, body, e, lv, gov) == {}
+    requires SeqErrs(p, true, In, body, e, lv, gov) == {}
     ensures SeqOk(p, In, body, e, lv, gov)
     decreases body, 0
   {
@@ -618,41 +793,47 @@ module SkopCheck {
     }
   }
 
-  lemma FlowSound(p: Program)
+  lemma FlowSound(p: Program, In: map<SectionId, Env>)
     requires EntryOk(p) && RefsOk(p)
-    requires CycleErrs(p) == {} && FlowErrs(p) == {}
+    requires In == InEnvs(p, Reaches(p)) && FlowErrs(p, In, true) == {}
     ensures FlowOk(p)
   {
-    var In := InEnvs(p);
-    forall id | IsInstr(p, id) ensures id in In && SeqOk(p, In, Body(p, id), In[id], {}, None) {
-      assert id in Ids(p);
+    var reach := Reaches(p);
+    var entry := p.entry.section;
+    assert entry in Ids(p);
+    ReachLeast(p, entry);
+    var live := reach[entry];
+    forall id | id in In ensures IsInstr(p, id) && SeqOk(p, In, Body(p, id), In[id], {}, None) {
+      assert id in live && id in Ids(p);
       forall s, j | s in Flat(Body(p, id)) && j in Jumps(s) ensures j.ref.id in In {
         assert s in Stmts(p);
         assert IsInstr(p, j.ref.id);
+        InAllJumps(Flat(Body(p, id)), s, j);
+        assert j.ref.id in Succ(p, id);
       }
-      if err :| err in SeqErrs(p, In, Body(p, id), In[id], {}, None) { InOverSections(p, FlowOf(p, In), id, err); }
+      if err :| err in SeqErrs(p, true, In, Body(p, id), In[id], {}, None) { InOverSections(p, FlowOf(p, In, true), id, err); }
       SeqSound(p, In, Body(p, id), In[id], {}, None);
     }
-    assert p.entry.section in Ids(p);
     assert FlowOkWith(p, In);
   }
 
   // ---- warnings ----
 
-  function Warnings(p: Program): seq<LintError> {
-    Sorted(UnreachedWarns(p) + NoGuidanceWarns(p) + ScoreWarns(p)
-           + (if CycleErrs(p) == {} then NoContextWarns(p) else {}))
+  function WarningsWith(p: Program, f: Facts): set<LintError> {
+    UnreachedWarns(p, f.reach) + NoGuidanceWarns(p) + ScoreWarns(p, f.reach)
+    + (if CycleErrs(p, f.reach) == {} then NoContextWarns(p, f.In) else {})
   }
 
   // No chain of transfers from the entry reaches the section.
-  function UnreachedWarns(p: Program): set<LintError> {
-    if !IsInstr(p, p.entry.section) then {}
+  function UnreachedWarns(p: Program, reach: map<SectionId, set<SectionId>>): set<LintError> {
+    if p.entry.section !in reach then {}
     else
-      var reached := Closure(p, {p.entry.section});
-      set id | id in Ids(p) && id !in reached :: Err("W-SECTION-UNREACHED", p.sections[id].src)
+      var reached := reach[p.entry.section];
+      set id | id in reach && id in p.sections && id !in reached :: Err("W-SECTION-UNREACHED", p.sections[id].src)
   }
 
-  // A section offered as an option has no guidance to describe it.
+  // A section offered as an option has no guidance to describe it. At the
+  // section's heading, where the fix goes, once however many asks offer it.
   function NoGuidanceWarns(p: Program): set<LintError> {
     var stmts := Stmts(p);
     set s, o | s in stmts && s.Ask? && s.form.Sections? && o in s.form.options && IsInstr(p, o.ref.id)
@@ -671,8 +852,7 @@ module SkopCheck {
       + NoContext(p, body[1..], After(p, s, e))
   }
 
-  function NoContextWarns(p: Program): set<LintError> {
-    var In := InEnvs(p);
+  function NoContextWarns(p: Program, In: map<SectionId, Env>): set<LintError> {
     OverSections(p, id => if IsInstr(p, id) && id in In then NoContext(p, Body(p, id), In[id]) else {})
   }
 
@@ -701,26 +881,26 @@ module SkopCheck {
 
   // For each Score ask, the statements that name its variable afterwards:
   // later in its section, or in any section reachable from it.
-  function ScoreWarns(p: Program): set<LintError> {
-    OverSections(p, id => if IsInstr(p, id) then ScoreWarnsIn(p, id, Flat(Body(p, id)), 0) else {})
+  function ScoreWarns(p: Program, reach: map<SectionId, set<SectionId>>): set<LintError> {
+    OverSections(p, id => if IsInstr(p, id) && id in reach then ScoreWarnsIn(p, reach, id, Flat(Body(p, id)), 0) else {})
   }
 
-  function ScoreWarnsIn(p: Program, id: SectionId, flat: seq<Stmt>, i: nat): set<LintError>
-    requires IsInstr(p, id)
+  function ScoreWarnsIn(p: Program, reach: map<SectionId, set<SectionId>>, id: SectionId, flat: seq<Stmt>, i: nat): set<LintError>
+    requires id in reach
     decreases |flat| - i
   {
-    if i >= |flat| then {} else ScoreWarn(p, id, flat, i) + ScoreWarnsIn(p, id, flat, i + 1)
+    if i >= |flat| then {} else ScoreWarn(p, reach, id, flat, i) + ScoreWarnsIn(p, reach, id, flat, i + 1)
   }
 
-  function ScoreWarn(p: Program, id: SectionId, flat: seq<Stmt>, i: nat): set<LintError>
-    requires IsInstr(p, id) && i < |flat|
+  function ScoreWarn(p: Program, reach: map<SectionId, set<SectionId>>, id: SectionId, flat: seq<Stmt>, i: nat): set<LintError>
+    requires id in reach && i < |flat|
   {
     var s := flat[i];
     if !(s.Ask? && s.form.Score?) then {}
     else
       var x := s.form.binding;
       var later := (set j | i < j < |flat| :: flat[j])
-                   + (var reach := Closure(p, {id}); set t, u | t in reach && t != id && IsInstr(p, t) && u in Flat(Body(p, t)) :: u);
+                   + (set t, u | t in reach[id] && t != id && IsInstr(p, t) && u in Flat(Body(p, t)) :: u);
       var users := set u | u in later && Uses(u, x) > 0;
       if users == {} then {Err("W-SCORE-UNUSED", s.src)}
       else if exists u <- users :: users == {u} && Uses(u, x) == 1 && Threshold(u, x) then {Err("W-SCORE-THRESHOLD", s.src)}
