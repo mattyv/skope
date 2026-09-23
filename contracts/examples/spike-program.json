@@ -1,7 +1,10 @@
 {
+  "name": "Main",
+  "src": 1,
+  "guidance": null,
   "body": [
-    { "src": 3, "run": { "cmd": [{ "lit": "df --output=pcent / | tail -1" }] } },
-    { "src": 4, "do": { "cmd": [{ "lit": "journalctl --vacuum-size=500M" }] } },
+    { "src": 3, "run": { "cmd": [{ "lit": "df --output=pcent / | tail -1" }] }, "else": null },
+    { "src": 4, "do": { "cmd": [{ "lit": "journalctl --vacuum-size=500M" }] }, "else": null },
     { "src": 5, "stop": {} }
   ]
 }

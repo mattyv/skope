@@ -20,7 +20,7 @@
 //   node scripts/build-id.mjs --write FILE     also write that JSON to FILE
 
 import { createHash } from "node:crypto";
-import { readFileSync, readdirSync, statSync, writeFileSync, mkdirSync } from "node:fs";
+import { mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -103,6 +103,6 @@ if (writeAt !== -1) {
   const out = process.argv[writeAt + 1];
   if (!out) fail("--write needs a file path");
   mkdirSync(dirname(join(ROOT, out)), { recursive: true });
-  writeFileSync(join(ROOT, out), json + "\n");
+  writeFileSync(join(ROOT, out), `${json}\n`);
 }
 console.log(json);

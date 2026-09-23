@@ -97,7 +97,9 @@ scratch):
 - `LICENSE-MIT` and `LICENSE-APACHE`: skop is dual-licensed, like ply.
 
 **Repository and toolchain**
-- Node 20+, TypeScript, Vitest, a formatter and linter.
+- Node 20+, TypeScript, Vitest, and Biome as the formatter and linter
+  (`npm run lint`, `npm run format`), so parallel agents don't produce
+  formatting noise in each other's diffs.
 - A pinned Dafny version, with `dafny verify` and translation to JavaScript
   running in CI (SPEC §5.5).
 - `package.json` with `"version": "0.1.0"` and
@@ -121,28 +123,40 @@ contracts are frozen or the six parallel streams start:
 If any step is painful, raise it now (SPEC §13), before six agents depend on
 it. The contracts are frozen, and Phase 1 starts, only after all three work.
 
-**Spike result: all three work** (`core/`, `src/`, `tests/spike/`). What
-the next agents need to know:
+**Spike result: all three work** (`core/`, `src/`, `tests/spike/`), after
+an independent review and a proof review. What the next agents need to know:
 - **Dafny 4.11.0**, pinned in `.dafny-version`. `npm run core` verifies the
   core and writes `core/generated/core.cjs`, which is committed, so tests
-  and releases never need Dafny. CI rebuilds it and fails if the committed
-  file is stale.
+  and releases never need Dafny. CI verifies every tracked `.dfy` file,
+  rebuilds the JavaScript, and fails if the committed file is stale.
 - Dafny's JavaScript bundles its runtime with `--include-runtime`, needs
   the `bignumber.js` package, and exports nothing, so the build appends an
   export line.
 - The build turns off `--optimize-erasable-datatype-wrapper`. With it on,
-  a one-field datatype like `Program(body)` is erased to its field inside
-  functions but not in its constructor, so values built by the adapter
-  don't match what the compiled functions expect.
-- Numbers cross the boundary as `BigNumber`, strings as Dafny sequences.
-  Only `src/core.ts` converts them; nothing else imports the generated
-  code.
-- Dry run is guarded twice: Dafny proves P3 for the spike, and a
-  randomised test checks the compiled code agrees. Deliberately breaking
-  either one makes it fail.
+  a one-field datatype is erased to its field inside functions but not in
+  its constructor, so values built by the adapter don't match what the
+  compiled functions expect.
+- **Compiled Dafny checks nothing at run time**: not preconditions, not
+  `nat` or `int`. `src/core.ts` is the only file that touches it, and it
+  refuses anything it can't represent exactly, rather than rewriting it.
+  It also enforces `Step`'s rules: a command's result must come back after
+  an exec, and there's no step after the run is done.
+- **Proofs must carry state, not just constrain one step.** The first
+  version proved "this step never returns a `do` in dry run" but not that
+  the dry-run flag survives the step, so two broken versions still
+  verified. Now `Start`, `Advance` and `Step` preserve `dry` and `prog`, a
+  `done` flag enforces P2, a measure gives P1, and `DryRunNeverDoes`
+  proves P3 over a whole run. Four deliberately broken versions each fail
+  verification.
+- **Randomised tests must show they generate the interesting case.** The
+  first dry-run test never generated a `do`. It's now exhaustive (every
+  run/do sequence up to six long) and asserts how many contain a `do`.
+- Event names follow SPEC §10: `run`, `effect_start`, `effect_end`,
+  `would_do`, `outcome`, with `after_would_do` on reads after a `would_do`.
 
 **Contracts** (in `contracts/`, owned by the Phase 0 agent, later by the
-integration agent):
+integration agent; `contracts/README.md` lists the files and the decisions
+the spec left open):
 
 | Contract | Between | Source in the spec |
 |---|---|---|
@@ -173,9 +187,11 @@ and options nothing in the spec needs (§6).
   that the release smoke test must not treat as failures.
 - **Spec coverage check.** `scripts/check_spec.py coverage` fails CI if a
   code in SPEC §7.1, except `E-INTERNAL` and `E-IO`, isn't named in any
-  test file. It's a **reference check** only: it shows a code is mentioned,
-  not that a test exercises it. Reviewers and the milestone check cover the
-  rest.
+  test file once the code's milestone has closed: parse and lint codes at
+  M2, argument, runtime and backend codes at M4, Score codes at M7. Before
+  that it lists what's missing. It's a **reference check** only: it shows a
+  code is mentioned, not that a test exercises it. Reviewers and the
+  milestone check cover the rest.
 - **Milestone check.** `scripts/check_spec.py milestones` enforces the
   closed-milestone rule in §1.
 - **No-cheating check.** CI fails if Dafny code contains `assume`,
@@ -321,7 +337,7 @@ necessary but not enough to merge: the review (§6) runs after it.
 | `dafny verify` | any unproven obligation |
 | No-cheating check | `assume`, `{:axiom}` or `{:verify false}` in Dafny code |
 | Contract check | a contract example doesn't validate, or generated types are stale |
-| Spec coverage check (reference only) | an error code isn't named in any test file |
+| Spec coverage check (reference only) | an error code whose milestone has closed isn't named in any test file |
 | Milestone check | a closed milestone has an expected failure, skip or todo, or no tests |
 | Golden files | any mismatch, ignoring the fields in SPEC §12.3 |
 | Differential check (from Phase 2) | a fake run's trace isn't among the explored paths |
@@ -483,6 +499,11 @@ After v1 ships. The same stream owners pick up their part in parallel:
   read-only access. They never see the author's session and never review
   their own stream's code. One reviewer per PR, plus a proof reviewer for
   Dafny changes; the full panel only at milestones.
+- **Models.** Sonnet builds the well-specified streams: A (preprocessor),
+  D (backends), E (runner) and F (acceptance tests). Their tests and
+  contracts pin down the target, and the reviewer catches misses. Opus
+  builds stream C (the interpreter and proofs) and integration, and does
+  every review, since that's where judgement matters most.
 - **Ponytail is on for every building agent,** at **full** by default and
   **ultra** for audits and contract reviews.
 - **Contract changes are rare and deliberate.** The contract owner makes

@@ -129,7 +129,12 @@
     },
     "target": {
       "oneOf": [
-        { "type": "object", "additionalProperties": false, "required": ["stop"], "properties": { "stop": { "type": "object", "maxProperties": 0 } } },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["stop"],
+          "properties": { "stop": { "type": "object", "maxProperties": 0 } }
+        },
         { "$ref": "#/$defs/sectionRef" }
       ]
     },
@@ -137,7 +142,12 @@
       "description": "null when there's no else.",
       "oneOf": [
         { "type": "null" },
-        { "type": "object", "additionalProperties": false, "required": ["skip"], "properties": { "skip": { "type": "object", "maxProperties": 0 } } },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["skip"],
+          "properties": { "skip": { "type": "object", "maxProperties": 0 } }
+        },
         { "$ref": "#/$defs/sectionRef" }
       ]
     },
@@ -148,13 +158,24 @@
           "type": "object",
           "additionalProperties": false,
           "required": ["num"],
-          "properties": { "num": { "type": "string", "pattern": "^-?[0-9]+(\\.[0-9]+)?$", "description": "Decimal as written; a trailing % is dropped (SPEC §3.4)." } }
+          "properties": {
+            "num": {
+              "type": "string",
+              "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+              "description": "Decimal as written; a trailing % is dropped (SPEC §3.4)."
+            }
+          }
         }
       ]
     },
     "cond": {
       "oneOf": [
-        { "type": "object", "additionalProperties": false, "required": ["succeeds"], "properties": { "succeeds": { "$ref": "#/$defs/parts" } } },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["succeeds"],
+          "properties": { "succeeds": { "$ref": "#/$defs/parts" } }
+        },
         {
           "type": "object",
           "additionalProperties": false,

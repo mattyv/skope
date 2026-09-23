@@ -73,10 +73,7 @@ jobs:
       - name: Lint
         if: steps.code.outputs.present == 'true'
         run: npm run lint --if-present
-      - name: Build
-        if: steps.code.outputs.present == 'true'
-        run: npm run build --if-present
-      - name: Unit, property, golden and acceptance tests
+      - name: Build, then unit, property, golden and acceptance tests
         if: steps.code.outputs.present == 'true'
         run: npm test
       - name: Every error code is named in a test file (reference check)
@@ -114,7 +111,10 @@ jobs:
         if: steps.code.outputs.present == 'true'
         with:
           node-version: "20"
-      - name: Verify every proof and rebuild the JavaScript
+      - name: Verify every tracked Dafny file, including tests
+        if: steps.code.outputs.present == 'true'
+        run: dafny verify $(git ls-files '*.dfy')
+      - name: Rebuild the JavaScript from the core
         if: steps.code.outputs.present == 'true'
         run: node scripts/build-core.mjs
       - name: Committed JavaScript matches the proofs

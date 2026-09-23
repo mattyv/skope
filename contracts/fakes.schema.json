@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/mattyv/skop/contracts/fakes.schema.json",
+  "title": "Fakes",
+  "description": "The fake handlers' files (SPEC §5.4, §6.2), after YAML parsing. Keys are the question or command text after interpolation, or `line:N` for the statement on line N of SKILL.md. Each fake scenario directory also holds `expected-exit`: the exit code the run must end with (PLAN.md §3).",
+  "$defs": {
+    "key": { "type": "string", "minLength": 1 },
+    "answers": {
+      "description": "answers.yaml: a probs object keyed by option id (with optional `unassigned`), or `unsure`, `unavailable` or `invalid` to force that path.",
+      "type": "object",
+      "propertyNames": { "$ref": "#/$defs/key" },
+      "additionalProperties": {
+        "oneOf": [
+          { "enum": ["unsure", "unavailable", "invalid"] },
+          { "type": "object", "minProperties": 1, "additionalProperties": { "type": "number" } }
+        ]
+      }
+    },
+    "commands": {
+      "description": "commands.yaml: how each command ends. An unmatched command is E-FAKE-UNMATCHED; no real command ever runs.",
+      "type": "object",
+      "propertyNames": { "$ref": "#/$defs/key" },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["exit"],
+        "properties": {
+          "exit": { "type": ["integer", "null"], "description": "null when it timed out." },
+          "stdout": { "type": "string", "default": "" },
+          "stderr": { "type": "string", "default": "" },
+          "timed_out": { "type": "boolean", "default": false }
+        }
+      }
+    }
+  }
+}

@@ -11,7 +11,8 @@ export function fakeExec(answers: Record<string, { exit: number }>): ExecHandler
   const calls: string[] = [];
   const handler = async (req: { cmd: string }) => {
     calls.push(req.cmd);
-    const answer = answers[req.cmd];
+    // Own properties only: a command named "toString" must not match.
+    const answer = Object.hasOwn(answers, req.cmd) ? answers[req.cmd] : undefined;
     if (!answer) throw new FakeUnmatched(`--fake-exec has no answer for: ${req.cmd}`);
     return answer;
   };

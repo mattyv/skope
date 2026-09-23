@@ -1189,6 +1189,27 @@ let _System = (function() {
 let SkopSyntax = (function() {
   let $module = {};
 
+  $module.__default = class __default {
+    constructor () {
+      this._tname = "SkopSyntax._default";
+    }
+    _parentTraits() {
+      return [];
+    }
+    static Render(parts) {
+      let _0___accumulator = _dafny.Seq.of();
+      TAIL_CALL_START: while (true) {
+        if ((new BigNumber((parts).length)).isEqualTo(_dafny.ZERO)) {
+          return _dafny.Seq.Concat(_0___accumulator, _dafny.Seq.UnicodeFromString(""));
+        } else {
+          _0___accumulator = _dafny.Seq.Concat(_0___accumulator, ((parts)[_dafny.ZERO]).dtor_s);
+          let _in0 = (parts).slice(_dafny.ONE);
+          parts = _in0;
+          continue TAIL_CALL_START;
+        }
+      }
+    };
+  };
 
   $module.Kind = class Kind {
     constructor(tag) {
@@ -1243,6 +1264,45 @@ let SkopSyntax = (function() {
     }
   }
 
+  $module.Part = class Part {
+    constructor(tag) {
+      this.$tag = tag;
+    }
+    static create_Lit(s) {
+      let $dt = new Part(0);
+      $dt.s = s;
+      return $dt;
+    }
+    get is_Lit() { return this.$tag === 0; }
+    get dtor_s() { return this.s; }
+    toString() {
+      if (this.$tag === 0) {
+        return "SkopSyntax.Part.Lit" + "(" + this.s.toVerbatimString(true) + ")";
+      } else  {
+        return "<unexpected>";
+      }
+    }
+    equals(other) {
+      if (this === other) {
+        return true;
+      } else if (this.$tag === 0) {
+        return other.$tag === 0 && _dafny.areEqual(this.s, other.s);
+      } else  {
+        return false; // unexpected
+      }
+    }
+    static Default() {
+      return SkopSyntax.Part.create_Lit(_dafny.Seq.UnicodeFromString(""));
+    }
+    static Rtd() {
+      return class {
+        static get Default() {
+          return Part.Default();
+        }
+      };
+    }
+  }
+
   $module.Stmt = class Stmt {
     constructor(tag) {
       this.$tag = tag;
@@ -1271,9 +1331,9 @@ let SkopSyntax = (function() {
     get dtor_cmd() { return this.cmd; }
     toString() {
       if (this.$tag === 0) {
-        return "SkopSyntax.Stmt.Run" + "(" + _dafny.toString(this.src) + ", " + this.cmd.toVerbatimString(true) + ")";
+        return "SkopSyntax.Stmt.Run" + "(" + _dafny.toString(this.src) + ", " + _dafny.toString(this.cmd) + ")";
       } else if (this.$tag === 1) {
-        return "SkopSyntax.Stmt.Do" + "(" + _dafny.toString(this.src) + ", " + this.cmd.toVerbatimString(true) + ")";
+        return "SkopSyntax.Stmt.Do" + "(" + _dafny.toString(this.src) + ", " + _dafny.toString(this.cmd) + ")";
       } else if (this.$tag === 2) {
         return "SkopSyntax.Stmt.Stop" + "(" + _dafny.toString(this.src) + ")";
       } else  {
@@ -1294,7 +1354,7 @@ let SkopSyntax = (function() {
       }
     }
     static Default() {
-      return SkopSyntax.Stmt.create_Run(_dafny.ZERO, _dafny.Seq.UnicodeFromString(""));
+      return SkopSyntax.Stmt.create_Run(_dafny.ZERO, _dafny.Seq.of());
     }
     static Rtd() {
       return class {
@@ -1309,16 +1369,18 @@ let SkopSyntax = (function() {
     constructor(tag) {
       this.$tag = tag;
     }
-    static create_Program(body) {
+    static create_Program(src, body) {
       let $dt = new Program(0);
+      $dt.src = src;
       $dt.body = body;
       return $dt;
     }
     get is_Program() { return this.$tag === 0; }
+    get dtor_src() { return this.src; }
     get dtor_body() { return this.body; }
     toString() {
       if (this.$tag === 0) {
-        return "SkopSyntax.Program.Program" + "(" + _dafny.toString(this.body) + ")";
+        return "SkopSyntax.Program.Program" + "(" + _dafny.toString(this.src) + ", " + _dafny.toString(this.body) + ")";
       } else  {
         return "<unexpected>";
       }
@@ -1327,13 +1389,13 @@ let SkopSyntax = (function() {
       if (this === other) {
         return true;
       } else if (this.$tag === 0) {
-        return other.$tag === 0 && _dafny.areEqual(this.body, other.body);
+        return other.$tag === 0 && _dafny.areEqual(this.src, other.src) && _dafny.areEqual(this.body, other.body);
       } else  {
         return false; // unexpected
       }
     }
     static Default() {
-      return SkopSyntax.Program.create_Program(_dafny.Seq.of());
+      return SkopSyntax.Program.create_Program(_dafny.ZERO, _dafny.Seq.of());
     }
     static Rtd() {
       return class {
@@ -1355,13 +1417,13 @@ let SkopLint = (function() {
     _parentTraits() {
       return [];
     }
-    static FallsOff(body) {
-      if ((new BigNumber((body).length)).isEqualTo(_dafny.ZERO)) {
-        return _dafny.Seq.of(SkopLint.LintError.create_LintError(_dafny.Seq.UnicodeFromString("E-FALLS-OFF"), _dafny.ZERO));
-      } else if (((body)[(new BigNumber((body).length)).minus(_dafny.ONE)]).is_Stop) {
+    static FallsOff(p) {
+      if ((new BigNumber(((p).dtor_body).length)).isEqualTo(_dafny.ZERO)) {
+        return _dafny.Seq.of(SkopLint.LintError.create_LintError(_dafny.Seq.UnicodeFromString("E-FALLS-OFF"), (p).dtor_src));
+      } else if ((((p).dtor_body)[(new BigNumber(((p).dtor_body).length)).minus(_dafny.ONE)]).is_Stop) {
         return _dafny.Seq.of();
       } else {
-        return _dafny.Seq.of(SkopLint.LintError.create_LintError(_dafny.Seq.UnicodeFromString("E-FALLS-OFF"), ((body)[(new BigNumber((body).length)).minus(_dafny.ONE)]).dtor_src));
+        return _dafny.Seq.of(SkopLint.LintError.create_LintError(_dafny.Seq.UnicodeFromString("E-FALLS-OFF"), (((p).dtor_body)[(new BigNumber(((p).dtor_body).length)).minus(_dafny.ONE)]).dtor_src));
       }
     };
     static Unreachable(body, i) {
@@ -1386,7 +1448,7 @@ let SkopLint = (function() {
       }
     };
     static Lint(p) {
-      return _dafny.Seq.Concat(SkopLint.__default.FallsOff((p).dtor_body), SkopLint.__default.Unreachable((p).dtor_body, _dafny.ZERO));
+      return _dafny.Seq.Concat(SkopLint.__default.FallsOff(p), SkopLint.__default.Unreachable((p).dtor_body, _dafny.ZERO));
     };
   };
 
@@ -1442,63 +1504,71 @@ let SkopInterp = (function() {
     _parentTraits() {
       return [];
     }
-    static Start(p, dry) {
-      return SkopInterp.State.create_State(p, _dafny.ZERO, dry, false);
+    static Measure(s) {
+      return ((new BigNumber(2)).multipliedBy((new BigNumber((((s).dtor_prog).dtor_body).length)).minus((s).dtor_pc))).minus((((s).dtor_waiting) ? (_dafny.ONE) : (_dafny.ZERO)));
     };
-    static KindOf(st) {
-      if ((st).is_Run) {
-        return SkopSyntax.Kind.create_RunKind();
-      } else {
-        return SkopSyntax.Kind.create_DoKind();
-      }
+    static Start(p, dry) {
+      return SkopInterp.State.create_State(p, _dafny.ZERO, dry, false, false, false);
     };
     static Advance(s) {
       let _pat_let_tv0 = s;
       let _source0 = (((s).dtor_prog).dtor_body)[(s).dtor_pc];
       {
         if (_source0.is_Stop) {
-          return _dafny.Tuple.of(s, _dafny.Seq.of(SkopInterp.Event.create_Finished(SkopInterp.Outcome.create_Stopped())), SkopInterp.Next.create_Done(SkopInterp.Outcome.create_Stopped()));
+          return _dafny.Tuple.of(function (_pat_let0_0) {
+  return function (_0_dt__update__tmp_h0) {
+    return function (_pat_let1_0) {
+      return function (_1_dt__update_hdone_h0) {
+        return SkopInterp.State.create_State((_0_dt__update__tmp_h0).dtor_prog, (_0_dt__update__tmp_h0).dtor_pc, (_0_dt__update__tmp_h0).dtor_dry, (_0_dt__update__tmp_h0).dtor_waiting, _1_dt__update_hdone_h0, (_0_dt__update__tmp_h0).dtor_afterWouldDo);
+      }(_pat_let1_0);
+    }(true);
+  }(_pat_let0_0);
+}(s), _dafny.Seq.of(SkopInterp.Event.create_Finished(SkopInterp.Outcome.create_Stopped())), SkopInterp.Next.create_Done(SkopInterp.Outcome.create_Stopped()));
         }
       }
       {
         if (_source0.is_Run) {
-          let _0_src = (_source0).src;
-          let _1_cmd = (_source0).cmd;
-          return _dafny.Tuple.of(function (_pat_let0_0) {
-  return function (_2_dt__update__tmp_h0) {
-    return function (_pat_let1_0) {
-      return function (_3_dt__update_hwaiting_h0) {
-        return SkopInterp.State.create_State((_2_dt__update__tmp_h0).dtor_prog, (_2_dt__update__tmp_h0).dtor_pc, (_2_dt__update__tmp_h0).dtor_dry, _3_dt__update_hwaiting_h0);
-      }(_pat_let1_0);
+          let _2_src = (_source0).src;
+          let _3_cmd = (_source0).cmd;
+          return _dafny.Tuple.of(function (_pat_let2_0) {
+  return function (_4_dt__update__tmp_h1) {
+    return function (_pat_let3_0) {
+      return function (_5_dt__update_hwaiting_h0) {
+        return SkopInterp.State.create_State((_4_dt__update__tmp_h1).dtor_prog, (_4_dt__update__tmp_h1).dtor_pc, (_4_dt__update__tmp_h1).dtor_dry, _5_dt__update_hwaiting_h0, (_4_dt__update__tmp_h1).dtor_done, (_4_dt__update__tmp_h1).dtor_afterWouldDo);
+      }(_pat_let3_0);
     }(true);
-  }(_pat_let0_0);
-}(s), _dafny.Seq.of(), SkopInterp.Next.create_Exec(SkopSyntax.Kind.create_RunKind(), _1_cmd, _0_src));
+  }(_pat_let2_0);
+}(s), _dafny.Seq.of(), SkopInterp.Next.create_Exec(SkopSyntax.Kind.create_RunKind(), SkopSyntax.__default.Render(_3_cmd), _2_src));
         }
       }
       {
-        let _4_src = (_source0).src;
-        let _5_cmd = (_source0).cmd;
+        let _6_src = (_source0).src;
+        let _7_cmd = (_source0).cmd;
         if ((s).dtor_dry) {
-          let _6_r = SkopInterp.__default.Advance(function (_pat_let2_0) {
-            return function (_7_dt__update__tmp_h1) {
-              return function (_pat_let3_0) {
-                return function (_8_dt__update_hpc_h0) {
-                  return SkopInterp.State.create_State((_7_dt__update__tmp_h1).dtor_prog, _8_dt__update_hpc_h0, (_7_dt__update__tmp_h1).dtor_dry, (_7_dt__update__tmp_h1).dtor_waiting);
-                }(_pat_let3_0);
-              }(((_pat_let_tv0).dtor_pc).plus(_dafny.ONE));
-            }(_pat_let2_0);
+          let _8_r = SkopInterp.__default.Advance(function (_pat_let4_0) {
+            return function (_9_dt__update__tmp_h2) {
+              return function (_pat_let5_0) {
+                return function (_10_dt__update_hafterWouldDo_h0) {
+                  return function (_pat_let6_0) {
+                    return function (_11_dt__update_hpc_h0) {
+                      return SkopInterp.State.create_State((_9_dt__update__tmp_h2).dtor_prog, _11_dt__update_hpc_h0, (_9_dt__update__tmp_h2).dtor_dry, (_9_dt__update__tmp_h2).dtor_waiting, (_9_dt__update__tmp_h2).dtor_done, _10_dt__update_hafterWouldDo_h0);
+                    }(_pat_let6_0);
+                  }(((_pat_let_tv0).dtor_pc).plus(_dafny.ONE));
+                }(_pat_let5_0);
+              }(true);
+            }(_pat_let4_0);
           }(s));
-          return _dafny.Tuple.of((_6_r)[0], _dafny.Seq.Concat(_dafny.Seq.of(SkopInterp.Event.create_WouldDo(_4_src, _5_cmd)), (_6_r)[1]), (_6_r)[2]);
+          return _dafny.Tuple.of((_8_r)[0], _dafny.Seq.Concat(_dafny.Seq.of(SkopInterp.Event.create_WouldDo(_6_src, SkopSyntax.__default.Render(_7_cmd))), (_8_r)[1]), (_8_r)[2]);
         } else {
-          return _dafny.Tuple.of(function (_pat_let4_0) {
-  return function (_9_dt__update__tmp_h2) {
-    return function (_pat_let5_0) {
-      return function (_10_dt__update_hwaiting_h1) {
-        return SkopInterp.State.create_State((_9_dt__update__tmp_h2).dtor_prog, (_9_dt__update__tmp_h2).dtor_pc, (_9_dt__update__tmp_h2).dtor_dry, _10_dt__update_hwaiting_h1);
-      }(_pat_let5_0);
+          return _dafny.Tuple.of(function (_pat_let7_0) {
+  return function (_12_dt__update__tmp_h3) {
+    return function (_pat_let8_0) {
+      return function (_13_dt__update_hwaiting_h1) {
+        return SkopInterp.State.create_State((_12_dt__update__tmp_h3).dtor_prog, (_12_dt__update__tmp_h3).dtor_pc, (_12_dt__update__tmp_h3).dtor_dry, _13_dt__update_hwaiting_h1, (_12_dt__update__tmp_h3).dtor_done, (_12_dt__update__tmp_h3).dtor_afterWouldDo);
+      }(_pat_let8_0);
     }(true);
-  }(_pat_let4_0);
-}(s), _dafny.Seq.of(SkopInterp.Event.create_EffectStart(_4_src, _5_cmd)), SkopInterp.Next.create_Exec(SkopSyntax.Kind.create_DoKind(), _5_cmd, _4_src));
+  }(_pat_let7_0);
+}(s), _dafny.Seq.of(SkopInterp.Event.create_EffectStart(_6_src, SkopSyntax.__default.Render(_7_cmd))), SkopInterp.Next.create_Exec(SkopSyntax.Kind.create_DoKind(), SkopSyntax.__default.Render(_7_cmd), _6_src));
         }
       }
     };
@@ -1508,24 +1578,37 @@ let SkopInterp = (function() {
         return SkopInterp.__default.Advance(s);
       } else {
         let _0_st = (((s).dtor_prog).dtor_body)[(s).dtor_pc];
-        let _1_ran = _dafny.Seq.of(SkopInterp.Event.create_Ran((_0_st).dtor_src, SkopInterp.__default.KindOf(_0_st), (_0_st).dtor_cmd, (r).dtor_exit));
+        let _1_cmd = SkopSyntax.__default.Render((_0_st).dtor_cmd);
+        let _2_ended = (((_0_st).is_Run) ? (_dafny.Seq.of(SkopInterp.Event.create_RunDone((_0_st).dtor_src, _1_cmd, (r).dtor_exit, (s).dtor_afterWouldDo))) : (_dafny.Seq.of(SkopInterp.Event.create_EffectEnd((_0_st).dtor_src, _1_cmd, (r).dtor_exit))));
         if (!((r).dtor_exit).isEqualTo(_dafny.ZERO)) {
-          return _dafny.Tuple.of(s, _dafny.Seq.Concat(_1_ran, _dafny.Seq.of(SkopInterp.Event.create_Finished(SkopInterp.Outcome.create_Handoff(_dafny.Seq.UnicodeFromString("command_failed"))))), SkopInterp.Next.create_Done(SkopInterp.Outcome.create_Handoff(_dafny.Seq.UnicodeFromString("command_failed"))));
+          return _dafny.Tuple.of(function (_pat_let9_0) {
+  return function (_3_dt__update__tmp_h0) {
+    return function (_pat_let10_0) {
+      return function (_4_dt__update_hdone_h0) {
+        return function (_pat_let11_0) {
+          return function (_5_dt__update_hwaiting_h0) {
+            return SkopInterp.State.create_State((_3_dt__update__tmp_h0).dtor_prog, (_3_dt__update__tmp_h0).dtor_pc, (_3_dt__update__tmp_h0).dtor_dry, _5_dt__update_hwaiting_h0, _4_dt__update_hdone_h0, (_3_dt__update__tmp_h0).dtor_afterWouldDo);
+          }(_pat_let11_0);
+        }(false);
+      }(_pat_let10_0);
+    }(true);
+  }(_pat_let9_0);
+}(s), _dafny.Seq.Concat(_2_ended, _dafny.Seq.of(SkopInterp.Event.create_Finished(SkopInterp.Outcome.create_Handoff(_dafny.Seq.UnicodeFromString("command_failed"))))), SkopInterp.Next.create_Done(SkopInterp.Outcome.create_Handoff(_dafny.Seq.UnicodeFromString("command_failed"))));
         } else {
-          let _2_a = SkopInterp.__default.Advance(function (_pat_let6_0) {
-            return function (_3_dt__update__tmp_h0) {
-              return function (_pat_let7_0) {
-                return function (_4_dt__update_hwaiting_h0) {
-                  return function (_pat_let8_0) {
-                    return function (_5_dt__update_hpc_h0) {
-                      return SkopInterp.State.create_State((_3_dt__update__tmp_h0).dtor_prog, _5_dt__update_hpc_h0, (_3_dt__update__tmp_h0).dtor_dry, _4_dt__update_hwaiting_h0);
-                    }(_pat_let8_0);
+          let _6_a = SkopInterp.__default.Advance(function (_pat_let12_0) {
+            return function (_7_dt__update__tmp_h1) {
+              return function (_pat_let13_0) {
+                return function (_8_dt__update_hwaiting_h1) {
+                  return function (_pat_let14_0) {
+                    return function (_9_dt__update_hpc_h0) {
+                      return SkopInterp.State.create_State((_7_dt__update__tmp_h1).dtor_prog, _9_dt__update_hpc_h0, (_7_dt__update__tmp_h1).dtor_dry, _8_dt__update_hwaiting_h1, (_7_dt__update__tmp_h1).dtor_done, (_7_dt__update__tmp_h1).dtor_afterWouldDo);
+                    }(_pat_let14_0);
                   }(((_pat_let_tv0).dtor_pc).plus(_dafny.ONE));
-                }(_pat_let7_0);
+                }(_pat_let13_0);
               }(false);
-            }(_pat_let6_0);
+            }(_pat_let12_0);
           }(s));
-          return _dafny.Tuple.of((_2_a)[0], _dafny.Seq.Concat(_1_ran, (_2_a)[1]), (_2_a)[2]);
+          return _dafny.Tuple.of((_6_a)[0], _dafny.Seq.Concat(_2_ended, (_6_a)[1]), (_6_a)[2]);
         }
       }
     };
@@ -1583,10 +1666,12 @@ let SkopInterp = (function() {
     constructor(tag) {
       this.$tag = tag;
     }
-    static create_WouldDo(src, cmd) {
+    static create_RunDone(src, cmd, exit, afterWouldDo) {
       let $dt = new Event(0);
       $dt.src = src;
       $dt.cmd = cmd;
+      $dt.exit = exit;
+      $dt.afterWouldDo = afterWouldDo;
       return $dt;
     }
     static create_EffectStart(src, cmd) {
@@ -1595,36 +1680,44 @@ let SkopInterp = (function() {
       $dt.cmd = cmd;
       return $dt;
     }
-    static create_Ran(src, kind, cmd, exit) {
+    static create_EffectEnd(src, cmd, exit) {
       let $dt = new Event(2);
       $dt.src = src;
-      $dt.kind = kind;
       $dt.cmd = cmd;
       $dt.exit = exit;
       return $dt;
     }
-    static create_Finished(outcome) {
+    static create_WouldDo(src, cmd) {
       let $dt = new Event(3);
+      $dt.src = src;
+      $dt.cmd = cmd;
+      return $dt;
+    }
+    static create_Finished(outcome) {
+      let $dt = new Event(4);
       $dt.outcome = outcome;
       return $dt;
     }
-    get is_WouldDo() { return this.$tag === 0; }
+    get is_RunDone() { return this.$tag === 0; }
     get is_EffectStart() { return this.$tag === 1; }
-    get is_Ran() { return this.$tag === 2; }
-    get is_Finished() { return this.$tag === 3; }
+    get is_EffectEnd() { return this.$tag === 2; }
+    get is_WouldDo() { return this.$tag === 3; }
+    get is_Finished() { return this.$tag === 4; }
     get dtor_src() { return this.src; }
     get dtor_cmd() { return this.cmd; }
-    get dtor_kind() { return this.kind; }
     get dtor_exit() { return this.exit; }
+    get dtor_afterWouldDo() { return this.afterWouldDo; }
     get dtor_outcome() { return this.outcome; }
     toString() {
       if (this.$tag === 0) {
-        return "SkopInterp.Event.WouldDo" + "(" + _dafny.toString(this.src) + ", " + this.cmd.toVerbatimString(true) + ")";
+        return "SkopInterp.Event.RunDone" + "(" + _dafny.toString(this.src) + ", " + this.cmd.toVerbatimString(true) + ", " + _dafny.toString(this.exit) + ", " + _dafny.toString(this.afterWouldDo) + ")";
       } else if (this.$tag === 1) {
         return "SkopInterp.Event.EffectStart" + "(" + _dafny.toString(this.src) + ", " + this.cmd.toVerbatimString(true) + ")";
       } else if (this.$tag === 2) {
-        return "SkopInterp.Event.Ran" + "(" + _dafny.toString(this.src) + ", " + _dafny.toString(this.kind) + ", " + this.cmd.toVerbatimString(true) + ", " + _dafny.toString(this.exit) + ")";
+        return "SkopInterp.Event.EffectEnd" + "(" + _dafny.toString(this.src) + ", " + this.cmd.toVerbatimString(true) + ", " + _dafny.toString(this.exit) + ")";
       } else if (this.$tag === 3) {
+        return "SkopInterp.Event.WouldDo" + "(" + _dafny.toString(this.src) + ", " + this.cmd.toVerbatimString(true) + ")";
+      } else if (this.$tag === 4) {
         return "SkopInterp.Event.Finished" + "(" + _dafny.toString(this.outcome) + ")";
       } else  {
         return "<unexpected>";
@@ -1634,19 +1727,21 @@ let SkopInterp = (function() {
       if (this === other) {
         return true;
       } else if (this.$tag === 0) {
-        return other.$tag === 0 && _dafny.areEqual(this.src, other.src) && _dafny.areEqual(this.cmd, other.cmd);
+        return other.$tag === 0 && _dafny.areEqual(this.src, other.src) && _dafny.areEqual(this.cmd, other.cmd) && _dafny.areEqual(this.exit, other.exit) && this.afterWouldDo === other.afterWouldDo;
       } else if (this.$tag === 1) {
         return other.$tag === 1 && _dafny.areEqual(this.src, other.src) && _dafny.areEqual(this.cmd, other.cmd);
       } else if (this.$tag === 2) {
-        return other.$tag === 2 && _dafny.areEqual(this.src, other.src) && _dafny.areEqual(this.kind, other.kind) && _dafny.areEqual(this.cmd, other.cmd) && _dafny.areEqual(this.exit, other.exit);
+        return other.$tag === 2 && _dafny.areEqual(this.src, other.src) && _dafny.areEqual(this.cmd, other.cmd) && _dafny.areEqual(this.exit, other.exit);
       } else if (this.$tag === 3) {
-        return other.$tag === 3 && _dafny.areEqual(this.outcome, other.outcome);
+        return other.$tag === 3 && _dafny.areEqual(this.src, other.src) && _dafny.areEqual(this.cmd, other.cmd);
+      } else if (this.$tag === 4) {
+        return other.$tag === 4 && _dafny.areEqual(this.outcome, other.outcome);
       } else  {
         return false; // unexpected
       }
     }
     static Default() {
-      return SkopInterp.Event.create_WouldDo(_dafny.ZERO, _dafny.Seq.UnicodeFromString(""));
+      return SkopInterp.Event.create_RunDone(_dafny.ZERO, _dafny.Seq.UnicodeFromString(""), _dafny.ZERO, false);
     }
     static Rtd() {
       return class {
@@ -1763,12 +1858,14 @@ let SkopInterp = (function() {
     constructor(tag) {
       this.$tag = tag;
     }
-    static create_State(prog, pc, dry, waiting) {
+    static create_State(prog, pc, dry, waiting, done, afterWouldDo) {
       let $dt = new State(0);
       $dt.prog = prog;
       $dt.pc = pc;
       $dt.dry = dry;
       $dt.waiting = waiting;
+      $dt.done = done;
+      $dt.afterWouldDo = afterWouldDo;
       return $dt;
     }
     get is_State() { return this.$tag === 0; }
@@ -1776,9 +1873,11 @@ let SkopInterp = (function() {
     get dtor_pc() { return this.pc; }
     get dtor_dry() { return this.dry; }
     get dtor_waiting() { return this.waiting; }
+    get dtor_done() { return this.done; }
+    get dtor_afterWouldDo() { return this.afterWouldDo; }
     toString() {
       if (this.$tag === 0) {
-        return "SkopInterp.State.State" + "(" + _dafny.toString(this.prog) + ", " + _dafny.toString(this.pc) + ", " + _dafny.toString(this.dry) + ", " + _dafny.toString(this.waiting) + ")";
+        return "SkopInterp.State.State" + "(" + _dafny.toString(this.prog) + ", " + _dafny.toString(this.pc) + ", " + _dafny.toString(this.dry) + ", " + _dafny.toString(this.waiting) + ", " + _dafny.toString(this.done) + ", " + _dafny.toString(this.afterWouldDo) + ")";
       } else  {
         return "<unexpected>";
       }
@@ -1787,13 +1886,13 @@ let SkopInterp = (function() {
       if (this === other) {
         return true;
       } else if (this.$tag === 0) {
-        return other.$tag === 0 && _dafny.areEqual(this.prog, other.prog) && _dafny.areEqual(this.pc, other.pc) && this.dry === other.dry && this.waiting === other.waiting;
+        return other.$tag === 0 && _dafny.areEqual(this.prog, other.prog) && _dafny.areEqual(this.pc, other.pc) && this.dry === other.dry && this.waiting === other.waiting && this.done === other.done && this.afterWouldDo === other.afterWouldDo;
       } else  {
         return false; // unexpected
       }
     }
     static Default() {
-      return SkopInterp.State.create_State(SkopSyntax.Program.Default(), _dafny.ZERO, false, false);
+      return SkopInterp.State.create_State(SkopSyntax.Program.Default(), _dafny.ZERO, false, false, false, false);
     }
     static Rtd() {
       return class {

@@ -1,0 +1,538 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/mattyv/skop/contracts/event.schema.json",
+  "title": "Event",
+  "description": "One line of skop's JSON Lines output on stdout (SPEC \u00a710). Every event has the common fields; each event name adds its own. Nothing else is allowed.",
+  "type": "object",
+  "required": ["ts", "run_id", "skill", "skill_hash", "host", "event"],
+  "properties": {
+    "ts": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?Z$",
+      "description": "UTC, ISO 8601."
+    },
+    "run_id": {
+      "type": "string"
+    },
+    "skill": {
+      "type": "string"
+    },
+    "skill_hash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "host": {
+      "type": "string"
+    },
+    "event": {
+      "enum": [
+        "run_start",
+        "run",
+        "check_cmd",
+        "check",
+        "ask",
+        "effect_start",
+        "effect_end",
+        "would_do",
+        "would_page",
+        "handoff_page",
+        "transfer",
+        "outcome",
+        "handoff_record",
+        "error",
+        "warning",
+        "locked",
+        "stale_lock"
+      ]
+    },
+    "section": {
+      "type": "string"
+    },
+    "line": {
+      "type": "integer"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "const": "run_start"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "params": {
+            "type": "object"
+          },
+          "dry_run": {
+            "type": "boolean"
+          },
+          "caller": {
+            "enum": ["person", "agent"]
+          },
+          "run_dir": {
+            "type": "string"
+          },
+          "skop_version": {
+            "type": "string"
+          },
+          "skop_build": {
+            "type": "string"
+          }
+        },
+        "required": ["params", "dry_run", "caller", "run_dir", "skop_version", "skop_build"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "const": "run"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "cmd": {
+            "type": "string"
+          },
+          "exit": {
+            "type": ["integer", "null"]
+          },
+          "ms": {
+            "type": "integer"
+          },
+          "timed_out": {
+            "type": "boolean"
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "stdout_hash": {
+            "type": "string"
+          },
+          "stdout_tail": {
+            "type": "string",
+            "maxLength": 2048
+          },
+          "after_would_do": {
+            "type": "boolean"
+          }
+        },
+        "required": ["cmd", "exit", "ms", "timed_out", "truncated", "stdout_hash", "stdout_tail", "after_would_do"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "const": "check_cmd"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "cmd": {
+            "type": "string"
+          },
+          "exit": {
+            "type": ["integer", "null"]
+          },
+          "ms": {
+            "type": "integer"
+          },
+          "timed_out": {
+            "type": "boolean"
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "stdout_hash": {
+            "type": "string"
+          },
+          "stdout_tail": {
+            "type": "string",
+            "maxLength": 2048
+          },
+          "after_would_do": {
+            "type": "boolean"
+          }
+        },
+        "required": ["cmd", "exit", "ms", "timed_out", "truncated", "stdout_hash", "stdout_tail", "after_would_do"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "const": "check"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "expr": {
+            "type": "string"
+          },
+          "left": {
+            "type": ["string", "null"]
+          },
+          "right": {
+            "type": ["string", "null"]
+          },
+          "result": {
+            "type": ["boolean", "null"]
+          },
+          "after_would_do": {
+            "type": "boolean"
+          }
+        },
+        "required": ["expr", "left", "right", "result", "after_would_do"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "const": "ask"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "question": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": ["choice", "yesno", "score"]
+          },
+          "probs": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number"
+            }
+          },
+          "chosen": {
+            "type": ["string", "integer", "null"]
+          },
+          "confidence": {
+            "type": ["number", "null"]
+          },
+          "sure": {
+            "type": "integer"
+          },
+          "passed": {
+            "type": "boolean"
+          },
+          "backend": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "ms": {
+            "type": "integer"
+          },
+          "request_path": {
+            "type": "string"
+          },
+          "request_sha256": {
+            "type": "string"
+          },
+          "after_would_do": {
+            "type": "boolean"
+          },
+          "range": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "minItems": 2,
+            "maxItems": 2
+          }
+        },
+        "required": [
+          "question",
+          "kind",
+          "probs",
+          "chosen",
+          "confidence",
+          "sure",
+          "passed",
+          "backend",
+          "model",
+          "ms",
+          "request_path",
+          "request_sha256",
+          "after_would_do"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "const": "effect_start"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "cmd": {
+            "type": "string"
+          }
+        },
+        "required": ["cmd"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "const": "effect_end"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "cmd": {
+            "type": "string"
+          },
+          "exit": {
+            "type": ["integer", "null"]
+          },
+          "ms": {
+            "type": "integer"
+          },
+          "timed_out": {
+            "type": "boolean"
+          }
+        },
+        "required": ["cmd", "exit", "ms", "timed_out"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "const": "would_do"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "cmd": {
+            "type": "string"
+          }
+        },
+        "required": ["cmd"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "const": "would_page"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": ["text"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "const": "handoff_page"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": ["text", "ok"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "const": "transfer"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          }
+        },
+        "required": ["from", "to"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "const": "outcome"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "outcome": {
+            "enum": ["stopped", "paged", "handoff", "locked", "stale_lock", "invalid", "error"]
+          },
+          "reason": {
+            "type": ["string", "null"]
+          },
+          "ask_calls": {
+            "type": "integer"
+          },
+          "effects": {
+            "type": "integer"
+          },
+          "dry_run": {
+            "type": "boolean"
+          }
+        },
+        "required": ["outcome", "reason", "ask_calls", "effects", "dry_run"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "const": "handoff_record"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "record": {
+            "type": "object"
+          }
+        },
+        "required": ["path", "record"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "const": "error"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "pattern": "^E-"
+          },
+          "stage": {
+            "enum": ["parse", "lint", "args", "runtime"]
+          },
+          "file": {
+            "type": "string"
+          },
+          "line": {
+            "type": "integer"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": ["code", "stage", "message"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "const": "warning"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "pattern": "^W-"
+          },
+          "stage": {
+            "const": "warning"
+          },
+          "file": {
+            "type": "string"
+          },
+          "line": {
+            "type": "integer"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": ["code", "stage", "message"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "const": "locked"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "holder_pid": {
+            "type": "integer"
+          }
+        },
+        "required": ["holder_pid"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "const": "stale_lock"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "holder_pid": {
+            "type": "integer"
+          }
+        },
+        "required": ["path", "holder_pid"]
+      }
+    }
+  ],
+  "unevaluatedProperties": false
+}

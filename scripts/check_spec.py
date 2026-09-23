@@ -6,8 +6,8 @@ Usage:
                                 contracts/error-codes.json match the spec
   check_spec.py codes           regenerate contracts/error-codes.json from SPEC §7.1
   check_spec.py mermaid DIR     write every Mermaid diagram to DIR as .mmd files
-  check_spec.py coverage        every error code is named in a test file (reference check,
-                                enforced once M2 closes)
+  check_spec.py coverage        every error code is named in a test file (reference check;
+                                each code is enforced once its milestone closes)
   check_spec.py milestones      closed milestones have no expected failures or skips
 
 The coverage check is a reference check only: it proves a code is named in
@@ -112,15 +112,32 @@ def check_coverage() -> list[str]:
         return []
     files = [p for p in tests.rglob("*") if p.is_file() and TEST_FILE.search(p.name)]
     text = "\n".join(p.read_text(errors="ignore") for p in files)
-    missing = sorted(c for c in defined_codes() - UNTESTABLE if c not in text)
-    # Enforced once M2 closes: that's when every parse and lint code is due
-    # (SPEC §12.3). Before that, list what's still missing.
-    closed = ACCEPTANCE / "CLOSED"
-    if "M2" not in (closed.read_text().split() if closed.is_file() else []):
-        if missing:
-            print(f"coverage: {len(missing)} codes have no test yet (enforced once M2 closes): {', '.join(missing)}")
-        return []
-    return [f"{c} has no test (SPEC §12.2 requires one)" for c in missing]
+    closed_file = ACCEPTANCE / "CLOSED"
+    closed = set(closed_file.read_text().split()) if closed_file.is_file() else set()
+    due, later = [], []
+    for row in spec_code_table():
+        c = row["code"]
+        if c in UNTESTABLE or c in text:
+            continue
+        (due if due_at(row) in closed else later).append(c)
+    if later:
+        print(f"coverage: {len(later)} codes have no test yet; each is enforced once its milestone closes")
+    return [f"{c} has no test, and its milestone ({due_at(r)}) is closed (SPEC §12.2)"
+            for r in spec_code_table() for c in [r["code"]] if c in due]
+
+
+# Warnings that come from lint rather than from running.
+LINT_WARNINGS = {"W-ASK-NO-CONTEXT", "W-NO-GUIDANCE", "W-SECTION-UNREACHED"}
+
+
+def due_at(row: dict) -> str:
+    """The milestone by which a code must have a test (SPEC §12.3)."""
+    c = row["code"]
+    if "SCORE" in c or "RUBRIC" in c:
+        return "M7"
+    if row["stage"] in ("parse", "lint") or c in LINT_WARNINGS:
+        return "M2"
+    return "M4"
 
 
 def check_milestones() -> list[str]:

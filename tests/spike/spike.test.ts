@@ -1,15 +1,19 @@
 // Phase 0 spike (PLAN.md §3): one tiny program through lint, execution and
-// a fake handler, and proof that dry run suppresses its effect.
+// a fake handler, and evidence that dry run suppresses its effect.
 
 import { readFileSync } from "node:fs";
 import { describe, expect, test } from "vitest";
-import { lint, type Program, type Stmt } from "../../src/core.js";
-import { fakeExec, FakeUnmatched } from "../../src/fake.js";
+import { lint, Run, type Section, Unsupported } from "../../src/core.js";
+import { FakeUnmatched, fakeExec } from "../../src/fake.js";
 import { run } from "../../src/host.js";
 
-const program: Program = JSON.parse(readFileSync(new URL("../../contracts/examples/spike-program.json", import.meta.url), "utf8"));
+const program: Section = JSON.parse(readFileSync(new URL("../../contracts/examples/spike-program.json", import.meta.url), "utf8"));
 const DF = "df --output=pcent / | tail -1";
 const VACUUM = "journalctl --vacuum-size=500M";
+const section = (body: unknown[], src = 10): Section => ({ name: "Main", src, guidance: null, body });
+const runStmt = (src: number, cmd: string) => ({ src, run: { cmd: [{ lit: cmd }] }, else: null });
+const doStmt = (src: number, cmd: string) => ({ src, do: { cmd: [{ lit: cmd }] }, else: null });
+const stop = (src: number) => ({ src, stop: {} });
 
 describe("lint (SPEC §4.1)", () => {
   test("the example program is clean", () => {
@@ -17,77 +21,127 @@ describe("lint (SPEC §4.1)", () => {
   });
 
   test("E-FALLS-OFF when the last instruction isn't a stop", () => {
-    expect(lint({ body: [{ src: 7, run: { cmd: [{ lit: "true" }] } }] })).toEqual([{ code: "E-FALLS-OFF", src: 7 }]);
+    expect(lint(section([runStmt(7, "true")]))).toEqual([{ code: "E-FALLS-OFF", src: 7 }]);
   });
 
-  test("E-FALLS-OFF for an empty section", () => {
-    expect(lint({ body: [] })).toEqual([{ code: "E-FALLS-OFF", src: 0 }]);
+  test("E-FALLS-OFF for an empty section is reported at its heading", () => {
+    expect(lint(section([], 12))).toEqual([{ code: "E-FALLS-OFF", src: 12 }]);
   });
 
   test("E-UNREACHABLE for an instruction after a stop", () => {
-    expect(lint({ body: [{ src: 1, stop: {} }, { src: 2, stop: {} }] })).toEqual([{ code: "E-UNREACHABLE", src: 2 }]);
+    expect(lint(section([stop(1), stop(2)]))).toEqual([{ code: "E-UNREACHABLE", src: 2 }]);
   });
 });
 
 describe("execution with the fake handler", () => {
-  test("runs each command in order and stops", async () => {
+  test("runs each command in order and stops, with SPEC §10 event names", async () => {
     const exec = fakeExec({ [DF]: { exit: 0 }, [VACUUM]: { exit: 0 } });
     const { events, outcome } = await run(program, { dry: false }, exec);
     expect(exec.calls).toEqual([DF, VACUUM]);
     expect(events).toEqual([
-      { event: "ran", src: 3, kind: "run", cmd: DF, exit: 0 },
+      { event: "run", src: 3, cmd: DF, exit: 0, after_would_do: false },
       { event: "effect_start", src: 4, cmd: VACUUM },
-      { event: "ran", src: 4, kind: "do", cmd: VACUUM, exit: 0 },
+      { event: "effect_end", src: 4, cmd: VACUUM, exit: 0 },
       { event: "outcome", outcome: "stopped" },
     ]);
     expect(outcome).toEqual({ outcome: "stopped" });
   });
 
-  test("a failing command hands off (SPEC §4.3)", async () => {
+  test("a failing command hands off and nothing after it runs (SPEC §4.3)", async () => {
     const exec = fakeExec({ [DF]: { exit: 1 } });
-    const { outcome } = await run(program, { dry: false }, exec);
-    expect(outcome).toEqual({ outcome: "handoff", reason: "command_failed" });
+    const { events, outcome } = await run(program, { dry: false }, exec);
     expect(exec.calls).toEqual([DF]);
+    expect(events).toEqual([
+      { event: "run", src: 3, cmd: DF, exit: 1, after_would_do: false },
+      { event: "outcome", outcome: "handoff", reason: "command_failed" },
+    ]);
+    expect(outcome).toEqual({ outcome: "handoff", reason: "command_failed" });
   });
 
-  test("an unmatched command is E-FAKE-UNMATCHED, never a real run", async () => {
+  test("an unmatched command is E-FAKE-UNMATCHED", async () => {
     await expect(run(program, { dry: false }, fakeExec({}))).rejects.toBeInstanceOf(FakeUnmatched);
   });
 
-  test("a program that fails lint can't be started", async () => {
-    await expect(run({ body: [] }, { dry: false }, fakeExec({}))).rejects.toThrow(/E-FALLS-OFF/);
+  test("a command named after an inherited property is still unmatched", async () => {
+    const p = section([runStmt(3, "toString"), stop(4)]);
+    await expect(run(p, { dry: false }, fakeExec({}))).rejects.toBeInstanceOf(FakeUnmatched);
+  });
+});
+
+describe("the adapter refuses what it can't represent exactly", () => {
+  const refuse: [string, Section][] = [
+    [
+      "a variable part, which would otherwise drop out of the command",
+      section([{ src: 3, do: { cmd: [{ lit: "rm -rf /" }, { var: "dir" }] }, else: null }, stop(4)]),
+    ],
+    ["an unsupported statement, which would otherwise become a stop", section([{ src: 3, check: {} }, stop(4)])],
+    ["an else", section([{ src: 3, run: { cmd: [{ lit: "x" }] }, else: { skip: {} } }, stop(4)])],
+    ["a run binding", section([{ src: 3, run: { cmd: [{ lit: "x" }], as: "x" }, else: null }, stop(4)])],
+    ["a negative src", section([stop(-1)])],
+    ["a fractional src", section([stop(1.5)])],
+  ];
+  for (const [what, p] of refuse) {
+    test(what, () => {
+      expect(() => lint(p)).toThrow(Unsupported);
+    });
+  }
+
+  test("a program that fails lint can't be started", () => {
+    expect(() => new Run(section([]), { dry: false })).toThrow(/E-FALLS-OFF/);
+  });
+
+  test("a fractional exit code", () => {
+    const r = new Run(program, { dry: false });
+    r.step(null);
+    expect(() => r.step({ exit: 1.5 })).toThrow(/integer/);
+  });
+
+  test("a step that skips the command's result, or sends one nobody asked for", () => {
+    const r = new Run(program, { dry: false });
+    expect(() => r.step({ exit: 0 })).toThrow(/nothing asked for/);
+    r.step(null);
+    expect(() => r.step(null)).toThrow(/needs the command's result/);
+  });
+
+  test("a step after the run is done", () => {
+    const r = new Run(section([stop(1)]), { dry: false });
+    expect(r.step(null).next).toEqual({ done: { outcome: "stopped" } });
+    expect(() => r.step(null)).toThrow(/after the run is done/);
   });
 });
 
 describe("dry run suppresses effects (SPEC §4.5, P3)", () => {
-  test("the do never reaches the handler; would_do is emitted instead", async () => {
+  test("the do never reaches the handler; would_do is emitted and later reads are marked", async () => {
+    const p = section([runStmt(3, DF), doStmt(4, VACUUM), runStmt(5, DF), stop(6)]);
     const exec = fakeExec({ [DF]: { exit: 0 } });
-    const { events, outcome } = await run(program, { dry: true }, exec);
-    expect(exec.calls).toEqual([DF]);
+    const { events, outcome } = await run(p, { dry: true }, exec);
+    expect(exec.calls).toEqual([DF, DF]);
     expect(events).toEqual([
-      { event: "ran", src: 3, kind: "run", cmd: DF, exit: 0 },
+      { event: "run", src: 3, cmd: DF, exit: 0, after_would_do: false },
       { event: "would_do", src: 4, cmd: VACUUM },
+      { event: "run", src: 5, cmd: DF, exit: 0, after_would_do: true },
       { event: "outcome", outcome: "stopped" },
     ]);
     expect(outcome).toEqual({ outcome: "stopped" });
   });
 
-  // P3 is proven in Dafny; this checks the compiled code and the adapter
-  // agree with it, over many random programs.
-  test("no random program ever hands a do to the handler in dry run", async () => {
-    let seed = 42;
-    const rand = (n: number) => ((seed = (seed * 1103515245 + 12345) % 2 ** 31), seed % n);
-    for (let i = 0; i < 300; i++) {
-      const body: Stmt[] = Array.from({ length: rand(8) }, (_, j): Stmt =>
-        rand(2) === 0 ? { src: j, run: { cmd: [{ lit: `run-${j}` }] } } : { src: j, do: { cmd: [{ lit: `do-${j}` }] } },
-      );
-      body.push({ src: body.length, stop: {} });
+  // DryRunNeverDoes proves this in Dafny. This checks the compiled code and
+  // the adapter agree, over every run/do sequence up to six long.
+  test("no program of up to six commands hands a do to the handler", async () => {
+    let withDo = 0;
+    for (let n = 1; n < 128; n++) {
+      const bits = n.toString(2).slice(1); // length 0..6; each bit picks run or do
+      const body = [...bits].map((b, i) => (b === "1" ? doStmt(i + 1, `do-${i}`) : runStmt(i + 1, `run-${i}`)));
+      const dos = body.filter((s) => "do" in s).length;
+      if (dos > 0) withDo++;
       const kinds: string[] = [];
-      await run({ body }, { dry: true }, async (req) => {
+      const { events } = await run(section([...body, stop(bits.length + 1)]), { dry: true }, async (req) => {
         kinds.push(req.kind);
         return { exit: 0 };
       });
       expect(kinds).not.toContain("do");
+      expect(events.filter((e) => e.event === "would_do")).toHaveLength(dos);
     }
+    expect(withDo).toBe(120); // every sequence except the seven all-run ones
   });
 });

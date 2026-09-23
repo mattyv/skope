@@ -6,10 +6,11 @@ module SkopLint {
   datatype LintError = LintError(code: string, src: nat)
 
   // Every path must end in stop; here, the last instruction must be one.
-  function FallsOff(body: seq<Stmt>): seq<LintError> {
-    if |body| == 0 then [LintError("E-FALLS-OFF", 0)]
-    else if body[|body| - 1].Stop? then []
-    else [LintError("E-FALLS-OFF", body[|body| - 1].src)]
+  // An empty section is reported at its heading.
+  function FallsOff(p: Program): seq<LintError> {
+    if |p.body| == 0 then [LintError("E-FALLS-OFF", p.src)]
+    else if p.body[|p.body| - 1].Stop? then []
+    else [LintError("E-FALLS-OFF", p.body[|p.body| - 1].src)]
   }
 
   // An instruction straight after a stop can never run.
@@ -22,7 +23,7 @@ module SkopLint {
   }
 
   function Lint(p: Program): seq<LintError> {
-    FallsOff(p.body) + Unreachable(p.body, 0)
+    FallsOff(p) + Unreachable(p.body, 0)
   }
 
   // What a clean lint guarantees the interpreter: the body ends in stop.

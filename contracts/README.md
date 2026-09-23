@@ -12,7 +12,11 @@ of the spike and contracts.
 | `core-program.schema.json` | Core program JSON (SPEC §5.1) | preprocessor (A) and core (B, C) |
 | `examples/*.core.json` | The three example skills as core JSON. Also the M1 goldens: the preprocessor must produce exactly these. | A, B, C, F |
 | `error-codes.json` | Error and warning codes, generated from SPEC §7.1 by `scripts/check_spec.py codes` | everyone who reports errors |
-| `examples/spike-program.json` | The Phase 0 spike's section body (`run`, `do`, `stop`) | spike only |
+| `ask.schema.json` | Backend request and answer (SPEC §6.1). The answer schema checks shape only; the core rejects bad numbers (P5). | host (G) and backends (D) |
+| `fakes.schema.json` | `answers.yaml` and `commands.yaml` for the fake handlers (SPEC §5.4, §6.2) | fakes (D, E) and tests (F) |
+| `event.schema.json` | One line of skop's JSON Lines output (SPEC §10) | everyone who emits events |
+| `src/core.ts` types (`CoreEvent`, `Next`, `Run.step`) | The step interface between the core and the host (SPEC §5.2) | core (C) and host (G) |
+| `examples/spike-program.json` | The Phase 0 spike's section: `run`, `do`, `stop` with literal commands, in the contract's section shape | spike only |
 
 Decisions the spec left open, made here:
 - **`src` is the 1-based line number in SKILL.md.** That's the source-map
