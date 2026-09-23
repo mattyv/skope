@@ -662,6 +662,15 @@ sequenceDiagram
   `Page`.
 - `runConfig` carries params, built-ins, dry-run flag and mode
   (`concrete` or `explore`).
+- **Events are split between core and host.** `Step` returns core events
+  (`CoreEvent` in `core/Step.dfy`) carrying what the core decides: section,
+  line, commands, comparisons, answers, gates, transfers, `would_do`,
+  `after_would_do`, the outcome and its counts. The host adds what only it
+  knows (timestamps, run ids, durations, output hashes and tails, backend,
+  model, request paths) and emits the host-only events (`run_start`,
+  `handoff_page`, `handoff_record`, `error`, `warning`, `locked`,
+  `stale_lock`). `EVENT_FIELDS` in `src/step.ts` says which side fills each
+  field, and a test checks it against `contracts/event.schema.json`.
 
 ### 5.3 Proven properties (MUST)
 CI runs `dafny verify` and fails on any unproven obligation.
@@ -1990,6 +1999,10 @@ Also, where things live in the Markdown:
 - **Goldens list what they ignore**, including `request_sha256`, whose
   exact bytes are an implementation detail.
 - **A deadline handoff points at the next instruction** it didn't start.
+- **A link's anchor is checked against the heading it resolves to**, not
+  its link text, so `[Clean_Up](#clean-up)` finds `## Clean up`.
+- **The step interface includes events**, split between what the core
+  decides and what the host adds (§5.2).
 - **A Score rubric in core JSON is a list** of `{src, level, text}`, so
   each line keeps its source line.
 - **The event contract is one shape per event**, with an example of each

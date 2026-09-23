@@ -49,7 +49,9 @@ function listFiles(dir) {
 
 function trackedFiles() {
   try {
-    return execFileSync("git", ["ls-files", "-z", "--", ...INPUT_DIRS], {
+    // Tracked files plus untracked ones git doesn't ignore: a new module
+    // that isn't committed yet still changes what skop does.
+    return execFileSync("git", ["ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", ...INPUT_DIRS], {
       cwd: ROOT,
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],

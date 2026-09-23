@@ -125,7 +125,7 @@ export interface RunBody {
   as?: Name;
 }
 /**
- * A reference to a section. `anchor` is present only for a real link `[text](#anchor)`: `given` is the anchor written, `expected` the GitHub slug of the link text. The core reports E-UNRESOLVED if they differ.
+ * A reference to a section. `anchor` is present only for a real link `[text](#anchor)`: `given` is the anchor written; `expected` is the GitHub slug of the heading of the section the link text resolves to (SPEC §3.4), or of the link text itself when it resolves to no section. The core reports E-UNRESOLVED if they differ.
  */
 export interface SectionRef {
   section: SectionId;

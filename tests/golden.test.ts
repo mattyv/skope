@@ -40,4 +40,16 @@ describe("golden helper (SPEC §12.3)", () => {
     const b = { event: "run_start", skop_version: "0.2.0", skop_build: "bbb", dry_run: true };
     expect(toJsonl([a])).toBe(toJsonl([b]));
   });
+
+  test("a handoff record's build identity doesn't break goldens", () => {
+    const rec = (build: string) => ({ event: "handoff_record", record: { reason: "deadline", skop: { version: "0.1.0", build } } });
+    expect(toJsonl([rec("aaa")])).toBe(toJsonl([rec("bbb")]));
+  });
+
+  test("a skill variable named path or host is still compared", () => {
+    const rec = (path: string) => ({ event: "handoff_record", record: { variables: { path, host: path } } });
+    expect(toJsonl([rec("/var")])).not.toBe(toJsonl([rec("/tmp")]));
+    const ask = (host: string) => ({ event: "ask", probs: { host: 0.9, path: 0.1 }, chosen: host });
+    expect(toJsonl([ask("host")])).not.toBe(toJsonl([ask("path")]));
+  });
 });

@@ -1,9 +1,10 @@
 // Golden files for event streams (SPEC §12.3). Comparisons ignore the
-// fields that differ between runs or builds: `ts`, `ms`, `run_id`, `host`,
-// `skill_hash`, file paths, and skop's own version and build identity
-// (which changes on every source edit, SPEC §7.2). They're dropped at every
-// depth, so a handoff record inside an event is normalised too, and keys
-// are sorted, so goldens don't depend on the order fields are emitted in.
+// fields that differ between runs or builds, and only where SPEC §10 puts
+// them: an event's own `ts`, `ms`, `run_id`, `host`, `skill_hash`, paths,
+// request hash and skop version and build; and inside a handoff record,
+// `run_id`, `host`, `skill_hash` and `skop`. Anything else is compared,
+// including a skill variable that happens to be called `path` or `host`.
+// Keys are sorted at every depth, so emit order doesn't matter.
 //
 // Set UPDATE_GOLDENS=1 to rewrite a golden from the current output. A
 // rewritten golden is a claim about the spec, so review the diff. CI refuses
@@ -14,6 +15,7 @@ import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect } from "vitest";
 
+// An event's own fields that vary between runs or builds (SPEC §12.3 M3).
 const VARYING = new Set([
   "ts",
   "ms",
@@ -28,20 +30,34 @@ const VARYING = new Set([
   "skop_version",
   "skop_build",
 ]);
+// The same, inside a handoff record (SPEC §8.1).
+const RECORD_VARYING = new Set(["run_id", "host", "skill_hash", "skop"]);
 
-function normaliseValue(v: unknown): unknown {
-  if (Array.isArray(v)) return v.map(normaliseValue);
+const byKey = ([a]: [string, unknown], [b]: [string, unknown]) => (a < b ? -1 : a > b ? 1 : 0);
+
+function sorted(v: unknown): unknown {
+  if (Array.isArray(v)) return v.map(sorted);
   if (v === null || typeof v !== "object") return v;
   return Object.fromEntries(
     Object.entries(v)
-      .filter(([k]) => !VARYING.has(k))
-      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-      .map(([k, x]) => [k, normaliseValue(x)]),
+      .sort(byKey)
+      .map(([k, x]) => [k, sorted(x)]),
   );
 }
 
+const without = (o: object, drop: Set<string>) => Object.fromEntries(Object.entries(o).filter(([k]) => !drop.has(k)));
+
+function normaliseEvent(e: object): object {
+  const out = without(e, VARYING);
+  const record = (e as { event?: string; record?: unknown }).record;
+  if ((e as { event?: string }).event === "handoff_record" && record && typeof record === "object") {
+    out.record = without(record, RECORD_VARYING);
+  }
+  return sorted(out) as object;
+}
+
 export function normalise(events: object[]): object[] {
-  return events.map((e) => normaliseValue(e) as object);
+  return events.map(normaliseEvent);
 }
 
 export function toJsonl(events: object[]): string {

@@ -1,5 +1,6 @@
 // The interface between the core and the host (SPEC §5.2): what Start
-// takes, what Step returns, and what the host sends back. Types only; stream
+// takes, what Step returns (State, seq<CoreEvent>, Next), and what the host
+// sends back. Types only; stream
 // C implements Start and Step against them and proves P1-P6 (SPEC §5.3).
 //
 // Phase 0 contract, mirrored by the TypeScript types in src/step.ts.
@@ -58,6 +59,35 @@ module SkopStep {
     | PageResult(ok: bool)
     | Picked(i: nat)          // answers Choose(n), i < n
     | DeadlineExceeded        // the host may send this instead of any response
+
+  // What Step reports (SPEC §10). The core says what happened; the host adds
+  // what only it knows: ts, run_id, skill, skill_hash, host, and per event
+  // the fields listed in src/step.ts EVENT_FIELDS (durations, output hashes
+  // and tails, backend, model, request paths). Host-only events (run_start,
+  // handoff_page, handoff_record, error, warning, locked, stale_lock) never
+  // come from the core.
+  datatype Where = Where(section: string, line: Src) // display name, SKILL.md line
+  datatype Chosen = ChosenId(id: string) | ChosenLevel(level: int)
+  datatype EventBody =
+    | RunEv(cmd: string, exit: Option<int>, timedOut: bool, afterWouldDo: bool)
+    | CheckCmdEv(cmd: string, exit: Option<int>, timedOut: bool, afterWouldDo: bool)
+    // left and right are the compared values as text, None when unbound or not
+    // a number; result is None when the comparison couldn't be made.
+    | CheckEv(expr: string, left: Option<string>, right: Option<string>, result: Option<bool>, afterWouldDo: bool)
+    // probs, chosen and confidence are None when the backend failed; detail
+    // then says why. range is Some((low, high)) for a Score ask.
+    | AskEv(question: string, kind: AskKind, probs: Option<map<string, real>>, chosen: Option<Chosen>,
+            confidence: Option<real>, sure: nat, passed: bool, range: Option<(int, int)>,
+            detail: Option<AskFailure>, afterWouldDo: bool)
+    | EffectStartEv(cmd: string)
+    | EffectEndEv(cmd: string, exit: Option<int>, timedOut: bool)
+    | WouldDoEv(cmd: string)
+    | PageEv(text: string, ok: bool)
+    | WouldPageEv(text: string)
+    | TransferEv(from: string, to: string) // display names
+    | OutcomeEv(outcome: Outcome, askCalls: nat, effects: nat, dry: bool)
+  // `at` is None only for OutcomeEv.
+  datatype CoreEvent = CoreEvent(at: Option<Where>, body: EventBody)
 
   datatype Mode = Concrete | Explore
 

@@ -161,4 +161,18 @@ describe("build-id.mjs (SPEC §7.2)", () => {
     const written = JSON.parse(readFileSync(out, "utf8"));
     expect(written).toEqual(JSON.parse(r.stdout));
   });
+
+  test("in a git checkout, an untracked source file changes the identity and an ignored one doesn't", () => {
+    const dir = makeTree();
+    const git = (...a: string[]) => execFileSync("git", a, { cwd: dir, stdio: "ignore" });
+    git("init", "-q");
+    writeFileSync(join(dir, ".gitignore"), "src/ignored.ts\n");
+    git("add", "-A");
+    git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "base");
+    const before = buildOf(dir);
+    writeFileSync(join(dir, "src", "ignored.ts"), "export const x = 1;\n");
+    expect(buildOf(dir)).toBe(before);
+    writeFileSync(join(dir, "src", "new-module.ts"), "export const y = 2;\n");
+    expect(buildOf(dir)).not.toBe(before);
+  });
 });
