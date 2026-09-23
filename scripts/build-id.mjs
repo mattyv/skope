@@ -87,5 +87,7 @@ if (writeAt !== -1) {
   if (!out) throw new Error("build-id: --write needs a file path");
   mkdirSync(dirname(join(ROOT, out)), { recursive: true });
   writeFileSync(join(ROOT, out), `${json}\n`);
+  // The same identity as a module, next to the JSON, so a bundled CLI carries it (SPEC §7.2).
+  writeFileSync(join(ROOT, out.replace(/\.json$/, ".js")), `export default ${json};\n`);
 }
 console.log(json);
