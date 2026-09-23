@@ -1,4 +1,4 @@
-# skop (skill op) — Implementation Spec (v1, rev 15)
+# skop (skill op) — Implementation Spec (v1, rev 16)
 
 Audience: an engineer or LLM implementing this from scratch. Everything
 marked **MUST** is normative. Where this spec says "verify against current
@@ -795,6 +795,11 @@ Exactly one backend is used per run.
 | Score levels | 10 | 10 | 10 | 10 |
 | context tokens (`limits.ask_context`) | none | 30k | the model's context length from OpenRouter's model list, minus 2k | none |
 
+The context limit is a **best-effort budget**, not a guarantee. It covers
+only the context, estimated as chars/4, while the question, guidance and
+option descriptions have no size bound. A request can pass this check and
+still be too big for the model. That case is handled at run time (§6.3).
+
 Adding a backend means adding a column here and an entry below. Nothing
 outside §6.2 changes.
 
@@ -803,7 +808,9 @@ outside §6.2 changes.
 on a timeout, a connection error, 408, 429 or 5xx. Wait 500ms before the
 first retry, doubling each time. On 429, wait for `retry-after` instead, if
 it's no longer than `ask.timeout_ms`; otherwise stop retrying. A value
-outside 0–3 is `E-CONFIG`. The cap keeps the worst-case time bounded.
+outside 0–3 is `E-CONFIG`. The cap keeps the worst-case time bounded. A
+"request too large" error is never retried, because the same request would
+fail again (§6.3).
 
 - **`jev`**: TypeSafe Jev. **Read TypeSafe's current API docs for request
   format, auth, and model names; do not guess.** Checked against the docs
@@ -924,7 +931,12 @@ outside 0–3 is `E-CONFIG`. The cap keeps the worst-case time bounded.
 - Truncate to `limits.ask_context` (approximate tokens as chars/4), which
   must fit the backend's context limit (§6.2). Shrink the
   largest values first, keeping their **last** lines (logs are most useful
-  at the end).
+  at the end). This is an estimate, so it can't promise the full request
+  fits (§6.2).
+- If the backend rejects a request as too large for the model's input
+  limit, `skop-ask` reports the backend as unavailable, and the run hands
+  off with reason `ask_unavailable` and detail `request_too_large`. It
+  doesn't retry. Exact token counting can come later.
 - Every request, after redaction, is written to the run directory as
   `ask-<n>.json`. The `ask` event logs its path and sha256, so any decision can
   be reproduced.
@@ -1358,7 +1370,9 @@ file paths.
   ids) as Choice keys, mapped back to ids; context holding only the named
   `run` outputs; a 429 with `retry-after` within and beyond the timeout;
   `W-MODEL-ALIAS` for `jev-latest`; and `ask.retries` of 0 and 3 making
-  exactly 1 and 4 attempts, with 4 rejected as `E-CONFIG`. For `openrouter` that covers letters mapped
+  exactly 1 and 4 attempts, with 4 rejected as `E-CONFIG`; and an
+  oversized request whose "too large" error hands off with
+  `request_too_large` after exactly one attempt. For `openrouter` that covers letters mapped
   to options, the missing-letter example in §6.2 failing a 99% gate, low
   letter mass, missing logprobs, a reasoning-only response, a model without
   logprobs, and too many options. A recorded request for disk-full's
@@ -1835,6 +1849,13 @@ Also, where things live in the Markdown:
   and Jev's types, lists the patterns built from them (multi-select,
   thresholds, degrees, numbers, escape options), and collects the
   question-writing rules from Jev's docs.
+
+### Rev 16 (context budget)
+
+- **The context limit is a best-effort budget.** The question and option
+  text aren't counted, and chars/4 is only an estimate.
+- **A "request too large" error hands off** as `ask_unavailable` with
+  detail `request_too_large`, and is never retried. A test covers it.
 
 ---
 
