@@ -56,8 +56,38 @@ function normaliseEvent(e: object): object {
   return sorted(out) as object;
 }
 
+// G3: the page/handoff_page text (and anything else) contains the run's actual host, run_id
+// and run dir. Take them from run_start (host from the common `host` field, run_id from
+// `run_id`, run_dir from run_start's `run_dir`) and replace those exact substrings with
+// stable placeholders in every string value, so goldens can use the placeholders instead of
+// depending on a real run's host/run_id/run_dir.
+function replaceStrings(v: unknown, replacements: [string, string][]): unknown {
+  if (typeof v === "string") {
+    let out = v;
+    for (const [from, to] of replacements) {
+      if (from) out = out.split(from).join(to);
+    }
+    return out;
+  }
+  if (Array.isArray(v)) return v.map((x) => replaceStrings(x, replacements));
+  if (v === null || typeof v !== "object") return v;
+  return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, replaceStrings(x, replacements)]));
+}
+
 export function normalise(events: object[]): object[] {
-  return events.map(normaliseEvent);
+  const runStart = events.find((e) => (e as { event?: string }).event === "run_start") as
+    | { host?: string; run_id?: string; run_dir?: string }
+    | undefined;
+  // run_dir typically contains run_id (e.g. ".../runs/<run_id>"), so replace the longer,
+  // more specific substring first or its replacement would never match.
+  const replacements: [string, string][] = runStart
+    ? [
+        [runStart.run_dir ?? "", "<run_dir>"],
+        [runStart.run_id ?? "", "<run_id>"],
+        [runStart.host ?? "", "<host>"],
+      ]
+    : [];
+  return events.map((e) => replaceStrings(normaliseEvent(e), replacements) as object);
 }
 
 export function toJsonl(events: object[]): string {

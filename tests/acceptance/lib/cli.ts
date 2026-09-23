@@ -3,6 +3,9 @@
 // goes through this, so there's one place that knows how skop is invoked.
 
 import { spawn } from "node:child_process";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const CLI = fileURLToPath(new URL("../../../dist/cli.js", import.meta.url));
@@ -17,10 +20,41 @@ export interface CliResult {
   events: SkopEvent[];
 }
 
+// P1: each call gets its own throwaway XDG dirs, so parallel test runs never collide on the
+// lock at $XDG_RUNTIME_DIR/skop/<name>.lock (SPEC §7 step 3), and never leak state between
+// runs. Unless the test passes its own `--config` (e.g. the pager-failure test, which needs
+// `pager.command: exit 1`), a config is written with a harmless pager (SPEC §5.4: the pager
+// isn't a skill command, so it always really runs) and a fixed state_dir, so `page`/
+// `handoff_page` events come back `ok: true` and run directories land somewhere disposable.
+function cleanEnv(args: string[], extra: Record<string, string> | undefined): Record<string, string> {
+  const root = mkdtempSync(join(tmpdir(), "skop-test-"));
+  const configHome = join(root, "config");
+  const stateHome = join(root, "state");
+  const runtimeDir = join(root, "runtime");
+
+  const env: Record<string, string> = {
+    ...process.env,
+    XDG_CONFIG_HOME: configHome,
+    XDG_STATE_HOME: stateHome,
+    XDG_RUNTIME_DIR: runtimeDir,
+  };
+  delete env.SKOP_CALLER;
+
+  if (!args.includes("--config")) {
+    mkdirSync(join(configHome, "skop"), { recursive: true });
+    writeFileSync(
+      join(configHome, "skop", "config.yaml"),
+      `pager:\n  command: "cat > /dev/null"\nstate_dir: ${stateHome}/skop\nask:\n  backend: fake\n`,
+    );
+  }
+
+  return { ...env, ...extra };
+}
+
 export function runSkop(args: string[], opts: { env?: Record<string, string>; input?: string } = {}): Promise<CliResult> {
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [CLI, ...args], {
-      env: { ...process.env, ...opts.env },
+      env: cleanEnv(args, opts.env),
       stdio: ["pipe", "pipe", "pipe"],
     });
     let stdout = "";

@@ -9,62 +9,105 @@ its scenario definitions as the thing to review, the same way you'd review
 a hand-edited `.jsonl` file. Re-run it after any edit
 (`node tests/acceptance/tools/build-fixtures.mjs`) and diff the result.
 
-Known caveats to check first:
+This pass (post external-review, SPEC rev 18) fixed:
+- **G1**: `handoff_record.record` now carries the full SPEC §8.1 shape
+  (`skill`, `section`, `line`, `reason`, `detail` for `gate_failed`/
+  `ask_unavailable` asks, `variables`, `effects`, `dry_run`, `skop`,
+  `preamble` — the §8.2 text verbatim), not the `{reason}` stub it used to
+  be. `tests/helpers/golden.ts` still ignores `record.run_id`/`host`/
+  `skill_hash`/`skop`.
+- **G2**: event order in every scenario is `handoff_record`, then
+  `handoff_page` if it pages, then `outcome` last (already the order the
+  generator produced; this pass re-checked it against SPEC §8). Not
+  reviewed: `contracts/examples/events.jsonl`'s own order, which is outside
+  this pass's file list.
+- **G3**: page/handoff_page text embeds the run's actual host, run_id and
+  run dir; `tests/helpers/golden.ts` now replaces those exact substrings
+  (taken from the stream's own `run_start`) with `<host>`/`<run_id>`/
+  `<run_dir>` before comparing, so goldens don't need to hardcode
+  `test-host`/`r-test`/`/tmp/skop/runs/r-test` to match a real run.
+- **G4**: `check.expr` is now `{used} < {threshold}` (no decorative `%`),
+  matching "rendered from the core program" (SPEC §10).
+- **G5**: `ask.question` is the question **as sent** (SPEC §3.5): names
+  bound by `run` are backticked (`` `used` ``, `` `errors` ``, `` `biggest` ``,
+  `` `timer` ``, `` `renew_log` ``, `` `listeners` ``), trusted values
+  (params, list items) are pasted in — including each `for each` iteration's
+  own item label, e.g. `is it worth running "Clear the apt cache"?`, and
+  `example.com` (the `domain` param) pasted into cert-expiry's Reload
+  question.
+- **Gate-failure/passing probabilities are dyadic everywhere** (halves,
+  quarters, eighths, sixteenths, thirty-seconds), so `probs` sums to
+  exactly 1 in IEEE doubles and the golden helper's normalisation is exact.
+  A passing ask uses `0.875/0.0625/.../` (7/8 for the chosen option); a
+  failing one uses `0.5/0.25/0.125/0.125` (disk-full/error-triage) or
+  `0.5/0.3125/0.1875` (cert-expiry, 3 options) — well under `sure`.
+- **error-triage `unavailable`**: previously routed through the ask's own
+  `else [Unsure]` and paged (exit 10). Fixed: the backend being unavailable
+  is `ask_unavailable`, a handoff reason in its own right (SPEC §8.1),
+  distinct from `gate_failed`/the else clause — SPEC §5.4 explicitly says
+  "Unsure and unavailable differ: with `else [Page]`, unsure pages but
+  unavailable hands off." The scenario now hands off, exit 20, with
+  `probs`/`chosen`/`confidence` null and `detail: "unavailable"` on the
+  `ask` event, and `reason: "ask_unavailable"` on the handoff record.
+- **M1/M7 split**: error-triage (Appendix D, v1.1) is no longer linted in
+  `tests/acceptance/m1/lint-cli.test.ts`'s M1 loop (that's the v1 fixture
+  pair only); its `--lint` coverage moved into
+  `tests/acceptance/m7/score-fixture-coverage.test.ts`.
+- **M7 severity coverage**: added `severity-3-page` (error-triage has no
+  explicit `check` for level 3; it falls through the same as level 4, to
+  `[Page]`) so all four Score levels have a scenario, per SPEC §12.1
+  ("Its fakes cover each level").
+- **M3 dry run**: `exec.test.ts` now asserts no `effect_start`/`effect_end`
+  and no `page`/`handoff_page` on dry-run scenarios (there is no `do` event
+  kind in SPEC §10 — dry run suppresses a `do` as `would_do`), and every
+  scenario now also asserts the process exit code against `expected-exit`.
+- **M2 differential check**: `differential.test.ts` now drives the real
+  `--verify --trace <events.jsonl>` flag from §12.4 instead of an invented
+  `--verify --json` "paths" listing, using the trace file format's actual
+  shape (an ordinary events.jsonl). It builds the trace from each
+  scenario's own M3 run (via `runSkop`), not from the golden, and checks
+  both that a real run's trace is accepted (exit 0) and that a truncated
+  one is rejected (exit 40). The stray `"hand_off"` entry (not a real event
+  kind) is gone from the event-kind filter.
+- **P1**: `tests/acceptance/lib/cli.ts`'s `runSkop` now builds a clean,
+  disposable environment per call — a fresh temp dir supplies
+  `XDG_CONFIG_HOME`, `XDG_STATE_HOME` and `XDG_RUNTIME_DIR`, which also
+  fixes lock collisions between parallel test runs at
+  `$XDG_RUNTIME_DIR/skop/<name>.lock` (SPEC §7 step 3). `SKOP_CALLER` is
+  stripped from the inherited environment unless a test sets it. Unless a
+  test passes its own `--config`, a config is written with a harmless pager
+  (`pager.command: "cat > /dev/null"`, so `page`/`handoff_page` events come
+  back `ok: true`) and a fixed `state_dir`.
+
+Known caveats still open:
 
 - **`ask.request_sha256` is a placeholder**, not a real hash
-  (`sha256:0000…0000` on every ask event). The golden helper
-  (`tests/helpers/golden.ts`) does **not** ignore this field — only `ts`,
-  `ms`, `run_id`, `host`, `skill_hash`, `run_dir`, `request_path`, `path`,
-  `file`, `skop_version` and `skop_build` are dropped. But the exact bytes
-  `skop-ask` writes to `ask-<n>.json` (key order, number formatting,
-  trailing whitespace) aren't pinned by SPEC.md or any contract, so no
-  golden can state the real hash today. Flagged in the final stream F
-  report as a spec/contract gap; the two options are (a) add
-  `request_sha256` to the golden helper's ignore list, alongside
-  `skop_version`/`skop_build`, or (b) pin the exact JSON serialisation in
-  `contracts/ask.schema.json`'s description. Whichever is chosen, every
-  golden here needs its `ask` lines re-verified (or the ignore list
-  extended) once real requests exist.
+  (`sha256:0000…0000` on every ask event), same as before — see the
+  original note below.
 - **`stdout_hash` values are real** — sha256 of the exact fake `stdout`
-  string in the matching `commands.yaml` entry — so they should already be
-  correct; spot-check a couple by hand if anything looks off after an edit.
-- **`yes`/`no` are assumed as the option ids for a `yesno` ask** (so
-  `probs`/`chosen` on those events use the strings `"yes"`/`"no"`). SPEC.md
+  string in the matching `commands.yaml` entry.
+- **`yes`/`no` are assumed as the option ids for a `yesno` ask.** SPEC.md
   doesn't name these ids explicitly (§4.2 just says "bind NAME to
-  boolean"); `contracts/README.md` doesn't cover it either. If stream C/D
-  picks different ids, the `yesno` events in every scenario need updating.
-- **Ordinary `check` events' `expr` field** is the literal source text of
-  the comparison (e.g. `"{used} < {threshold}%"`), copied from SKILL.md by
-  hand for each occurrence; `left`/`right` are the coerced decimal values.
-  This matches the one example in `contracts/examples/events.jsonl` but
-  hasn't been cross-checked against a second implementation.
+  boolean"). If stream C/D picks different ids, the `yesno` events in every
+  scenario need updating.
 - **`transfer`/`handoff_record`/`handoff_page` line numbers on gate
   failure and Score-gate-failure-via-`else`** point at the `ask`
-  statement's own `src` line (matching `contracts/examples/events.jsonl`'s
-  gate-failure example). Double-check this against the real host once it
-  exists — it's the natural reading but not spelled out as a rule.
-- **`disk-full/fakes/dry-run` and `cert-expiry/fakes/dry-run`** are the
-  most elaborate scenarios (a full `for_each` loop, or two `do`s and a
-  second real check after suppression) and are the most likely to have a
-  transcription slip. Worth a careful line-by-line read against SPEC §4.5.
-- **Deadline scenarios are not included.** SPEC §12.1 lists "deadline" as
-  a required scenario category per fixture; none of the fifteen scenarios
-  here exercise `limits.deadline`. `commands.yaml`'s `ms` field is
-  documented as advancing the host's simulated clock for exactly this
-  purpose, but SPEC.md doesn't say what `section`/`line` a deadline
-  handoff reports (the deadline is checked *between* steps, so it isn't
-  tied to any one instruction) — raised as a spec gap in the final report.
-  Recommend a human/stream-G decision on the reported line before adding
-  these.
-- **`do`-timeout and generic `command_failed` are only covered for
-  disk-full** (`gate-failure`'s Triage `run` has no timeout variant; there
-  is no dedicated `command-failure` or `do-timeout` scenario in this set —
-  `restart-happy` and `renew-happy` cover the happy `do` path only). Left
-  as follow-up scope; noted in the final report.
-- **cert-expiry has no direct "already-renewed-on-disk, reload only"
-  scenario** (Triage's second `check` transferring straight to Reload
-  without going through the ask). `stop-happy` only exercises the first
-  check. Left as follow-up scope.
+  statement's own `src` line, matching `contracts/examples/events.jsonl`.
+- **New scenarios flagged in the task are only partly added.** This pass
+  added `error-triage/severity-3-page`. Still missing, called out
+  explicitly by the review and left as follow-up scope: per-fixture
+  backend-unavailable/invalid-response scenarios on a **choice** ask (only
+  error-triage's Score ask has one), a `do` timeout, a `command_failed`
+  without an `else`, a `deadline` scenario using `commands.yaml`'s `ms`
+  field, disk-full's line 26 (`du … · else skip`) actually failing so
+  `biggest` is unbound, a tie via `unassigned`, and cert-expiry's
+  Page/Investigate options beyond what `gate-failure`/`renew-happy` already
+  exercise. A secret-redaction pin (a fake's stdout containing something
+  that should be redacted, checked in `stdout_tail` and
+  `record.variables`) is also not yet added. SPEC §7's `deadline` handoff
+  section/line ("the instruction the run would have started next") still
+  needs a human/implementor decision on exactly which line that is when
+  the deadline is checked between steps, not at one.
 
 ## Scenario index
 
@@ -82,6 +125,7 @@ Known caveats to check first:
 | cert-expiry | `dry-run` | `--dry-run`: two `would_do`s in Renew, second check still fails, Page |
 | error-triage | `severity-1-stop` | Score level 1 → stop |
 | error-triage | `severity-2-investigate` | Score level 2 → Investigate → hand off |
+| error-triage | `severity-3-page` | Score level 3 → Page (falls through, same as level 4) |
 | error-triage | `severity-4-page` | Score level 4 → Page |
-| error-triage | `unsure` | Score gate fails (0.45 top, below 75% sure) → Unsure → Page |
-| error-triage | `unavailable` | Backend unavailable on the Score ask → Unsure → Page |
+| error-triage | `unsure` | Score gate fails (0.375 top, below 75% sure) → Unsure → Page |
+| error-triage | `unavailable` | Backend unavailable on the Score ask → handoff (ask_unavailable), exit 20 |

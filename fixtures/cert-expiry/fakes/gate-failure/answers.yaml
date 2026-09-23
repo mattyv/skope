@@ -1,7 +1,7 @@
 {
   "line:28": {
     "s:renew": 0.5,
-    "s:page": 0.3,
-    "s:investigate": 0.2
+    "s:page": 0.3125,
+    "s:investigate": 0.1875
   }
 }

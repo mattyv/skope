@@ -8,13 +8,30 @@
 // as an expected failure there.
 
 import { describe, expect, test } from "vitest";
-import { allScenarios, readYaml } from "../lib/scenarios.js";
+import { runSkop } from "../lib/cli.js";
+import { allScenarios, readExpectedExit, readYaml } from "../lib/scenarios.js";
+
+// M1's slice of error-triage's --lint coverage lives here, not in
+// tests/acceptance/m1/lint-cli.test.ts: error-triage is the Appendix D fixture, which SPEC
+// §12.3 scopes to M7 ("Score asks (v1.1)"), not the M1 v1 fixture pair (disk-full,
+// cert-expiry).
+const ERROR_TRIAGE = new URL("../../../fixtures-next/error-triage/SKILL.md", import.meta.url).pathname;
+
+describe("M1 (v1.1 slice): --lint on error-triage (SPEC §7, §12.3)", () => {
+  test.fails("error-triage/SKILL.md lints clean and exits 0", async () => {
+    const r = await runSkop([ERROR_TRIAGE, "--lint"]);
+    expect(r.code).toBe(0);
+    expect(r.events.some((e: { event: string }) => e.event === "error")).toBe(false);
+  });
+});
 
 describe("M7: error-triage fake scenarios cover every level, unsure and unavailable (SPEC §12.1 v1.1)", () => {
   const scenarios = allScenarios().filter((s) => s.fixture === "error-triage");
 
-  test("a scenario exists for at least one Score level reaching each of the skill's outcomes", () => {
-    expect(scenarios.map((s) => s.name)).toEqual(expect.arrayContaining(["severity-1-stop", "severity-2-investigate", "severity-4-page"]));
+  test("a scenario exists for every Score level (1-4) reaching each of the skill's outcomes", () => {
+    expect(scenarios.map((s) => s.name)).toEqual(
+      expect.arrayContaining(["severity-1-stop", "severity-2-investigate", "severity-3-page", "severity-4-page"]),
+    );
   });
 
   test("a scenario exists for the gate failing (unsure)", () => {
@@ -26,6 +43,15 @@ describe("M7: error-triage fake scenarios cover every level, unsure and unavaila
     expect(s).toBeDefined();
     const answers = readYaml((s as (typeof scenarios)[number]).answersPath) as Record<string, unknown>;
     expect(Object.values(answers)).toContain("unavailable");
+  });
+
+  // The backend being unavailable is never routed through the ask's own `else [Unsure]`: SPEC
+  // §8.1 lists `ask_unavailable` as its own handoff reason, distinct from `gate_failed`
+  // (§4.2/§5.4). The scenario's expected-exit (20, handoff) pins that, independent of the
+  // event-stream golden checked in tests/acceptance/m3/exec.test.ts.
+  test("the 'unavailable' scenario hands off (exit 20), not the ask's else (paged, exit 10)", () => {
+    const s = scenarios.find((s) => s.name === "unavailable") as (typeof scenarios)[number];
+    expect(readExpectedExit(s.expectedExitPath)).toBe(20);
   });
 });
 

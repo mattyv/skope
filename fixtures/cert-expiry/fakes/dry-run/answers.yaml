@@ -1,11 +1,11 @@
 {
   "line:28": {
-    "s:renew": 0.92,
-    "s:page": 0.05,
-    "s:investigate": 0.03
+    "s:renew": 0.875,
+    "s:page": 0.0625,
+    "s:investigate": 0.0625
   },
   "line:45": {
-    "nginx": 0.96,
-    "haproxy": 0.04
+    "nginx": 0.9375,
+    "haproxy": 0.0625
   }
 }

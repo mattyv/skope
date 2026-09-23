@@ -1,56 +1,58 @@
 // The differential check (SPEC §12.4): "For each fake scenario, the
-// concrete trace MUST appear among the explore handler's paths. Deadline
-// scenarios are excluded (SPEC §5.4)." PLAN.md §4 F: "the differential
-// check ..., ready to run once integration lands." None of this repo's
+// concrete trace MUST appear among the explore handler's paths.
+// `skop SKILL.md --verify --trace events.jsonl` checks one: it replays the
+// trace's sequence of (section, line, response class) through the
+// explorer's graph and exits 0 if the explorer can take that path, 40 if
+// it can't. Deadline scenarios are excluded (§5.4)." None of this repo's
 // fixtures exercise a deadline handoff, so none are excluded here.
 //
-// SPEC §5.6 describes the verify report's content (total paths, reachable
-// outcomes, max backend calls/effects, worst-case duration, unreached
-// sections) but contracts/ has no JSON schema pinning its exact shape. This
-// test assumes `skop --verify --json <skill>` prints one JSON object with a
-// `paths` array, each entry a `src` (SKILL.md line number) array describing
-// one abstract path through the transfer graph, in execution order — the
-// natural reading of §5.4's "explore handler ... walks the paths" and
-// §5.6's "total abstract paths". If stream G's real report shape differs
-// (a different field name, or `--verify` without `--json` already printing
-// structured JSON), fix the two small helpers below rather than the
-// scenario loop; this is noted as a spec gap in the stream F report.
+// The trace file is an ordinary events.jsonl (a golden, or a real run's
+// stdout captured to a file) — `--trace` takes exactly that shape, so this
+// test builds it from the *actual* M3 run's events (not the golden), which
+// also exercises the CLI's own JSON Lines output as a valid trace input.
 
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import { runSkop } from "../lib/cli.js";
-import { allScenarios, readGolden } from "../lib/scenarios.js";
+import { allScenarios } from "../lib/scenarios.js";
 
-/** The concrete trace: src lines of every instruction the run actually executed, in order. */
-function concreteTrace(events: object[]): number[] {
-  const stepKinds = new Set(["run", "check_cmd", "check", "ask", "effect_start", "would_do", "page", "would_page", "hand_off"]);
-  return events
-    .filter((e) => stepKinds.has((e as { event: string }).event))
-    .map((e) => (e as { line: number }).line)
-    .filter((line) => typeof line === "number");
+function writeTrace(events: object[]): string {
+  const dir = mkdtempSync(join(tmpdir(), "skop-trace-"));
+  const path = join(dir, "events.jsonl");
+  writeFileSync(
+    path,
+    events
+      .map((e) => JSON.stringify(e))
+      .join("\n")
+      .concat("\n"),
+  );
+  return path;
 }
 
-async function verifyPaths(skillPath: string): Promise<number[][]> {
-  const r = await runSkop([skillPath, "--verify", "--json"]);
-  const report = JSON.parse(r.stdout) as { paths: { src: number[] }[] };
-  return report.paths.map((p) => p.src);
-}
-
-function isSubsequence(needle: number[], haystack: number[]): boolean {
-  let i = 0;
-  for (const x of haystack) {
-    if (i < needle.length && x === needle[i]) i++;
-  }
-  return i === needle.length;
-}
-
-describe("differential check: every concrete fake trace appears among --verify's explored paths (SPEC §12.4)", () => {
+describe("differential check: a real run's trace is one --verify's explorer can take (SPEC §12.4)", () => {
   for (const s of allScenarios()) {
-    test.fails(`${s.fixture}/${s.name}`, async () => {
-      const golden = readGolden(s.goldenPath);
-      const trace = concreteTrace(golden);
-      const paths = await verifyPaths(s.skillPath);
-      expect(paths.length).toBeGreaterThan(0);
-      expect(paths.some((p) => isSubsequence(trace, p))).toBe(true);
+    test.fails(`${s.fixture}/${s.name}: --verify --trace exits 0 on the run's own trace`, async () => {
+      const mode = s.name === "dry-run" ? "--dry-run" : "--apply";
+      const run = await runSkop([s.skillPath, mode, "--fake", s.answersPath, "--fake-exec", s.commandsPath]);
+      expect(run.events.length).toBeGreaterThan(0);
+      const trace = writeTrace(run.events);
+
+      const r = await runSkop([s.skillPath, "--verify", "--trace", trace]);
+      expect(r.code).toBe(0);
+    });
+
+    test.fails(`${s.fixture}/${s.name}: --verify --trace exits 40 on a tampered trace`, async () => {
+      const mode = s.name === "dry-run" ? "--dry-run" : "--apply";
+      const run = await runSkop([s.skillPath, mode, "--fake", s.answersPath, "--fake-exec", s.commandsPath]);
+      // Tamper with the trace by dropping its outcome event: no explored path ends mid-stream,
+      // so the explorer can't have taken this (truncated) sequence.
+      const tampered = run.events.filter((e) => (e as { event: string }).event !== "outcome");
+      const trace = writeTrace(tampered);
+
+      const r = await runSkop([s.skillPath, "--verify", "--trace", trace]);
+      expect(r.code).toBe(40);
     });
   }
 });

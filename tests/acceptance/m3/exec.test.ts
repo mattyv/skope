@@ -15,7 +15,7 @@
 import { describe, expect, test } from "vitest";
 import { normalise } from "../../helpers/golden.js";
 import { runSkop } from "../lib/cli.js";
-import { allScenarios, readGolden } from "../lib/scenarios.js";
+import { allScenarios, readExpectedExit, readGolden } from "../lib/scenarios.js";
 
 describe("M3: exec with fakes matches the golden event stream (SPEC §12.3)", () => {
   for (const s of allScenarios()) {
@@ -31,9 +31,14 @@ describe("M3: exec with fakes matches the golden event stream (SPEC §12.3)", ()
       const result = await runSkop([s.skillPath, mode, "--fake", s.answersPath, "--fake-exec", s.commandsPath]);
       const expected = readGolden(s.goldenPath);
       expect(normalise(result.events)).toEqual(normalise(expected));
+      expect(result.code).toBe(readExpectedExit(s.expectedExitPath));
       if (isDryRun) {
-        expect(result.events.some((e: { event: string }) => e.event === "do")).toBe(false);
-        expect(result.events.some((e: { event: string }) => e.event === "page")).toBe(false);
+        // "do" isn't a real event kind (SPEC §10 has no such event); dry run suppresses a
+        // `do` as `would_do` instead, so no `effect_start`/`effect_end` pair is ever logged,
+        // and suppresses a `page` as `would_page`/`would_page`'s handoff sibling instead, so
+        // no `page` or `handoff_page` is ever logged (SPEC §4.5, §8).
+        expect(result.events.some((e: { event: string }) => e.event === "effect_start" || e.event === "effect_end")).toBe(false);
+        expect(result.events.some((e: { event: string }) => e.event === "page" || e.event === "handoff_page")).toBe(false);
       }
     });
   }
