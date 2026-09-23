@@ -47,7 +47,12 @@ Node.
 ### 1.2 Non-goals (v1)
 - General-purpose programming (no arithmetic, no user functions, no
   unbounded loops, no recursion).
-- Resuming a run after handoff (v1.1).
+- Answer and resume (v1.1). Today a handoff ends the run, so whoever picks
+  it up owns the whole rest of the incident. In v1.1, when a run stops at an
+  `ask`, a person or agent picks one of the author's options, and skop
+  continues from that point. The answer goes through the same validation as
+  a Jev answer (P5), so the rest of the run keeps skop's checks. It needs
+  skop to save and restore a run's state mid-run.
 - `guarantees:` block for custom effect properties (v1.1).
 - MCP server (v1.1; the CLI contract below is designed to be wrapped).
 - Multi-select and numeric answers. Use a `for each` of `yes | no` asks
@@ -1027,6 +1032,9 @@ Run in CI.
   is the same design in plain TypeScript with property-based tests.
 - Pager integration target (Slack, PagerDuty, etc.).
 - How agent launching should work in v1.1.
+- Answer and resume (§1.2): how to save a run's state, how to re-check
+  what changed while the run was paused, and which handoffs can resume
+  (a failed or unavailable `ask`, and maybe a failed command with an else).
 - Whether to add a cumulative gate, e.g. "level ≥ 3 with 75% confidence".
   Not in v1.1: it's a second gate meaning to prove and explain.
 - Default `sure` values. A four-way ask at 85% may fail the gate on most real
