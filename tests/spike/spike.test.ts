@@ -32,6 +32,17 @@ describe("lint (SPEC §4.1)", () => {
   test("E-UNREACHABLE for an instruction after a stop", () => {
     expect(lint(section([stop(1), stop(2)]))).toEqual([{ code: "E-UNREACHABLE", src: 2 }]);
   });
+
+  test("every error is reported, in order", () => {
+    expect(lint(section([stop(1), stop(2), stop(3)]))).toEqual([
+      { code: "E-UNREACHABLE", src: 2 },
+      { code: "E-UNREACHABLE", src: 3 },
+    ]);
+    expect(lint(section([stop(1), runStmt(2, "true")]))).toEqual([
+      { code: "E-FALLS-OFF", src: 2 },
+      { code: "E-UNREACHABLE", src: 2 },
+    ]);
+  });
 });
 
 describe("execution with the fake handler", () => {
@@ -61,6 +72,48 @@ describe("execution with the fake handler", () => {
 
   test("an unmatched command is E-FAKE-UNMATCHED", async () => {
     await expect(run(program, { dry: false }, fakeExec({}))).rejects.toBeInstanceOf(FakeUnmatched);
+    await expect(run(program, { dry: false }, fakeExec({}))).rejects.toMatchObject({ code: "E-FAKE-UNMATCHED" });
+  });
+
+  test("the handler gets each command's kind, text and line", async () => {
+    const p = section([runStmt(3, "a"), doStmt(4, "b"), runStmt(5, "c"), stop(6)]);
+    for (const dry of [false, true]) {
+      const seen: string[] = [];
+      await run(p, { dry }, async (q) => {
+        seen.push(`${q.kind}:${q.cmd}:${q.src}`);
+        return { exit: 0 };
+      });
+      expect(seen).toEqual(dry ? ["run:a:3", "run:c:5"] : ["run:a:3", "do:b:4", "run:c:5"]);
+    }
+  });
+
+  test("a command's parts are joined exactly", async () => {
+    const seen: string[] = [];
+    const p = section([{ src: 1, run: { cmd: [{ lit: "echo " }, { lit: "hi" }, { lit: "!" }] }, else: null }, stop(2)]);
+    await run(p, { dry: false }, async (q) => {
+      seen.push(q.cmd);
+      return { exit: 0 };
+    });
+    expect(seen).toEqual(["echo hi!"]);
+  });
+
+  test("a failing do hands off, and its end records the exit", async () => {
+    const { events } = await run(section([doStmt(1, "b"), stop(2)]), { dry: false }, async () => ({ exit: 3 }));
+    expect(events).toEqual([
+      { event: "effect_start", src: 1, cmd: "b" },
+      { event: "effect_end", src: 1, cmd: "b", exit: 3 },
+      { event: "outcome", outcome: "handoff", reason: "command_failed" },
+    ]);
+  });
+
+  test("a failing read hands off in a dry run too", async () => {
+    const { outcome } = await run(section([runStmt(1, "a"), stop(2)]), { dry: true }, async () => ({ exit: 2 }));
+    expect(outcome).toEqual({ outcome: "handoff", reason: "command_failed" });
+  });
+
+  test("a negative exit is a failure", async () => {
+    const { outcome } = await run(section([runStmt(1, "a"), stop(2)]), { dry: false }, async () => ({ exit: -1 }));
+    expect(outcome).toEqual({ outcome: "handoff", reason: "command_failed" });
   });
 
   test("a command named after an inherited property is still unmatched", async () => {
@@ -80,6 +133,13 @@ describe("the adapter refuses what it can't represent exactly", () => {
     ["a run binding", section([{ src: 3, run: { cmd: [{ lit: "x" }], as: "x" }, else: null }, stop(4)])],
     ["a negative src", section([stop(-1)])],
     ["a fractional src", section([stop(1.5)])],
+    ["a part with a literal and a variable", section([{ src: 3, run: { cmd: [{ lit: "rm ", var: "d" }] }, else: null }, stop(4)])],
+    ["a falsy else that isn't null", section([{ src: 3, run: { cmd: [{ lit: "x" }] }, else: 0 }, stop(4)] as unknown[])],
+    ["a do with extra fields", section([{ src: 3, do: { cmd: [{ lit: "x" }], as: "y" }, else: null }, stop(4)] as unknown[])],
+    ["a statement that is both a run and a stop", section([{ src: 3, run: { cmd: [{ lit: "x" }] }, stop: {}, else: null }] as unknown[])],
+    ["a negative section line", section([stop(1)], -1)],
+    ["a fractional section line", section([stop(1)], 1.5)],
+    ["a body that isn't a list", { name: "Main", src: 1, guidance: null, body: {} } as unknown as Section],
   ];
   for (const [what, p] of refuse) {
     test(what, () => {
