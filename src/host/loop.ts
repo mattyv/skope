@@ -75,7 +75,6 @@ export async function runLoop(interp: Interp, ctx: LoopContext): Promise<LoopRes
   let lastExec: LoopResult["lastExec"] = null;
   // Host fields for the core event that reports the request just answered.
   let pending: Record<string, unknown> = {};
-  let unassigned = 0;
   let response: Response = { kind: "none" };
 
   for (;;) {
@@ -99,10 +98,7 @@ export async function runLoop(interp: Interp, ctx: LoopContext): Promise<LoopRes
       }
       if (body.event === "would_do") effects.push({ cmd: body.cmd, status: "would_do" });
       if (body.event === "ask") {
-        // Probability the backend couldn't attribute is shown next to the options, so a tie it causes is visible.
-        const probs = body.probs && unassigned > 0 ? { ...body.probs, unassigned } : body.probs;
-        out.probs = probs;
-        lastAsk = { question: body.question, probs, sure: body.sure, ...(body.range ? { range: body.range } : {}) };
+        lastAsk = { question: body.question, probs: body.probs, sure: body.sure, ...(body.range ? { range: body.range } : {}) };
       }
       ctx.emit(out);
     }
@@ -139,7 +135,6 @@ export async function runLoop(interp: Interp, ctx: LoopContext): Promise<LoopRes
       case "ask": {
         const { response: r, fields } = await handlers.ask(next.request, next.src);
         pending = { ...fields };
-        unassigned = r.kind === "answer" ? r.unassigned : 0;
         return r;
       }
       case "page":

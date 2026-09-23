@@ -152,7 +152,7 @@ describe("host loop", () => {
     ]);
   });
 
-  test("an ask event gets the backend's fields, and unassigned probability is shown with the options", async () => {
+  test("an ask event gets the backend's fields; probs stay keyed by option id only (SPEC §10)", async () => {
     const ask: CoreEvent = {
       at,
       event: "ask",
@@ -175,9 +175,9 @@ describe("host loop", () => {
       backend: "fake",
       model: "fake",
       request_path: "/r/ask-1.json",
-      probs: { yes: 0.5, no: 0.25, unassigned: 0.25 },
+      probs: { yes: 0.5, no: 0.25 },
     });
-    expect(r.lastAsk).toEqual({ question: "q?", probs: { yes: 0.5, no: 0.25, unassigned: 0.25 }, sure: 90 });
+    expect(r.lastAsk).toEqual({ question: "q?", probs: { yes: 0.5, no: 0.25 }, sure: 90 });
   });
 
   test("page text is escaped in the event and to the pager: no mentions, no links", async () => {

@@ -111,13 +111,18 @@ Known caveats still open:
     900000ms, SPEC §3.1 — neither fixture's frontmatter overrides it) and
     a `commands.yaml` `ms: 1000000` on the first instruction, rather than
     editing frontmatter (out of this pass's scope). The handoff's
-    `section`/`line` is the next instruction that didn't start (SPEC §7
-    step 5), which for both fixtures is the very next line after the one
-    the huge `ms` was attached to.
+    `section`/`line` is the next request the host would have started
+    (SPEC §7 step 5, as settled with stream G): pure steps such as
+    disk-full's line 24 comparison run in the same core `Step`, so
+    disk-full hands off at line 25 after logging the check, and
+    cert-expiry at line 24.
   - `unbound-biggest` renders the ask's unbound name as `(unavailable)`
     per SPEC §3.5 ("A name used in `Q` or `QUOTED` that may be unbound
     renders as `(unavailable)`") — this is not actually ambiguous in
     SPEC.md, despite the note this file used to carry.
+  - `ask.probs` in events and in a record's `detail` is keyed by option
+    id only (SPEC §10, as settled with stream G); `unassigned` appears
+    only in the fake answer.
   - `tie-unassigned` uses dyadic `A=0.5, B=0.25, unassigned=0.25` as in
     the task brief. At every `sure` value the two fixtures actually use
     (75–90%), a tie-causing `unassigned` share can only appear together

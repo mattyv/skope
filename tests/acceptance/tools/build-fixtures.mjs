@@ -842,18 +842,21 @@ function dfRunStart(dry_run) {
 }
 
 // --- deadline: a huge simulated `ms` on line 23 pushes the run past limits.deadline (default
-// 15m/900000ms, SPEC §3.1) before the next instruction (the line 24 check) can start ---
+// 15m/900000ms, SPEC §3.1). The line 24 check is pure, so it runs in the same Step as line 23's
+// result; the handoff points at the next request the host would have started, line 25 (SPEC §7
+// step 5) ---
 {
   const events = [
     dfRunStart(false),
     mk.run(DF, { section: "Triage", line: 23, cmd: "df --output=pcent / | tail -1", exit: 0, stdout: " 91%\n" }),
+    mk.check(DF, { section: "Triage", line: 24, expr: "{used} < {threshold}", left: "91", right: "85", result: false }),
     mk.handoffRecord(DF, {
       section: "Triage",
-      line: 24,
+      line: 25,
       record: buildRecord({
         skill: DF,
         section: "Triage",
-        line: 24,
+        line: 25,
         reason: "deadline",
         variables: { used: "91%" },
         effects: [],
@@ -862,7 +865,7 @@ function dfRunStart(dry_run) {
     }),
     mk.handoffPage(DF, {
       section: "Triage",
-      line: 24,
+      line: 25,
       text: "test-host: skop disk-full handed off (deadline) in Triage. Record: /tmp/skop/runs/r-test/handoff.json",
       ok: true,
     }),
@@ -887,7 +890,7 @@ function dfRunStart(dry_run) {
       line: 27,
       question: "Given `used`, `errors` and `biggest`, what's the best next step?",
       kind: "choice",
-      probs: { "s:clean_up": 0.5, "s:restart": 0.25, "s:page": 0, "s:investigate": 0, unassigned: 0.25 },
+      probs: { "s:clean_up": 0.5, "s:restart": 0.25, "s:page": 0, "s:investigate": 0 },
       chosen: "s:clean_up",
       confidence: 0.5,
       sure: 85,
@@ -903,7 +906,7 @@ function dfRunStart(dry_run) {
         reason: "gate_failed",
         detail: {
           question: "Given `used`, `errors` and `biggest`, what's the best next step?",
-          probs: { "s:clean_up": 0.5, "s:restart": 0.25, "s:page": 0, "s:investigate": 0, unassigned: 0.25 },
+          probs: { "s:clean_up": 0.5, "s:restart": 0.25, "s:page": 0, "s:investigate": 0 },
           sure: 85,
         },
         variables: { used: "91%", errors: "ambiguous", biggest: "ambiguous" },
@@ -1600,7 +1603,7 @@ function ceRunStart(dry_run) {
       line: 28,
       question: "Given `timer` and `renew_log`, what's the best next step?",
       kind: "choice",
-      probs: { "s:renew": 0.5, "s:page": 0.25, "s:investigate": 0, unassigned: 0.25 },
+      probs: { "s:renew": 0.5, "s:page": 0.25, "s:investigate": 0 },
       chosen: "s:renew",
       confidence: 0.5,
       sure: 85,
@@ -1616,7 +1619,7 @@ function ceRunStart(dry_run) {
         reason: "gate_failed",
         detail: {
           question: "Given `timer` and `renew_log`, what's the best next step?",
-          probs: { "s:renew": 0.5, "s:page": 0.25, "s:investigate": 0, unassigned: 0.25 },
+          probs: { "s:renew": 0.5, "s:page": 0.25, "s:investigate": 0 },
           sure: 85,
         },
         variables: { timer: "ambiguous", renew_log: "ambiguous" },

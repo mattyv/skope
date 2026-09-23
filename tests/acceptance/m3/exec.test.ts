@@ -32,9 +32,6 @@ const PENDING = new Set([
   "error-triage/severity-4-page",
   "error-triage/unavailable",
   "error-triage/unsure",
-  // Deadline: the golden hands off at line 24, a pure check inside the same Step as line 23's
-  // result; the host can only stop between Steps (SPEC §5.2, §7 step 5), so it hands off at 25.
-  "disk-full/deadline",
 ]);
 
 describe("M3: exec with fakes matches the golden event stream (SPEC §12.3)", () => {
