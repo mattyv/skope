@@ -72,6 +72,31 @@ jobs:
       - name: Every closed milestone's acceptance tests pass, none skipped
         run: python3 scripts/check_spec.py milestones
 
+  package:
+    name: Packaging (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm, macos-14]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - run: npm ci
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+      - name: install.sh passes shellcheck (POSIX sh)
+        if: runner.os == 'Linux'
+        run: shellcheck -s sh install.sh
+      - name: Bundle, standalone binary and installer tests (SPEC §5.5, §12.3)
+        run: npx vitest run tests/package
+
   dafny:
     name: Dafny proofs
     runs-on: ubuntu-latest

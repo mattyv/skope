@@ -1,4 +1,7 @@
 node_modules/
 dist/
+dist-bundle/
+dist-bin/
+build-identity.json
 __pycache__/
 .claude/worktrees/
