@@ -27,6 +27,14 @@ piece is proven done.
   before its feature is marked expected-to-fail (`test.fails` in Vitest).
   CI checks that it still fails. When the feature lands, the owner flips it
   to a normal test in the same PR. Nothing is ever skipped silently.
+- **Build the smallest thing that works.** The repo carries the
+  [ponytail](https://github.com/DietrichGebert/ponytail) skills (v4.10.0,
+  MIT) in `.claude/skills/`: `ponytail` while writing code,
+  `ponytail-review` on each PR, `ponytail-audit` before each milestone, and
+  `ponytail-debt` to list the shortcuts marked with `ponytail:` comments.
+  One exception: ponytail's "one self-check, no test suites unless asked"
+  rule doesn't apply here. This plan asks for the full test suites, so
+  ponytail must never trim them.
 - **Main is always green.** Every PR runs the full CI gate (§5). Streams
   merge small PRs often rather than one big one at the end.
 
