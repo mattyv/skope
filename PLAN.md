@@ -153,6 +153,16 @@ an independent review and a proof review. What the next agents need to know:
   run/do sequence up to six long) and asserts how many contain a `do`.
 - Event names follow SPEC §10: `run`, `effect_start`, `effect_end`,
   `would_do`, `outcome`, with `after_would_do` on reads after a `would_do`.
+- **A passing test isn't evidence it tests anything.** A mutation review
+  planted 160 small bugs; dozens survived, in the adapter, the proofs'
+  edges, the schemas and the tooling scripts. Every targeted survivor is
+  now caught. Streams should mutation-check their own tests the same way
+  before asking for review.
+
+**Phase 0 is closed.** The spike works, the contracts are frozen, and the
+milestone review (spec conformance, correctness and security, proofs,
+tests, ponytail) found nothing left open. CI is green on every platform.
+Phase 1 can start.
 
 **Contracts** (in `contracts/`, owned by the Phase 0 agent, later by the
 integration agent; `contracts/README.md` lists the files and the decisions
@@ -161,8 +171,8 @@ the spec left open):
 | Contract | Between | Source in the spec |
 |---|---|---|
 | Core program JSON schema, with 3 hand-written examples | preprocessor (A) and core (B, C) | §5.1 |
-| Dafny AST types, `Syntax.dfy` | lint (B) and interpreter (C) | §5.1, §5.2 |
-| `Step` interface: requests, responses, events | core (C) and host (G) | §5.2 |
+| Dafny AST types, `core/Ast.dfy` (the spike's `Syntax.dfy` goes when C replaces it) | lint (B) and interpreter (C) | §5.1, §5.2 |
+| `Step` interface: requests, responses, events, `core/Step.dfy` and `src/step.ts` | core (C) and host (G) | §5.2 |
 | Ask request and answer schema, including `unassigned` | host (G) and backends (D) | §6.1 |
 | Fake file formats: answers and commands | fakes (D, E) and tests (F) | §5.4, §6.2 |
 | Log event schema | everyone who emits events | §10 |
