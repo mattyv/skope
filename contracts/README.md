@@ -19,10 +19,6 @@ test fails if it's stale.
 | `fakes.schema.json` | `answers.yaml` and `commands.yaml` for the fake handlers (SPEC §5.4, §6.2) | fakes (D, E) and tests (F) |
 | `event.schema.json` | One line of skop's JSON Lines output (SPEC §10): one shape per event | everyone who emits events |
 | `examples/events.jsonl` | One example of every event kind; a test checks they cover the schema | G, F |
-| `examples/spike-program.json` | The Phase 0 spike's section: `run`, `do`, `stop` with literal commands | spike only |
-
-The spike's `core/Syntax.dfy`, `Lint.dfy` and `Interp.dfy` stay until
-stream C replaces them with code on `Ast.dfy` and `Step.dfy`.
 
 **Host ↔ `skop-ask` environment variables.** The host launches `skop-ask`
 per run with these instead of re-reading `config.yaml` (PLAN.md §4 E owns
