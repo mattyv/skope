@@ -29,13 +29,14 @@ async function main(argv: string[]): Promise<number> {
     process.stderr.write(`skop: give exactly one skill file\n${USAGE}\n`);
     return 40;
   }
-  if (values.explain || values.verify) {
-    process.stderr.write("skop: --explain and --verify need the real core, which hasn't landed yet\n");
-    return 50;
+  if (values.trace !== undefined && !values.verify) {
+    process.stderr.write(`skop: --trace goes with --verify\n${USAGE}\n`);
+    return 40;
   }
   return runSkill({
     file,
-    mode: values.lint ? "lint" : "run",
+    mode: values.lint ? "lint" : values.verify ? "verify" : values.explain ? "explain" : "run",
+    trace: values.trace,
     apply: values.apply ?? false,
     dryRun: values["dry-run"] ?? false,
     noPage: values["no-page"] ?? false,

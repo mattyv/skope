@@ -54,6 +54,14 @@ export class Interp {
     return out;
   }
 
+  fork(): Interp {
+    throw new Error("the stand-in can't explore: --verify and --explain need the real core");
+  }
+
+  key(): string {
+    return this.fork() as never;
+  }
+
   variables(): Record<string, Val> {
     return Object.fromEntries([...this.vars].filter(([, b]) => b.run).map(([k, b]) => [k, b.v]));
   }

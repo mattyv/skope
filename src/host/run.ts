@@ -27,10 +27,13 @@ import type { AskRequest, Response, RunConfig, Val } from "../step.js";
 import { identity } from "./identity.js";
 import { escapePage, type Handlers, type LoopResult, runLoop } from "./loop.js";
 import { Interp, unsafeInputs } from "./standin.js";
+import { readOnly } from "./verify.js";
 
 export interface RunOptions {
   file: string;
-  mode: "run" | "lint";
+  mode: "run" | "lint" | "verify" | "explain";
+  /** With --verify: a run's events.jsonl to replay (SPEC §12.4). */
+  trace?: string;
   apply: boolean;
   dryRun: boolean;
   noPage: boolean;
@@ -117,6 +120,16 @@ export async function runSkill(o: RunOptions): Promise<number> {
       throw new End("invalid");
     }
     if (o.mode === "lint") return 0;
+    if (o.mode === "verify" || o.mode === "explain") {
+      return readOnly(o.mode === "verify" ? { verify: true, trace: o.trace } : { explain: true }, {
+        program,
+        config,
+        params: params(program, o.params, fail),
+        start: (c) => new Interp(program, c),
+        emit: (e) => process.stdout.write(`${JSON.stringify(e)}\n`),
+        warn: (code, message, line) => diag("warning", { code, stage: "lint", file: o.file, line, message }),
+      });
+    }
 
     // Step 2: params and built-ins (SPEC §3.5, §7).
     const runId = `r-${randomBytes(4).toString("hex")}`;
