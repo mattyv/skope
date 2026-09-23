@@ -120,18 +120,28 @@ limits:                         # optional; defaults shown
 ```
 
 ### 3.2 Document structure
-- `# Heading` (level 1): title. Prose only.
+- `# Heading` (level 1): title. It and everything before the first `##`
+  heading are prose.
 - `## Heading` (level 2): a **section**. The heading text is the section name.
   Section names MUST be unique (case-insensitive).
-- Level 3+ headings are prose and belong to the enclosing section.
-- A section is either:
-  - an **instruction section**: contains at least one instruction (§3.3), or
-  - a **data section**: contains no instructions and exactly one list (§3.6).
-- The first paragraph of an instruction section is its **guidance**. It is
-  sent to Jev as the description of that section when it is an `ask` option
-  (§6.1).
+- Level 3+ headings are prose. They don't split a section: everything up to
+  the next `##` belongs to the enclosing section.
+- A section is one of:
+  - an **instruction section**: contains at least one instruction (§3.3);
+  - any other section, which is prose. Prose-only sections, like
+    `## Background`, are fine. A section used as a list (`[List]`) is a
+    **data section** and MUST contain exactly one list (§3.6), or it's
+    `E-SECTION-KIND`.
+- An instruction section's **guidance** is its first paragraph before its
+  first list. If there's none, it's the first paragraph anywhere in the
+  section. If there's none at all, the section has no guidance. Guidance is
+  sent as the section's description when it's an `ask` option (§6.1). A
+  section offered as an option with no guidance gets warning
+  `W-NO-GUIDANCE`, since the model decides from descriptions.
 - Paragraphs, bold text in paragraphs, code blocks, tables, and blockquotes
-  are **always prose**. The runtime ignores them; agents read them.
+  are **prose**. The runtime ignores them; agents read them. A keyword in the
+  middle of a paragraph is prose too. A list item that starts with a keyword
+  is never prose; see §3.3 rule 7.
 
 ### 3.3 Instructions
 An instruction is a **list item** whose text begins with a bold span whose
@@ -140,14 +150,17 @@ content, case-insensitively, is one of the keywords:
 `run`, `do`, `check`, `ask`, `for each`, `if yes`, `then`, `page`, `hand off`, `stop`
 
 Rules:
-1. **Where instructions live.** Instructions are recognised in (a) items of a
-   top-level list in an instruction section, and (b) items of the nested list
-   under a `for each`. Two other nested lists are not instructions:
+1. **Where instructions live.** Instructions are recognised in (a) items of
+   every top-level list in an instruction section, and (b) items of the
+   nested list under a `for each`, including a nested `for each`. A
+   section's lists run in document order, as one sequence, whatever
+   paragraphs or `###` headings sit between them. Two other nested lists
+   are not instructions:
    - under a section-option `ask`: each item MUST be exactly one `[Section]`
      link;
    - under a Score `ask`: each item MUST be a rubric line (§3.4).
 2. **Nested lists.** A nested list under any other instruction is a **parse
-   error**. A nested list under a prose item is prose.
+   error**. A nested list under a prose item is prose, subject to rule 7.
 3. **Leading bold.** Rules 3 and 4 apply only to instruction lists (rule 1
    (a) and (b)). Option and rubric lists have their own strict forms, and any
    item that doesn't match its form exactly is a parse error: `**4**: outage`
@@ -170,13 +183,19 @@ Rules:
    **for each**?").
 6. `→` and `->` are interchangeable. `·` (U+00B7) is the only option
    separator. `yes | no` is a fixed token, not a separator.
+7. **Misplaced instructions.** A list item that starts with a keyword
+   anywhere rule 1 doesn't cover is `E-MISPLACED`, never prose. That
+   includes before the first section, inside a blockquote, and in a list
+   nested under a prose item. Skop must never quietly skip something that
+   looks like an instruction.
 
 ### 3.4 Instruction grammar (surface)
 Whitespace between tokens is one or more spaces. `CMD` is exactly one inline
 code span. `Q` is question text: free text that MUST NOT contain `→`, `->`,
 or ` · `. `NAME` is `[a-z_][a-z0-9_]*`. `[X]` names a section or list,
-resolved case-insensitively. It may also be a real link `[text](#anchor)`, in
-which case the anchor text is used.
+resolved case-insensitively. It may also be a real link `[text](#anchor)`.
+It resolves by its link text, and `#anchor` MUST be the GitHub-style slug of
+that section's heading, or it's `E-UNRESOLVED`.
 
 ~~~ebnf
 run      = "**run**" CMD [" as " NAME] [ELSE]
@@ -271,9 +290,12 @@ As a result the runtime never meets an unbound name (proven, §5.3).
 
 ### 3.6 Data lists
 A data section's single list defines a named list (name = section name).
-Item forms:
-- `Label — \`command\`` (em dash, or ` - `): an **action item** with a label and a command.
-- `text`: a **value item** (label = value = text).
+The list may be numbered or bulleted. Item forms:
+- `Label — \`command\`` (em dash, or ` - `): an **action item**. The label is
+  plain text, and the command is exactly one code span.
+- `text`: a **value item** (label = value = text). It MUST be plain text: no
+  code spans, emphasis or links. `` `nginx` `` is `E-DATA-ITEM`, not
+  `nginx`.
 
 Rules:
 - A list MUST be non-empty and MUST NOT mix action and value items.
@@ -836,7 +858,9 @@ and have no codes.
 | `E-NOT-RUNNABLE` | parse | no `format: 1` in the frontmatter (§3.1) | a plain agent skill |
 | `E-FRONTMATTER` | parse | a frontmatter field is missing or invalid | no `description`; `run_timeout: soon` |
 | `E-DUP-SECTION` | parse | two sections share a name, ignoring case | `## Page` twice |
-| `E-SECTION-KIND` | parse | a section is neither an instruction section nor a data section with one list | a data section with two lists |
+| `E-SECTION-KIND` | lint | a section used as a list doesn't contain exactly one list (§3.2) | `[Notes]` where Notes has two lists |
+| `E-MISPLACED` | parse | a list item starting with a keyword where instructions aren't recognised (§3.3 rule 7) | `- **run** …` in a blockquote |
+| `E-DATA-ITEM` | parse | a data list item isn't a plain-text value or ``Label — `command` `` (§3.6) | value item `` `nginx` `` |
 | `E-UNKNOWN-BOLD` | parse | bold text that isn't a keyword and doesn't end in `:`, including a misspelled keyword (§3.3 rules 3 and 5) | ``**rn** `df -h` `` |
 | `E-GRAMMAR` | parse | a keyword item doesn't match §3.4 | `**Run** the tests first`; `**run** df -h` |
 | `E-NESTED-LIST` | parse | a nested list under an instruction that doesn't take one | a list under a `run` item |
@@ -877,6 +901,7 @@ Warnings don't stop a run:
 | `W-SCORE-THRESHOLD` | a Score variable is only used in one comparison against one threshold; a `yes \| no` ask gates more reliably (v1.1) |
 | `W-SCORE-UNUSED` | a Score variable is never used after it's bound (v1.1) |
 | `W-SECTION-UNREACHED` | no path reaches a section (§5.6) |
+| `W-NO-GUIDANCE` | a section offered as an `ask` option has no guidance paragraph (§3.2) |
 | `W-REDACT-OFF` | built-in redaction patterns are turned off (§9) |
 
 Parse codes come from the preprocessor. Lint codes come from the Dafny core,
@@ -1082,6 +1107,11 @@ match on code and line, never on message text.
 - an `ask` with 1 option, and with 256 options: `E-OPTION-COUNT`
 - an empty data list: `E-LIST-EMPTY`; a list mixing action and value items: `E-LIST-MIXED`
 - a skill with two errors reports both
+- `- **run** \`df -h\`` before the first `##`, inside a blockquote, and nested
+  under a plain bullet: `E-MISPLACED` for each
+- value item `` `nginx` ``: `E-DATA-ITEM`
+- `[Clean up](#cleanup)` where the section's slug is `#clean-up`: `E-UNRESOLVED`
+- `for each` over a section with two lists: `E-SECTION-KIND`
 
 Every code in §7.1 MUST have at least one test, except `E-INTERNAL` and
 `E-IO`, which can't be triggered on purpose.
@@ -1115,7 +1145,10 @@ branches, 1 unsure and 1 unavailable at the ask.
 
 Positive: `- **Note:** …` and `- **Warning**: …` in an instruction list are
 prose; `**run**` in a paragraph is prose; a section ending in `**stop**`
-lints; an instruction after
+lints; a prose-only `## Background` section lints; instructions in two lists
+under separate `###` headings run in document order; a nested `for each`
+lints; a numbered data list works; a section offered as an option with no
+guidance gets `W-NO-GUIDANCE`; an instruction after
 `check … → stop` is reachable; `(unavailable)` renders for a
 possibly-unbound name in `page` text.
 
@@ -1234,6 +1267,8 @@ Restart the one service most likely behind the growth. Never more than one.
 - **then** [Page]
 
 ## Page
+Nothing here is safe to try automatically. Tell a human.
+
 - **page** "{host}: {mount} at {used}. Run {run_id} has the errors and biggest dirs."
 
 ## Investigate
@@ -1342,6 +1377,8 @@ The cert on disk is fresh, so the server just needs to pick it up.
 - **then** [Page]
 
 ## Page
+The cert can't be fixed automatically. Tell a human.
+
 - **page** "{host}: cert for {domain} expires soon and couldn't be fixed automatically."
 
 ## Investigate
@@ -1514,6 +1551,20 @@ Also from a review of rev 5:
 
 - **Multi-word keywords need exactly one ordinary space.** Other spellings,
   like `for_each`, are `E-UNKNOWN-BOLD` with a suggested fix.
+
+Also, where things live in the Markdown:
+- **Misplaced instructions are errors.** A keyword list item outside an
+  instruction list is `E-MISPLACED`, not silently prose.
+- **Prose-only sections are allowed.** Only a section used as a list must
+  hold exactly one list.
+- **Sections run in document order.** Every top-level list counts;
+  `###` headings don't split a section.
+- **Guidance defined.** First paragraph before the list, else the first
+  anywhere. `W-NO-GUIDANCE` flags options without one.
+- **Data items are plain text**, in numbered or bulleted lists
+  (`E-DATA-ITEM`).
+- **Link anchors checked** against the section's slug.
+- **Nested loops allowed.**
 
 ---
 
