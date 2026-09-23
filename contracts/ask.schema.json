@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/mattyv/skop/contracts/ask.schema.json",
+  "title": "Ask",
+  "description": "What the host sends skop-ask, and what skop-ask prints back (SPEC §6.1): an answer, or a failure. The answer schema checks shape only. Whether the numbers are valid (range, sum, exact option ids) is the core's check, so P5 covers it; the contract must be able to carry an invalid answer to it.",
+  "$defs": {
+    "request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "question", "guidance", "options", "context", "timeout_ms"],
+      "properties": {
+        "kind": {
+          "enum": ["choice", "yesno", "score"]
+        },
+        "question": {
+          "type": "string",
+          "description": "Rendered: trusted values pasted in, run outputs named in backticks (SPEC §3.5)."
+        },
+        "guidance": {
+          "type": ["string", "null"]
+        },
+        "options": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "label", "description"],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "description": {
+                "type": ["string", "null"]
+              }
+            }
+          }
+        },
+        "context": {
+          "type": "object",
+          "description": "Exactly the run outputs the question names, redacted and truncated (SPEC §6.3).",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "timeout_ms": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "answer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["probs", "backend", "model", "ms"],
+      "properties": {
+        "probs": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number"
+          }
+        },
+        "unassigned": {
+          "type": "number"
+        },
+        "backend": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        },
+        "ms": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "failure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["error", "detail", "backend"],
+      "description": "The backend couldn't answer. Every failure hands off with reason ask_unavailable; `error` becomes the handoff detail (SPEC §6.3).",
+      "properties": {
+        "error": {
+          "enum": ["unavailable", "request_too_large"]
+        },
+        "detail": {
+          "type": "string"
+        },
+        "backend": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        }
+      }
+    },
+    "output": {
+      "description": "What skop-ask prints: exactly one of an answer or a failure.",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/answer"
+        },
+        {
+          "$ref": "#/$defs/failure"
+        }
+      ]
+    }
+  }
+}

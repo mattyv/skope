@@ -97,7 +97,9 @@ scratch):
 - `LICENSE-MIT` and `LICENSE-APACHE`: skop is dual-licensed, like ply.
 
 **Repository and toolchain**
-- Node 20+, TypeScript, Vitest, a formatter and linter.
+- Node 20+, TypeScript, Vitest, and Biome as the formatter and linter
+  (`npm run lint`, `npm run format`), so parallel agents don't produce
+  formatting noise in each other's diffs.
 - A pinned Dafny version, with `dafny verify` and translation to JavaScript
   running in CI (SPEC §5.5).
 - `package.json` with `"version": "0.1.0"` and
@@ -121,14 +123,56 @@ contracts are frozen or the six parallel streams start:
 If any step is painful, raise it now (SPEC §13), before six agents depend on
 it. The contracts are frozen, and Phase 1 starts, only after all three work.
 
+**Spike result: all three work** (`core/`, `src/`, `tests/spike/`), after
+an independent review and a proof review. What the next agents need to know:
+- **Dafny 4.11.0**, pinned in `.dafny-version`. `npm run core` verifies the
+  core and writes `core/generated/core.cjs`, which is committed, so tests
+  and releases never need Dafny. CI verifies every tracked `.dfy` file,
+  rebuilds the JavaScript, and fails if the committed file is stale.
+- Dafny's JavaScript bundles its runtime with `--include-runtime`, needs
+  the `bignumber.js` package, and exports nothing, so the build appends an
+  export line.
+- The build turns off `--optimize-erasable-datatype-wrapper`. With it on,
+  a one-field datatype is erased to its field inside functions but not in
+  its constructor, so values built by the adapter don't match what the
+  compiled functions expect.
+- **Compiled Dafny checks nothing at run time**: not preconditions, not
+  `nat` or `int`. `src/core.ts` is the only file that touches it, and it
+  refuses anything it can't represent exactly, rather than rewriting it.
+  It also enforces `Step`'s rules: a command's result must come back after
+  an exec, and there's no step after the run is done.
+- **Proofs must carry state, not just constrain one step.** The first
+  version proved "this step never returns a `do` in dry run" but not that
+  the dry-run flag survives the step, so two broken versions still
+  verified. Now `Start`, `Advance` and `Step` preserve `dry` and `prog`, a
+  `done` flag enforces P2, a measure gives P1, and `DryRunNeverDoes`
+  proves P3 over a whole run. Four deliberately broken versions each fail
+  verification.
+- **Randomised tests must show they generate the interesting case.** The
+  first dry-run test never generated a `do`. It's now exhaustive (every
+  run/do sequence up to six long) and asserts how many contain a `do`.
+- Event names follow SPEC §10: `run`, `effect_start`, `effect_end`,
+  `would_do`, `outcome`, with `after_would_do` on reads after a `would_do`.
+- **A passing test isn't evidence it tests anything.** A mutation review
+  planted 160 small bugs; dozens survived, in the adapter, the proofs'
+  edges, the schemas and the tooling scripts. Every targeted survivor is
+  now caught. Streams should mutation-check their own tests the same way
+  before asking for review.
+
+**Phase 0 is closed.** The spike works, the contracts are frozen, and the
+milestone review (spec conformance, correctness and security, proofs,
+tests, ponytail) found nothing left open. CI is green on every platform.
+Phase 1 can start.
+
 **Contracts** (in `contracts/`, owned by the Phase 0 agent, later by the
-integration agent):
+integration agent; `contracts/README.md` lists the files and the decisions
+the spec left open):
 
 | Contract | Between | Source in the spec |
 |---|---|---|
 | Core program JSON schema, with 3 hand-written examples | preprocessor (A) and core (B, C) | §5.1 |
-| Dafny AST types, `Syntax.dfy` | lint (B) and interpreter (C) | §5.1, §5.2 |
-| `Step` interface: requests, responses, events | core (C) and host (G) | §5.2 |
+| Dafny AST types, `core/Ast.dfy` (the spike's `Syntax.dfy` goes when C replaces it) | lint (B) and interpreter (C) | §5.1, §5.2 |
+| `Step` interface: requests, responses, events, `core/Step.dfy` and `src/step.ts` | core (C) and host (G) | §5.2 |
 | Ask request and answer schema, including `unassigned` | host (G) and backends (D) | §6.1 |
 | Fake file formats: answers and commands | fakes (D, E) and tests (F) | §5.4, §6.2 |
 | Log event schema | everyone who emits events | §10 |
@@ -153,9 +197,11 @@ and options nothing in the spec needs (§6).
   that the release smoke test must not treat as failures.
 - **Spec coverage check.** `scripts/check_spec.py coverage` fails CI if a
   code in SPEC §7.1, except `E-INTERNAL` and `E-IO`, isn't named in any
-  test file. It's a **reference check** only: it shows a code is mentioned,
-  not that a test exercises it. Reviewers and the milestone check cover the
-  rest.
+  test file once the code's milestone has closed: parse and lint codes at
+  M2, argument, runtime and backend codes at M4, Score codes at M7. Before
+  that it lists what's missing. It's a **reference check** only: it shows a
+  code is mentioned, not that a test exercises it. Reviewers and the
+  milestone check cover the rest.
 - **Milestone check.** `scripts/check_spec.py milestones` enforces the
   closed-milestone rule in §1.
 - **No-cheating check.** CI fails if Dafny code contains `assume`,
@@ -301,7 +347,7 @@ necessary but not enough to merge: the review (§6) runs after it.
 | `dafny verify` | any unproven obligation |
 | No-cheating check | `assume`, `{:axiom}` or `{:verify false}` in Dafny code |
 | Contract check | a contract example doesn't validate, or generated types are stale |
-| Spec coverage check (reference only) | an error code isn't named in any test file |
+| Spec coverage check (reference only) | an error code whose milestone has closed isn't named in any test file |
 | Milestone check | a closed milestone has an expected failure, skip or todo, or no tests |
 | Golden files | any mismatch, ignoring the fields in SPEC §12.3 |
 | Differential check (from Phase 2) | a fake run's trace isn't among the explored paths |
@@ -430,6 +476,20 @@ One agent, joined by a second once the pieces arrive.
 - Install the package on a clean machine with only Node and run the fake
   test suite on all three platforms.
 - Smoke-test the container image with each example skill in dry run.
+- **Standalone binaries** (SPEC §5.5):
+  - Bundle the CLI, the compiled core and `bignumber.js` into one CommonJS
+    file with esbuild, since Node's single executable applications take one
+    script. The build identity is baked in at bundle time.
+  - Build each platform's binary on that platform's runner, from a pinned
+    Node version, injected with `postject`. Ad-hoc sign the macOS binary
+    (`codesign --sign -`) so it runs.
+  - Test each binary in a clean `debian:stable-slim` container (Linux) or
+    with `node` removed from `PATH` (macOS): `--version`, then the fake
+    scenarios with their expected exit codes.
+- **`install.sh`** (SPEC §5.5): POSIX `sh`, checked by `shellcheck` in CI.
+  Its tests (SPEC §12.3) serve a release directory locally and point
+  `SKOP_DOWNLOAD_URL` at it, including a tampered binary and a missing
+  `SHA256SUMS`.
 
 ---
 
@@ -463,6 +523,11 @@ After v1 ships. The same stream owners pick up their part in parallel:
   read-only access. They never see the author's session and never review
   their own stream's code. One reviewer per PR, plus a proof reviewer for
   Dafny changes; the full panel only at milestones.
+- **Models.** Sonnet builds the well-specified streams: A (preprocessor),
+  D (backends), E (runner) and F (acceptance tests). Their tests and
+  contracts pin down the target, and the reviewer catches misses. Opus
+  builds stream C (the interpreter and proofs) and integration, and does
+  every review, since that's where judgement matters most.
 - **Ponytail is on for every building agent,** at **full** by default and
   **ultra** for audits and contract reviews.
 - **Contract changes are rare and deliberate.** The contract owner makes
@@ -492,7 +557,12 @@ Versioning follows ply (SPEC §7.2): a hand-edited release version in
    - builds the npm package once;
    - installs it on a clean machine on each platform, checks
      `skop --version`, and lints and dry-runs each example skill with fakes;
-   - creates the GitHub release with the package attached;
+   - builds a binary on each platform, writes `SHA256SUMS`, and adds a
+     build-provenance attestation for each binary;
+   - runs the installer against those files on each platform with no Node
+     on the machine, then the same checks as for the package;
+   - creates the GitHub release with the binaries, `SHA256SUMS`,
+     `install.sh` and the package attached;
    - builds and pushes the container image to
      `ghcr.io/mattyv/skop` for linux/amd64 and linux/arm64;
    - publishes to npm, only if an `NPM_TOKEN` secret is set.

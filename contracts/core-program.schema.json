@@ -1,0 +1,764 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/mattyv/skop/contracts/core-program.schema.json",
+  "title": "CoreProgram",
+  "description": "Core program JSON (SPEC §5.1): what the preprocessor emits and the Dafny core consumes. The preprocessor only parses; every semantic check (references resolve, taint, bound names, ...) is the core's job, so this schema accepts programs that will fail lint. `src` is always the 1-based line in SKILL.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["skill", "format", "entry", "params", "limits", "sections"],
+  "properties": {
+    "skill": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+$"
+    },
+    "format": {
+      "const": 1
+    },
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["section", "src"],
+      "description": "The `entry:` frontmatter value and its line; when defaulted, the first instruction section and its heading line.",
+      "properties": {
+        "section": {
+          "$ref": "#/$defs/sectionId"
+        },
+        "src": {
+          "$ref": "#/$defs/src"
+        }
+      }
+    },
+    "params": {
+      "type": "object",
+      "propertyNames": {
+        "$ref": "#/$defs/name"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/paramValue"
+      }
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["run_timeout_ms", "do_timeout_ms", "deadline_ms", "ask_context_tokens"],
+      "properties": {
+        "run_timeout_ms": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "do_timeout_ms": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "deadline_ms": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "ask_context_tokens": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "sections": {
+      "description": "Every ## section (SPEC §5.1), by id. An instruction section has a body; any other section has its lists.",
+      "type": "object",
+      "propertyNames": {
+        "$ref": "#/$defs/sectionId"
+      },
+      "additionalProperties": {
+        "oneOf": [
+          {
+            "$ref": "#/$defs/section"
+          },
+          {
+            "$ref": "#/$defs/otherSection"
+          }
+        ]
+      }
+    }
+  },
+  "$defs": {
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z_][a-z0-9_]*$"
+    },
+    "src": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "sectionId": {
+      "description": "`s:` plus the section's slug (SPEC §3.4): lowercased, every run of characters that aren't letters or digits turned into one `_`.",
+      "type": "string",
+      "pattern": "^s:[\\p{Ll}\\p{Lo}\\p{Lm}\\p{N}_]+$"
+    },
+    "paramValue": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["str", "src"],
+          "properties": {
+            "str": {
+              "type": "string"
+            },
+            "src": {
+              "$ref": "#/$defs/src"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["int", "src"],
+          "properties": {
+            "int": {
+              "type": "integer"
+            },
+            "src": {
+              "$ref": "#/$defs/src"
+            }
+          }
+        }
+      ]
+    },
+    "parts": {
+      "description": "Text split into literal and variable parts, so the core never scans for `{`. How a variable is shown in a question is decided by the core from its value's origin (SPEC §3.5).",
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["lit"],
+            "properties": {
+              "lit": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["var"],
+            "properties": {
+              "var": {
+                "$ref": "#/$defs/name"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "list": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["src", "items"],
+      "properties": {
+        "src": {
+          "$ref": "#/$defs/src"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["src", "action"],
+                "properties": {
+                  "src": {
+                    "$ref": "#/$defs/src"
+                  },
+                  "action": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["label", "cmd"],
+                    "properties": {
+                      "label": {
+                        "type": "string"
+                      },
+                      "cmd": {
+                        "$ref": "#/$defs/parts"
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["src", "value"],
+                "properties": {
+                  "src": {
+                    "$ref": "#/$defs/src"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "description": "One Markdown list in a non-instruction section. `src` is its first item's line."
+    },
+    "section": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "src", "guidance", "body"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Display name, as written in the heading."
+        },
+        "src": {
+          "$ref": "#/$defs/src"
+        },
+        "guidance": {
+          "type": ["string", "null"],
+          "description": "SPEC §3.2."
+        },
+        "body": {
+          "$ref": "#/$defs/body"
+        }
+      }
+    },
+    "body": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/stmt"
+      }
+    },
+    "sectionRef": {
+      "description": "A reference to a section. `anchor` is present only for a real link `[text](#anchor)`: `given` is the anchor written, `expected` the GitHub slug of the link text. The core reports E-UNRESOLVED if they differ.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["section"],
+      "properties": {
+        "section": {
+          "$ref": "#/$defs/sectionId"
+        },
+        "anchor": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["given", "expected"],
+          "properties": {
+            "given": {
+              "type": "string"
+            },
+            "expected": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "target": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["stop"],
+          "properties": {
+            "stop": {
+              "type": "object",
+              "maxProperties": 0
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/sectionRef"
+        }
+      ]
+    },
+    "else": {
+      "description": "null when there's no else.",
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["skip"],
+          "properties": {
+            "skip": {
+              "type": "object",
+              "maxProperties": 0
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/sectionRef"
+        }
+      ]
+    },
+    "operand": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["var"],
+          "properties": {
+            "var": {
+              "$ref": "#/$defs/name"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["num"],
+          "properties": {
+            "num": {
+              "type": "string",
+              "pattern": "^-?[0-9]+(\\.[0-9]+)?$",
+              "description": "Decimal as written; a trailing % is dropped (SPEC §3.4)."
+            }
+          }
+        }
+      ]
+    },
+    "cond": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["succeeds"],
+          "properties": {
+            "succeeds": {
+              "$ref": "#/$defs/parts"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["cmp"],
+          "properties": {
+            "cmp": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["op", "l", "r"],
+              "properties": {
+                "op": {
+                  "enum": ["<", "<=", ">", ">=", "==", "!="]
+                },
+                "l": {
+                  "$ref": "#/$defs/operand"
+                },
+                "r": {
+                  "$ref": "#/$defs/operand"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "runBody": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cmd"],
+      "properties": {
+        "cmd": {
+          "$ref": "#/$defs/parts"
+        },
+        "as": {
+          "$ref": "#/$defs/name"
+        }
+      }
+    },
+    "doBody": {
+      "description": "A command, or `item`: the name of a for-each variable over action items (`do step`).",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["cmd"],
+          "properties": {
+            "cmd": {
+              "$ref": "#/$defs/parts"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["item"],
+          "properties": {
+            "item": {
+              "$ref": "#/$defs/name"
+            }
+          }
+        }
+      ]
+    },
+    "ask": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["question", "sure", "else"],
+      "minProperties": 4,
+      "maxProperties": 4,
+      "description": "Exactly one of sections, yesno, one_of or score (SPEC §3.4, §4.7).",
+      "properties": {
+        "question": {
+          "$ref": "#/$defs/parts"
+        },
+        "sure": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "else": {
+          "$ref": "#/$defs/else"
+        },
+        "sections": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["src", "section"],
+            "properties": {
+              "src": {
+                "$ref": "#/$defs/src"
+              },
+              "section": {
+                "$ref": "#/$defs/sectionId"
+              },
+              "anchor": {
+                "$ref": "#/$defs/sectionRef/properties/anchor"
+              }
+            }
+          }
+        },
+        "yesno": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["as"],
+          "properties": {
+            "as": {
+              "$ref": "#/$defs/name",
+              "description": "`_yn` when the skill doesn't name it."
+            }
+          }
+        },
+        "one_of": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["list", "as"],
+          "properties": {
+            "list": {
+              "$ref": "#/$defs/sectionRef"
+            },
+            "as": {
+              "$ref": "#/$defs/name"
+            }
+          }
+        },
+        "score": {
+          "description": "v1.1.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["low", "high", "rubric", "as"],
+          "properties": {
+            "low": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "high": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "rubric": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["src", "level", "text"],
+                "properties": {
+                  "src": {
+                    "$ref": "#/$defs/src"
+                  },
+                  "level": {
+                    "type": "integer"
+                  },
+                  "text": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "as": {
+              "$ref": "#/$defs/name"
+            }
+          }
+        }
+      }
+    },
+    "stmt": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/stmtRun"
+        },
+        {
+          "$ref": "#/$defs/stmtDo"
+        },
+        {
+          "$ref": "#/$defs/stmtCheck"
+        },
+        {
+          "$ref": "#/$defs/stmtAsk"
+        },
+        {
+          "$ref": "#/$defs/stmtForEach"
+        },
+        {
+          "$ref": "#/$defs/stmtIfYes"
+        },
+        {
+          "$ref": "#/$defs/stmtThen"
+        },
+        {
+          "$ref": "#/$defs/stmtPage"
+        },
+        {
+          "$ref": "#/$defs/stmtHandOff"
+        },
+        {
+          "$ref": "#/$defs/stmtStop"
+        }
+      ]
+    },
+    "stmtRun": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["src", "run", "else"],
+      "properties": {
+        "src": {
+          "$ref": "#/$defs/src"
+        },
+        "run": {
+          "$ref": "#/$defs/runBody"
+        },
+        "else": {
+          "$ref": "#/$defs/else"
+        }
+      }
+    },
+    "stmtDo": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["src", "do", "else"],
+      "properties": {
+        "src": {
+          "$ref": "#/$defs/src"
+        },
+        "do": {
+          "$ref": "#/$defs/doBody"
+        },
+        "else": {
+          "$ref": "#/$defs/else"
+        }
+      }
+    },
+    "stmtCheck": {
+      "description": "`then` is null for the `check COND else …` form (SPEC §4.2), which then needs an else.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["src", "check"],
+      "properties": {
+        "src": {
+          "$ref": "#/$defs/src"
+        },
+        "check": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["cond", "then", "else"],
+          "properties": {
+            "cond": {
+              "$ref": "#/$defs/cond"
+            },
+            "then": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "#/$defs/target"
+                }
+              ]
+            },
+            "else": {
+              "$ref": "#/$defs/else"
+            }
+          },
+          "not": {
+            "properties": {
+              "then": {
+                "type": "null"
+              },
+              "else": {
+                "type": "null"
+              }
+            },
+            "required": ["then", "else"]
+          }
+        }
+      }
+    },
+    "stmtAsk": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["src", "ask"],
+      "properties": {
+        "src": {
+          "$ref": "#/$defs/src"
+        },
+        "ask": {
+          "$ref": "#/$defs/ask"
+        }
+      }
+    },
+    "stmtForEach": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["src", "for_each"],
+      "properties": {
+        "src": {
+          "$ref": "#/$defs/src"
+        },
+        "for_each": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["var", "list", "body"],
+          "properties": {
+            "var": {
+              "$ref": "#/$defs/name"
+            },
+            "list": {
+              "$ref": "#/$defs/sectionRef"
+            },
+            "body": {
+              "$ref": "#/$defs/body"
+            }
+          }
+        }
+      }
+    },
+    "stmtIfYes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["src", "if_yes"],
+      "properties": {
+        "src": {
+          "$ref": "#/$defs/src"
+        },
+        "if_yes": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["else"],
+          "minProperties": 2,
+          "maxProperties": 2,
+          "description": "Exactly one of run or do.",
+          "properties": {
+            "run": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["cmd"],
+              "properties": {
+                "cmd": {
+                  "$ref": "#/$defs/parts"
+                }
+              },
+              "description": "INLINE has no `as` (SPEC §3.4)."
+            },
+            "do": {
+              "$ref": "#/$defs/doBody"
+            },
+            "else": {
+              "$ref": "#/$defs/else"
+            }
+          }
+        }
+      }
+    },
+    "stmtThen": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["src", "then"],
+      "properties": {
+        "src": {
+          "$ref": "#/$defs/src"
+        },
+        "then": {
+          "$ref": "#/$defs/sectionRef"
+        }
+      }
+    },
+    "stmtPage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["src", "page"],
+      "properties": {
+        "src": {
+          "$ref": "#/$defs/src"
+        },
+        "page": {
+          "$ref": "#/$defs/parts"
+        }
+      }
+    },
+    "stmtHandOff": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["src", "hand_off"],
+      "properties": {
+        "src": {
+          "$ref": "#/$defs/src"
+        },
+        "hand_off": {
+          "type": "object",
+          "maxProperties": 0
+        }
+      }
+    },
+    "stmtStop": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["src", "stop"],
+      "properties": {
+        "src": {
+          "$ref": "#/$defs/src"
+        },
+        "stop": {
+          "type": "object",
+          "maxProperties": 0
+        }
+      }
+    },
+    "otherSection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "src", "lists"],
+      "description": "A section with no instructions: a data section, or prose. Used as a list only if it has exactly one list (E-SECTION-KIND otherwise).",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Display name, as written in the heading."
+        },
+        "src": {
+          "$ref": "#/$defs/src"
+        },
+        "lists": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/list"
+          }
+        }
+      }
+    }
+  }
+}

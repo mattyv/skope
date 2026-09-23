@@ -1,0 +1,232 @@
+[
+  {
+    "code": "E-NOT-RUNNABLE",
+    "stage": "parse",
+    "meaning": "no `format: 1` in the frontmatter (§3.1)"
+  },
+  {
+    "code": "E-FRONTMATTER",
+    "stage": "parse",
+    "meaning": "a frontmatter field is missing or invalid"
+  },
+  {
+    "code": "E-DUP-SECTION",
+    "stage": "parse",
+    "meaning": "two sections have the same slug (§3.4)"
+  },
+  {
+    "code": "E-SECTION-KIND",
+    "stage": "lint",
+    "meaning": "a section used as a list doesn't contain exactly one list (§3.2)"
+  },
+  {
+    "code": "E-MISPLACED",
+    "stage": "parse",
+    "meaning": "a list item starting with a keyword where instructions aren't recognised (§3.3 rule 7)"
+  },
+  {
+    "code": "E-DATA-ITEM",
+    "stage": "parse",
+    "meaning": "a data list item isn't a plain-text value or ``Label — `command` `` (§3.6)"
+  },
+  {
+    "code": "E-UNKNOWN-BOLD",
+    "stage": "parse",
+    "meaning": "bold text that isn't a keyword and doesn't end in `:`, including a misspelled keyword (§3.3 rules 3 and 5)"
+  },
+  {
+    "code": "E-GRAMMAR",
+    "stage": "parse",
+    "meaning": "a keyword item doesn't match §3.4"
+  },
+  {
+    "code": "E-NESTED-LIST",
+    "stage": "parse",
+    "meaning": "a nested list under an instruction that doesn't take one"
+  },
+  {
+    "code": "E-OPTION-ITEM",
+    "stage": "parse",
+    "meaning": "an option item isn't exactly one `[Section]` link"
+  },
+  {
+    "code": "E-RUBRIC-ITEM",
+    "stage": "parse",
+    "meaning": "a rubric line isn't `INT: text` (v1.1)"
+  },
+  {
+    "code": "E-UNRESOLVED",
+    "stage": "lint",
+    "meaning": "a `[Section]` or `[List]` reference doesn't resolve"
+  },
+  {
+    "code": "E-REF-KIND",
+    "stage": "lint",
+    "meaning": "a data section used as a target, or an instruction section used as a list"
+  },
+  {
+    "code": "E-CYCLE",
+    "stage": "lint",
+    "meaning": "the transfer graph has a cycle (§4.6)"
+  },
+  {
+    "code": "E-FALLS-OFF",
+    "stage": "lint",
+    "meaning": "a path reaches the end of a section without ending or transferring"
+  },
+  {
+    "code": "E-UNREACHABLE",
+    "stage": "lint",
+    "meaning": "an instruction can never run (§4.1)"
+  },
+  {
+    "code": "E-TAINT",
+    "stage": "lint",
+    "meaning": "an untrusted value in a command (§3.5)"
+  },
+  {
+    "code": "E-ACTION-IN-CMD",
+    "stage": "lint",
+    "meaning": "an action item interpolated into a command (§3.5)"
+  },
+  {
+    "code": "E-UNSAFE-VALUE",
+    "stage": "lint",
+    "meaning": "a param default or value item reaching a command fails the safe-value check"
+  },
+  {
+    "code": "E-UNBOUND",
+    "stage": "lint",
+    "meaning": "a name in a command or comparison may be unbound, is never bound, or is out of scope"
+  },
+  {
+    "code": "E-IF-YES",
+    "stage": "lint",
+    "meaning": "`if yes` has no governing `yes | no` ask (§4.2)"
+  },
+  {
+    "code": "E-ELSE-SKIP",
+    "stage": "lint",
+    "meaning": "`else skip` where it isn't allowed"
+  },
+  {
+    "code": "E-OPTION-COUNT",
+    "stage": "lint",
+    "meaning": "a section-option ask has fewer than 2 or more than 255 options"
+  },
+  {
+    "code": "E-LIST-KIND",
+    "stage": "lint",
+    "meaning": "the wrong kind of list for the instruction"
+  },
+  {
+    "code": "E-LIST-EMPTY",
+    "stage": "lint",
+    "meaning": "a data list has no items"
+  },
+  {
+    "code": "E-LIST-MIXED",
+    "stage": "lint",
+    "meaning": "a data list mixes action and value items"
+  },
+  {
+    "code": "E-LIST-DUP",
+    "stage": "lint",
+    "meaning": "two items in a data list have the same label, ignoring case (§3.6)"
+  },
+  {
+    "code": "E-SCORE-RANGE",
+    "stage": "lint",
+    "meaning": "Score bounds invalid, or not 2–10 levels (v1.1)"
+  },
+  {
+    "code": "E-SCORE-RUBRIC",
+    "stage": "lint",
+    "meaning": "Score rubric missing, incomplete, out of range or duplicated (v1.1)"
+  },
+  {
+    "code": "E-MODE",
+    "stage": "args",
+    "meaning": "neither or both of `--apply` and `--dry-run` (§7 step 0)"
+  },
+  {
+    "code": "E-PARAM-UNKNOWN",
+    "stage": "args",
+    "meaning": "`--param` names a param the skill doesn't declare"
+  },
+  {
+    "code": "E-PARAM-TYPE",
+    "stage": "args",
+    "meaning": "a `--param` value has the wrong type"
+  },
+  {
+    "code": "E-PARAM-UNSAFE",
+    "stage": "args",
+    "meaning": "a param override or built-in fails the safe-value check"
+  },
+  {
+    "code": "E-CONFIG",
+    "stage": "args",
+    "meaning": "the config file is unreadable or invalid"
+  },
+  {
+    "code": "E-BACKEND-MODEL",
+    "stage": "args",
+    "meaning": "the `openrouter` model doesn't support logprobs, or its reasoning can't be turned off (§6.2)"
+  },
+  {
+    "code": "E-BACKEND-LIMIT",
+    "stage": "args",
+    "meaning": "the skill exceeds the configured backend's limits: options, Score levels or context (§6.2)"
+  },
+  {
+    "code": "E-FAKE-UNMATCHED",
+    "stage": "runtime",
+    "meaning": "`--fake-exec` has no answer for a command (§5.4)"
+  },
+  {
+    "code": "E-IO",
+    "stage": "runtime",
+    "meaning": "skop can't write its run directory or lock file"
+  },
+  {
+    "code": "E-INTERNAL",
+    "stage": "runtime",
+    "meaning": "a runner bug. Unreachable by P6, so always a bug report"
+  },
+  {
+    "code": "W-SCORE-THRESHOLD",
+    "stage": "warning",
+    "meaning": "a Score variable is only used in one comparison against one threshold; a `yes | no` ask gates more reliably (v1.1)"
+  },
+  {
+    "code": "W-SCORE-UNUSED",
+    "stage": "warning",
+    "meaning": "a Score variable is never used after it's bound (v1.1)"
+  },
+  {
+    "code": "W-SECTION-UNREACHED",
+    "stage": "warning",
+    "meaning": "no path reaches a section (§5.6)"
+  },
+  {
+    "code": "W-ASK-NO-CONTEXT",
+    "stage": "warning",
+    "meaning": "an `ask` question names nothing that could hold `run` output, so the model gets no evidence (§6.3)"
+  },
+  {
+    "code": "W-MODEL-ALIAS",
+    "stage": "warning",
+    "meaning": "`jev.model` is an alias, or a response came from a different model than configured (§6.2)"
+  },
+  {
+    "code": "W-NO-GUIDANCE",
+    "stage": "warning",
+    "meaning": "a section offered as an `ask` option has no guidance paragraph (§3.2)"
+  },
+  {
+    "code": "W-REDACT-OFF",
+    "stage": "warning",
+    "meaning": "built-in redaction patterns are turned off (§9)"
+  }
+]

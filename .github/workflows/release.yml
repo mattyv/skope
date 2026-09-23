@@ -29,13 +29,17 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      # The tag comes in through env, never pasted into the script: a tag
+      # name can contain shell syntax.
       - name: Tag to commit, and tag matches package version
         id: resolve
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
         run: |
-          tag="${{ inputs.tag || github.ref_name }}"
+          tag="$TAG"
           sha=$(git rev-parse --verify "refs/tags/$tag^{commit}") || { echo "No tag $tag."; exit 1; }
           git checkout -q "$sha"
-          if [ ! -f package.json ]; then echo "No package.json at $tag: nothing to release yet."; exit 1; fi
+          if [ ! -f Dockerfile ]; then echo "No Dockerfile at $tag, so no container image to publish (PLAN.md §8)."; exit 1; fi
           pkg="v$(node -p "require('./package.json').version")"
           if [ "$tag" != "$pkg" ]; then echo "Tag $tag doesn't match package.json version $pkg."; exit 1; fi
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
@@ -64,7 +68,6 @@ jobs:
           node-version: "20"
           cache: npm
       - run: npm ci
-      - run: npm run build --if-present
       - name: Pack
         id: pack
         run: |
@@ -95,11 +98,16 @@ jobs:
           name: package
           path: dist-pkg
       - name: Install into an empty directory with only Node
+        env:
+          TARBALL: ${{ needs.package.outputs.tarball }}
+          VERSION: ${{ needs.resolve.outputs.version }}
         run: |
           mkdir "$RUNNER_TEMP/clean" && cd "$RUNNER_TEMP/clean"
           npm init -y > /dev/null
-          npm install "$GITHUB_WORKSPACE/dist-pkg/${{ needs.package.outputs.tarball }}"
-          npx skop --version
+          npm install "$GITHUB_WORKSPACE/dist-pkg/$TARBALL"
+          out=$(npx skop --version)
+          echo "$out"
+          case "$out" in "skop $VERSION (build identity "*) ;; *) echo "expected skop $VERSION"; exit 1 ;; esac
       # Only fixtures in fixtures/ ship with this release. Skills for later
       # versions wait in fixtures-next/ (PLAN.md §3). Each scenario directory
       # holds answers.yaml, commands.yaml and expected-exit, because paged
@@ -107,11 +115,14 @@ jobs:
       - name: Every released scenario gives its expected exit code
         run: |
           cd "$RUNNER_TEMP/clean"
+          shopt -s nullglob
           status=0
           for skill in "$GITHUB_WORKSPACE"/fixtures/*/SKILL.md; do
             dir=$(dirname "$skill")
             npx skop "$skill" --lint || { echo "lint failed: $skill"; status=1; }
-            for scenario in "$dir"/fakes/*/; do
+            scenarios=("$dir"/fakes/*/)
+            if [ ${#scenarios[@]} -eq 0 ]; then echo "$(basename "$dir") has no fake scenarios"; status=1; fi
+            for scenario in "${scenarios[@]}"; do
               want=$(cat "$scenario/expected-exit")
               set +e
               npx skop "$skill" --dry-run --fake "$scenario/answers.yaml" --fake-exec "$scenario/commands.yaml" > /dev/null
@@ -124,9 +135,11 @@ jobs:
           done
           exit $status
 
+  # Publishing waits for everything, including the container, so a failed
+  # step can't leave a half-published release (an npm publish can't be undone).
   github-release:
     name: GitHub release
-    needs: [resolve, package, install-check]
+    needs: [resolve, package, install-check, container]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -152,9 +165,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ needs.resolve.outputs.sha }}
-      - name: Refuse to release without a Dockerfile
-        run: |
-          if [ ! -f Dockerfile ]; then echo "No Dockerfile yet (PLAN.md §8)."; exit 1; fi
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
@@ -173,7 +183,7 @@ jobs:
 
   npm-publish:
     name: Publish to npm
-    needs: [package, install-check]
+    needs: [package, install-check, container, github-release]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -190,8 +200,9 @@ jobs:
       - name: Publish, if an NPM_TOKEN secret is set
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          TARBALL: ${{ needs.package.outputs.tarball }}
         run: |
           if [ -z "$NODE_AUTH_TOKEN" ]; then
             echo "No NPM_TOKEN secret; skipping npm publish."; exit 0
           fi
-          npm publish "dist-pkg/${{ needs.package.outputs.tarball }}" --provenance --access public
+          npm publish "dist-pkg/$TARBALL" --provenance --access public

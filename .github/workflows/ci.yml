@@ -1,7 +1,7 @@
 # Test workflow: runs on every push and pull request, and is reused by the
-# release workflow. Build, test and Dafny steps switch on once Phase 0 adds
-# package.json and .dafny-version (PLAN.md §3). Until then only the spec
-# checks run.
+# release workflow (which passes the release commit as `ref`). Every step
+# always runs: a missing package.json or .dafny-version is a failure, never
+# a reason to skip checks.
 name: CI
 
 on:
@@ -22,6 +22,7 @@ jobs:
   spec:
     name: Spec and plan checks
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
@@ -29,7 +30,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Error codes defined, JSON examples valid
+      - name: Error codes defined, JSON examples valid, fixtures and codes match the spec
         run: python3 scripts/check_spec.py docs
       - uses: actions/setup-node@v4
         with:
@@ -50,69 +51,58 @@ jobs:
       matrix:
         os: [ubuntu-latest, ubuntu-24.04-arm, macos-14]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.ref }}
-      - name: Check for code
-        id: code
-        run: |
-          if [ -f package.json ]; then echo "present=true" >> "$GITHUB_OUTPUT"
-          else echo "present=false" >> "$GITHUB_OUTPUT"; echo "No package.json yet; skipping build and tests."; fi
       - uses: actions/setup-node@v4
-        if: steps.code.outputs.present == 'true'
         with:
           node-version: "20"
           cache: npm
-      - name: Install
-        if: steps.code.outputs.present == 'true'
-        run: npm ci
+      - run: npm ci
       - name: Type check
-        if: steps.code.outputs.present == 'true'
-        run: npm run typecheck --if-present
-      - name: Lint
-        if: steps.code.outputs.present == 'true'
-        run: npm run lint --if-present
-      - name: Build
-        if: steps.code.outputs.present == 'true'
-        run: npm run build --if-present
-      - name: Unit, property, golden and acceptance tests
-        if: steps.code.outputs.present == 'true'
+        run: npm run typecheck
+      - name: Lint and formatting
+        run: npm run lint
+      - name: Build, then every test
         run: npm test
-      - name: Every error code is named in a test file (reference check)
+      - name: Every error code is named in a test (reference check)
         run: python3 scripts/check_spec.py coverage
-      - name: Closed milestones have no expected failures or skips
+      - name: Every closed milestone's acceptance tests pass, none skipped
         run: python3 scripts/check_spec.py milestones
 
   dafny:
     name: Dafny proofs
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.ref }}
-      - name: Check for Dafny code
-        id: code
-        run: |
-          if [ -f .dafny-version ]; then
-            echo "present=true" >> "$GITHUB_OUTPUT"
-            echo "version=$(tr -d '[:space:]' < .dafny-version)" >> "$GITHUB_OUTPUT"
-          else
-            echo "present=false" >> "$GITHUB_OUTPUT"; echo "No .dafny-version yet; skipping."
-          fi
+      - name: Pinned Dafny version
+        id: dafny
+        run: echo "version=$(tr -d '[:space:]' < .dafny-version)" >> "$GITHUB_OUTPUT"
+      # Dafny spells an axiom several ways ({:axiom}, @Axiom, extra spaces),
+      # so any mention of one fails. {:verify false} and {:only} make Dafny
+      # itself fail, but they're checked here too.
       - name: No proof shortcuts (SPEC §5.3)
-        if: steps.code.outputs.present == 'true'
         run: |
-          if grep -rnE '\bassume\b|\{:axiom\}|\{:verify false\}' --include='*.dfy' .; then
-            echo "Dafny code must not use assume, {:axiom} or {:verify false}."; exit 1
+          if grep -rniE '\bassume\b|axiom|\{:\s*verify\s+false|@verify|\{:\s*only' --include='*.dfy' .; then
+            echo "Dafny code must not assume, declare an axiom, or skip verification."; exit 1
           fi
       - uses: dafny-lang/setup-dafny-action@v1
-        if: steps.code.outputs.present == 'true'
         with:
-          dafny-version: ${{ steps.code.outputs.version }}
-      - name: Verify every proof
-        if: steps.code.outputs.present == 'true'
+          dafny-version: ${{ steps.dafny.outputs.version }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Verify every tracked Dafny file, including tests
+        run: dafny verify $(git ls-files '*.dfy')
+      - name: Rebuild the JavaScript from the core
+        run: node scripts/build-core.mjs
+      - name: Committed JavaScript matches the proofs
         run: |
-          files=$(git ls-files '*.dfy')
-          if [ -z "$files" ]; then echo "No .dfy files yet."; exit 0; fi
-          dafny verify $files
+          if ! git diff --exit-code core/generated; then
+            echo "core/generated is stale: run 'npm run core' and commit the result."; exit 1
+          fi
