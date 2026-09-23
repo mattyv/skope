@@ -26,7 +26,8 @@ interface VerifyReport {
 
 async function verify(skill: string): Promise<VerifyReport> {
   const r = await runSkop([skill, "--verify"], { input: undefined });
-  return JSON.parse(r.stdout) as VerifyReport;
+  // The report is the last stdout line; warning events come before it (SPEC §7).
+  return JSON.parse(r.stdout.trim().split("\n").at(-1) ?? "") as VerifyReport;
 }
 
 describe("M2: --verify (SPEC §5.4, §5.6)", () => {

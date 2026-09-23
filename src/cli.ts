@@ -16,25 +16,20 @@ async function main(argv: string[]): Promise<number> {
     console.log(`skop ${version} (build identity ${build})`);
     return 0;
   }
-  let values: ReturnType<typeof parse>["values"];
-  let positionals: string[];
+  let values: ReturnType<typeof parse>["values"] = {};
+  let positionals: string[] = [];
+  let usage: string | undefined;
   try {
     ({ values, positionals } = parse(argv));
+    if (positionals.length !== 1) usage = "give exactly one skill file";
+    else if (values.trace !== undefined && !values.verify) usage = "--trace goes with --verify";
   } catch (err) {
-    process.stderr.write(`skop: ${(err as Error).message}\n${USAGE}\n`);
-    return 40;
+    usage = (err as Error).message;
   }
-  const file = positionals[0];
-  if (positionals.length !== 1 || file === undefined) {
-    process.stderr.write(`skop: give exactly one skill file\n${USAGE}\n`);
-    return 40;
-  }
-  if (values.trace !== undefined && !values.verify) {
-    process.stderr.write(`skop: --trace goes with --verify\n${USAGE}\n`);
-    return 40;
-  }
+  if (usage) process.stderr.write(`${USAGE}\n`);
   return runSkill({
-    file,
+    usage,
+    file: positionals[0] ?? "",
     mode: values.lint ? "lint" : values.verify ? "verify" : values.explain ? "explain" : "run",
     trace: values.trace,
     apply: values.apply ?? false,

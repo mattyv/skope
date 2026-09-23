@@ -81,10 +81,27 @@ describe("run flow", () => {
     expect(find(r.events, "error", "E-CONFIG")).toBeDefined();
   });
 
-  test("an unknown flag is a usage error: exit 40, nothing runs", async () => {
-    const r = await runSkop([skill("- **stop**"), "--apply", "--frobnicate"]);
+  test("E-USAGE: an unknown flag, a missing flag value or a missing skill path exits 40, nothing runs (SPEC §7.1)", async () => {
+    for (const args of [
+      [skill("- **stop**"), "--apply", "--aply"],
+      [skill("- **stop**"), "--apply", "--fake"],
+      ["--apply"],
+      ["a", "b", "--lint"],
+    ]) {
+      const r = await runSkop(args);
+      expect(r.code, args.join(" ")).toBe(40);
+      expect(r.events.map((e) => [e.event, e.code ?? e.outcome])).toEqual([
+        ["error", "E-USAGE"],
+        ["outcome", "invalid"],
+      ]);
+      expect(r.stderr).toContain("E-USAGE");
+    }
+  });
+
+  test("E-USAGE: --trace without --verify", async () => {
+    const r = await runSkop([skill("- **stop**"), "--trace", "t.jsonl"]);
     expect(r.code).toBe(40);
-    expect(r.events).toEqual([]);
+    expect(find(r.events, "error", "E-USAGE")).toBeDefined();
   });
 
   test("a pager failure prints the page to stderr and keeps the outcome (SPEC §4.2)", async () => {

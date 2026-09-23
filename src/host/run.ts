@@ -30,6 +30,8 @@ import { Interp, unsafeInputs } from "./standin.js";
 import { readOnly } from "./verify.js";
 
 export interface RunOptions {
+  /** Why the command line can't be used (E-USAGE), if it can't. */
+  usage?: string;
   file: string;
   mode: "run" | "lint" | "verify" | "explain";
   /** With --verify: a run's events.jsonl to replay (SPEC §12.4). */
@@ -89,6 +91,7 @@ export async function runSkill(o: RunOptions): Promise<number> {
 
   let release = () => {};
   try {
+    if (o.usage !== undefined) fail("E-USAGE", "args", o.usage);
     // Step 0: a run names its mode (SPEC §7).
     if (o.mode === "run" && o.apply === o.dryRun)
       fail("E-MODE", "args", o.apply ? "--apply and --dry-run can't both be given" : "a run needs --apply or --dry-run");
