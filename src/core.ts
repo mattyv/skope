@@ -16,9 +16,10 @@ export type { Section };
 
 const require = createRequire(import.meta.url);
 // Dafny's output has no types, so it's `any` here and nowhere else.
-const gen: any = require("../core/generated/core.cjs");
-const BigNumber: any = require("bignumber.js");
-const { _dafny, SkopSyntax, SkopLint, SkopInterp } = gen;
+export const gen: any = require("../core/generated/core.cjs");
+export const BigNumber: any = require("bignumber.js");
+export const { _dafny } = gen;
+const { SkopSyntax, SkopLint, SkopInterp } = gen;
 
 export type Kind = "run" | "do";
 export type LintError = { code: string; src: number };

@@ -1,5 +1,6 @@
 {
   "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
   "files": {
     "includes": ["src/**", "tests/**", "scripts/**", "contracts/**", "!src/contracts.gen.ts"]
   },
@@ -10,7 +11,9 @@
   "linter": {
     "rules": {
       "suspicious": {
-        "noExplicitAny": "off"
+        "noExplicitAny": "off",
+        // The core program contract has a `then` field (a check's target).
+        "noThenProperty": "off"
       }
     }
   }

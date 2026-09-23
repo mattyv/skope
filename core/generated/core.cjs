@@ -4159,4 +4159,4 @@ let _module = (function() {
   return $module;
 })(); // end of module _module
 
-module.exports = { _dafny, SkopSyntax, SkopLint, SkopInterp };
+module.exports = { _dafny, SkopSyntax, SkopLint, SkopInterp, SkopAst, SkopStep };

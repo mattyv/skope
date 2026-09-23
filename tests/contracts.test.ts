@@ -44,7 +44,6 @@ describe("core program schema (SPEC §5.1)", () => {
     ["a section id without the s: prefix", (p) => (p.entry.section = "triage")],
     ["an id that isn't a slug", (p) => (p.entry.section = "s:Triage")],
     ["a list reference as a bare id", (p) => (p.sections["s:clean_up"].body[0].for_each.list = "s:cleanups")],
-    // biome-ignore lint/suspicious/noThenProperty: `then` is the check's target field in the core program
     ["a check with neither a target nor an else", (p) => (triage(p)[1].check.then = null)],
     [
       "an if_yes run with a binding",
