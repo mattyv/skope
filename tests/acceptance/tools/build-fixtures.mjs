@@ -291,9 +291,9 @@ function dfRunStart(dry_run) {
       line: 46,
       question: "Given `errors` and `biggest`, which service is behind it?",
       kind: "choice",
-      probs: { nginx: 0.03125, rsyslog: 0.03125, "myapp-worker": 0.875, "myapp-api": 0.03125 },
+      probs: { nginx: 0.03125, rsyslog: 0.03125, "myapp-worker": 0.90625, "myapp-api": 0.03125 },
       chosen: "myapp-worker",
-      confidence: 0.875,
+      confidence: 0.90625,
       sure: 90,
       passed: true,
     }),
@@ -316,7 +316,7 @@ function dfRunStart(dry_run) {
     events,
     {
       "line:27": { "s:clean_up": 0.03125, "s:restart": 0.875, "s:page": 0.0625, "s:investigate": 0.03125 },
-      "line:46": { nginx: 0.03125, rsyslog: 0.03125, "myapp-worker": 0.875, "myapp-api": 0.03125 },
+      "line:46": { nginx: 0.03125, rsyslog: 0.03125, "myapp-worker": 0.90625, "myapp-api": 0.03125 },
     },
     {
       "line:23": { exit: 0, stdout: " 93%\n" },
@@ -746,9 +746,9 @@ function dfRunStart(dry_run) {
       line: 46,
       question: "Given `errors` and `biggest`, which service is behind it?",
       kind: "choice",
-      probs: { nginx: 0.03125, rsyslog: 0.03125, "myapp-worker": 0.875, "myapp-api": 0.03125 },
+      probs: { nginx: 0.03125, rsyslog: 0.03125, "myapp-worker": 0.90625, "myapp-api": 0.03125 },
       chosen: "myapp-worker",
-      confidence: 0.875,
+      confidence: 0.90625,
       sure: 90,
       passed: true,
     }),
@@ -782,7 +782,7 @@ function dfRunStart(dry_run) {
     events,
     {
       "line:27": { "s:clean_up": 0.03125, "s:restart": 0.875, "s:page": 0.0625, "s:investigate": 0.03125 },
-      "line:46": { nginx: 0.03125, rsyslog: 0.03125, "myapp-worker": 0.875, "myapp-api": 0.03125 },
+      "line:46": { nginx: 0.03125, rsyslog: 0.03125, "myapp-worker": 0.90625, "myapp-api": 0.03125 },
     },
     {
       "line:23": { exit: 0, stdout: " 93%\n" },
@@ -937,10 +937,11 @@ function dfRunStart(dry_run) {
 }
 
 // --- unbound-biggest: line 26's `du … · else skip` fails, leaving `biggest` unbound; the
-// Triage ask's question shows it per SPEC §3.5 ("(unavailable)" for a name that may be unbound)
-// ---
+// Triage ask's question still names it in backticks, since it's a run output; its value in the
+// context is "(unavailable)" (SPEC §3.5: "For a `run` output named in `Q`, that's its value in the
+// context"; §6.3) ---
 {
-  const question = "Given `used`, `errors` and (unavailable), what's the best next step?";
+  const question = "Given `used`, `errors` and `biggest`, what's the best next step?";
   const events = [
     dfRunStart(false),
     mk.run(DF, { section: "Triage", line: 23, cmd: "df --output=pcent / | tail -1", exit: 0, stdout: " 89%\n" }),

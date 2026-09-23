@@ -14,6 +14,7 @@ import { JEV_LIMITS, OPENROUTER_LIMITS } from "../ask/limits.js";
 import { checkModel } from "../ask/openrouter.js";
 import { type AskOutput, checkAskLimits, isFailure } from "../ask/types.js";
 import type { CoreProgram, FakesAnswers, FakesCommands, Section } from "../contracts.gen.js";
+import { Interp, unsafeInputs } from "../interp.js";
 import { lint } from "../lint.js";
 import { preprocess } from "../preprocess/index.js";
 import { type Config, loadConfig } from "../runner/config.js";
@@ -26,7 +27,6 @@ import { buildRedactor } from "../runner/redact.js";
 import type { AskRequest, Response, RunConfig, Val } from "../step.js";
 import { identity } from "./identity.js";
 import { escapePage, type Handlers, type LoopResult, runLoop } from "./loop.js";
-import { Interp, unsafeInputs } from "./standin.js";
 import { readOnly } from "./verify.js";
 
 export interface RunOptions {

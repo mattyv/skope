@@ -33,7 +33,7 @@ function writeTrace(events: object[]): string {
 
 describe("differential check: a real run's trace is one --verify's explorer can take (SPEC §12.4)", () => {
   for (const s of allScenarios().filter((s) => s.name !== "deadline")) {
-    test.fails(`${s.fixture}/${s.name}: --verify --trace exits 0 on the run's own trace`, async () => {
+    test(`${s.fixture}/${s.name}: --verify --trace exits 0 on the run's own trace`, async () => {
       const mode = s.name === "dry-run" ? "--dry-run" : "--apply";
       const run = await runSkop([s.skillPath, mode, "--fake", s.answersPath, "--fake-exec", s.commandsPath]);
       expect(run.events.length).toBeGreaterThan(0);
@@ -43,7 +43,7 @@ describe("differential check: a real run's trace is one --verify's explorer can 
       expect(r.code).toBe(0);
     });
 
-    test.fails(`${s.fixture}/${s.name}: --verify --trace exits 40 on a tampered trace`, async () => {
+    test(`${s.fixture}/${s.name}: --verify --trace exits 40 on a tampered trace`, async () => {
       const mode = s.name === "dry-run" ? "--dry-run" : "--apply";
       const run = await runSkop([s.skillPath, mode, "--fake", s.answersPath, "--fake-exec", s.commandsPath]);
       // Tamper with the trace by dropping its outcome event: no explored path ends mid-stream,

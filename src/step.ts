@@ -93,7 +93,9 @@ export const EVENT_FIELDS: Record<string, { core: string[]; host: string[] }> = 
   page: { core: ["text", "ok"], host: [] },
   would_page: { core: ["text"], host: [] },
   transfer: { core: ["from", "to"], host: [] },
-  outcome: { core: ["outcome", "reason", "ask_calls", "effects", "dry_run"], host: [] },
+  // ask_calls and effects are counted by the host from the events it emits: SPEC §10 counts `do`
+  // commands started, which a dry run's would_do isn't, and a run that ends in error still needs them.
+  outcome: { core: ["outcome", "reason", "dry_run"], host: ["ask_calls", "effects"] },
   // Host-only events: the core never emits these.
   run_start: { core: [], host: ["params", "dry_run", "caller", "run_dir", "skop_version", "skop_build"] },
   handoff_page: { core: [], host: ["text", "ok"] },

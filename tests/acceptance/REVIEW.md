@@ -116,10 +116,13 @@ Known caveats still open:
     disk-full's line 24 comparison run in the same core `Step`, so
     disk-full hands off at line 25 after logging the check, and
     cert-expiry at line 24.
-  - `unbound-biggest` renders the ask's unbound name as `(unavailable)`
-    per SPEC §3.5 ("A name used in `Q` or `QUOTED` that may be unbound
-    renders as `(unavailable)`") — this is not actually ambiguous in
-    SPEC.md, despite the note this file used to carry.
+  - `unbound-biggest`: `biggest` is a `run` output, so the question still
+    names it in backticks and its context value is `(unavailable)` (SPEC
+    §3.5: "For a `run` output named in `Q`, that's its value in the
+    context"). Stream G corrected this against the real core; the golden
+    used to paste `(unavailable)` into the question.
+  - The Restart ask's fake answer sums to 1 (`myapp-worker` 29/32): it
+    used to sum to 31/32, which SPEC §6.1 rejects as invalid.
   - `ask.probs` in events and in a record's `detail` is keyed by option
     id only (SPEC §10, as settled with stream G); `unassigned` appears
     only in the fake answer.
@@ -161,7 +164,7 @@ Known caveats still open:
 | disk-full | `command-failed` | Triage's `run` (line 25, no else) fails → handoff (command_failed) |
 | disk-full | `deadline` | Huge simulated `ms` exceeds `limits.deadline` → handoff (deadline) before the next step |
 | disk-full | `tie-unassigned` | Triage ask ties via `unassigned` (0.5/0.25/…/0.25) → handoff (gate_failed) |
-| disk-full | `unbound-biggest` | Line 26's `du … · else skip` fails; Triage ask's question shows `biggest` as `(unavailable)` |
+| disk-full | `unbound-biggest` | Line 26's `du … · else skip` fails; `biggest` is `(unavailable)` in the ask's context |
 | disk-full | `secret-redaction` | A secret in `errors`' stdout is redacted in `stdout_tail` and `record.variables` |
 | cert-expiry | `stop-happy` | First check succeeds → stop, no ask |
 | cert-expiry | `renew-happy` | Triage → Renew (two `do`s) → Reload → stop |
