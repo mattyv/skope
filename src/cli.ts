@@ -10,8 +10,8 @@ const identity = JSON.parse(readFileSync(new URL("./build-identity.json", import
   build: string;
 };
 
-const args = process.argv.slice(2);
-if (args.includes("--version")) {
+// Only the flag itself, not a value that happens to spell it.
+if (process.argv[2] === "--version" && process.argv.length === 3) {
   console.log(`skop ${identity.version} (build identity ${identity.build})`);
   process.exit(0);
 }

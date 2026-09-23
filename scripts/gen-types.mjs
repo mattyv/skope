@@ -4,7 +4,6 @@
 // tests/contracts.test.ts fails if the committed file is stale.
 //
 //   node scripts/gen-types.mjs           write src/contracts.gen.ts
-//   node scripts/gen-types.mjs --print   print it instead (used by the test)
 
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -46,8 +45,4 @@ export async function generate() {
   return parts.join("\n");
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const text = await generate();
-  if (process.argv.includes("--print")) process.stdout.write(text);
-  else writeFileSync(OUT, text);
-}
+if (process.argv[1] === fileURLToPath(import.meta.url)) writeFileSync(OUT, await generate());

@@ -31,7 +31,8 @@ function dafny(args) {
 
 const pinned = readFileSync(join(ROOT, ".dafny-version"), "utf8").trim();
 const installed = execFileSync(DAFNY, ["--version"], { encoding: "utf8" }).trim();
-if (!installed.startsWith(pinned)) {
+// `dafny --version` prints e.g. 4.11.0+fcb2042d…; compare the version part exactly.
+if (installed.split("+")[0] !== pinned) {
   console.error(`build-core: .dafny-version pins ${pinned}, but ${DAFNY} is ${installed}.`);
   process.exit(1);
 }

@@ -3,6 +3,10 @@
   "version": "0.1.0",
   "description": "Run dual-use skills: Markdown an agent can read and a small, proven runtime can execute.",
   "license": "MIT OR Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mattyv/skop.git"
+  },
   "type": "module",
   "bin": {
     "skop": "dist/cli.js"
@@ -18,15 +22,16 @@
   },
   "scripts": {
     "core": "node scripts/build-core.mjs",
-    "build": "node scripts/build-id.mjs --write dist/build-identity.json && tsc -p tsconfig.build.json",
+    "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && node scripts/build-id.mjs --write dist/build-identity.json && tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "pretest": "npm run build",
     "test": "vitest run",
     "lint": "biome check .",
-    "format": "biome check --write ."
+    "format": "biome check --write .",
+    "prepack": "npm run build"
   },
   "dependencies": {
-    "bignumber.js": "^9.3.1"
+    "bignumber.js": "9.3.1"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.14",

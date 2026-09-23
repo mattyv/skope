@@ -26,4 +26,17 @@ describe("golden helper (SPEC §12.3)", () => {
   test("a change in a meaningful field changes the golden", () => {
     expect(toJsonl([{ event: "run", exit: 0 }])).not.toBe(toJsonl([{ event: "run", exit: 1 }]));
   });
+
+  test("nested records are normalised too, and key order doesn't matter", () => {
+    const a = { event: "handoff_record", record: { run_id: "r-1", host: "h", reason: "gate_failed", skill: "disk-full" } };
+    const b = { record: { skill: "disk-full", reason: "gate_failed", host: "h2", run_id: "r-9" }, event: "handoff_record" };
+    expect(toJsonl([a])).toBe(toJsonl([b]));
+    expect(normalise([a])).toEqual([{ event: "handoff_record", record: { reason: "gate_failed", skill: "disk-full" } }]);
+  });
+
+  test("skop's version and build identity don't break goldens", () => {
+    const a = { event: "run_start", skop_version: "0.1.0", skop_build: "aaa", dry_run: true };
+    const b = { event: "run_start", skop_version: "0.2.0", skop_build: "bbb", dry_run: true };
+    expect(toJsonl([a])).toBe(toJsonl([b]));
+  });
 });

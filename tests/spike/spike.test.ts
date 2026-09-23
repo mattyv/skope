@@ -87,6 +87,20 @@ describe("the adapter refuses what it can't represent exactly", () => {
     });
   }
 
+  test("a lone surrogate in a command", () => {
+    expect(() => lint(section([runStmt(3, "echo \ud800x"), stop(4)]))).toThrow(Unsupported);
+  });
+
+  test("a null run body, and a stop with fields", () => {
+    expect(() => lint(section([{ src: 3, run: null, else: null }, stop(4)]))).toThrow(Unsupported);
+    expect(() => lint(section([{ src: 3, stop: { x: 1 } }]))).toThrow(Unsupported);
+  });
+
+  test("a dry-run flag that isn't a boolean, which would otherwise run the effect", () => {
+    expect(() => new Run(program, { dry: undefined as unknown as boolean })).toThrow(Unsupported);
+    expect(() => new Run(program, { dry: "yes" as unknown as boolean })).toThrow(Unsupported);
+  });
+
   test("a program that fails lint can't be started", () => {
     expect(() => new Run(section([]), { dry: false })).toThrow(/E-FALLS-OFF/);
   });
@@ -94,7 +108,7 @@ describe("the adapter refuses what it can't represent exactly", () => {
   test("a fractional exit code", () => {
     const r = new Run(program, { dry: false });
     r.step(null);
-    expect(() => r.step({ exit: 1.5 })).toThrow(/integer/);
+    expect(() => r.step({ exit: 1.5 })).toThrow(Unsupported);
   });
 
   test("a step that skips the command's result, or sends one nobody asked for", () => {
