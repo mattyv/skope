@@ -591,8 +591,10 @@ shapes here as shape, not copy-paste.
 A Score ask (v1.1) in core JSON:
 ```json
 {"src":22,"ask":{"score":{"low":1,"high":4,
-  "rubric":{"1":"known noise, nothing to do","2":"worth a human look, not urgent",
-            "3":"degraded service","4":"outage or data at risk"},
+  "rubric":[{"src":23,"level":1,"text":"known noise, nothing to do"},
+            {"src":24,"level":2,"text":"worth a human look, not urgent"},
+            {"src":25,"level":3,"text":"degraded service"},
+            {"src":26,"level":4,"text":"outage or data at risk"}],
   "as":"severity"},
   "question":[{"lit":"How severe are the errors in "},{"var":"errors"},{"lit":"?"}],
   "sure":75,"else":null}}
@@ -1937,6 +1939,8 @@ Also, where things live in the Markdown:
 - **Events before a run** have `null` run fields.
 - **A failed `ask` event** has `null` answer fields and a `detail`.
 - **A warning's `stage`** is the stage that found it.
+- **A Score rubric in core JSON is a list** of `{src, level, text}`, so
+  each line keeps its source line.
 - **The event contract is one shape per event**, with an example of each
   in `contracts/examples/events.jsonl`.
 

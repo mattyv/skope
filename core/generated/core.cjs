@@ -1186,6 +1186,1219 @@ let _System = (function() {
 
   return $module;
 })(); // end of module _System
+let SkopAst = (function() {
+  let $module = {};
+
+
+  $module.Option = class Option {
+    constructor(tag) {
+      this.$tag = tag;
+    }
+    static create_None() {
+      let $dt = new Option(0);
+      return $dt;
+    }
+    static create_Some(value) {
+      let $dt = new Option(1);
+      $dt.value = value;
+      return $dt;
+    }
+    get is_None() { return this.$tag === 0; }
+    get is_Some() { return this.$tag === 1; }
+    get dtor_value() { return this.value; }
+    toString() {
+      if (this.$tag === 0) {
+        return "SkopAst.Option.None";
+      } else if (this.$tag === 1) {
+        return "SkopAst.Option.Some" + "(" + _dafny.toString(this.value) + ")";
+      } else  {
+        return "<unexpected>";
+      }
+    }
+    equals(other) {
+      if (this === other) {
+        return true;
+      } else if (this.$tag === 0) {
+        return other.$tag === 0;
+      } else if (this.$tag === 1) {
+        return other.$tag === 1 && _dafny.areEqual(this.value, other.value);
+      } else  {
+        return false; // unexpected
+      }
+    }
+    static Default() {
+      return SkopAst.Option.create_None();
+    }
+    static Rtd() {
+      return class {
+        static get Default() {
+          return Option.Default();
+        }
+      };
+    }
+  }
+
+  $module.Part = class Part {
+    constructor(tag) {
+      this.$tag = tag;
+    }
+    static create_Lit(s) {
+      let $dt = new Part(0);
+      $dt.s = s;
+      return $dt;
+    }
+    static create_Var(name) {
+      let $dt = new Part(1);
+      $dt.name = name;
+      return $dt;
+    }
+    get is_Lit() { return this.$tag === 0; }
+    get is_Var() { return this.$tag === 1; }
+    get dtor_s() { return this.s; }
+    get dtor_name() { return this.name; }
+    toString() {
+      if (this.$tag === 0) {
+        return "SkopAst.Part.Lit" + "(" + this.s.toVerbatimString(true) + ")";
+      } else if (this.$tag === 1) {
+        return "SkopAst.Part.Var" + "(" + this.name.toVerbatimString(true) + ")";
+      } else  {
+        return "<unexpected>";
+      }
+    }
+    equals(other) {
+      if (this === other) {
+        return true;
+      } else if (this.$tag === 0) {
+        return other.$tag === 0 && _dafny.areEqual(this.s, other.s);
+      } else if (this.$tag === 1) {
+        return other.$tag === 1 && _dafny.areEqual(this.name, other.name);
+      } else  {
+        return false; // unexpected
+      }
+    }
+    static Default() {
+      return SkopAst.Part.create_Lit(_dafny.Seq.UnicodeFromString(""));
+    }
+    static Rtd() {
+      return class {
+        static get Default() {
+          return Part.Default();
+        }
+      };
+    }
+  }
+
+  $module.Anchor = class Anchor {
+    constructor(tag) {
+      this.$tag = tag;
+    }
+    static create_Anchor(given, expected) {
+      let $dt = new Anchor(0);
+      $dt.given = given;
+      $dt.expected = expected;
+      return $dt;
+    }
+    get is_Anchor() { return this.$tag === 0; }
+    get dtor_given() { return this.given; }
+    get dtor_expected() { return this.expected; }
+    toString() {
+      if (this.$tag === 0) {
+        return "SkopAst.Anchor.Anchor" + "(" + this.given.toVerbatimString(true) + ", " + this.expected.toVerbatimString(true) + ")";
+      } else  {
+        return "<unexpected>";
+      }
+    }
+    equals(other) {
+      if (this === other) {
+        return true;
+      } else if (this.$tag === 0) {
+        return other.$tag === 0 && _dafny.areEqual(this.given, other.given) && _dafny.areEqual(this.expected, other.expected);
+      } else  {
+        return false; // unexpected
+      }
+    }
+    static Default() {
+      return SkopAst.Anchor.create_Anchor(_dafny.Seq.UnicodeFromString(""), _dafny.Seq.UnicodeFromString(""));
+    }
+    static Rtd() {
+      return class {
+        static get Default() {
+          return Anchor.Default();
+        }
+      };
+    }
+  }
+
+  $module.SectionRef = class SectionRef {
+    constructor(tag) {
+      this.$tag = tag;
+    }
+    static create_SectionRef(id, anchor) {
+      let $dt = new SectionRef(0);
+      $dt.id = id;
+      $dt.anchor = anchor;
+      return $dt;
+    }
+    get is_SectionRef() { return this.$tag === 0; }
+    get dtor_id() { return this.id; }
+    get dtor_anchor() { return this.anchor; }
+    toString() {
+      if (this.$tag === 0) {
+        return "SkopAst.SectionRef.SectionRef" + "(" + this.id.toVerbatimString(true) + ", " + _dafny.toString(this.anchor) + ")";
+      } else  {
+        return "<unexpected>";
+      }
+    }
+    equals(other) {
+      if (this === other) {
+        return true;
+      } else if (this.$tag === 0) {
+        return other.$tag === 0 && _dafny.areEqual(this.id, other.id) && _dafny.areEqual(this.anchor, other.anchor);
+      } else  {
+        return false; // unexpected
+      }
+    }
+    static Default() {
+      return SkopAst.SectionRef.create_SectionRef(_dafny.Seq.UnicodeFromString(""), SkopAst.Option.Default());
+    }
+    static Rtd() {
+      return class {
+        static get Default() {
+          return SectionRef.Default();
+        }
+      };
+    }
+  }
+
+  $module.Else = class Else {
+    constructor(tag) {
+      this.$tag = tag;
+    }
+    static create_NoElse() {
+      let $dt = new Else(0);
+      return $dt;
+    }
+    static create_Skip() {
+      let $dt = new Else(1);
+      return $dt;
+    }
+    static create_ElseTo(ref) {
+      let $dt = new Else(2);
+      $dt.ref = ref;
+      return $dt;
+    }
+    get is_NoElse() { return this.$tag === 0; }
+    get is_Skip() { return this.$tag === 1; }
+    get is_ElseTo() { return this.$tag === 2; }
+    get dtor_ref() { return this.ref; }
+    toString() {
+      if (this.$tag === 0) {
+        return "SkopAst.Else.NoElse";
+      } else if (this.$tag === 1) {
+        return "SkopAst.Else.Skip";
+      } else if (this.$tag === 2) {
+        return "SkopAst.Else.ElseTo" + "(" + _dafny.toString(this.ref) + ")";
+      } else  {
+        return "<unexpected>";
+      }
+    }
+    equals(other) {
+      if (this === other) {
+        return true;
+      } else if (this.$tag === 0) {
+        return other.$tag === 0;
+      } else if (this.$tag === 1) {
+        return other.$tag === 1;
+      } else if (this.$tag === 2) {
+        return other.$tag === 2 && _dafny.areEqual(this.ref, other.ref);
+      } else  {
+        return false; // unexpected
+      }
+    }
+    static Default() {
+      return SkopAst.Else.create_NoElse();
+    }
+    static Rtd() {
+      return class {
+        static get Default() {
+          return Else.Default();
+        }
+      };
+    }
+  }
+
+  $module.Target = class Target {
+    constructor(tag) {
+      this.$tag = tag;
+    }
+    static create_StopTarget() {
+      let $dt = new Target(0);
+      return $dt;
+    }
+    static create_To(ref) {
+      let $dt = new Target(1);
+      $dt.ref = ref;
+      return $dt;
+    }
+    get is_StopTarget() { return this.$tag === 0; }
+    get is_To() { return this.$tag === 1; }
+    get dtor_ref() { return this.ref; }
+    toString() {
+      if (this.$tag === 0) {
+        return "SkopAst.Target.StopTarget";
+      } else if (this.$tag === 1) {
+        return "SkopAst.Target.To" + "(" + _dafny.toString(this.ref) + ")";
+      } else  {
+        return "<unexpected>";
+      }
+    }
+    equals(other) {
+      if (this === other) {
+        return true;
+      } else if (this.$tag === 0) {
+        return other.$tag === 0;
+      } else if (this.$tag === 1) {
+        return other.$tag === 1 && _dafny.areEqual(this.ref, other.ref);
+      } else  {
+        return false; // unexpected
+      }
+    }
+    static Default() {
+      return SkopAst.Target.create_StopTarget();
+    }
+    static Rtd() {
+      return class {
+        static get Default() {
+          return Target.Default();
+        }
+      };
+    }
+  }
+
+  $module.DoBody = class DoBody {
+    constructor(tag) {
+      this.$tag = tag;
+    }
+    static create_DoCmd(cmd) {
+      let $dt = new DoBody(0);
+      $dt.cmd = cmd;
+      return $dt;
+    }
+    static create_DoItem(item) {
+      let $dt = new DoBody(1);
+      $dt.item = item;
+      return $dt;
+    }
+    get is_DoCmd() { return this.$tag === 0; }
+    get is_DoItem() { return this.$tag === 1; }
+    get dtor_cmd() { return this.cmd; }
+    get dtor_item() { return this.item; }
+    toString() {
+      if (this.$tag === 0) {
+        return "SkopAst.DoBody.DoCmd" + "(" + _dafny.toString(this.cmd) + ")";
+      } else if (this.$tag === 1) {
+        return "SkopAst.DoBody.DoItem" + "(" + this.item.toVerbatimString(true) + ")";
+      } else  {
+        return "<unexpected>";
+      }
+    }
+    equals(other) {
+      if (this === other) {
+        return true;
+      } else if (this.$tag === 0) {
+        return other.$tag === 0 && _dafny.areEqual(this.cmd, other.cmd);
+      } else if (this.$tag === 1) {
+        return other.$tag === 1 && _dafny.areEqual(this.item, other.item);
+      } else  {
+        return false; // unexpected
+      }
+    }
+    static Default() {
+      return SkopAst.DoBody.create_DoCmd(_dafny.Seq.of());
+    }
+    static Rtd() {
+      return class {
+        static get Default() {
+          return DoBody.Default();
+        }
+      };
+    }
+  }
+
+  $module.CmpOp = class CmpOp {
+    constructor(tag) {
+      this.$tag = tag;
+    }
+    static create_Lt() {
+      let $dt = new CmpOp(0);
+      return $dt;
+    }
+    static create_Le() {
+      let $dt = new CmpOp(1);
+      return $dt;
+    }
+    static create_Gt() {
+      let $dt = new CmpOp(2);
+      return $dt;
+    }
+    static create_Ge() {
+      let $dt = new CmpOp(3);
+      return $dt;
+    }
+    static create_Eq() {
+      let $dt = new CmpOp(4);
+      return $dt;
+    }
+    static create_Ne() {
+      let $dt = new CmpOp(5);
+      return $dt;
+    }
+    get is_Lt() { return this.$tag === 0; }
+    get is_Le() { return this.$tag === 1; }
+    get is_Gt() { return this.$tag === 2; }
+    get is_Ge() { return this.$tag === 3; }
+    get is_Eq() { return this.$tag === 4; }
+    get is_Ne() { return this.$tag === 5; }
+    static get AllSingletonConstructors() {
+      return this.AllSingletonConstructors_();
+    }
+    static *AllSingletonConstructors_() {
+      yield CmpOp.create_Lt();
+      yield CmpOp.create_Le();
+      yield CmpOp.create_Gt();
+      yield CmpOp.create_Ge();
+      yield CmpOp.create_Eq();
+      yield CmpOp.create_Ne();
+    }
+    toString() {
+      if (this.$tag === 0) {
+        return "SkopAst.CmpOp.Lt";
+      } else if (this.$tag === 1) {
+        return "SkopAst.CmpOp.Le";
+      } else if (this.$tag === 2) {
+        return "SkopAst.CmpOp.Gt";
+      } else if (this.$tag === 3) {
+        return "SkopAst.CmpOp.Ge";
+      } else if (this.$tag === 4) {
+        return "SkopAst.CmpOp.Eq";
+      } else if (this.$tag === 5) {
+        return "SkopAst.CmpOp.Ne";
+      } else  {
+        return "<unexpected>";
+      }
+    }
+    equals(other) {
+      if (this === other) {
+        return true;
+      } else if (this.$tag === 0) {
+        return other.$tag === 0;
+      } else if (this.$tag === 1) {
+        return other.$tag === 1;
+      } else if (this.$tag === 2) {
+        return other.$tag === 2;
+      } else if (this.$tag === 3) {
+        return other.$tag === 3;
+      } else if (this.$tag === 4) {
+        return other.$tag === 4;
+      } else if (this.$tag === 5) {
+        return other.$tag === 5;
+      } else  {
+        return false; // unexpected
+      }
+    }
+    static Default() {
+      return SkopAst.CmpOp.create_Lt();
+    }
+    static Rtd() {
+      return class {
+        static get Default() {
+          return CmpOp.Default();
+        }
+      };
+    }
+  }
+
+  $module.Operand = class Operand {
+    constructor(tag) {
+      this.$tag = tag;
+    }
+    static create_VarOp(name) {
+      let $dt = new Operand(0);
+      $dt.name = name;
+      return $dt;
+    }
+    static create_Num(text) {
+      let $dt = new Operand(1);
+      $dt.text = text;
+      return $dt;
+    }
+    get is_VarOp() { return this.$tag === 0; }
+    get is_Num() { return this.$tag === 1; }
+    get dtor_name() { return this.name; }
+    get dtor_text() { return this.text; }
+    toString() {
+      if (this.$tag === 0) {
+        return "SkopAst.Operand.VarOp" + "(" + this.name.toVerbatimString(true) + ")";
+      } else if (this.$tag === 1) {
+        return "SkopAst.Operand.Num" + "(" + this.text.toVerbatimString(true) + ")";
+      } else  {
+        return "<unexpected>";
+      }
+    }
+    equals(other) {
+      if (this === other) {
+        return true;
+      } else if (this.$tag === 0) {
+        return other.$tag === 0 && _dafny.areEqual(this.name, other.name);
+      } else if (this.$tag === 1) {
+        return other.$tag === 1 && _dafny.areEqual(this.text, other.text);
+      } else  {
+        return false; // unexpected
+      }
+    }
+    static Default() {
+      return SkopAst.Operand.create_VarOp(_dafny.Seq.UnicodeFromString(""));
+    }
+    static Rtd() {
+      return class {
+        static get Default() {
+          return Operand.Default();
+        }
+      };
+    }
+  }
+
+  $module.Cond = class Cond {
+    constructor(tag) {
+      this.$tag = tag;
+    }
+    static create_Succeeds(cmd) {
+      let $dt = new Cond(0);
+      $dt.cmd = cmd;
+      return $dt;
+    }
+    static create_Cmp(op, l, r) {
+      let $dt = new Cond(1);
+      $dt.op = op;
+      $dt.l = l;
+      $dt.r = r;
+      return $dt;
+    }
+    get is_Succeeds() { return this.$tag === 0; }
+    get is_Cmp() { return this.$tag === 1; }
+    get dtor_cmd() { return this.cmd; }
+    get dtor_op() { return this.op; }
+    get dtor_l() { return this.l; }
+    get dtor_r() { return this.r; }
+    toString() {
+      if (this.$tag === 0) {
+        return "SkopAst.Cond.Succeeds" + "(" + _dafny.toString(this.cmd) + ")";
+      } else if (this.$tag === 1) {
+        return "SkopAst.Cond.Cmp" + "(" + _dafny.toString(this.op) + ", " + _dafny.toString(this.l) + ", " + _dafny.toString(this.r) + ")";
+      } else  {
+        return "<unexpected>";
+      }
+    }
+    equals(other) {
+      if (this === other) {
+        return true;
+      } else if (this.$tag === 0) {
+        return other.$tag === 0 && _dafny.areEqual(this.cmd, other.cmd);
+      } else if (this.$tag === 1) {
+        return other.$tag === 1 && _dafny.areEqual(this.op, other.op) && _dafny.areEqual(this.l, other.l) && _dafny.areEqual(this.r, other.r);
+      } else  {
+        return false; // unexpected
+      }
+    }
+    static Default() {
+      return SkopAst.Cond.create_Succeeds(_dafny.Seq.of());
+    }
+    static Rtd() {
+      return class {
+        static get Default() {
+          return Cond.Default();
+        }
+      };
+    }
+  }
+
+  $module.AskOption = class AskOption {
+    constructor(tag) {
+      this.$tag = tag;
+    }
+    static create_AskOption(src, ref) {
+      let $dt = new AskOption(0);
+      $dt.src = src;
+      $dt.ref = ref;
+      return $dt;
+    }
+    get is_AskOption() { return this.$tag === 0; }
+    get dtor_src() { return this.src; }
+    get dtor_ref() { return this.ref; }
+    toString() {
+      if (this.$tag === 0) {
+        return "SkopAst.AskOption.AskOption" + "(" + _dafny.toString(this.src) + ", " + _dafny.toString(this.ref) + ")";
+      } else  {
+        return "<unexpected>";
+      }
+    }
+    equals(other) {
+      if (this === other) {
+        return true;
+      } else if (this.$tag === 0) {
+        return other.$tag === 0 && _dafny.areEqual(this.src, other.src) && _dafny.areEqual(this.ref, other.ref);
+      } else  {
+        return false; // unexpected
+      }
+    }
+    static Default() {
+      return SkopAst.AskOption.create_AskOption(_dafny.ZERO, SkopAst.SectionRef.Default());
+    }
+    static Rtd() {
+      return class {
+        static get Default() {
+          return AskOption.Default();
+        }
+      };
+    }
+  }
+
+  $module.RubricLine = class RubricLine {
+    constructor(tag) {
+      this.$tag = tag;
+    }
+    static create_RubricLine(src, level, text) {
+      let $dt = new RubricLine(0);
+      $dt.src = src;
+      $dt.level = level;
+      $dt.text = text;
+      return $dt;
+    }
+    get is_RubricLine() { return this.$tag === 0; }
+    get dtor_src() { return this.src; }
+    get dtor_level() { return this.level; }
+    get dtor_text() { return this.text; }
+    toString() {
+      if (this.$tag === 0) {
+        return "SkopAst.RubricLine.RubricLine" + "(" + _dafny.toString(this.src) + ", " + _dafny.toString(this.level) + ", " + this.text.toVerbatimString(true) + ")";
+      } else  {
+        return "<unexpected>";
+      }
+    }
+    equals(other) {
+      if (this === other) {
+        return true;
+      } else if (this.$tag === 0) {
+        return other.$tag === 0 && _dafny.areEqual(this.src, other.src) && _dafny.areEqual(this.level, other.level) && _dafny.areEqual(this.text, other.text);
+      } else  {
+        return false; // unexpected
+      }
+    }
+    static Default() {
+      return SkopAst.RubricLine.create_RubricLine(_dafny.ZERO, _dafny.ZERO, _dafny.Seq.UnicodeFromString(""));
+    }
+    static Rtd() {
+      return class {
+        static get Default() {
+          return RubricLine.Default();
+        }
+      };
+    }
+  }
+
+  $module.AskForm = class AskForm {
+    constructor(tag) {
+      this.$tag = tag;
+    }
+    static create_Sections(options) {
+      let $dt = new AskForm(0);
+      $dt.options = options;
+      return $dt;
+    }
+    static create_YesNo(binding) {
+      let $dt = new AskForm(1);
+      $dt.binding = binding;
+      return $dt;
+    }
+    static create_OneOf(list, binding) {
+      let $dt = new AskForm(2);
+      $dt.list = list;
+      $dt.binding = binding;
+      return $dt;
+    }
+    static create_Score(low, high, rubric, binding) {
+      let $dt = new AskForm(3);
+      $dt.low = low;
+      $dt.high = high;
+      $dt.rubric = rubric;
+      $dt.binding = binding;
+      return $dt;
+    }
+    get is_Sections() { return this.$tag === 0; }
+    get is_YesNo() { return this.$tag === 1; }
+    get is_OneOf() { return this.$tag === 2; }
+    get is_Score() { return this.$tag === 3; }
+    get dtor_options() { return this.options; }
+    get dtor_binding() { return this.binding; }
+    get dtor_list() { return this.list; }
+    get dtor_low() { return this.low; }
+    get dtor_high() { return this.high; }
+    get dtor_rubric() { return this.rubric; }
+    toString() {
+      if (this.$tag === 0) {
+        return "SkopAst.AskForm.Sections" + "(" + _dafny.toString(this.options) + ")";
+      } else if (this.$tag === 1) {
+        return "SkopAst.AskForm.YesNo" + "(" + this.binding.toVerbatimString(true) + ")";
+      } else if (this.$tag === 2) {
+        return "SkopAst.AskForm.OneOf" + "(" + _dafny.toString(this.list) + ", " + this.binding.toVerbatimString(true) + ")";
+      } else if (this.$tag === 3) {
+        return "SkopAst.AskForm.Score" + "(" + _dafny.toString(this.low) + ", " + _dafny.toString(this.high) + ", " + _dafny.toString(this.rubric) + ", " + this.binding.toVerbatimString(true) + ")";
+      } else  {
+        return "<unexpected>";
+      }
+    }
+    equals(other) {
+      if (this === other) {
+        return true;
+      } else if (this.$tag === 0) {
+        return other.$tag === 0 && _dafny.areEqual(this.options, other.options);
+      } else if (this.$tag === 1) {
+        return other.$tag === 1 && _dafny.areEqual(this.binding, other.binding);
+      } else if (this.$tag === 2) {
+        return other.$tag === 2 && _dafny.areEqual(this.list, other.list) && _dafny.areEqual(this.binding, other.binding);
+      } else if (this.$tag === 3) {
+        return other.$tag === 3 && _dafny.areEqual(this.low, other.low) && _dafny.areEqual(this.high, other.high) && _dafny.areEqual(this.rubric, other.rubric) && _dafny.areEqual(this.binding, other.binding);
+      } else  {
+        return false; // unexpected
+      }
+    }
+    static Default() {
+      return SkopAst.AskForm.create_Sections(_dafny.Seq.of());
+    }
+    static Rtd() {
+      return class {
+        static get Default() {
+          return AskForm.Default();
+        }
+      };
+    }
+  }
+
+  $module.Stmt = class Stmt {
+    constructor(tag) {
+      this.$tag = tag;
+    }
+    static create_Run(src, cmd, binding, els) {
+      let $dt = new Stmt(0);
+      $dt.src = src;
+      $dt.cmd = cmd;
+      $dt.binding = binding;
+      $dt.els = els;
+      return $dt;
+    }
+    static create_Do(src, action, els) {
+      let $dt = new Stmt(1);
+      $dt.src = src;
+      $dt.action = action;
+      $dt.els = els;
+      return $dt;
+    }
+    static create_Check(src, cond, onTrue, els) {
+      let $dt = new Stmt(2);
+      $dt.src = src;
+      $dt.cond = cond;
+      $dt.onTrue = onTrue;
+      $dt.els = els;
+      return $dt;
+    }
+    static create_Ask(src, question, sure, form, els) {
+      let $dt = new Stmt(3);
+      $dt.src = src;
+      $dt.question = question;
+      $dt.sure = sure;
+      $dt.form = form;
+      $dt.els = els;
+      return $dt;
+    }
+    static create_ForEach(src, loopVar, list, body) {
+      let $dt = new Stmt(4);
+      $dt.src = src;
+      $dt.loopVar = loopVar;
+      $dt.list = list;
+      $dt.body = body;
+      return $dt;
+    }
+    static create_IfYesRun(src, cmd, els) {
+      let $dt = new Stmt(5);
+      $dt.src = src;
+      $dt.cmd = cmd;
+      $dt.els = els;
+      return $dt;
+    }
+    static create_IfYesDo(src, action, els) {
+      let $dt = new Stmt(6);
+      $dt.src = src;
+      $dt.action = action;
+      $dt.els = els;
+      return $dt;
+    }
+    static create_Then(src, ref) {
+      let $dt = new Stmt(7);
+      $dt.src = src;
+      $dt.ref = ref;
+      return $dt;
+    }
+    static create_Page(src, text) {
+      let $dt = new Stmt(8);
+      $dt.src = src;
+      $dt.text = text;
+      return $dt;
+    }
+    static create_HandOff(src) {
+      let $dt = new Stmt(9);
+      $dt.src = src;
+      return $dt;
+    }
+    static create_Stop(src) {
+      let $dt = new Stmt(10);
+      $dt.src = src;
+      return $dt;
+    }
+    get is_Run() { return this.$tag === 0; }
+    get is_Do() { return this.$tag === 1; }
+    get is_Check() { return this.$tag === 2; }
+    get is_Ask() { return this.$tag === 3; }
+    get is_ForEach() { return this.$tag === 4; }
+    get is_IfYesRun() { return this.$tag === 5; }
+    get is_IfYesDo() { return this.$tag === 6; }
+    get is_Then() { return this.$tag === 7; }
+    get is_Page() { return this.$tag === 8; }
+    get is_HandOff() { return this.$tag === 9; }
+    get is_Stop() { return this.$tag === 10; }
+    get dtor_src() { return this.src; }
+    get dtor_cmd() { return this.cmd; }
+    get dtor_binding() { return this.binding; }
+    get dtor_els() { return this.els; }
+    get dtor_action() { return this.action; }
+    get dtor_cond() { return this.cond; }
+    get dtor_onTrue() { return this.onTrue; }
+    get dtor_question() { return this.question; }
+    get dtor_sure() { return this.sure; }
+    get dtor_form() { return this.form; }
+    get dtor_loopVar() { return this.loopVar; }
+    get dtor_list() { return this.list; }
+    get dtor_body() { return this.body; }
+    get dtor_ref() { return this.ref; }
+    get dtor_text() { return this.text; }
+    toString() {
+      if (this.$tag === 0) {
+        return "SkopAst.Stmt.Run" + "(" + _dafny.toString(this.src) + ", " + _dafny.toString(this.cmd) + ", " + _dafny.toString(this.binding) + ", " + _dafny.toString(this.els) + ")";
+      } else if (this.$tag === 1) {
+        return "SkopAst.Stmt.Do" + "(" + _dafny.toString(this.src) + ", " + _dafny.toString(this.action) + ", " + _dafny.toString(this.els) + ")";
+      } else if (this.$tag === 2) {
+        return "SkopAst.Stmt.Check" + "(" + _dafny.toString(this.src) + ", " + _dafny.toString(this.cond) + ", " + _dafny.toString(this.onTrue) + ", " + _dafny.toString(this.els) + ")";
+      } else if (this.$tag === 3) {
+        return "SkopAst.Stmt.Ask" + "(" + _dafny.toString(this.src) + ", " + _dafny.toString(this.question) + ", " + _dafny.toString(this.sure) + ", " + _dafny.toString(this.form) + ", " + _dafny.toString(this.els) + ")";
+      } else if (this.$tag === 4) {
+        return "SkopAst.Stmt.ForEach" + "(" + _dafny.toString(this.src) + ", " + this.loopVar.toVerbatimString(true) + ", " + _dafny.toString(this.list) + ", " + _dafny.toString(this.body) + ")";
+      } else if (this.$tag === 5) {
+        return "SkopAst.Stmt.IfYesRun" + "(" + _dafny.toString(this.src) + ", " + _dafny.toString(this.cmd) + ", " + _dafny.toString(this.els) + ")";
+      } else if (this.$tag === 6) {
+        return "SkopAst.Stmt.IfYesDo" + "(" + _dafny.toString(this.src) + ", " + _dafny.toString(this.action) + ", " + _dafny.toString(this.els) + ")";
+      } else if (this.$tag === 7) {
+        return "SkopAst.Stmt.Then" + "(" + _dafny.toString(this.src) + ", " + _dafny.toString(this.ref) + ")";
+      } else if (this.$tag === 8) {
+        return "SkopAst.Stmt.Page" + "(" + _dafny.toString(this.src) + ", " + _dafny.toString(this.text) + ")";
+      } else if (this.$tag === 9) {
+        return "SkopAst.Stmt.HandOff" + "(" + _dafny.toString(this.src) + ")";
+      } else if (this.$tag === 10) {
+        return "SkopAst.Stmt.Stop" + "(" + _dafny.toString(this.src) + ")";
+      } else  {
+        return "<unexpected>";
+      }
+    }
+    equals(other) {
+      if (this === other) {
+        return true;
+      } else if (this.$tag === 0) {
+        return other.$tag === 0 && _dafny.areEqual(this.src, other.src) && _dafny.areEqual(this.cmd, other.cmd) && _dafny.areEqual(this.binding, other.binding) && _dafny.areEqual(this.els, other.els);
+      } else if (this.$tag === 1) {
+        return other.$tag === 1 && _dafny.areEqual(this.src, other.src) && _dafny.areEqual(this.action, other.action) && _dafny.areEqual(this.els, other.els);
+      } else if (this.$tag === 2) {
+        return other.$tag === 2 && _dafny.areEqual(this.src, other.src) && _dafny.areEqual(this.cond, other.cond) && _dafny.areEqual(this.onTrue, other.onTrue) && _dafny.areEqual(this.els, other.els);
+      } else if (this.$tag === 3) {
+        return other.$tag === 3 && _dafny.areEqual(this.src, other.src) && _dafny.areEqual(this.question, other.question) && _dafny.areEqual(this.sure, other.sure) && _dafny.areEqual(this.form, other.form) && _dafny.areEqual(this.els, other.els);
+      } else if (this.$tag === 4) {
+        return other.$tag === 4 && _dafny.areEqual(this.src, other.src) && _dafny.areEqual(this.loopVar, other.loopVar) && _dafny.areEqual(this.list, other.list) && _dafny.areEqual(this.body, other.body);
+      } else if (this.$tag === 5) {
+        return other.$tag === 5 && _dafny.areEqual(this.src, other.src) && _dafny.areEqual(this.cmd, other.cmd) && _dafny.areEqual(this.els, other.els);
+      } else if (this.$tag === 6) {
+        return other.$tag === 6 && _dafny.areEqual(this.src, other.src) && _dafny.areEqual(this.action, other.action) && _dafny.areEqual(this.els, other.els);
+      } else if (this.$tag === 7) {
+        return other.$tag === 7 && _dafny.areEqual(this.src, other.src) && _dafny.areEqual(this.ref, other.ref);
+      } else if (this.$tag === 8) {
+        return other.$tag === 8 && _dafny.areEqual(this.src, other.src) && _dafny.areEqual(this.text, other.text);
+      } else if (this.$tag === 9) {
+        return other.$tag === 9 && _dafny.areEqual(this.src, other.src);
+      } else if (this.$tag === 10) {
+        return other.$tag === 10 && _dafny.areEqual(this.src, other.src);
+      } else  {
+        return false; // unexpected
+      }
+    }
+    static Default() {
+      return SkopAst.Stmt.create_Run(_dafny.ZERO, _dafny.Seq.of(), SkopAst.Option.Default(), SkopAst.Else.Default());
+    }
+    static Rtd() {
+      return class {
+        static get Default() {
+          return Stmt.Default();
+        }
+      };
+    }
+  }
+
+  $module.Item = class Item {
+    constructor(tag) {
+      this.$tag = tag;
+    }
+    static create_Action(src, text, cmd) {
+      let $dt = new Item(0);
+      $dt.src = src;
+      $dt.text = text;
+      $dt.cmd = cmd;
+      return $dt;
+    }
+    static create_Value(src, value) {
+      let $dt = new Item(1);
+      $dt.src = src;
+      $dt.value = value;
+      return $dt;
+    }
+    get is_Action() { return this.$tag === 0; }
+    get is_Value() { return this.$tag === 1; }
+    get dtor_src() { return this.src; }
+    get dtor_text() { return this.text; }
+    get dtor_cmd() { return this.cmd; }
+    get dtor_value() { return this.value; }
+    toString() {
+      if (this.$tag === 0) {
+        return "SkopAst.Item.Action" + "(" + _dafny.toString(this.src) + ", " + this.text.toVerbatimString(true) + ", " + _dafny.toString(this.cmd) + ")";
+      } else if (this.$tag === 1) {
+        return "SkopAst.Item.Value" + "(" + _dafny.toString(this.src) + ", " + this.value.toVerbatimString(true) + ")";
+      } else  {
+        return "<unexpected>";
+      }
+    }
+    equals(other) {
+      if (this === other) {
+        return true;
+      } else if (this.$tag === 0) {
+        return other.$tag === 0 && _dafny.areEqual(this.src, other.src) && _dafny.areEqual(this.text, other.text) && _dafny.areEqual(this.cmd, other.cmd);
+      } else if (this.$tag === 1) {
+        return other.$tag === 1 && _dafny.areEqual(this.src, other.src) && _dafny.areEqual(this.value, other.value);
+      } else  {
+        return false; // unexpected
+      }
+    }
+    static Default() {
+      return SkopAst.Item.create_Action(_dafny.ZERO, _dafny.Seq.UnicodeFromString(""), _dafny.Seq.of());
+    }
+    static Rtd() {
+      return class {
+        static get Default() {
+          return Item.Default();
+        }
+      };
+    }
+  }
+
+  $module.List = class List {
+    constructor(tag) {
+      this.$tag = tag;
+    }
+    static create_List(src, items) {
+      let $dt = new List(0);
+      $dt.src = src;
+      $dt.items = items;
+      return $dt;
+    }
+    get is_List() { return this.$tag === 0; }
+    get dtor_src() { return this.src; }
+    get dtor_items() { return this.items; }
+    toString() {
+      if (this.$tag === 0) {
+        return "SkopAst.List.List" + "(" + _dafny.toString(this.src) + ", " + _dafny.toString(this.items) + ")";
+      } else  {
+        return "<unexpected>";
+      }
+    }
+    equals(other) {
+      if (this === other) {
+        return true;
+      } else if (this.$tag === 0) {
+        return other.$tag === 0 && _dafny.areEqual(this.src, other.src) && _dafny.areEqual(this.items, other.items);
+      } else  {
+        return false; // unexpected
+      }
+    }
+    static Default() {
+      return SkopAst.List.create_List(_dafny.ZERO, _dafny.Seq.of());
+    }
+    static Rtd() {
+      return class {
+        static get Default() {
+          return List.Default();
+        }
+      };
+    }
+  }
+
+  $module.Section = class Section {
+    constructor(tag) {
+      this.$tag = tag;
+    }
+    static create_Instructions(name, src, guidance, body) {
+      let $dt = new Section(0);
+      $dt.name = name;
+      $dt.src = src;
+      $dt.guidance = guidance;
+      $dt.body = body;
+      return $dt;
+    }
+    static create_Other(name, src, lists) {
+      let $dt = new Section(1);
+      $dt.name = name;
+      $dt.src = src;
+      $dt.lists = lists;
+      return $dt;
+    }
+    get is_Instructions() { return this.$tag === 0; }
+    get is_Other() { return this.$tag === 1; }
+    get dtor_name() { return this.name; }
+    get dtor_src() { return this.src; }
+    get dtor_guidance() { return this.guidance; }
+    get dtor_body() { return this.body; }
+    get dtor_lists() { return this.lists; }
+    toString() {
+      if (this.$tag === 0) {
+        return "SkopAst.Section.Instructions" + "(" + this.name.toVerbatimString(true) + ", " + _dafny.toString(this.src) + ", " + _dafny.toString(this.guidance) + ", " + _dafny.toString(this.body) + ")";
+      } else if (this.$tag === 1) {
+        return "SkopAst.Section.Other" + "(" + this.name.toVerbatimString(true) + ", " + _dafny.toString(this.src) + ", " + _dafny.toString(this.lists) + ")";
+      } else  {
+        return "<unexpected>";
+      }
+    }
+    equals(other) {
+      if (this === other) {
+        return true;
+      } else if (this.$tag === 0) {
+        return other.$tag === 0 && _dafny.areEqual(this.name, other.name) && _dafny.areEqual(this.src, other.src) && _dafny.areEqual(this.guidance, other.guidance) && _dafny.areEqual(this.body, other.body);
+      } else if (this.$tag === 1) {
+        return other.$tag === 1 && _dafny.areEqual(this.name, other.name) && _dafny.areEqual(this.src, other.src) && _dafny.areEqual(this.lists, other.lists);
+      } else  {
+        return false; // unexpected
+      }
+    }
+    static Default() {
+      return SkopAst.Section.create_Instructions(_dafny.Seq.UnicodeFromString(""), _dafny.ZERO, SkopAst.Option.Default(), _dafny.Seq.of());
+    }
+    static Rtd() {
+      return class {
+        static get Default() {
+          return Section.Default();
+        }
+      };
+    }
+  }
+
+  $module.Param = class Param {
+    constructor(tag) {
+      this.$tag = tag;
+    }
+    static create_PStr(s, src) {
+      let $dt = new Param(0);
+      $dt.s = s;
+      $dt.src = src;
+      return $dt;
+    }
+    static create_PInt(i, src) {
+      let $dt = new Param(1);
+      $dt.i = i;
+      $dt.src = src;
+      return $dt;
+    }
+    get is_PStr() { return this.$tag === 0; }
+    get is_PInt() { return this.$tag === 1; }
+    get dtor_s() { return this.s; }
+    get dtor_src() { return this.src; }
+    get dtor_i() { return this.i; }
+    toString() {
+      if (this.$tag === 0) {
+        return "SkopAst.Param.PStr" + "(" + this.s.toVerbatimString(true) + ", " + _dafny.toString(this.src) + ")";
+      } else if (this.$tag === 1) {
+        return "SkopAst.Param.PInt" + "(" + _dafny.toString(this.i) + ", " + _dafny.toString(this.src) + ")";
+      } else  {
+        return "<unexpected>";
+      }
+    }
+    equals(other) {
+      if (this === other) {
+        return true;
+      } else if (this.$tag === 0) {
+        return other.$tag === 0 && _dafny.areEqual(this.s, other.s) && _dafny.areEqual(this.src, other.src);
+      } else if (this.$tag === 1) {
+        return other.$tag === 1 && _dafny.areEqual(this.i, other.i) && _dafny.areEqual(this.src, other.src);
+      } else  {
+        return false; // unexpected
+      }
+    }
+    static Default() {
+      return SkopAst.Param.create_PStr(_dafny.Seq.UnicodeFromString(""), _dafny.ZERO);
+    }
+    static Rtd() {
+      return class {
+        static get Default() {
+          return Param.Default();
+        }
+      };
+    }
+  }
+
+  $module.Limits = class Limits {
+    constructor(tag) {
+      this.$tag = tag;
+    }
+    static create_Limits(runTimeoutMs, doTimeoutMs, deadlineMs, askContextTokens) {
+      let $dt = new Limits(0);
+      $dt.runTimeoutMs = runTimeoutMs;
+      $dt.doTimeoutMs = doTimeoutMs;
+      $dt.deadlineMs = deadlineMs;
+      $dt.askContextTokens = askContextTokens;
+      return $dt;
+    }
+    get is_Limits() { return this.$tag === 0; }
+    get dtor_runTimeoutMs() { return this.runTimeoutMs; }
+    get dtor_doTimeoutMs() { return this.doTimeoutMs; }
+    get dtor_deadlineMs() { return this.deadlineMs; }
+    get dtor_askContextTokens() { return this.askContextTokens; }
+    toString() {
+      if (this.$tag === 0) {
+        return "SkopAst.Limits.Limits" + "(" + _dafny.toString(this.runTimeoutMs) + ", " + _dafny.toString(this.doTimeoutMs) + ", " + _dafny.toString(this.deadlineMs) + ", " + _dafny.toString(this.askContextTokens) + ")";
+      } else  {
+        return "<unexpected>";
+      }
+    }
+    equals(other) {
+      if (this === other) {
+        return true;
+      } else if (this.$tag === 0) {
+        return other.$tag === 0 && _dafny.areEqual(this.runTimeoutMs, other.runTimeoutMs) && _dafny.areEqual(this.doTimeoutMs, other.doTimeoutMs) && _dafny.areEqual(this.deadlineMs, other.deadlineMs) && _dafny.areEqual(this.askContextTokens, other.askContextTokens);
+      } else  {
+        return false; // unexpected
+      }
+    }
+    static Default() {
+      return SkopAst.Limits.create_Limits(_dafny.ZERO, _dafny.ZERO, _dafny.ZERO, _dafny.ZERO);
+    }
+    static Rtd() {
+      return class {
+        static get Default() {
+          return Limits.Default();
+        }
+      };
+    }
+  }
+
+  $module.Entry = class Entry {
+    constructor(tag) {
+      this.$tag = tag;
+    }
+    static create_Entry(section, src) {
+      let $dt = new Entry(0);
+      $dt.section = section;
+      $dt.src = src;
+      return $dt;
+    }
+    get is_Entry() { return this.$tag === 0; }
+    get dtor_section() { return this.section; }
+    get dtor_src() { return this.src; }
+    toString() {
+      if (this.$tag === 0) {
+        return "SkopAst.Entry.Entry" + "(" + this.section.toVerbatimString(true) + ", " + _dafny.toString(this.src) + ")";
+      } else  {
+        return "<unexpected>";
+      }
+    }
+    equals(other) {
+      if (this === other) {
+        return true;
+      } else if (this.$tag === 0) {
+        return other.$tag === 0 && _dafny.areEqual(this.section, other.section) && _dafny.areEqual(this.src, other.src);
+      } else  {
+        return false; // unexpected
+      }
+    }
+    static Default() {
+      return SkopAst.Entry.create_Entry(_dafny.Seq.UnicodeFromString(""), _dafny.ZERO);
+    }
+    static Rtd() {
+      return class {
+        static get Default() {
+          return Entry.Default();
+        }
+      };
+    }
+  }
+
+  $module.Program = class Program {
+    constructor(tag) {
+      this.$tag = tag;
+    }
+    static create_Program(skill, entry, params, limits, sections) {
+      let $dt = new Program(0);
+      $dt.skill = skill;
+      $dt.entry = entry;
+      $dt.params = params;
+      $dt.limits = limits;
+      $dt.sections = sections;
+      return $dt;
+    }
+    get is_Program() { return this.$tag === 0; }
+    get dtor_skill() { return this.skill; }
+    get dtor_entry() { return this.entry; }
+    get dtor_params() { return this.params; }
+    get dtor_limits() { return this.limits; }
+    get dtor_sections() { return this.sections; }
+    toString() {
+      if (this.$tag === 0) {
+        return "SkopAst.Program.Program" + "(" + this.skill.toVerbatimString(true) + ", " + _dafny.toString(this.entry) + ", " + _dafny.toString(this.params) + ", " + _dafny.toString(this.limits) + ", " + _dafny.toString(this.sections) + ")";
+      } else  {
+        return "<unexpected>";
+      }
+    }
+    equals(other) {
+      if (this === other) {
+        return true;
+      } else if (this.$tag === 0) {
+        return other.$tag === 0 && _dafny.areEqual(this.skill, other.skill) && _dafny.areEqual(this.entry, other.entry) && _dafny.areEqual(this.params, other.params) && _dafny.areEqual(this.limits, other.limits) && _dafny.areEqual(this.sections, other.sections);
+      } else  {
+        return false; // unexpected
+      }
+    }
+    static Default() {
+      return SkopAst.Program.create_Program(_dafny.Seq.UnicodeFromString(""), SkopAst.Entry.Default(), _dafny.Map.Empty, SkopAst.Limits.Default(), _dafny.Map.Empty);
+    }
+    static Rtd() {
+      return class {
+        static get Default() {
+          return Program.Default();
+        }
+      };
+    }
+  }
+  return $module;
+})(); // end of module SkopAst
 let SkopSyntax = (function() {
   let $module = {};
 
@@ -1904,6 +3117,1042 @@ let SkopInterp = (function() {
   }
   return $module;
 })(); // end of module SkopInterp
+let SkopStep = (function() {
+  let $module = {};
+
+  $module.__default = class __default {
+    constructor () {
+      this._tname = "SkopStep._default";
+    }
+    _parentTraits() {
+      return [];
+    }
+    static Answers(n, r) {
+      return ((r).is_DeadlineExceeded) || (function () {
+        let _source0 = n;
+        {
+          if (_source0.is_Exec) {
+            return (r).is_ExecResult;
+          }
+        }
+        {
+          if (_source0.is_AskNext) {
+            return ((r).is_AskAnswer) || ((r).is_AskFailed);
+          }
+        }
+        {
+          if (_source0.is_PageNext) {
+            return (r).is_PageResult;
+          }
+        }
+        {
+          if (_source0.is_Choose) {
+            let _0_k = (_source0).n;
+            return ((r).is_Picked) && (((r).dtor_i).isLessThan(_0_k));
+          }
+        }
+        {
+          return false;
+        }
+      }());
+    };
+  };
+
+  $module.Origin = class Origin {
+    constructor(tag) {
+      this.$tag = tag;
+    }
+    static create_FromParam() {
+      let $dt = new Origin(0);
+      return $dt;
+    }
+    static create_FromBuiltin() {
+      let $dt = new Origin(1);
+      return $dt;
+    }
+    static create_FromListItem() {
+      let $dt = new Origin(2);
+      return $dt;
+    }
+    static create_FromYesNo() {
+      let $dt = new Origin(3);
+      return $dt;
+    }
+    static create_FromScore() {
+      let $dt = new Origin(4);
+      return $dt;
+    }
+    static create_FromRunOutput() {
+      let $dt = new Origin(5);
+      return $dt;
+    }
+    get is_FromParam() { return this.$tag === 0; }
+    get is_FromBuiltin() { return this.$tag === 1; }
+    get is_FromListItem() { return this.$tag === 2; }
+    get is_FromYesNo() { return this.$tag === 3; }
+    get is_FromScore() { return this.$tag === 4; }
+    get is_FromRunOutput() { return this.$tag === 5; }
+    static get AllSingletonConstructors() {
+      return this.AllSingletonConstructors_();
+    }
+    static *AllSingletonConstructors_() {
+      yield Origin.create_FromParam();
+      yield Origin.create_FromBuiltin();
+      yield Origin.create_FromListItem();
+      yield Origin.create_FromYesNo();
+      yield Origin.create_FromScore();
+      yield Origin.create_FromRunOutput();
+    }
+    toString() {
+      if (this.$tag === 0) {
+        return "SkopStep.Origin.FromParam";
+      } else if (this.$tag === 1) {
+        return "SkopStep.Origin.FromBuiltin";
+      } else if (this.$tag === 2) {
+        return "SkopStep.Origin.FromListItem";
+      } else if (this.$tag === 3) {
+        return "SkopStep.Origin.FromYesNo";
+      } else if (this.$tag === 4) {
+        return "SkopStep.Origin.FromScore";
+      } else if (this.$tag === 5) {
+        return "SkopStep.Origin.FromRunOutput";
+      } else  {
+        return "<unexpected>";
+      }
+    }
+    equals(other) {
+      if (this === other) {
+        return true;
+      } else if (this.$tag === 0) {
+        return other.$tag === 0;
+      } else if (this.$tag === 1) {
+        return other.$tag === 1;
+      } else if (this.$tag === 2) {
+        return other.$tag === 2;
+      } else if (this.$tag === 3) {
+        return other.$tag === 3;
+      } else if (this.$tag === 4) {
+        return other.$tag === 4;
+      } else if (this.$tag === 5) {
+        return other.$tag === 5;
+      } else  {
+        return false; // unexpected
+      }
+    }
+    static Default() {
+      return SkopStep.Origin.create_FromParam();
+    }
+    static Rtd() {
+      return class {
+        static get Default() {
+          return Origin.Default();
+        }
+      };
+    }
+  }
+
+  $module.Val = class Val {
+    constructor(tag) {
+      this.$tag = tag;
+    }
+    static create_Str(s) {
+      let $dt = new Val(0);
+      $dt.s = s;
+      return $dt;
+    }
+    static create_Int(i) {
+      let $dt = new Val(1);
+      $dt.i = i;
+      return $dt;
+    }
+    get is_Str() { return this.$tag === 0; }
+    get is_Int() { return this.$tag === 1; }
+    get dtor_s() { return this.s; }
+    get dtor_i() { return this.i; }
+    toString() {
+      if (this.$tag === 0) {
+        return "SkopStep.Val.Str" + "(" + this.s.toVerbatimString(true) + ")";
+      } else if (this.$tag === 1) {
+        return "SkopStep.Val.Int" + "(" + _dafny.toString(this.i) + ")";
+      } else  {
+        return "<unexpected>";
+      }
+    }
+    equals(other) {
+      if (this === other) {
+        return true;
+      } else if (this.$tag === 0) {
+        return other.$tag === 0 && _dafny.areEqual(this.s, other.s);
+      } else if (this.$tag === 1) {
+        return other.$tag === 1 && _dafny.areEqual(this.i, other.i);
+      } else  {
+        return false; // unexpected
+      }
+    }
+    static Default() {
+      return SkopStep.Val.create_Str(_dafny.Seq.UnicodeFromString(""));
+    }
+    static Rtd() {
+      return class {
+        static get Default() {
+          return Val.Default();
+        }
+      };
+    }
+  }
+
+  $module.Bound = class Bound {
+    constructor(tag) {
+      this.$tag = tag;
+    }
+    static create_Bound(value, origin) {
+      let $dt = new Bound(0);
+      $dt.value = value;
+      $dt.origin = origin;
+      return $dt;
+    }
+    get is_Bound() { return this.$tag === 0; }
+    get dtor_value() { return this.value; }
+    get dtor_origin() { return this.origin; }
+    toString() {
+      if (this.$tag === 0) {
+        return "SkopStep.Bound.Bound" + "(" + _dafny.toString(this.value) + ", " + _dafny.toString(this.origin) + ")";
+      } else  {
+        return "<unexpected>";
+      }
+    }
+    equals(other) {
+      if (this === other) {
+        return true;
+      } else if (this.$tag === 0) {
+        return other.$tag === 0 && _dafny.areEqual(this.value, other.value) && _dafny.areEqual(this.origin, other.origin);
+      } else  {
+        return false; // unexpected
+      }
+    }
+    static Default() {
+      return SkopStep.Bound.create_Bound(SkopStep.Val.Default(), SkopStep.Origin.Default());
+    }
+    static Rtd() {
+      return class {
+        static get Default() {
+          return Bound.Default();
+        }
+      };
+    }
+  }
+
+  $module.Piece = class Piece {
+    constructor(tag) {
+      this.$tag = tag;
+    }
+    static create_AuthorLit(s) {
+      let $dt = new Piece(0);
+      $dt.s = s;
+      return $dt;
+    }
+    static create_Trusted(s, origin) {
+      let $dt = new Piece(1);
+      $dt.s = s;
+      $dt.origin = origin;
+      return $dt;
+    }
+    get is_AuthorLit() { return this.$tag === 0; }
+    get is_Trusted() { return this.$tag === 1; }
+    get dtor_s() { return this.s; }
+    get dtor_origin() { return this.origin; }
+    toString() {
+      if (this.$tag === 0) {
+        return "SkopStep.Piece.AuthorLit" + "(" + this.s.toVerbatimString(true) + ")";
+      } else if (this.$tag === 1) {
+        return "SkopStep.Piece.Trusted" + "(" + this.s.toVerbatimString(true) + ", " + _dafny.toString(this.origin) + ")";
+      } else  {
+        return "<unexpected>";
+      }
+    }
+    equals(other) {
+      if (this === other) {
+        return true;
+      } else if (this.$tag === 0) {
+        return other.$tag === 0 && _dafny.areEqual(this.s, other.s);
+      } else if (this.$tag === 1) {
+        return other.$tag === 1 && _dafny.areEqual(this.s, other.s) && _dafny.areEqual(this.origin, other.origin);
+      } else  {
+        return false; // unexpected
+      }
+    }
+    static Default() {
+      return SkopStep.Piece.create_AuthorLit(_dafny.Seq.UnicodeFromString(""));
+    }
+    static Rtd() {
+      return class {
+        static get Default() {
+          return Piece.Default();
+        }
+      };
+    }
+  }
+
+  $module.ExecKind = class ExecKind {
+    constructor(tag) {
+      this.$tag = tag;
+    }
+    static create_RunExec() {
+      let $dt = new ExecKind(0);
+      return $dt;
+    }
+    static create_DoExec() {
+      let $dt = new ExecKind(1);
+      return $dt;
+    }
+    static create_CheckExec() {
+      let $dt = new ExecKind(2);
+      return $dt;
+    }
+    get is_RunExec() { return this.$tag === 0; }
+    get is_DoExec() { return this.$tag === 1; }
+    get is_CheckExec() { return this.$tag === 2; }
+    static get AllSingletonConstructors() {
+      return this.AllSingletonConstructors_();
+    }
+    static *AllSingletonConstructors_() {
+      yield ExecKind.create_RunExec();
+      yield ExecKind.create_DoExec();
+      yield ExecKind.create_CheckExec();
+    }
+    toString() {
+      if (this.$tag === 0) {
+        return "SkopStep.ExecKind.RunExec";
+      } else if (this.$tag === 1) {
+        return "SkopStep.ExecKind.DoExec";
+      } else if (this.$tag === 2) {
+        return "SkopStep.ExecKind.CheckExec";
+      } else  {
+        return "<unexpected>";
+      }
+    }
+    equals(other) {
+      if (this === other) {
+        return true;
+      } else if (this.$tag === 0) {
+        return other.$tag === 0;
+      } else if (this.$tag === 1) {
+        return other.$tag === 1;
+      } else if (this.$tag === 2) {
+        return other.$tag === 2;
+      } else  {
+        return false; // unexpected
+      }
+    }
+    static Default() {
+      return SkopStep.ExecKind.create_RunExec();
+    }
+    static Rtd() {
+      return class {
+        static get Default() {
+          return ExecKind.Default();
+        }
+      };
+    }
+  }
+
+  $module.AskKind = class AskKind {
+    constructor(tag) {
+      this.$tag = tag;
+    }
+    static create_Choice() {
+      let $dt = new AskKind(0);
+      return $dt;
+    }
+    static create_YesNoKind() {
+      let $dt = new AskKind(1);
+      return $dt;
+    }
+    static create_ScoreKind() {
+      let $dt = new AskKind(2);
+      return $dt;
+    }
+    get is_Choice() { return this.$tag === 0; }
+    get is_YesNoKind() { return this.$tag === 1; }
+    get is_ScoreKind() { return this.$tag === 2; }
+    static get AllSingletonConstructors() {
+      return this.AllSingletonConstructors_();
+    }
+    static *AllSingletonConstructors_() {
+      yield AskKind.create_Choice();
+      yield AskKind.create_YesNoKind();
+      yield AskKind.create_ScoreKind();
+    }
+    toString() {
+      if (this.$tag === 0) {
+        return "SkopStep.AskKind.Choice";
+      } else if (this.$tag === 1) {
+        return "SkopStep.AskKind.YesNoKind";
+      } else if (this.$tag === 2) {
+        return "SkopStep.AskKind.ScoreKind";
+      } else  {
+        return "<unexpected>";
+      }
+    }
+    equals(other) {
+      if (this === other) {
+        return true;
+      } else if (this.$tag === 0) {
+        return other.$tag === 0;
+      } else if (this.$tag === 1) {
+        return other.$tag === 1;
+      } else if (this.$tag === 2) {
+        return other.$tag === 2;
+      } else  {
+        return false; // unexpected
+      }
+    }
+    static Default() {
+      return SkopStep.AskKind.create_Choice();
+    }
+    static Rtd() {
+      return class {
+        static get Default() {
+          return AskKind.Default();
+        }
+      };
+    }
+  }
+
+  $module.AskOpt = class AskOpt {
+    constructor(tag) {
+      this.$tag = tag;
+    }
+    static create_AskOpt(id, text, description) {
+      let $dt = new AskOpt(0);
+      $dt.id = id;
+      $dt.text = text;
+      $dt.description = description;
+      return $dt;
+    }
+    get is_AskOpt() { return this.$tag === 0; }
+    get dtor_id() { return this.id; }
+    get dtor_text() { return this.text; }
+    get dtor_description() { return this.description; }
+    toString() {
+      if (this.$tag === 0) {
+        return "SkopStep.AskOpt.AskOpt" + "(" + this.id.toVerbatimString(true) + ", " + this.text.toVerbatimString(true) + ", " + _dafny.toString(this.description) + ")";
+      } else  {
+        return "<unexpected>";
+      }
+    }
+    equals(other) {
+      if (this === other) {
+        return true;
+      } else if (this.$tag === 0) {
+        return other.$tag === 0 && _dafny.areEqual(this.id, other.id) && _dafny.areEqual(this.text, other.text) && _dafny.areEqual(this.description, other.description);
+      } else  {
+        return false; // unexpected
+      }
+    }
+    static Default() {
+      return SkopStep.AskOpt.create_AskOpt(_dafny.Seq.UnicodeFromString(""), _dafny.Seq.UnicodeFromString(""), SkopAst.Option.Default());
+    }
+    static Rtd() {
+      return class {
+        static get Default() {
+          return AskOpt.Default();
+        }
+      };
+    }
+  }
+
+  $module.AskRequest = class AskRequest {
+    constructor(tag) {
+      this.$tag = tag;
+    }
+    static create_AskRequest(kind, question, guidance, options, context, timeoutMs) {
+      let $dt = new AskRequest(0);
+      $dt.kind = kind;
+      $dt.question = question;
+      $dt.guidance = guidance;
+      $dt.options = options;
+      $dt.context = context;
+      $dt.timeoutMs = timeoutMs;
+      return $dt;
+    }
+    get is_AskRequest() { return this.$tag === 0; }
+    get dtor_kind() { return this.kind; }
+    get dtor_question() { return this.question; }
+    get dtor_guidance() { return this.guidance; }
+    get dtor_options() { return this.options; }
+    get dtor_context() { return this.context; }
+    get dtor_timeoutMs() { return this.timeoutMs; }
+    toString() {
+      if (this.$tag === 0) {
+        return "SkopStep.AskRequest.AskRequest" + "(" + _dafny.toString(this.kind) + ", " + this.question.toVerbatimString(true) + ", " + _dafny.toString(this.guidance) + ", " + _dafny.toString(this.options) + ", " + _dafny.toString(this.context) + ", " + _dafny.toString(this.timeoutMs) + ")";
+      } else  {
+        return "<unexpected>";
+      }
+    }
+    equals(other) {
+      if (this === other) {
+        return true;
+      } else if (this.$tag === 0) {
+        return other.$tag === 0 && _dafny.areEqual(this.kind, other.kind) && _dafny.areEqual(this.question, other.question) && _dafny.areEqual(this.guidance, other.guidance) && _dafny.areEqual(this.options, other.options) && _dafny.areEqual(this.context, other.context) && _dafny.areEqual(this.timeoutMs, other.timeoutMs);
+      } else  {
+        return false; // unexpected
+      }
+    }
+    static Default() {
+      return SkopStep.AskRequest.create_AskRequest(SkopStep.AskKind.Default(), _dafny.Seq.UnicodeFromString(""), SkopAst.Option.Default(), _dafny.Seq.of(), _dafny.Map.Empty, _dafny.ZERO);
+    }
+    static Rtd() {
+      return class {
+        static get Default() {
+          return AskRequest.Default();
+        }
+      };
+    }
+  }
+
+  $module.Reason = class Reason {
+    constructor(tag) {
+      this.$tag = tag;
+    }
+    static create_Explicit() {
+      let $dt = new Reason(0);
+      return $dt;
+    }
+    static create_GateFailed() {
+      let $dt = new Reason(1);
+      return $dt;
+    }
+    static create_CommandFailed() {
+      let $dt = new Reason(2);
+      return $dt;
+    }
+    static create_AskUnavailable() {
+      let $dt = new Reason(3);
+      return $dt;
+    }
+    static create_Deadline() {
+      let $dt = new Reason(4);
+      return $dt;
+    }
+    get is_Explicit() { return this.$tag === 0; }
+    get is_GateFailed() { return this.$tag === 1; }
+    get is_CommandFailed() { return this.$tag === 2; }
+    get is_AskUnavailable() { return this.$tag === 3; }
+    get is_Deadline() { return this.$tag === 4; }
+    static get AllSingletonConstructors() {
+      return this.AllSingletonConstructors_();
+    }
+    static *AllSingletonConstructors_() {
+      yield Reason.create_Explicit();
+      yield Reason.create_GateFailed();
+      yield Reason.create_CommandFailed();
+      yield Reason.create_AskUnavailable();
+      yield Reason.create_Deadline();
+    }
+    toString() {
+      if (this.$tag === 0) {
+        return "SkopStep.Reason.Explicit";
+      } else if (this.$tag === 1) {
+        return "SkopStep.Reason.GateFailed";
+      } else if (this.$tag === 2) {
+        return "SkopStep.Reason.CommandFailed";
+      } else if (this.$tag === 3) {
+        return "SkopStep.Reason.AskUnavailable";
+      } else if (this.$tag === 4) {
+        return "SkopStep.Reason.Deadline";
+      } else  {
+        return "<unexpected>";
+      }
+    }
+    equals(other) {
+      if (this === other) {
+        return true;
+      } else if (this.$tag === 0) {
+        return other.$tag === 0;
+      } else if (this.$tag === 1) {
+        return other.$tag === 1;
+      } else if (this.$tag === 2) {
+        return other.$tag === 2;
+      } else if (this.$tag === 3) {
+        return other.$tag === 3;
+      } else if (this.$tag === 4) {
+        return other.$tag === 4;
+      } else  {
+        return false; // unexpected
+      }
+    }
+    static Default() {
+      return SkopStep.Reason.create_Explicit();
+    }
+    static Rtd() {
+      return class {
+        static get Default() {
+          return Reason.Default();
+        }
+      };
+    }
+  }
+
+  $module.Outcome = class Outcome {
+    constructor(tag) {
+      this.$tag = tag;
+    }
+    static create_Stopped() {
+      let $dt = new Outcome(0);
+      return $dt;
+    }
+    static create_Paged() {
+      let $dt = new Outcome(1);
+      return $dt;
+    }
+    static create_Handoff(reason, detail) {
+      let $dt = new Outcome(2);
+      $dt.reason = reason;
+      $dt.detail = detail;
+      return $dt;
+    }
+    get is_Stopped() { return this.$tag === 0; }
+    get is_Paged() { return this.$tag === 1; }
+    get is_Handoff() { return this.$tag === 2; }
+    get dtor_reason() { return this.reason; }
+    get dtor_detail() { return this.detail; }
+    toString() {
+      if (this.$tag === 0) {
+        return "SkopStep.Outcome.Stopped";
+      } else if (this.$tag === 1) {
+        return "SkopStep.Outcome.Paged";
+      } else if (this.$tag === 2) {
+        return "SkopStep.Outcome.Handoff" + "(" + _dafny.toString(this.reason) + ", " + _dafny.toString(this.detail) + ")";
+      } else  {
+        return "<unexpected>";
+      }
+    }
+    equals(other) {
+      if (this === other) {
+        return true;
+      } else if (this.$tag === 0) {
+        return other.$tag === 0;
+      } else if (this.$tag === 1) {
+        return other.$tag === 1;
+      } else if (this.$tag === 2) {
+        return other.$tag === 2 && _dafny.areEqual(this.reason, other.reason) && _dafny.areEqual(this.detail, other.detail);
+      } else  {
+        return false; // unexpected
+      }
+    }
+    static Default() {
+      return SkopStep.Outcome.create_Stopped();
+    }
+    static Rtd() {
+      return class {
+        static get Default() {
+          return Outcome.Default();
+        }
+      };
+    }
+  }
+
+  $module.Next = class Next {
+    constructor(tag) {
+      this.$tag = tag;
+    }
+    static create_Exec(cmd, kind, timeoutMs, src) {
+      let $dt = new Next(0);
+      $dt.cmd = cmd;
+      $dt.kind = kind;
+      $dt.timeoutMs = timeoutMs;
+      $dt.src = src;
+      return $dt;
+    }
+    static create_AskNext(request, src) {
+      let $dt = new Next(1);
+      $dt.request = request;
+      $dt.src = src;
+      return $dt;
+    }
+    static create_PageNext(text, src) {
+      let $dt = new Next(2);
+      $dt.text = text;
+      $dt.src = src;
+      return $dt;
+    }
+    static create_Choose(n) {
+      let $dt = new Next(3);
+      $dt.n = n;
+      return $dt;
+    }
+    static create_Done(outcome) {
+      let $dt = new Next(4);
+      $dt.outcome = outcome;
+      return $dt;
+    }
+    get is_Exec() { return this.$tag === 0; }
+    get is_AskNext() { return this.$tag === 1; }
+    get is_PageNext() { return this.$tag === 2; }
+    get is_Choose() { return this.$tag === 3; }
+    get is_Done() { return this.$tag === 4; }
+    get dtor_cmd() { return this.cmd; }
+    get dtor_kind() { return this.kind; }
+    get dtor_timeoutMs() { return this.timeoutMs; }
+    get dtor_src() { return this.src; }
+    get dtor_request() { return this.request; }
+    get dtor_text() { return this.text; }
+    get dtor_n() { return this.n; }
+    get dtor_outcome() { return this.outcome; }
+    toString() {
+      if (this.$tag === 0) {
+        return "SkopStep.Next.Exec" + "(" + this.cmd.toVerbatimString(true) + ", " + _dafny.toString(this.kind) + ", " + _dafny.toString(this.timeoutMs) + ", " + _dafny.toString(this.src) + ")";
+      } else if (this.$tag === 1) {
+        return "SkopStep.Next.AskNext" + "(" + _dafny.toString(this.request) + ", " + _dafny.toString(this.src) + ")";
+      } else if (this.$tag === 2) {
+        return "SkopStep.Next.PageNext" + "(" + this.text.toVerbatimString(true) + ", " + _dafny.toString(this.src) + ")";
+      } else if (this.$tag === 3) {
+        return "SkopStep.Next.Choose" + "(" + _dafny.toString(this.n) + ")";
+      } else if (this.$tag === 4) {
+        return "SkopStep.Next.Done" + "(" + _dafny.toString(this.outcome) + ")";
+      } else  {
+        return "<unexpected>";
+      }
+    }
+    equals(other) {
+      if (this === other) {
+        return true;
+      } else if (this.$tag === 0) {
+        return other.$tag === 0 && _dafny.areEqual(this.cmd, other.cmd) && _dafny.areEqual(this.kind, other.kind) && _dafny.areEqual(this.timeoutMs, other.timeoutMs) && _dafny.areEqual(this.src, other.src);
+      } else if (this.$tag === 1) {
+        return other.$tag === 1 && _dafny.areEqual(this.request, other.request) && _dafny.areEqual(this.src, other.src);
+      } else if (this.$tag === 2) {
+        return other.$tag === 2 && _dafny.areEqual(this.text, other.text) && _dafny.areEqual(this.src, other.src);
+      } else if (this.$tag === 3) {
+        return other.$tag === 3 && _dafny.areEqual(this.n, other.n);
+      } else if (this.$tag === 4) {
+        return other.$tag === 4 && _dafny.areEqual(this.outcome, other.outcome);
+      } else  {
+        return false; // unexpected
+      }
+    }
+    static Default() {
+      return SkopStep.Next.create_Exec(_dafny.Seq.UnicodeFromString(""), SkopStep.ExecKind.Default(), _dafny.ZERO, _dafny.ZERO);
+    }
+    static Rtd() {
+      return class {
+        static get Default() {
+          return Next.Default();
+        }
+      };
+    }
+  }
+
+  $module.AskFailure = class AskFailure {
+    constructor(tag) {
+      this.$tag = tag;
+    }
+    static create_Unavailable() {
+      let $dt = new AskFailure(0);
+      return $dt;
+    }
+    static create_RequestTooLarge() {
+      let $dt = new AskFailure(1);
+      return $dt;
+    }
+    get is_Unavailable() { return this.$tag === 0; }
+    get is_RequestTooLarge() { return this.$tag === 1; }
+    static get AllSingletonConstructors() {
+      return this.AllSingletonConstructors_();
+    }
+    static *AllSingletonConstructors_() {
+      yield AskFailure.create_Unavailable();
+      yield AskFailure.create_RequestTooLarge();
+    }
+    toString() {
+      if (this.$tag === 0) {
+        return "SkopStep.AskFailure.Unavailable";
+      } else if (this.$tag === 1) {
+        return "SkopStep.AskFailure.RequestTooLarge";
+      } else  {
+        return "<unexpected>";
+      }
+    }
+    equals(other) {
+      if (this === other) {
+        return true;
+      } else if (this.$tag === 0) {
+        return other.$tag === 0;
+      } else if (this.$tag === 1) {
+        return other.$tag === 1;
+      } else  {
+        return false; // unexpected
+      }
+    }
+    static Default() {
+      return SkopStep.AskFailure.create_Unavailable();
+    }
+    static Rtd() {
+      return class {
+        static get Default() {
+          return AskFailure.Default();
+        }
+      };
+    }
+  }
+
+  $module.Response = class Response {
+    constructor(tag) {
+      this.$tag = tag;
+    }
+    static create_NoResponse() {
+      let $dt = new Response(0);
+      return $dt;
+    }
+    static create_ExecResult(exit, stdout, stderrTail, timedOut) {
+      let $dt = new Response(1);
+      $dt.exit = exit;
+      $dt.stdout = stdout;
+      $dt.stderrTail = stderrTail;
+      $dt.timedOut = timedOut;
+      return $dt;
+    }
+    static create_AskAnswer(probs, unassigned, backend, model, ms) {
+      let $dt = new Response(2);
+      $dt.probs = probs;
+      $dt.unassigned = unassigned;
+      $dt.backend = backend;
+      $dt.model = model;
+      $dt.ms = ms;
+      return $dt;
+    }
+    static create_AskFailed(error, backend) {
+      let $dt = new Response(3);
+      $dt.error = error;
+      $dt.backend = backend;
+      return $dt;
+    }
+    static create_PageResult(ok) {
+      let $dt = new Response(4);
+      $dt.ok = ok;
+      return $dt;
+    }
+    static create_Picked(i) {
+      let $dt = new Response(5);
+      $dt.i = i;
+      return $dt;
+    }
+    static create_DeadlineExceeded() {
+      let $dt = new Response(6);
+      return $dt;
+    }
+    get is_NoResponse() { return this.$tag === 0; }
+    get is_ExecResult() { return this.$tag === 1; }
+    get is_AskAnswer() { return this.$tag === 2; }
+    get is_AskFailed() { return this.$tag === 3; }
+    get is_PageResult() { return this.$tag === 4; }
+    get is_Picked() { return this.$tag === 5; }
+    get is_DeadlineExceeded() { return this.$tag === 6; }
+    get dtor_exit() { return this.exit; }
+    get dtor_stdout() { return this.stdout; }
+    get dtor_stderrTail() { return this.stderrTail; }
+    get dtor_timedOut() { return this.timedOut; }
+    get dtor_probs() { return this.probs; }
+    get dtor_unassigned() { return this.unassigned; }
+    get dtor_backend() { return this.backend; }
+    get dtor_model() { return this.model; }
+    get dtor_ms() { return this.ms; }
+    get dtor_error() { return this.error; }
+    get dtor_ok() { return this.ok; }
+    get dtor_i() { return this.i; }
+    toString() {
+      if (this.$tag === 0) {
+        return "SkopStep.Response.NoResponse";
+      } else if (this.$tag === 1) {
+        return "SkopStep.Response.ExecResult" + "(" + _dafny.toString(this.exit) + ", " + this.stdout.toVerbatimString(true) + ", " + this.stderrTail.toVerbatimString(true) + ", " + _dafny.toString(this.timedOut) + ")";
+      } else if (this.$tag === 2) {
+        return "SkopStep.Response.AskAnswer" + "(" + _dafny.toString(this.probs) + ", " + _dafny.toString(this.unassigned) + ", " + this.backend.toVerbatimString(true) + ", " + this.model.toVerbatimString(true) + ", " + _dafny.toString(this.ms) + ")";
+      } else if (this.$tag === 3) {
+        return "SkopStep.Response.AskFailed" + "(" + _dafny.toString(this.error) + ", " + this.backend.toVerbatimString(true) + ")";
+      } else if (this.$tag === 4) {
+        return "SkopStep.Response.PageResult" + "(" + _dafny.toString(this.ok) + ")";
+      } else if (this.$tag === 5) {
+        return "SkopStep.Response.Picked" + "(" + _dafny.toString(this.i) + ")";
+      } else if (this.$tag === 6) {
+        return "SkopStep.Response.DeadlineExceeded";
+      } else  {
+        return "<unexpected>";
+      }
+    }
+    equals(other) {
+      if (this === other) {
+        return true;
+      } else if (this.$tag === 0) {
+        return other.$tag === 0;
+      } else if (this.$tag === 1) {
+        return other.$tag === 1 && _dafny.areEqual(this.exit, other.exit) && _dafny.areEqual(this.stdout, other.stdout) && _dafny.areEqual(this.stderrTail, other.stderrTail) && this.timedOut === other.timedOut;
+      } else if (this.$tag === 2) {
+        return other.$tag === 2 && _dafny.areEqual(this.probs, other.probs) && _dafny.areEqual(this.unassigned, other.unassigned) && _dafny.areEqual(this.backend, other.backend) && _dafny.areEqual(this.model, other.model) && _dafny.areEqual(this.ms, other.ms);
+      } else if (this.$tag === 3) {
+        return other.$tag === 3 && _dafny.areEqual(this.error, other.error) && _dafny.areEqual(this.backend, other.backend);
+      } else if (this.$tag === 4) {
+        return other.$tag === 4 && this.ok === other.ok;
+      } else if (this.$tag === 5) {
+        return other.$tag === 5 && _dafny.areEqual(this.i, other.i);
+      } else if (this.$tag === 6) {
+        return other.$tag === 6;
+      } else  {
+        return false; // unexpected
+      }
+    }
+    static Default() {
+      return SkopStep.Response.create_NoResponse();
+    }
+    static Rtd() {
+      return class {
+        static get Default() {
+          return Response.Default();
+        }
+      };
+    }
+  }
+
+  $module.Mode = class Mode {
+    constructor(tag) {
+      this.$tag = tag;
+    }
+    static create_Concrete() {
+      let $dt = new Mode(0);
+      return $dt;
+    }
+    static create_Explore() {
+      let $dt = new Mode(1);
+      return $dt;
+    }
+    get is_Concrete() { return this.$tag === 0; }
+    get is_Explore() { return this.$tag === 1; }
+    static get AllSingletonConstructors() {
+      return this.AllSingletonConstructors_();
+    }
+    static *AllSingletonConstructors_() {
+      yield Mode.create_Concrete();
+      yield Mode.create_Explore();
+    }
+    toString() {
+      if (this.$tag === 0) {
+        return "SkopStep.Mode.Concrete";
+      } else if (this.$tag === 1) {
+        return "SkopStep.Mode.Explore";
+      } else  {
+        return "<unexpected>";
+      }
+    }
+    equals(other) {
+      if (this === other) {
+        return true;
+      } else if (this.$tag === 0) {
+        return other.$tag === 0;
+      } else if (this.$tag === 1) {
+        return other.$tag === 1;
+      } else  {
+        return false; // unexpected
+      }
+    }
+    static Default() {
+      return SkopStep.Mode.create_Concrete();
+    }
+    static Rtd() {
+      return class {
+        static get Default() {
+          return Mode.Default();
+        }
+      };
+    }
+  }
+
+  $module.RunConfig = class RunConfig {
+    constructor(tag) {
+      this.$tag = tag;
+    }
+    static create_RunConfig(params, builtins, dry, mode) {
+      let $dt = new RunConfig(0);
+      $dt.params = params;
+      $dt.builtins = builtins;
+      $dt.dry = dry;
+      $dt.mode = mode;
+      return $dt;
+    }
+    get is_RunConfig() { return this.$tag === 0; }
+    get dtor_params() { return this.params; }
+    get dtor_builtins() { return this.builtins; }
+    get dtor_dry() { return this.dry; }
+    get dtor_mode() { return this.mode; }
+    toString() {
+      if (this.$tag === 0) {
+        return "SkopStep.RunConfig.RunConfig" + "(" + _dafny.toString(this.params) + ", " + _dafny.toString(this.builtins) + ", " + _dafny.toString(this.dry) + ", " + _dafny.toString(this.mode) + ")";
+      } else  {
+        return "<unexpected>";
+      }
+    }
+    equals(other) {
+      if (this === other) {
+        return true;
+      } else if (this.$tag === 0) {
+        return other.$tag === 0 && _dafny.areEqual(this.params, other.params) && _dafny.areEqual(this.builtins, other.builtins) && this.dry === other.dry && _dafny.areEqual(this.mode, other.mode);
+      } else  {
+        return false; // unexpected
+      }
+    }
+    static Default() {
+      return SkopStep.RunConfig.create_RunConfig(_dafny.Map.Empty, _dafny.Map.Empty, false, SkopStep.Mode.Default());
+    }
+    static Rtd() {
+      return class {
+        static get Default() {
+          return RunConfig.Default();
+        }
+      };
+    }
+  }
+
+  $module.LintError = class LintError {
+    constructor(tag) {
+      this.$tag = tag;
+    }
+    static create_LintError(code, src) {
+      let $dt = new LintError(0);
+      $dt.code = code;
+      $dt.src = src;
+      return $dt;
+    }
+    get is_LintError() { return this.$tag === 0; }
+    get dtor_code() { return this.code; }
+    get dtor_src() { return this.src; }
+    toString() {
+      if (this.$tag === 0) {
+        return "SkopStep.LintError.LintError" + "(" + this.code.toVerbatimString(true) + ", " + _dafny.toString(this.src) + ")";
+      } else  {
+        return "<unexpected>";
+      }
+    }
+    equals(other) {
+      if (this === other) {
+        return true;
+      } else if (this.$tag === 0) {
+        return other.$tag === 0 && _dafny.areEqual(this.code, other.code) && _dafny.areEqual(this.src, other.src);
+      } else  {
+        return false; // unexpected
+      }
+    }
+    static Default() {
+      return SkopStep.LintError.create_LintError(_dafny.Seq.UnicodeFromString(""), _dafny.ZERO);
+    }
+    static Rtd() {
+      return class {
+        static get Default() {
+          return LintError.Default();
+        }
+      };
+    }
+  }
+  return $module;
+})(); // end of module SkopStep
 let _module = (function() {
   let $module = {};
 
