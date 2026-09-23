@@ -32,6 +32,7 @@
     "prepack": "npm run build"
   },
   "dependencies": {
+    "ajv": "^8.20.0",
     "bignumber.js": "9.3.1",
     "js-yaml": "^4.3.2",
     "markdown-it": "^15.0.2"
@@ -40,7 +41,6 @@
     "@biomejs/biome": "^2.5.14",
     "@types/markdown-it": "^14.2.0",
     "@types/node": "^20.19.43",
-    "ajv": "^8.20.0",
     "json-schema-to-typescript": "^15.0.4",
     "typescript": "^5.9.3",
     "vitest": "^3.2.7"

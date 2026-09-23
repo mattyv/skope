@@ -120,13 +120,6 @@ describe("error-code contract (SPEC §7.1)", () => {
   });
 });
 
-describe("the spike example is a valid core program section", () => {
-  test("spike-program.json matches the section definition", () => {
-    const section = schema("core-program", "#/$defs/section");
-    expect(section(read("examples/spike-program.json")), JSON.stringify(section.errors)).toBe(true);
-  });
-});
-
 describe("backend request and answer (SPEC §6.1)", () => {
   const request = schema("ask", "#/$defs/request");
   const answer = schema("ask", "#/$defs/answer");

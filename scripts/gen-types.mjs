@@ -42,6 +42,16 @@ export async function generate() {
       );
     }
   }
+  // Data the runtime needs from the contracts, so the built CLI never reads contracts/ (it isn't shipped).
+  const codes = JSON.parse(readFileSync(join(ROOT, "contracts", "error-codes.json"), "utf8"));
+  const meanings = Object.fromEntries(codes.map((c) => [c.code, c.meaning]));
+  parts.push(`/** SPEC §7.1: each error and warning code's meaning, from contracts/error-codes.json. */
+export const CODE_MEANINGS: Record<string, string> = ${JSON.stringify(meanings, null, 2)};
+`);
+  const fakes = readFileSync(join(ROOT, "contracts", "fakes.schema.json"), "utf8");
+  parts.push(`/** contracts/fakes.schema.json, which --fake and --fake-exec files are checked against (SPEC §7.1 E-CONFIG). */
+export const FAKES_SCHEMA = ${JSON.stringify(JSON.parse(fakes), null, 2)};
+`);
   return parts.join("\n");
 }
 

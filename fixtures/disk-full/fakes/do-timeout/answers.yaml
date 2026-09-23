@@ -8,7 +8,7 @@
   "line:46": {
     "nginx": 0.03125,
     "rsyslog": 0.03125,
-    "myapp-worker": 0.875,
+    "myapp-worker": 0.90625,
     "myapp-api": 0.03125
   }
 }

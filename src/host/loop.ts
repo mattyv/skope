@@ -5,7 +5,7 @@
 
 import { createHash } from "node:crypto";
 import type { ExecResult } from "../runner/exec.js";
-import type { Redactor } from "../runner/redact.js";
+import { type Redactor, tailBytes } from "../runner/redact.js";
 import { type AskRequest, type CoreEvent, EVENT_FIELDS, type Next, type Outcome, type Response, type Val, type Where } from "../step.js";
 
 export interface Interp {
@@ -60,12 +60,20 @@ const TAIL_BYTES = 2048;
 
 /**
  * Page text is escaped for the pager (SPEC §3.5, §11 rule 8): no mentions,
- * no links. HTML-style entities stop `<…>` links and `<!here>`, a
- * zero-width space after `@` stops mentions, and one inside `://` stops
- * URLs being linked.
+ * no links. HTML-style entities stop `<…>` links and `<!here>`; a
+ * zero-width space after `@` stops mentions, and one inside `://` or after
+ * a dot inside a word stops URLs and bare domains (`evil.example`) being
+ * linked; `[` and `]` are backslash-escaped so `[x](…)` isn't a link.
  */
 export function escapePage(text: string): string {
-  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/@/g, "@\u200b").replace(/:\/\//g, ":/\u200b/");
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/[[\]]/g, "\\$&")
+    .replace(/@/g, "@\u200b")
+    .replace(/:\/\//g, ":/\u200b/")
+    .replace(/\.(?=[\p{L}\p{N}])/gu, ".\u200b");
 }
 
 export async function runLoop(interp: Interp, ctx: LoopContext): Promise<LoopResult> {
@@ -116,21 +124,17 @@ export async function runLoop(interp: Interp, ctx: LoopContext): Promise<LoopRes
         const started = Date.now();
         const r = await handlers.exec(next);
         const stderrTail = redactor.redactedTail(r.stderr, TAIL_BYTES, r.truncated);
+        // The core, the hash and the tail all see only redacted output, so no log or record leaks a
+        // secret, and a hash can't be used to test guesses of one (SPEC §10).
+        const stdout = redactor.redact(r.stdout, { truncated: r.truncated });
         pending = {
           ms: Date.now() - started,
           truncated: r.truncated,
-          stdout_hash: sha256(r.stdout),
-          stdout_tail: redactor.redactedTail(r.stdout, TAIL_BYTES, r.truncated),
+          stdout_hash: sha256(stdout),
+          stdout_tail: tailBytes(stdout, TAIL_BYTES),
         };
         lastExec = { cmd: next.cmd, exit: r.exit, timed_out: r.timedOut, stderr_tail: stderrTail };
-        // The core sees output only after redaction, so nothing downstream (context, record) can leak it.
-        return {
-          kind: "exec",
-          exit: r.exit,
-          stdout: redactor.redact(r.stdout, { truncated: r.truncated }),
-          stderrTail,
-          timedOut: r.timedOut,
-        };
+        return { kind: "exec", exit: r.exit, stdout, stderrTail, timedOut: r.timedOut };
       }
       case "ask": {
         const { response: r, fields } = await handlers.ask(next.request, next.src);

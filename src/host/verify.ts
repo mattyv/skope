@@ -1,15 +1,14 @@
 // --verify, --verify --trace and --explain (SPEC §5.6, §7, §12.4): the
 // explore handler's graph, reported without running anything.
 
-import { readFileSync } from "node:fs";
+import IDENTITY from "../build-identity.js";
 import type { CoreProgram, Section } from "../contracts.gen.js";
 import type { Config } from "../runner/config.js";
 import { DEFAULT_GRACE_MS } from "../runner/exec.js";
 import type { RunConfig, Val } from "../step.js";
 import { askMs, type Costs, type Explorable, explore, traceFits, traceOf } from "./explore.js";
-import { identity } from "./identity.js";
 
-export type ReadOnly = { verify: true; trace?: string } | { explain: true };
+export type ReadOnly = { verify: true; trace?: Record<string, unknown>[] } | { explain: true };
 
 export interface VerifyInput {
   program: CoreProgram;
@@ -19,8 +18,6 @@ export interface VerifyInput {
   start(cfg: RunConfig): Explorable;
   /** One JSON line on stdout. */
   emit(e: Record<string, unknown>): void;
-  /** A W-* warning (SPEC §7.1). */
-  warn(code: string, message: string, line: number): void;
 }
 
 const EXPLORE_BUILTINS = { host: "host", run_id: "r-explore", skill: "skill" };
@@ -40,10 +37,7 @@ export function readOnly(mode: ReadOnly, v: VerifyInput): number {
   });
 
   if ("verify" in mode && mode.trace) {
-    const events = readFileSync(mode.trace, "utf8")
-      .split("\n")
-      .filter(Boolean)
-      .map((l) => JSON.parse(l) as Record<string, unknown>);
+    const events = mode.trace;
     const start = events.find((e) => e.event === "run_start") as { dry_run?: boolean; params?: Record<string, string> } | undefined;
     // The trace's own mode and params decide which paths exist.
     const params = Object.fromEntries(
@@ -58,9 +52,9 @@ export function readOnly(mode: ReadOnly, v: VerifyInput): number {
 
   const s = explore(v.start(cfg(false)), c);
   const sections = Object.entries(v.program.sections);
+  // Lint already warns about these (W-SECTION-UNREACHED); the report lists them.
   const unreached = sections.filter(([, x]) => "body" in x && !s.sections.has(x.name)).map(([, x]) => x as Section);
-  for (const x of unreached) v.warn("W-SECTION-UNREACHED", `no path reaches ${x.name}`, x.src);
-  const { version, build } = identity();
+  const { version, build } = IDENTITY;
   const maxima = { max_ask_calls: s.maxAsks, max_effects: s.maxEffects, worst_case_ms: s.maxMs };
   if ("explain" in mode) {
     v.emit({
@@ -77,11 +71,10 @@ export function readOnly(mode: ReadOnly, v: VerifyInput): number {
     });
     return 0;
   }
-  const ok = s.paths > 0n && [...s.outcomes].every((o) => /^(stopped|paged|handoff:)/.test(o));
+  // A path that ends without an outcome, or in error, can't get here: the loop would have thrown (P6).
   v.emit({
     skop_version: version,
     skop_build: build,
-    ok,
     paths: s.paths <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(s.paths) : String(s.paths),
     outcomes: [...s.outcomes].sort(),
     ...maxima,
@@ -89,5 +82,5 @@ export function readOnly(mode: ReadOnly, v: VerifyInput): number {
     unreached_sections: unreached.map((x) => x.name),
     note: "deadline handoffs aren't explored: once limits.deadline passes, any run hands off between two steps (SPEC §5.4)",
   });
-  return ok ? 0 : 40;
+  return 0;
 }

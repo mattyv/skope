@@ -50,7 +50,7 @@ function toy(start = 0): Explorable {
       }
       if (r.kind !== "answer") throw new Error("bad response");
       const top = Object.entries(r.probs).sort((x, y) => y[1] - x[1])[0] as [string, number];
-      const passed = top[1] >= 0.8;
+      const passed = top[1] >= 0.8 && r.unassigned === 0;
       const e = { ...base, probs: r.probs, chosen: top[0], confidence: top[1], passed } as CoreEvent;
       if (!passed) return { events: [e, outcome(2, "handoff", "gate_failed")], next: done("handoff", "gate_failed") };
       if (top[0] === "s:a") return { events: [e, outcome(2, "stopped")], next: done("stopped") };
@@ -106,12 +106,12 @@ describe("explore", () => {
     expect(steps).toBeLessThan(100);
   });
 
-  test("an ask gets one confident branch per option, one unsure (a tie) and one unavailable", () => {
+  test("an ask gets one confident branch per option, one unsure (all unassigned) and one unavailable", () => {
     const b = branches({ kind: "ask", request, src: 2 }, costs).map((x) => x.response);
     expect(b).toEqual([
       expect.objectContaining({ kind: "answer", probs: { "s:a": 1, "s:b": 0 } }),
       expect.objectContaining({ kind: "answer", probs: { "s:a": 0, "s:b": 1 } }),
-      expect.objectContaining({ kind: "answer", probs: { "s:a": 0.5, "s:b": 0.5 } }),
+      expect.objectContaining({ kind: "answer", probs: { "s:a": 0, "s:b": 0 }, unassigned: 1 }),
       expect.objectContaining({ kind: "ask_failed", error: "unavailable" }),
     ]);
     expect(branches({ kind: "choose", n: 3 }, costs).map((x) => x.response)).toEqual([0, 1, 2].map((i) => ({ kind: "picked", i })));

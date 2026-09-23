@@ -55,7 +55,18 @@ export function branches(next: Exclude<Next, { kind: "done" }>, costs: Costs): B
       });
       return [
         ...ids.map((id) => answer(Object.fromEntries(ids.map((x) => [x, x === id ? 1 : 0])))),
-        answer(Object.fromEntries(ids.map((x) => [x, 1 / ids.length]))), // unsure: a tie, so the gate fails
+        // Unsure: all of it unassigned, so no option can pass a gate (P5), whatever `sure` is.
+        {
+          response: {
+            kind: "answer",
+            probs: Object.fromEntries(ids.map((x) => [x, 0])),
+            unassigned: 1,
+            backend: "explore",
+            model: "explore",
+            ms: 0,
+          },
+          ms: costs.askMs,
+        },
         { response: { kind: "ask_failed", error: "unavailable", backend: "explore" }, ms: costs.askMs },
       ];
     }
@@ -77,6 +88,8 @@ function edge(events: CoreEvent[], ms: number, rest: Summary): Summary {
     if (e.at) sections.add(e.at.section);
     if (e.event === "ask") asks++;
     if (e.event === "effect_start") effects++;
+    // A section entered by a transfer is reached through its own events: at least the outcome, whose
+    // `at` is where the run ended, as for a section that only hands off.
     if (e.event === "transfer") transfers.add(`${e.from} → ${e.to}`);
   }
   return { ...rest, maxAsks: rest.maxAsks + asks, maxEffects: rest.maxEffects + effects, maxMs: rest.maxMs + ms, sections, transfers };
@@ -100,7 +113,11 @@ const EMPTY: Summary = { paths: 0n, maxAsks: 0, maxEffects: 0, maxMs: 0, outcome
 export function explore(start: Explorable, costs: Costs): Summary {
   const memo = new Map<string, Summary>();
   const visit = (run: Explorable, next: Next): Summary => {
-    if (next.kind === "done") return { ...EMPTY, paths: 1n, outcomes: new Set([outcomeName(next.outcome)]) };
+    if (next.kind === "done") {
+      // A handoff may page (SPEC §8), so its worst case includes the pager's timeout.
+      const maxMs = next.outcome.kind === "handoff" ? costs.pagerMs : 0;
+      return { ...EMPTY, paths: 1n, maxMs, outcomes: new Set([outcomeName(next.outcome)]) };
+    }
     const key = run.key();
     const seen = memo.get(key);
     if (seen) return seen;

@@ -2,7 +2,7 @@
 // runtime errors, config warnings, backend checks and redaction.
 
 import { spawn } from "node:child_process";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -50,6 +50,9 @@ describe("run flow", () => {
     expect(find(r.events, "warning", "W-CONFIG-PERMS")).toMatchObject({ stage: "args" });
     expect(r.stderr).toContain("W-CONFIG-PERMS");
     expect(r.code).toBe(0);
+    // A warning about a run that goes ahead comes after run_start and carries its run_id (SPEC §10).
+    expect(r.events.map((e) => e.event)).toEqual(["run_start", "warning", "outcome"]);
+    expect(find(r.events, "warning")?.run_id).toBe(find(r.events, "run_start")?.run_id);
   });
 
   test("W-REDACT-OFF: turning off the built-in patterns is warned about on every run", async () => {
@@ -239,3 +242,107 @@ test("E-INTERRUPTED: SIGINT during a do stops it, releases the lock, exits 50 (S
   expect(existsSync(join(runtime, "skop", "tiny.lock"))).toBe(false);
   expect(Date.now() - started).toBeLessThan(20_000);
 }, 30_000);
+
+describe("review fixes", () => {
+  const ask = (lines = "") =>
+    skill(
+      `- **run** \`df\` as used\n- **ask** Given {used}, which? · sure 80%\n  - [Other]\n  - [Third]\n\n## Other\nElse.\n\n- **stop**\n\n## Third\nOr this.\n\n- **hand off**${lines}`,
+    );
+
+  test("a reader closing stdout early doesn't leak the lock: the run finishes with its exit code", async () => {
+    const runtime = mkdtempSync(join(tmpdir(), "skop-rt-"));
+    const env = { ...process.env, XDG_RUNTIME_DIR: runtime, XDG_CONFIG_HOME: runtime, XDG_STATE_HOME: runtime };
+    const path = skill('- **run** `echo a`\n- **run** `echo b`\n- **page** "done"');
+    const child = spawn(process.execPath, [CLI, path, "--dry-run"], { env });
+    // Like `| head -n1`: read one line, then close the pipe.
+    child.stdout.once("data", () => child.stdout.destroy());
+    const code = await new Promise<number | null>((resolve) => child.on("close", resolve));
+    expect(code).toBe(10);
+    expect(existsSync(join(runtime, "skop", "tiny.lock"))).toBe(false);
+  });
+
+  test("E-USAGE: an unreadable skill path, --param without =, and two modes at once (SPEC §7.1)", async () => {
+    const path = skill("- **stop**", "params:\n  n: 1\n");
+    for (const args of [
+      [join(tmpdir(), "no-such-skill.md"), "--apply"],
+      [path, "--apply", "--param", "n"],
+      [path, "--lint", "--verify"],
+      [path, "--apply", "--verify"],
+      [path, "--dry-run", "--explain"],
+    ]) {
+      const r = await runSkop(args);
+      expect(r.code, args.join(" ")).toBe(40);
+      expect(find(r.events, "error", "E-USAGE"), args.join(" ")).toBeDefined();
+    }
+  });
+
+  test("E-USAGE: an unreadable or malformed --trace file", async () => {
+    for (const trace of [join(tmpdir(), "no-such-trace.jsonl"), file("t.jsonl", "not json\n"), file("t.jsonl", "[1]\n")]) {
+      const r = await runSkop([skill("- **stop**"), "--verify", "--trace", trace]);
+      expect(r.code, trace).toBe(40);
+      expect(find(r.events, "error", "E-USAGE"), trace).toBeDefined();
+    }
+  });
+
+  test("E-CONFIG: --fake and --fake-exec files are checked against contracts/fakes.schema.json before the run", async () => {
+    const cases = [
+      ["--fake", file("a.yaml", '{"line:11": "maybe"}')],
+      ["--fake", file("a.yaml", "[1, 2]")],
+      ["--fake-exec", file("c.yaml", '{"line:10": {"exit": 0, "sdtout": "typo"}}')],
+      ["--fake-exec", file("c.yaml", "{ not yaml")],
+    ];
+    for (const [flag, path] of cases) {
+      const r = await runSkop([ask(), "--apply", flag as string, path as string]);
+      expect(r.code, `${flag} ${path}`).toBe(40);
+      expect(find(r.events, "error", "E-CONFIG"), `${flag} ${path}`).toBeDefined();
+      expect(find(r.events, "run_start")).toBeUndefined();
+    }
+  });
+
+  test("ask requests and the handoff record are private files (0600) in a fresh run directory", async () => {
+    const answers = file("a.yaml", '{"line:11": {"s:other": 0, "s:third": 1}}');
+    const r = await runSkop([ask(), "--apply", "--no-page", "--fake", answers], { env: {} });
+    expect(r.code).toBe(20);
+    const ask1 = find(r.events, "ask")?.request_path as string;
+    const record = find(r.events, "handoff_record")?.path as string;
+    for (const p of [ask1, record]) expect(statSync(p).mode & 0o777, p).toBe(0o600);
+    expect(statSync(find(r.events, "run_start")?.run_dir as string).mode & 0o777).toBe(0o700);
+  });
+
+  test("the handoff page is escaped like any page: its record path can't become a link", async () => {
+    const r = await runSkop([skill("- **hand off**"), "--apply"]);
+    const text = find(r.events, "handoff_page")?.text as string;
+    expect(text).toContain("handoff.​json");
+    expect(text).not.toContain("handoff.json");
+  });
+
+  test("with no pager configured, a page reports ok: false and the message goes to stderr", async () => {
+    const r = await runSkop([skill('- **page** "disk is full"'), "--apply", "--config", file("config.yaml", "ask:\n  backend: fake\n")]);
+    expect(r.code).toBe(10);
+    expect(find(r.events, "page")).toMatchObject({ ok: false });
+    expect(r.stderr).toContain("disk is full");
+  });
+
+  test("--verify reports exact counts, maxima and unreached sections for a small skill (SPEC §5.6)", async () => {
+    const path = skill(
+      "- **run** `a` as x\n- **check** {x} > 1 → stop\n- **then** [Hand]\n\n## Hand\n- **hand off**\n\n## Lost\nNever.\n\n- **stop**",
+    );
+    const r = await runSkop([path, "--verify"]);
+    expect(r.code).toBe(0);
+    const report = JSON.parse(r.stdout.trim().split("\n").at(-1) as string);
+    // run ok, fail, timeout; the check on unknown output is true, false or not a number.
+    expect(report).toMatchObject({
+      paths: 5,
+      outcomes: ["handoff:command_failed", "handoff:explicit", "stopped"],
+      max_ask_calls: 0,
+      max_effects: 0,
+      // run timeout 30s + 5s kill grace, then a handoff that may page (10s pager timeout).
+      worst_case_ms: 45_000,
+      unreached_sections: ["Lost"],
+    });
+    // Hand is only reached by a transfer and has no events of its own but the handoff.
+    expect(report.unreached_sections).not.toContain("Hand");
+    // Lint's warning, once, before the report.
+    expect(r.events.filter((e) => e.code === "W-SECTION-UNREACHED")).toHaveLength(1);
+  });
+});

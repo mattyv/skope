@@ -2,7 +2,7 @@
 // skop's command line (SPEC §7).
 
 import { parseArgs } from "node:util";
-import { identity } from "./host/identity.js";
+import IDENTITY from "./build-identity.js";
 import { runSkill } from "./host/run.js";
 
 const USAGE = `usage: skop <SKILL.md> (--apply | --dry-run) [--no-page] [--param k=v]... [--fake answers.yaml] [--fake-exec cmds.yaml] [--config path]
@@ -12,7 +12,7 @@ const USAGE = `usage: skop <SKILL.md> (--apply | --dry-run) [--no-page] [--param
 async function main(argv: string[]): Promise<number> {
   // Only the flag itself, not a value that happens to spell it.
   if (argv.length === 1 && argv[0] === "--version") {
-    const { version, build } = identity();
+    const { version, build } = IDENTITY;
     console.log(`skop ${version} (build identity ${build})`);
     return 0;
   }
@@ -21,8 +21,10 @@ async function main(argv: string[]): Promise<number> {
   let usage: string | undefined;
   try {
     ({ values, positionals } = parse(argv));
+    const modes = [values.lint, values.verify, values.explain, values.apply || values["dry-run"]].filter(Boolean).length;
     if (positionals.length !== 1) usage = "give exactly one skill file";
     else if (values.trace !== undefined && !values.verify) usage = "--trace goes with --verify";
+    else if (modes > 1) usage = "--lint, --verify, --explain and a run (--apply or --dry-run) don't combine";
   } catch (err) {
     usage = (err as Error).message;
   }
@@ -61,6 +63,11 @@ function parse(argv: string[]) {
     },
   });
 }
+
+// A reader that closes stdout early (`skop … | head -n1`) doesn't stop the run: a run that
+// stopped half way would leave its effects unknown. Later events are dropped, the run finishes,
+// and the exit code still reports its outcome.
+process.stdout.on("error", () => {});
 
 main(process.argv.slice(2)).then(
   (code) => {

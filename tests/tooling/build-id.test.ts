@@ -60,7 +60,7 @@ describe("build-id.mjs (SPEC §7.2)", () => {
     expect(parsed.build).toMatch(/^[0-9a-f]{64}$/);
   });
 
-  test.each(["src/core.ts", "core/Interp.dfy", "contracts/error-codes.json", "package-lock.json"])(
+  test.each(["src/core.ts", "core/Run.dfy", "contracts/error-codes.json", "package-lock.json"])(
     "changing a byte under %s changes the build id",
     (rel) => {
       const dir = makeTree();
