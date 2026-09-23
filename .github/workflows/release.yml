@@ -17,6 +17,12 @@ on:
 permissions:
   contents: read
 
+env:
+  # The standalone binaries embed this exact Node build (SPEC §5.5, PLAN.md
+  # §8: "from a pinned Node version"), independent of whichever Node the
+  # runner's own tool cache happens to have.
+  PINNED_NODE_VERSION: "20.18.1"
+
 jobs:
   resolve:
     name: Resolve release commit
@@ -135,11 +141,161 @@ jobs:
           done
           exit $status
 
+  binaries:
+    name: Standalone binary (${{ matrix.platform }}-${{ matrix.arch }})
+    needs: [resolve, test]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+            arch: x64
+          - os: ubuntu-24.04-arm
+            platform: linux
+            arch: arm64
+          - os: macos-14
+            platform: darwin
+            arch: arm64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - run: npm ci
+      - name: Download the pinned Node build to embed
+        id: pinned
+        shell: bash
+        run: |
+          file="node-v$PINNED_NODE_VERSION-${{ matrix.platform }}-${{ matrix.arch }}.tar.gz"
+          curl -fsSLO "https://nodejs.org/dist/v$PINNED_NODE_VERSION/$file"
+          tar xf "$file"
+          echo "node=$PWD/node-v$PINNED_NODE_VERSION-${{ matrix.platform }}-${{ matrix.arch }}/bin/node" >> "$GITHUB_OUTPUT"
+      - name: Bundle and build the standalone binary (SPEC §5.5)
+        run: |
+          node scripts/package/bundle.mjs
+          node scripts/package/sea.mjs \
+            --node "${{ steps.pinned.outputs.node }}" \
+            --outfile "dist-bin/skop-${{ needs.resolve.outputs.version }}-${{ matrix.platform }}-${{ matrix.arch }}"
+      - uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: dist-bin/*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: binary-${{ matrix.platform }}-${{ matrix.arch }}
+          path: dist-bin/*
+
+  checksums:
+    name: SHA256SUMS
+    needs: [resolve, binaries]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: binary-*
+          path: dist-bin
+          merge-multiple: true
+      - run: cd dist-bin && sha256sum skop-* > SHA256SUMS && cat SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: checksums
+          path: dist-bin/SHA256SUMS
+
+  binary-install-check:
+    name: Install binary (${{ matrix.platform }}-${{ matrix.arch }})
+    needs: [resolve, binaries, checksums]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+            arch: x64
+          - os: ubuntu-24.04-arm
+            platform: linux
+            arch: arm64
+          - os: macos-14
+            platform: darwin
+            arch: arm64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: binary-${{ matrix.platform }}-${{ matrix.arch }}
+          path: release/download/v${{ needs.resolve.outputs.version }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: checksums
+          path: release/download/v${{ needs.resolve.outputs.version }}
+      # A local file server standing in for the GitHub release, laid out the
+      # way install.sh expects under SKOP_DOWNLOAD_URL: <version>/<file>.
+      - name: Serve the release directory
+        run: |
+          chmod +x "release/download/v${{ needs.resolve.outputs.version }}"/skop-*
+          python3 -m http.server 8099 --directory release &
+          for _ in $(seq 1 20); do curl -fsS -o /dev/null http://127.0.0.1:8099/ && break; sleep 0.5; done
+      - name: Install with no Node on PATH, on a clean debian:stable-slim (Linux)
+        if: matrix.platform == 'linux'
+        run: |
+          docker run --rm --network host \
+            -v "$PWD:/work" -w /work \
+            -e SKOP_DOWNLOAD_URL=http://127.0.0.1:8099 \
+            -e SKOP_VERSION=${{ needs.resolve.outputs.version }} \
+            -e SKOP_INSTALL_DIR=/work/installed \
+            debian:stable-slim \
+            sh -c 'apt-get update -qq && apt-get install -y -qq curl ca-certificates >/dev/null && sh install.sh'
+          echo "$PWD/installed" >> "$GITHUB_PATH"
+      - name: Install with node removed from PATH (macOS)
+        if: matrix.platform == 'darwin'
+        env:
+          PATH: /usr/bin:/bin
+          SKOP_DOWNLOAD_URL: http://127.0.0.1:8099
+          SKOP_VERSION: ${{ needs.resolve.outputs.version }}
+          SKOP_INSTALL_DIR: installed
+        run: |
+          sh install.sh
+          echo "$PWD/installed" >> "$GITHUB_PATH"
+      # Same checks as the npm package's clean install (install-check above):
+      # --version, then every released fixture's fake scenarios.
+      - name: skop --version and every fixture's fake scenarios
+        env:
+          VERSION: ${{ needs.resolve.outputs.version }}
+        run: |
+          out=$(skop --version)
+          echo "$out"
+          case "$out" in "skop $VERSION (build identity "*) ;; *) echo "expected skop $VERSION"; exit 1 ;; esac
+          shopt -s nullglob
+          status=0
+          for skill in fixtures/*/SKILL.md; do
+            dir=$(dirname "$skill")
+            skop "$skill" --lint || { echo "lint failed: $skill"; status=1; }
+            scenarios=("$dir"/fakes/*/)
+            for scenario in "${scenarios[@]}"; do
+              want=$(cat "$scenario/expected-exit")
+              set +e
+              skop "$skill" --dry-run --fake "$scenario/answers.yaml" --fake-exec "$scenario/commands.yaml" > /dev/null
+              got=$?
+              set -e
+              if [ "$got" != "$want" ]; then
+                echo "$(basename "$dir")/$(basename "$scenario"): exit $got, expected $want"; status=1
+              fi
+            done
+          done
+          exit $status
+        shell: bash
+
   # Publishing waits for everything, including the container, so a failed
   # step can't leave a half-published release (an npm publish can't be undone).
   github-release:
     name: GitHub release
-    needs: [resolve, package, install-check, container]
+    needs: [resolve, package, install-check, binary-install-check, checksums, container]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -148,11 +304,20 @@ jobs:
         with:
           name: package
           path: dist-pkg
-      - name: Create release with the package attached
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: binary-*
+          path: dist-bin
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          name: checksums
+          path: dist-bin
+      - name: Create release with the binaries, SHA256SUMS, install.sh and the package attached
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ needs.resolve.outputs.tag }}
-        run: gh release create "$TAG" dist-pkg/* --repo "$GITHUB_REPOSITORY" --title "$TAG" --generate-notes --verify-tag
+        run: gh release create "$TAG" dist-pkg/* dist-bin/* install.sh --repo "$GITHUB_REPOSITORY" --title "$TAG" --generate-notes --verify-tag
 
   container:
     name: Container image
