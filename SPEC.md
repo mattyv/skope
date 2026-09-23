@@ -1,4 +1,4 @@
-# skop (skill op) — Implementation Spec (v1, rev 13)
+# skop (skill op) — Implementation Spec (v1, rev 14)
 
 Audience: an engineer or LLM implementing this from scratch. Everything
 marked **MUST** is normative. Where this spec says "verify against current
@@ -29,7 +29,7 @@ small deterministic runtime.
 The core of the language (static checks and the interpreter) is written in
 **Dafny**, proven to satisfy a small set of safety properties (§5.3), and
 compiled to JavaScript. Everything around it (Markdown preprocessing, the CLI
-wrapper, the Jev helper) is TypeScript on Node. The shipped tool needs only
+wrapper, the backend helper) is TypeScript on Node. The shipped tool needs only
 Node.
 
 ### 1.1 Goals
@@ -52,7 +52,7 @@ Node.
   it up owns the whole rest of the incident. In v1.1, when a run stops at an
   `ask`, a person or agent picks one of the author's options, and skop
   continues from that point. The answer goes through the same validation as
-  a Jev answer (P5), so the rest of the run keeps skop's checks. It needs
+  any backend's answer (P5), so the rest of the run keeps skop's checks. It needs
   skop to save and restore a run's state mid-run.
 - `guarantees:` block for custom effect properties (v1.1).
 - MCP server (v1.1; the CLI contract below is designed to be wrapped).
@@ -76,7 +76,7 @@ flowchart TD
     loop["host loop"]
   end
   core <-->|"state, response ⇄<br/>state, events, request"| loop
-  loop <--> real["real handler<br/>shell, Jev, pager"]
+  loop <--> real["real handler<br/>shell, backend, pager"]
   loop <--> fake["fake handler<br/>answer files, tests"]
   loop <--> explore["explore handler<br/>every path, --verify"]
 ```
@@ -89,7 +89,7 @@ that answers its requests changes.
 | `preprocess` | TypeScript | Parse Markdown (CommonMark AST), enforce the surface grammar, emit core JSON + source map. No semantic checks. |
 | `core` | Dafny → JS | Core AST types, semantic lint, interpreter step function, proofs |
 | `host` | TypeScript | The three request handlers and the loop that drives the core |
-| `jev-ask` | TypeScript | CLI: one question in, probabilities out. Backends: `jev`, `openrouter`, `fake` |
+| `skop-ask` | TypeScript | CLI: one question in, probabilities out. Backends: `jev`, `openrouter`, `fake` |
 | `skop` | TypeScript | CLI wrapper: preprocess, lint, lock, drive the host loop, stream logs, enforce budgets, handoff |
 
 ---
@@ -115,7 +115,7 @@ limits:                         # optional; defaults shown
   run_timeout: 30s              # run and check commands
   do_timeout: 5m                # do commands
   deadline: 15m                 # whole run; checked between steps (§7)
-  jev_state: 4k tokens          # at most 30k: Jev allows 32k for context plus question
+  ask_context: 4k tokens        # must fit the backend's context limit (§6.2)
 ---
 ```
 
@@ -224,13 +224,13 @@ handoff  = "**hand off**"
 stop     = "**stop**"
 ~~~
 
-- Section-option `ask`: at least 2, at most 255 options. The `openrouter`
-  backend allows at most 20 options per ask (§6.2).
+- Section-option `ask`: at least 2, at most 255 options. A backend may
+  allow fewer (§6.2).
 - `one of [L]`: L MUST be a list of value items.
 - Score `ask` (v1.1), `→ LOW to HIGH`. All of these are lint errors:
   - `LOW` and `HIGH` aren't integers with `0 ≤ LOW < HIGH`;
   - the ask has fewer than 2 or more than 10 levels (`HIGH − LOW + 1`).
-    10 is Jev's documented maximum;
+    10 is the language's maximum, and a backend may allow fewer (§6.2);
   - the rubric doesn't give exactly one `INT: text` line for every level in
     `LOW..HIGH`. It's required and complete because Jev's model sees only the
     level descriptions, never the numbers or the neighbouring levels;
@@ -383,11 +383,11 @@ timeout `limits.do_timeout`.
 - False → if `else [X]`, transfer to X; `else skip` or no else → continue.
 - `check COND else …` (no arrow): true → continue; false → else.
 
-**`ask`**: one Jev call (§6).
+**`ask`**: one backend call (§6).
 - Build the request: question (interpolated), options with descriptions,
   kind, guidance, context (§6.1, §6.3).
-- Validate the response (§6.1). An invalid response counts as Jev
-  unavailable.
+- Validate the response (§6.1). An invalid response counts as the backend
+  being unavailable.
 - Chosen = the option with the highest probability. Confidence = that
   probability. `sure` is compared with it directly. This isn't Jev's own
   `confidence` figure, which Jev rescales by the number of options: a top
@@ -405,14 +405,14 @@ timeout `limits.do_timeout`.
   - `else skip` → allowed **only** on `yes | no`: bind `false`, continue.
     On other forms it's a lint error.
   - `else [X]` → transfer to X.
-- Jev unavailable (after `ask.retries` retries, §6.2) or invalid response → `handoff`
+- Backend unavailable (after `ask.retries` retries, §6.2) or invalid response → `handoff`
   (reason `ask_unavailable`).
 
 ```mermaid
 flowchart TD
-  ask["ask"] --> jev{"valid answer from Jev?<br/>(after retries)"}
-  jev -- "no" --> h1(["handoff: ask_unavailable"])
-  jev -- "yes" --> gate{"one clear top option<br/>and confidence ≥ sure?"}
+  ask["ask"] --> be{"valid answer from the backend?<br/>(after retries)"}
+  be -- "no" --> h1(["handoff: ask_unavailable"])
+  be -- "yes" --> gate{"one clear top option<br/>and confidence ≥ sure?"}
   gate -- "yes" --> go["transfer, or bind the answer"]
   gate -- "no" --> els{"else?"}
   els -- "none" --> h2(["handoff: gate_failed"])
@@ -420,7 +420,7 @@ flowchart TD
   els -- "else [X]" --> x["transfer to X"]
 ```
 
-**`ask … → LOW to HIGH as NAME`** (Score, v1.1): one Jev call (§6).
+**`ask … → LOW to HIGH as NAME`** (Score, v1.1): one backend call (§6).
 - Options are the levels `LOW..HIGH`. Each id is the level number as a
   string (`"0"`, `"1"`, … when LOW is 0), and the rubric text is its
   description.
@@ -433,7 +433,7 @@ flowchart TD
   continue. A Score ask never transfers by itself.
 - Gate failed → no else: `handoff` (reason `gate_failed`); `else [X]`:
   transfer to X.
-- Jev unavailable or invalid response → `handoff` (reason `ask_unavailable`).
+- Backend unavailable or invalid response → `handoff` (reason `ask_unavailable`).
 
 Branch on the answer with ordinary `check`s on a known, trusted value:
 ~~~markdown
@@ -503,7 +503,7 @@ silently never paging.
   `would_page` instead of sent.
 - Skop never invokes the pager in dry run, whatever the reason: `page`,
   handoff (§8) or a stale lock (§7).
-- `run` and `check` commands and Jev calls run normally. Skop can't tell
+- `run` and `check` commands and backend calls run normally. Skop can't tell
   whether a command changes anything. Anything that might, including a
   tool's own "dry run" mode that runs hooks or reloads services, belongs in
   `do`.
@@ -619,7 +619,7 @@ CI runs `dafny verify` and fails on any unproven obligation.
   `do`, and never returns `Page`. P3 covers only what skop runs. It says
   nothing about what a `run` or `check` command does.
 - **P4 Taint.** Every `Exec` command string is a concatenation of author
-  literals and trusted values that passed the safe-value check. Every Jev
+  literals and trusted values that passed the safe-value check. Every backend
   question string is author literals and trusted values; values from `run`
   commands appear only as their names, with the values in context. (Score
   answers are trusted integers, so they pass trivially.)
@@ -636,8 +636,8 @@ Shipped Dafny code MUST NOT contain `assume`, `{:axiom}` or
 `{:verify false}`. CI greps for them.
 
 ### 5.4 Handlers (TypeScript)
-- **real**: commands per §4.4, `jev-ask` (§6), the configured pager.
-- **fake**: `--fake` answers Jev from a file (§6.2). `--fake-exec` answers
+- **real**: commands per §4.4, `skop-ask` (§6), the configured pager.
+- **fake**: `--fake` answers backend questions from a file (§6.2). `--fake-exec` answers
   commands from a file keyed by command text (after interpolation) or
   source-map id; value is `{exit, stdout, stderr, timed_out}`. An unmatched
   command is an error (exit 50). With `--fake-exec`, no real command ever
@@ -649,7 +649,7 @@ Shipped Dafny code MUST NOT contain `assume`, `{:axiom}` or
     returns `Choose(3)` and the handler takes all three.
   - Every `Exec` is answered with each of: ok, fail, timeout.
   - Every `Ask` is answered with each option confident, plus unsure, plus
-    unavailable (Jev down or an invalid response, §4.2). Unsure and
+    unavailable (backend down or an invalid response, §4.2). Unsure and
     unavailable differ: with `else [Page]`, unsure pages but unavailable hands
     off. A `one of` answer binds the real item, so its value stays known. A
     Score ask gives one branch per level plus unsure plus unavailable, at
@@ -677,19 +677,19 @@ From the explore handler, report:
   with reasons)
 - **fail** if any path ends without an outcome, or in `error` (impossible by
   P6; checked anyway)
-- max Jev calls on any path; max `do` effects on any path
+- max backend calls on any path; max `do` effects on any path
 - worst-case duration estimate, for information only. It includes command
-  timeouts plus kill grace, every Jev attempt allowed by `ask.retries` with its wait, and the pager
+  timeouts plus kill grace, every backend attempt allowed by `ask.retries` with its wait, and the pager
   timeout. The enforced limit is `limits.deadline` (§7).
 - sections never reached (warning `W-SECTION-UNREACHED`)
 
 ---
 
-## 6. `jev-ask` helper
+## 6. `skop-ask` helper
 
 ### 6.1 Contract
 ~~~
-jev-ask --request /path/req.json   # prints one JSON object to stdout
+skop-ask --request /path/req.json   # prints one JSON object to stdout
 ~~~
 Request:
 ```json
@@ -730,12 +730,37 @@ backend couldn't attribute to any option (default 0). It's valid only if:
 see". The core treats it as possibly belonging to any option (§4.2). Jev
 always reports 0, so it doesn't affect Jev.
 
-Anything else is invalid and handled as Jev unavailable.
+Anything else is invalid and handled as the backend being unavailable.
 
 ### 6.2 Backends (selected by config, §9)
-Exactly one backend is used per run. Elsewhere in this spec, "Jev
-unavailable" means whichever backend is configured. Every backend's answer
-goes through the same validation in the core (§6.1, P5).
+Exactly one backend is used per run.
+
+**Backend contract.** Every backend:
+- takes the request in §6.1 and returns `probs` keyed by option id, plus
+  `unassigned` if it has any. The core validates every backend's answer
+  the same way (§6.1, P5);
+- supports `choice`, `yesno` and `score`;
+- reports `backend` and `model` with every answer, for the logs;
+- follows the shared timeout and retry rules below;
+- declares its limits. Before the run starts, skop checks the skill against
+  the configured backend's limits. Anything over is `E-BACKEND-LIMIT`,
+  exit 40. A backend can only lower the language's maximums:
+
+| Limit | Language maximum | `jev` | `openrouter` | `fake` |
+|---|---|---|---|---|
+| options per ask | 255 | 255 | 20 | 255 |
+| Score levels | 10 | 10 | 10 | 10 |
+| context tokens (`limits.ask_context`) | none | 30k | the model's context length from OpenRouter's model list, minus 2k | none |
+
+Adding a backend means adding a column here and an entry below. Nothing
+outside §6.2 changes.
+
+**Timeouts and retry (every backend).** Each attempt times out after
+`ask.timeout_ms`. Retry up to `ask.retries` times (default 1, allowed 0–3)
+on a timeout, a connection error, 408, 429 or 5xx. Wait 500ms before the
+first retry, doubling each time. On 429, wait for `retry-after` instead, if
+it's no longer than `ask.timeout_ms`; otherwise stop retrying. A value
+outside 0–3 is `E-CONFIG`. The cap keeps the worst-case time bounded.
 
 - **`jev`**: TypeSafe Jev. **Read TypeSafe's current API docs for request
   format, auth, and model names; do not guess.** Checked against the docs
@@ -763,7 +788,7 @@ goes through the same validation in the core (§6.1, P5).
                    "Page":"Nothing here is safe to try automatically. Tell a human.",
                    "Investigate":"Nothing in the lists fits. Work out what's filling the disk from the errors and sizes gathered in Triage. Don't run anything outside Cleanups or Services without asking a human first."}}}}
     ```
-    Response, from which `jev-ask` maps "Clean up" back to `s:clean_up`:
+    Response, from which `skop-ask` maps "Clean up" back to `s:clean_up`:
     ```json
     {"model":"jev-1.13.0",
      "answers":{"q":{"type":"choice","choice":"Clean up","confidence":0.76,
@@ -773,7 +798,7 @@ goes through the same validation in the core (§6.1, P5).
   - **Option names are shown to the model**, so Jev's Choice keys are the
     option labels, not skop's internal ids. A section option's key is its
     display name ("Clean up") and a `one of` option's key is the item text.
-    `jev-ask` maps the keys back to ids before the core validates them.
+    `skop-ask` maps the keys back to ids before the core validates them.
     Labels are unique (§3.2, §3.6), so the mapping is exact.
   - `choice` → Jev *Choice*, with `criteria` = label → description (or
     null). `yesno` → Jev *Noul*, a 0–1 "is this yes?" probability; derive
@@ -783,17 +808,12 @@ goes through the same validation in the core (§6.1, P5).
     release, which silently shifts every tuned `sure`. An alias gets warning
     `W-MODEL-ALIAS` on every run, and so does a response whose `model`
     differs from the one configured.
-  - **Timeouts and retry.** Each attempt times out after `ask.timeout_ms`.
-    Retry up to `ask.retries` times (default 1, allowed 0–3) on a timeout,
-    a connection error, 408, 429 or 5xx. Wait 500ms before the first retry,
-    doubling each time. On 429, wait for `retry-after` instead, if it's no
-    longer than `ask.timeout_ms`; otherwise stop retrying. A value outside
-    0–3 is `E-CONFIG`. The cap keeps the worst-case time bounded. `jev-ask` MAY use TypeSafe's
-    JavaScript SDK (`@typesafe-ai/sdk`), with its own retries turned off so
-    skop's time budget stays exact.
+  - **SDK.** `skop-ask` MAY use TypeSafe's JavaScript SDK
+    (`@typesafe-ai/sdk`), with its own retries turned off so skop's time
+    budget stays exact.
   - Map `score` → Jev *Score*. Send the rubric as Jev's `criteria` array,
     lowest level first. Jev numbers levels by array position from 0, so Jev
-    level `i` is skop level `LOW + i`. `jev-ask` converts the ids before the
+    level `i` is skop level `LOW + i`. `skop-ask` converts the ids before the
     core validates them.
   - Require Jev's full `probabilities` object; if any level is missing, the
     response is invalid. Never fill in missing probabilities. The gate uses
@@ -830,7 +850,7 @@ goes through the same validation in the core (§6.1, P5).
     `H` ÷ (`L` + `H`). Example: A = 0.51, nineteen other tokens at 0.025,
     B not returned. Then `H` = 0.015, A's confidence is 0.51 ÷ 0.525 ≈ 97.1%,
     and a 99% gate fails.
-  - **Invalid responses.** Any of these counts as Jev unavailable (§4.2):
+  - **Invalid responses.** Any of these counts as the backend being unavailable (§4.2):
     - `L` is below `openrouter.min_mass` (default 0.5), so the model mostly
       answered something else;
     - there are no logprobs;
@@ -838,11 +858,10 @@ goes through the same validation in the core (§6.1, P5).
       tokens.
 
     Never fill in missing numbers.
-  - **Checked before the run starts**, both exit 40:
-    - the model doesn't list logprobs support in OpenRouter's model list, or
-      its reasoning can't be turned off → `E-BACKEND-MODEL`;
-    - an ask in the skill has more than 20 options → `E-BACKEND-LIMIT`.
-  - Timeouts and retry are the same as for `jev`.
+  - **Checked before the run starts:** the model must list logprobs
+    support in OpenRouter's model list, and its reasoning must be possible
+    to turn off. Otherwise `E-BACKEND-MODEL`, exit 40. Its option limit of
+    20 comes from the 20 alternatives OpenRouter returns (see the contract).
   - `sure` values are tuned against one backend. Moving a skill to another
     model changes how often gates pass, so re-tune before trusting it (§13).
 - **`fake`**: reads `--fake answers.yaml`, keyed by question text (after
@@ -859,8 +878,8 @@ goes through the same validation in the core (§6.1, P5).
   with no evidence. The lint decides this from the bindings that can reach
   the `ask`.
 - Apply redaction (§9) **before** anything leaves the machine.
-- Truncate to `limits.jev_state`, at most 30k tokens (approximate tokens as
-  chars/4), so context and question fit Jev's 32k limit: shrink the
+- Truncate to `limits.ask_context` (approximate tokens as chars/4), which
+  must fit the backend's context limit (§6.2). Shrink the
   largest values first, keeping their **last** lines (logs are most useful
   at the end).
 - Every request, after redaction, is written to the run directory as
@@ -880,7 +899,7 @@ skop <path/to/SKILL.md> [options]
   --explain               print sections, transfer graph, and worst-case cost; run nothing
   --verify                run the explore handler and print the verify report; run nothing
   --lint                  parse + static checks only
-  --fake answers.yaml     use the fake Jev backend
+  --fake answers.yaml     use the fake backend
   --fake-exec cmds.yaml   use the fake command handler; no real command runs
   --config path           default: $XDG_CONFIG_HOME/skop/config.yaml
 ~~~
@@ -999,7 +1018,7 @@ and have no codes.
 | `E-PARAM-UNSAFE` | args | a param override or built-in fails the safe-value check | `mount='/; rm -rf /'` |
 | `E-CONFIG` | args | the config file is unreadable or invalid | |
 | `E-BACKEND-MODEL` | args | the `openrouter` model doesn't support logprobs, or its reasoning can't be turned off (§6.2) | |
-| `E-BACKEND-LIMIT` | args | an ask has more options than the backend allows (§6.2) | 21 options on `openrouter` |
+| `E-BACKEND-LIMIT` | args | the skill exceeds the configured backend's limits: options, Score levels or context (§6.2) | 21 options on `openrouter`; `ask_context: 40k tokens` on `jev` |
 | `E-FAKE-UNMATCHED` | runtime | `--fake-exec` has no answer for a command (§5.4) | |
 | `E-IO` | runtime | skop can't write its run directory or lock file | |
 | `E-INTERNAL` | runtime | a runner bug. Unreachable by P6, so always a bug report | |
@@ -1095,7 +1114,7 @@ details or secrets.
 ask:
   backend: jev            # jev | openrouter | fake
   timeout_ms: 2000        # per attempt (§6.2)
-  retries: 1              # 0–3; applies to both backends (§6.2)
+  retries: 1              # 0–3; applies to every backend (§6.2)
 jev:
   model: jev-1.13.0       # a versioned id, not an alias (§6.2)
   key_env: TYPESAFE_API_KEY
@@ -1144,7 +1163,7 @@ logs warning `W-REDACT-OFF` on every run):
 | `would_page` | `text` |
 | `handoff_page` | `text`, `ok` (did the pager command succeed) |
 | `transfer` | `from`, `to` |
-| `outcome` | `outcome`, `reason`, `jev_calls`, `effects`, `dry_run` |
+| `outcome` | `outcome`, `reason`, `ask_calls`, `effects`, `dry_run` |
 | `handoff_record` | `path`, `record` |
 | `error` / `warning` | `code`, `stage`, `file`, `line`, `message` (§7.1) |
 | `locked` | `holder_pid` |
@@ -1176,7 +1195,7 @@ logs warning `W-REDACT-OFF` on every run):
 8. Page text is escaped. A pager failure never blocks the outcome.
 9. Backend probabilities are measured, never self-reported: Jev's own
    distribution, or token logprobs from OpenRouter.
-10. If Jev is down or answers badly, the result is a handoff, never "act
+10. If the backend is down or answers badly, the result is a handoff, never "act
    anyway".
 11. A handoff under `--apply` pages a human unless explicitly told not to
     (§8). Skop never guesses from how it was started.
@@ -1197,10 +1216,10 @@ generation, skill signing, off-host log shipping, agent launching.
 
 ### 12.1 Fixtures
 - Appendix A and B skills, and for v1.1 Appendix D. Its fakes cover each
-  level, unsure (pages via Unsure), and Jev unavailable.
-- A `fakes/` directory per fixture with a Jev answer file and a command file
+  level, unsure (pages via Unsure), and backend unavailable.
+- A `fakes/` directory per fixture with a backend answer file and a command file
   for each scenario: happy path, every section option, gate failure, command
-  failure, `do` timeout, Jev unavailable, invalid Jev response, deadline,
+  failure, `do` timeout, backend unavailable, invalid backend response, deadline,
   dry run.
 - Fixture tests run with `--fake` and `--fake-exec`. CI never runs a
   fixture's real commands, so results don't depend on the CI machine.
@@ -1228,7 +1247,7 @@ match on code and line, never on message text.
 - an empty data list: `E-LIST-EMPTY`; a list mixing action and value items: `E-LIST-MIXED`
 - a skill with two errors reports both
 - two `nginx` items in one data list: `E-LIST-DUP`
-- `jev_state: 40k tokens`: `E-FRONTMATTER`
+- `ask_context: 40k tokens` on the `jev` backend: `E-BACKEND-LIMIT`
 - `- **run** \`df -h\`` before the first `##`, inside a blockquote, and nested
   under a plain bullet: `E-MISPLACED` for each
 - value item `` `nginx` ``: `E-DATA-ITEM`
@@ -1242,7 +1261,7 @@ Also: `--param mount='/; rm -rf /'` MUST exit 40 with `E-PARAM-UNSAFE`
 before anything runs. A run with neither `--apply` nor `--dry-run`, or with
 both, MUST exit 40 with `E-MODE`.
 
-Jev response tests (each MUST be rejected as invalid): a missing option, an
+Backend response tests (each MUST be rejected as invalid): a missing option, an
 extra option, a value of 1.1, a negative value, `NaN`, and values summing to
 0.9. A tie for highest MUST fail the gate. So MUST A = 0.5, B = 0.2,
 `unassigned` = 0.3 at `sure` 40%: the response is valid and A clears 40%,
@@ -1288,7 +1307,7 @@ file paths.
 - **M2 Core**: `dafny verify` passes with P1–P6 and no `assume`/`{:axiom}`;
   all semantic negative tests fail with correct lines; `--verify` on both
   fixtures terminates, reports every path ending in an outcome, and reports
-  max Jev calls. (disk-full: Clean up loop is 5 items, bounded.)
+  max backend calls. (disk-full: Clean up loop is 5 items, bounded.)
 - **M3 Exec with fakes**: for each scenario, the event stream matches a golden
   JSONL. Dry run issues no `do` and no page.
 - **M4 Real backends + runner features**: both `jev` and `openrouter`
@@ -1313,7 +1332,7 @@ file paths.
   installed.
 - **M7 Score asks (v1.1)**: all Score tests in §12.2 pass; P4–P6 still
   verify with the Score additions; the Appendix D fixture passes M1–M3 with
-  fakes for each level, unsure, and Jev unavailable.
+  fakes for each level, unsure, and backend unavailable.
 
 ### 12.4 Differential check (optional but cheap)
 For each fake scenario, the concrete trace MUST appear among the explore
@@ -1361,7 +1380,7 @@ params:
 limits:
   run_timeout: 30s
   do_timeout: 10m
-  jev_state: 4k tokens
+  ask_context: 4k tokens
 ---
 
 # Disk full
@@ -1436,7 +1455,7 @@ Notes:
 - `du | sort -h` puts the biggest directories last, which is the part
   truncation keeps (§6.3).
 - `{used}` is bound on every path to Page because Triage binds it first.
-  `{biggest}` may be unbound (`else skip`); it only feeds Jev context, so
+  `{biggest}` may be unbound (`else skip`); it only feeds the backend's context, so
   that's allowed.
 - The commands are GNU/Linux-specific. That's fine for the skill; CI runs the
   fixture through fakes (§12.1).
@@ -1473,7 +1492,7 @@ params:
 limits:
   run_timeout: 60s
   do_timeout: 5m
-  jev_state: 2k tokens
+  ask_context: 2k tokens
 ---
 
 # Cert expiry
@@ -1754,6 +1773,21 @@ Also, where things live in the Markdown:
 
 ---
 
+### Rev 14 (backend-neutral wording and a backend contract)
+
+- **Generic names.** `jev-ask` is now `skop-ask`, `jev_state` is
+  `ask_context`, `jev_calls` is `ask_calls`, and "Jev unavailable" is
+  "backend unavailable". Earlier entries in this changelog keep the old
+  names.
+- **Backend contract** (§6.2). Every backend takes the same request,
+  returns the same answer shape, and declares its limits for options, Score
+  levels and context. Skop checks the skill against them before the run.
+- **Timeouts and retries** are now stated once, for every backend.
+- Jev stays the reference backend; its name remains where the text is about
+  Jev itself.
+
+---
+
 ## Appendix D — `error-triage/SKILL.md` (v1.1)
 
 ````markdown
@@ -1763,7 +1797,7 @@ description: Decide what to do about a burst of system errors. Use when an error
 format: 1
 limits:
   run_timeout: 30s
-  jev_state: 4k tokens
+  ask_context: 4k tokens
 ---
 
 # Error triage
@@ -1825,7 +1859,7 @@ multi-select, asked one item at a time. That's better for ops:
 - it needs no new validation rule (per-item probabilities that don't sum to
   1), no new P5 case, and no way to iterate over a bound set.
 
-The only gain would be one Jev call instead of several, about 100ms each.
+The only gain would be one backend call instead of several, about 100ms each.
 
 **Numeric answers** (a number the model estimates):
 - Numbers in skop should be measured facts, read by `run` and compared by
