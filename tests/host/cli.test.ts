@@ -2,7 +2,7 @@
 // runtime errors, config warnings, backend checks and redaction.
 
 import { spawn } from "node:child_process";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -102,6 +102,39 @@ describe("run flow", () => {
     expect(r.events.map((e) => e.event)).toEqual(["run_start", "outcome"]);
   });
 
+  test("E-PARAM-TYPE: an int param takes only a plain decimal integer", async () => {
+    const path = skill("- **run** `echo {n}`\n- **stop**", "params:\n  n: 1\n");
+    for (const v of ["1e3", "0x10", "1.5", "", "99999999999999999999"]) {
+      const r = await runSkop([path, "--apply", "--param", `n=${v}`]);
+      expect(find(r.events, "error", "E-PARAM-TYPE"), v).toBeDefined();
+    }
+  });
+
+  test("--lint prints nothing for a clean skill: no run, no outcome", async () => {
+    const r = await runSkop([skill("- **stop**"), "--lint"]);
+    expect(r.code).toBe(0);
+    expect(r.stdout).toBe("");
+  });
+
+  test("a dry-run handoff record says dry_run: true (SPEC §8.1)", async () => {
+    const r = await runSkop([skill("- **hand off**"), "--dry-run"]);
+    expect(r.code).toBe(20);
+    expect(find(r.events, "handoff_record")).toMatchObject({ record: { dry_run: true, reason: "explicit", detail: null } });
+  });
+
+  test("the saved ask request fits limits.ask_context, keeping the end of the output (SPEC §6.3)", async () => {
+    const path = skill(
+      "- **run** `seq 1 50` as log\n- **ask** Given {log}, which? · sure 80%\n  - [Other]\n  - [Third]\n\n## Other\nElse.\n\n- **stop**\n\n## Third\nOr this.\n\n- **stop**",
+      "limits:\n  ask_context: 3 tokens\n",
+    );
+    const answers = file("a.yaml", '{"line:13": {"s:other": 1, "s:third": 0}}');
+    const r = await runSkop([path, "--apply", "--fake", answers]);
+    expect(r.code).toBe(0);
+    const request = JSON.parse(readFileSync(find(r.events, "ask")?.request_path as string, "utf8"));
+    // 3 tokens is 12 chars: the last whole lines that fit.
+    expect(request.context).toEqual({ log: "47\n48\n49\n50" });
+  });
+
   test("an int --param override is typed and reaches the command", async () => {
     const path = skill("- **run** `echo {n}`\n- **stop**", "params:\n  n: 1\n");
     const r = await runSkop([path, "--apply", "--param", "n=42"]);
@@ -171,7 +204,11 @@ test("E-INTERRUPTED: SIGINT during a do stops it, releases the lock, exits 50 (S
   const code = await new Promise<number | null>((resolve) => {
     child.stdout.on("data", (d) => {
       out += d;
-      if (out.includes('"effect_start"')) child.kill("SIGINT");
+      // Twice: a second signal while skop is stopping must not cut the cleanup short.
+      if (out.includes('"effect_start"') && !child.killed) {
+        child.kill("SIGINT");
+        child.kill("SIGINT");
+      }
     });
     child.on("close", resolve);
   });
@@ -180,7 +217,7 @@ test("E-INTERRUPTED: SIGINT during a do stops it, releases the lock, exits 50 (S
     .split("\n")
     .map((l) => JSON.parse(l));
   expect(code).toBe(50);
-  expect(events.find((e) => e.code === "E-INTERRUPTED")).toMatchObject({ event: "error", stage: "runtime" });
+  expect(events.filter((e) => e.code === "E-INTERRUPTED")).toEqual([expect.objectContaining({ event: "error", stage: "runtime" })]);
   expect(events.at(-1)).toMatchObject({ event: "outcome", outcome: "error" });
   expect(existsSync(join(runtime, "skop", "tiny.lock"))).toBe(false);
   expect(Date.now() - started).toBeLessThan(20_000);

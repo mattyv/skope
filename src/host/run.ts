@@ -204,7 +204,6 @@ export async function runSkill(o: RunOptions): Promise<number> {
 
     // SPEC §4.4: interrupted → stop the command, release the lock, E-INTERRUPTED.
     const onSignal = async (signal: string) => {
-      if (interrupted) return;
       interrupted = true;
       await stopAll();
       release();
