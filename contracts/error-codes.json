@@ -152,7 +152,7 @@
   {
     "code": "E-USAGE",
     "stage": "args",
-    "meaning": "an unknown flag, a missing flag value, or a missing skill path (§7)"
+    "meaning": "an unknown flag, a missing or malformed flag value, a missing or unreadable skill path, or an unreadable or malformed `--trace` file (§7)"
   },
   {
     "code": "E-MODE",
@@ -177,7 +177,7 @@
   {
     "code": "E-CONFIG",
     "stage": "args",
-    "meaning": "the config file is unreadable or invalid"
+    "meaning": "the config file, or a `--fake` or `--fake-exec` file, is unreadable or invalid (fake files are checked against `contracts/fakes.schema.json` before the run)"
   },
   {
     "code": "E-BACKEND-MODEL",

@@ -833,6 +833,9 @@ identity (§7.2), then:
 ~~~
 skop-ask --request /path/req.json   # prints one JSON object to stdout
 ~~~
+skop itself calls the same code in-process, with the same inputs and
+validation, so the backend key never reaches a child process. The
+command exists for testing backends by hand.
 Request:
 ```json
 {"kind":"choice","question":"Given `used`, `errors` and `biggest`, what's the best next step?",
@@ -1180,12 +1183,12 @@ and have no codes.
 | `E-LIST-DUP` | lint | two items in a data list have the same label, ignoring case (§3.6) | `nginx` twice |
 | `E-SCORE-RANGE` | lint | Score bounds invalid, or not 2–10 levels (v1.1) | `→ 5 to 1`; `→ 1 to 11` |
 | `E-SCORE-RUBRIC` | lint | Score rubric missing, incomplete, out of range or duplicated (v1.1) | no line for level 2 |
-| `E-USAGE` | args | an unknown flag, a missing flag value, or a missing skill path (§7) | `--aply` |
+| `E-USAGE` | args | an unknown flag, a missing or malformed flag value, a missing or unreadable skill path, or an unreadable or malformed `--trace` file (§7) | `--aply`; `--param k` |
 | `E-MODE` | args | neither or both of `--apply` and `--dry-run` (§7 step 0) | |
 | `E-PARAM-UNKNOWN` | args | `--param` names a param the skill doesn't declare | |
 | `E-PARAM-TYPE` | args | a `--param` value has the wrong type | `threshold=high` |
 | `E-PARAM-UNSAFE` | args | a param override or built-in fails the safe-value check | `mount='/; rm -rf /'` |
-| `E-CONFIG` | args | the config file is unreadable or invalid | |
+| `E-CONFIG` | args | the config file, or a `--fake` or `--fake-exec` file, is unreadable or invalid (fake files are checked against `contracts/fakes.schema.json` before the run) | |
 | `E-BACKEND-MODEL` | args | the `openrouter` model doesn't support logprobs, or its reasoning can't be turned off (§6.2) | |
 | `E-BACKEND-LIMIT` | args | the skill exceeds the configured backend's limits: options, Score levels or context (§6.2) | 21 options on `openrouter`; `ask_context: 40k tokens` on `jev` |
 | `E-FAKE-UNMATCHED` | runtime | `--fake-exec` has no answer for a command, or `--fake` has none for a question (§5.4) | |
@@ -1388,7 +1391,7 @@ backend with no config block. `state_dir` expands a leading
 | `event` | Extra fields |
 |---|---|
 | `run_start` | `params`, `dry_run`, `caller`, `run_dir`, `skop_version`, `skop_build` (§7.2) |
-| `run` / `check_cmd` | `cmd`, `exit`, `ms`, `timed_out`, `truncated`, `stdout_hash`, `stdout_tail` (redacted, ≤2KB), `after_would_do` |
+| `run` / `check_cmd` | `cmd`, `exit`, `ms`, `timed_out`, `truncated`, `stdout_hash` (of the redacted output, so a log can't be used to test guesses of a secret), `stdout_tail` (redacted, ≤2KB), `after_would_do` |
 | `check` | `expr`, `left`, `right`, `result`, `after_would_do`. `expr` is rendered from the core program: operands as `{name}` or the number, e.g. `{used} < {threshold}` (a decorative `%` is gone by then) |
 | `ask` | `probs` keyed by option id only; unassigned probability stays in the request file. `question` (as sent, §3.5: trusted values pasted in, `run` outputs named in backticks), `kind`, `probs`, `chosen`, `confidence`, `sure`, `passed`, `backend`, `model`, `ms`, `request_path`, `request_sha256`, `after_would_do`; for `score`, `range`, and `chosen` is an integer. If the backend failed, `probs`, `chosen` and `confidence` are `null` and `detail` is `unavailable` or `request_too_large` |
 | `effect_start` / `effect_end` | `cmd`, `exit`, `ms`, `timed_out` (end only) |
@@ -2090,6 +2093,11 @@ Also, where things live in the Markdown:
 - **Standalone binaries and `install.sh`** (§5.5), so skop can run on a
   machine without Node. The installer checks each download against the
   release's `SHA256SUMS`.
+- **Host details from review:** `stdout_hash` hashes the redacted output;
+  fake files are schema-checked (`E-CONFIG`); an unreadable skill or trace
+  file is `E-USAGE`; the host calls `skop-ask`'s code in-process; warnings
+  about a run that goes ahead are emitted after `run_start`, so they carry
+  its `run_id`.
 - **Integration details:** a deadline handoff points at the next request
   the host would have started; `ask.probs` holds option ids only; an unknown
   flag is `E-USAGE`; `--verify` prints its report as the last stdout line.
