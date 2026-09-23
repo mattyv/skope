@@ -1,4 +1,4 @@
-# skop (skill op) — Implementation Spec (v1, rev 8)
+# skop (skill op) — Implementation Spec (v1, rev 9)
 
 Audience: an engineer or LLM implementing this from scratch. Everything
 marked **MUST** is normative. Where this spec says "verify against current
@@ -163,6 +163,11 @@ Rules:
    is a **parse error**. Never fall back to treating it as prose. (This is the
    core safety property of the format.)
 5. Keywords match case-insensitively (`**Run**` is the keyword `run`).
+   Multi-word keywords (`for each`, `if yes`, `hand off`) have exactly one
+   ordinary space between words. Any other spelling, such as `**for_each**`,
+   `**foreach**`, `**for-each**`, a double space, or a non-breaking space, is
+   `E-UNKNOWN-BOLD`. The message suggests the nearest keyword ("did you mean
+   **for each**?").
 6. `→` and `->` are interchangeable. `·` (U+00B7) is the only option
    separator. `yes | no` is a fixed token, not a separator.
 
@@ -832,7 +837,7 @@ and have no codes.
 | `E-FRONTMATTER` | parse | a frontmatter field is missing or invalid | no `description`; `run_timeout: soon` |
 | `E-DUP-SECTION` | parse | two sections share a name, ignoring case | `## Page` twice |
 | `E-SECTION-KIND` | parse | a section is neither an instruction section nor a data section with one list | a data section with two lists |
-| `E-UNKNOWN-BOLD` | parse | bold text that isn't a keyword and doesn't end in `:` (§3.3 rule 3) | ``**rn** `df -h` `` |
+| `E-UNKNOWN-BOLD` | parse | bold text that isn't a keyword and doesn't end in `:`, including a misspelled keyword (§3.3 rules 3 and 5) | ``**rn** `df -h` `` |
 | `E-GRAMMAR` | parse | a keyword item doesn't match §3.4 | `**Run** the tests first`; `**run** df -h` |
 | `E-NESTED-LIST` | parse | a nested list under an instruction that doesn't take one | a list under a `run` item |
 | `E-OPTION-ITEM` | parse | an option item isn't exactly one `[Section]` link | `- [Page] or restart` |
@@ -1061,6 +1066,7 @@ match on code and line, never on message text.
 - `- **Run** the tests first` (keyword, bad grammar): `E-GRAMMAR`
 - `- **run** df -h` (missing code span): `E-GRAMMAR`
 - `- **rn** \`df -h\`` (bold, not a keyword, no colon): `E-UNKNOWN-BOLD`
+- `**for_each**`, `**foreach**` and `**for  each**` (two spaces): `E-UNKNOWN-BOLD`
 - a nested list under a `run` item: `E-NESTED-LIST`
 - `**do** \`rm -rf {errors}\`` where `errors` came from `run`: `E-TAINT`
 - `**run** \`echo {step}\`` inside `for each step in [Cleanups]`: `E-ACTION-IN-CMD`
@@ -1503,6 +1509,11 @@ Also from a review of rev 5:
   may have more than 20 options on this backend.
 - **Config split** into `jev` and `openrouter` blocks.
 - **Automatic fallback** between backends stays out of v1.
+
+### Rev 9 (keyword spelling)
+
+- **Multi-word keywords need exactly one ordinary space.** Other spellings,
+  like `for_each`, are `E-UNKNOWN-BOLD` with a suggested fix.
 
 ---
 
