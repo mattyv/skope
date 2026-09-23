@@ -19,14 +19,14 @@ const SKILLS = [
 
 describe("M1: --lint on every example skill (SPEC §7)", () => {
   for (const skill of SKILLS) {
-    test.fails(`${skill.split("/").slice(-2).join("/")} lints clean and exits 0`, async () => {
+    test(`${skill.split("/").slice(-2).join("/")} lints clean and exits 0`, async () => {
       const r = await runSkop([skill, "--lint"]);
       expect(r.code).toBe(0);
       expect(r.events.some((e: { event: string }) => e.event === "error")).toBe(false);
     });
   }
 
-  test.fails("--lint runs nothing: no run, do, would_do, check_cmd, ask or page event", async () => {
+  test("--lint runs nothing: no run, do, would_do, check_cmd, ask or page event", async () => {
     const r = await runSkop([SKILLS[0] as string, "--lint"]);
     expect(r.code).toBe(0); // pins real behaviour, not just the absence of events below
     const ran = new Set(["run", "check_cmd", "do", "would_do", "ask", "page", "would_page", "effect_start"]);

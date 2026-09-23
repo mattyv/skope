@@ -3,8 +3,8 @@
 // `skop SKILL.md --verify --trace events.jsonl` checks one: it replays the
 // trace's sequence of (section, line, response class) through the
 // explorer's graph and exits 0 if the explorer can take that path, 40 if
-// it can't. Deadline scenarios are excluded (§5.4)." None of this repo's
-// fixtures exercise a deadline handoff, so none are excluded here.
+// it can't. Deadline scenarios are excluded (§5.4)." Stream G: the deadline
+// scenarios added since are excluded here, as the spec says.
 //
 // The trace file is an ordinary events.jsonl (a golden, or a real run's
 // stdout captured to a file) — `--trace` takes exactly that shape, so this
@@ -32,7 +32,7 @@ function writeTrace(events: object[]): string {
 }
 
 describe("differential check: a real run's trace is one --verify's explorer can take (SPEC §12.4)", () => {
-  for (const s of allScenarios()) {
+  for (const s of allScenarios().filter((s) => s.name !== "deadline")) {
     test.fails(`${s.fixture}/${s.name}: --verify --trace exits 0 on the run's own trace`, async () => {
       const mode = s.name === "dry-run" ? "--dry-run" : "--apply";
       const run = await runSkop([s.skillPath, mode, "--fake", s.answersPath, "--fake-exec", s.commandsPath]);

@@ -22,26 +22,26 @@ function errorEvent(events: object[], code: string) {
 }
 
 describe("M4: CLI argument validation exits 40 before anything runs (SPEC §7 step 0/2, §7.1)", () => {
-  test.fails("neither --apply nor --dry-run: E-MODE, exit 40, nothing runs", async () => {
+  test("neither --apply nor --dry-run: E-MODE, exit 40, nothing runs", async () => {
     const r = await runSkop([SKILL, "--fake", ANSWERS, "--fake-exec", COMMANDS]);
     expect(r.code).toBe(40);
     expect(errorEvent(r.events, "E-MODE")).toBeDefined();
     expect(r.events.some((e: { event: string }) => e.event === "run" || e.event === "would_do")).toBe(false);
   });
 
-  test.fails("both --apply and --dry-run: E-MODE, exit 40", async () => {
+  test("both --apply and --dry-run: E-MODE, exit 40", async () => {
     const r = await runSkop([SKILL, "--apply", "--dry-run", "--fake", ANSWERS, "--fake-exec", COMMANDS]);
     expect(r.code).toBe(40);
     expect(errorEvent(r.events, "E-MODE")).toBeDefined();
   });
 
-  test.fails("read-only modes need neither --apply nor --dry-run: --lint alone exits 0, not 40", async () => {
+  test("read-only modes need neither --apply nor --dry-run: --lint alone exits 0, not 40", async () => {
     const r = await runSkop([SKILL, "--lint"]);
     expect(r.code).toBe(0); // pins real behaviour, not just the absence of E-MODE below
     expect(errorEvent(r.events, "E-MODE")).toBeUndefined();
   });
 
-  test.fails("an E-MODE error event has no file/line (there's no source line, SPEC §7.1)", async () => {
+  test("an E-MODE error event has no file/line (there's no source line, SPEC §7.1)", async () => {
     const r = await runSkop([SKILL]);
     const e = errorEvent(r.events, "E-MODE") as { file?: string; line?: number } | undefined;
     expect(e).toBeDefined();
@@ -49,26 +49,26 @@ describe("M4: CLI argument validation exits 40 before anything runs (SPEC §7 st
     expect(e?.line).toBeUndefined();
   });
 
-  test.fails("--param naming an unknown param: E-PARAM-UNKNOWN, exit 40", async () => {
+  test("--param naming an unknown param: E-PARAM-UNKNOWN, exit 40", async () => {
     const r = await runSkop([SKILL, "--apply", "--param", "bogus=1", "--fake", ANSWERS, "--fake-exec", COMMANDS]);
     expect(r.code).toBe(40);
     expect(errorEvent(r.events, "E-PARAM-UNKNOWN")).toBeDefined();
   });
 
-  test.fails("--param with the wrong type: E-PARAM-TYPE, exit 40", async () => {
+  test("--param with the wrong type: E-PARAM-TYPE, exit 40", async () => {
     const r = await runSkop([SKILL, "--apply", "--param", "threshold=high", "--fake", ANSWERS, "--fake-exec", COMMANDS]);
     expect(r.code).toBe(40);
     expect(errorEvent(r.events, "E-PARAM-TYPE")).toBeDefined();
   });
 
-  test.fails("--param failing the safe-value check: E-PARAM-UNSAFE, exit 40, before anything runs (SPEC §12.2)", async () => {
+  test("--param failing the safe-value check: E-PARAM-UNSAFE, exit 40, before anything runs (SPEC §12.2)", async () => {
     const r = await runSkop([SKILL, "--apply", "--param", "mount=/; rm -rf /", "--fake", ANSWERS, "--fake-exec", COMMANDS]);
     expect(r.code).toBe(40);
     expect(errorEvent(r.events, "E-PARAM-UNSAFE")).toBeDefined();
     expect(r.events.some((e: { event: string }) => e.event === "run" || e.event === "would_do" || e.event === "effect_start")).toBe(false);
   });
 
-  test.fails("--param applies whoever the caller is, agents included (SPEC §7 step 2)", async () => {
+  test("--param applies whoever the caller is, agents included (SPEC §7 step 2)", async () => {
     const r = await runSkop([SKILL, "--apply", "--param", "mount=/; rm -rf /", "--fake", ANSWERS, "--fake-exec", COMMANDS], {
       env: { SKOP_CALLER: "agent" },
     });
@@ -76,13 +76,13 @@ describe("M4: CLI argument validation exits 40 before anything runs (SPEC §7 st
     expect(errorEvent(r.events, "E-PARAM-UNSAFE")).toBeDefined();
   });
 
-  test.fails("an unreadable --config file: E-CONFIG, exit 40", async () => {
+  test("an unreadable --config file: E-CONFIG, exit 40", async () => {
     const r = await runSkop([SKILL, "--apply", "--config", "/nonexistent/skop-config.yaml", "--fake", ANSWERS, "--fake-exec", COMMANDS]);
     expect(r.code).toBe(40);
     expect(errorEvent(r.events, "E-CONFIG")).toBeDefined();
   });
 
-  test.fails("an invalid --config file (not valid YAML / wrong shape): E-CONFIG, exit 40", async () => {
+  test("an invalid --config file (not valid YAML / wrong shape): E-CONFIG, exit 40", async () => {
     const dir = mkdtempSync(join(tmpdir(), "skop-config-"));
     const path = join(dir, "config.yaml");
     writeFileSync(path, "ask:\n  backend: [not, a, string]\n");
@@ -91,13 +91,13 @@ describe("M4: CLI argument validation exits 40 before anything runs (SPEC §7 st
     expect(errorEvent(r.events, "E-CONFIG")).toBeDefined();
   });
 
-  test.fails("every mode/param/config error is reported both on stdout (as an event) and stderr (as a readable line, SPEC §7.1)", async () => {
+  test("every mode/param/config error is reported both on stdout (as an event) and stderr (as a readable line, SPEC §7.1)", async () => {
     const r = await runSkop([SKILL]);
     expect(errorEvent(r.events, "E-MODE")).toBeDefined();
     expect(r.stderr).toContain("E-MODE");
   });
 
-  test.fails("a preprocess/lint error also exits 40, before the mode is even relevant to the outcome", async () => {
+  test("a preprocess/lint error also exits 40, before the mode is even relevant to the outcome", async () => {
     // fixtures/disk-full/SKILL.md is valid, so point at a file with no `format: 1`.
     const notRunnable = new URL("../../../fixtures/disk-full/fakes/page-direct/answers.yaml", import.meta.url).pathname;
     const r = await runSkop([notRunnable, "--apply", "--fake", ANSWERS, "--fake-exec", COMMANDS]);
@@ -106,7 +106,7 @@ describe("M4: CLI argument validation exits 40 before anything runs (SPEC §7 st
 });
 
 describe("M4: exit codes match the outcome table (SPEC §4.1)", () => {
-  test.fails("stopped -> 0", async () => {
+  test("stopped -> 0", async () => {
     const r = await runSkop([
       new URL("../../../fixtures/cert-expiry/SKILL.md", import.meta.url).pathname,
       "--apply",
@@ -118,12 +118,12 @@ describe("M4: exit codes match the outcome table (SPEC §4.1)", () => {
     expect(r.code).toBe(0);
   });
 
-  test.fails("paged -> 10", async () => {
+  test("paged -> 10", async () => {
     const r = await runSkop([SKILL, "--apply", "--fake", ANSWERS, "--fake-exec", COMMANDS]);
     expect(r.code).toBe(10);
   });
 
-  test.fails("handoff -> 20", async () => {
+  test("handoff -> 20", async () => {
     const r = await runSkop([
       SKILL,
       "--apply",

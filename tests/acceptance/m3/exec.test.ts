@@ -17,6 +17,23 @@ import { normalise } from "../../helpers/golden.js";
 import { runSkop } from "../lib/cli.js";
 import { allScenarios, readExpectedExit, readGolden } from "../lib/scenarios.js";
 
+// Scenarios still expected to fail, and why. Stream G empties this as they pass.
+const PENDING = new Set([
+  // for each, yes/no, one of and Score asks: waiting for the real core (stream C).
+  "disk-full/clean-up-happy",
+  "disk-full/do-timeout",
+  "disk-full/dry-run",
+  "disk-full/restart-happy",
+  "cert-expiry/dry-run",
+  "cert-expiry/renew-happy",
+  "error-triage/severity-1-stop",
+  "error-triage/severity-2-investigate",
+  "error-triage/severity-3-page",
+  "error-triage/severity-4-page",
+  "error-triage/unavailable",
+  "error-triage/unsure",
+]);
+
 describe("M3: exec with fakes matches the golden event stream (SPEC §12.3)", () => {
   for (const s of allScenarios()) {
     // dry-run scenarios are the SPEC §4.5 half of M3 ("dry run issues no `do` and no page");
@@ -26,7 +43,7 @@ describe("M3: exec with fakes matches the golden event stream (SPEC §12.3)", ()
       ? `${s.fixture}/${s.name}: dry run issues no do (would_do only) and no page (would_page only)`
       : `${s.fixture}/${s.name}: event stream matches the golden`;
 
-    test.fails(title, async () => {
+    (PENDING.has(`${s.fixture}/${s.name}`) ? test.fails : test)(title, async () => {
       const mode = isDryRun ? "--dry-run" : "--apply";
       const result = await runSkop([s.skillPath, mode, "--fake", s.answersPath, "--fake-exec", s.commandsPath]);
       const expected = readGolden(s.goldenPath);

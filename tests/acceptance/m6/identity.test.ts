@@ -14,7 +14,7 @@ const ANSWERS = new URL("../../../fixtures/disk-full/fakes/page-direct/answers.y
 const COMMANDS = new URL("../../../fixtures/disk-full/fakes/page-direct/commands.yaml", import.meta.url).pathname;
 
 describe("M6: one build identity everywhere (SPEC §7.2)", () => {
-  test.fails("run_start's skop_version/skop_build match `skop --version`", async () => {
+  test("run_start's skop_version/skop_build match `skop --version`", async () => {
     const version = await runSkop(["--version"]);
     const m = version.stdout.match(/^skop (\S+) \(build identity ([0-9a-f]{64})\)/);
     expect(m).not.toBeNull();
