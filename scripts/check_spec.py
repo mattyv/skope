@@ -21,7 +21,7 @@ import sys
 import textwrap
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-DOCS = [ROOT / "SPEC.md", ROOT / "PLAN.md"]
+DOCS = [ROOT / "SPEC.md", ROOT / "PLAN.md", ROOT / "README.md"]
 CODE = re.compile(r"`([EW]-[A-Z]+(?:-[A-Z]+)*)`")
 UNTESTABLE = {"E-INTERNAL", "E-IO"}  # SPEC §12.2: can't be triggered on purpose
 TEST_FILE = re.compile(r"\.test\.(ts|mts|js|mjs)$|\.dfy$")
