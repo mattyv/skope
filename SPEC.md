@@ -1,4 +1,4 @@
-# skop (skill op) — Implementation Spec (v1, rev 14)
+# skop (skill op) — Implementation Spec (v1, rev 15)
 
 Audience: an engineer or LLM implementing this from scratch. Everything
 marked **MUST** is normative. Where this spec says "verify against current
@@ -442,7 +442,7 @@ Branch on the answer with ordinary `check`s on a known, trusted value:
 - **then** [Page]
 ~~~
 
-Authoring note (put this in the user docs). Probability spreads across
+Authoring note (put this in the user docs; see also §4.7). Probability spreads across
 neighbouring levels. A 0.45 / 0.45 split between 3 and 4 fails a 75% gate,
 even though "at least 3" is 90% likely. So:
 - If the next step is a single threshold ("page if severe"), ask a
@@ -518,6 +518,49 @@ silently never paging.
   otherwise).
 - Therefore every run terminates, and the number of paths is finite. This is
   proven (P1, §5.3), and the explore handler (§5.4) walks the paths.
+
+### 4.7 Question forms and patterns
+Backends answer three kinds of question, which match Jev's three types.
+Skop's four `ask` forms each use one of them:
+
+| Skop form | Kind (§6.1) | Jev type | Result |
+|---|---|---|---|
+| `ask …` with a list of `[Section]` options | `choice` | Choice | transfers to the chosen section |
+| `→ one of [List] as x` | `choice` | Choice | binds the chosen item to `x` |
+| `→ yes \| no` | `yesno` | Noul | binds true or false; `if yes` acts on it |
+| `→ LOW to HIGH as x` (v1.1) | `score` | Score | binds a level to `x`; branch with `check` |
+
+Everything else is a pattern built from these forms and the other
+instructions. None of them needs new syntax:
+
+| Need | Pattern | Example |
+|---|---|---|
+| Pick several items | `for each` over the list, a `yes \| no` per item, then `if yes do item`. Each question sees fresh state, and the loop can stop early. | disk-full's Clean up |
+| Act on each item that qualifies | The same loop, with the action on `if yes` | disk-full's Clean up |
+| Act only above one threshold | A `yes \| no` phrased as the threshold ("Is this severe enough to page someone?"), not a Score | §4.2 authoring note |
+| Branch three or more ways by degree | A Score, then one `check` per branch | error-triage (Appendix D) |
+| A number | Measure it with `run`, then compare with `check`. The model never estimates numbers. | disk-full's usage checks |
+| "None of these fit" | An escape option, such as a section that hands off | Investigate in both examples |
+
+Skop has no arithmetic, so it can't count or add up answers. If a decision
+depends on a count, measure the count with a `run` command.
+
+**Writing questions.** These rules come from Jev's documentation, and
+apply to any backend:
+- **One judgment per question.** Split "Is the customer angry and asking
+  for a refund?" into two questions.
+- **Phrase a yes/no so yes means the thing you're checking.** "Does the log
+  show disk errors?", not "Is the log free of disk errors?".
+- **Say exactly what you mean.** The model reads the question literally.
+  Put boundary cases in the option descriptions or rubric.
+- **Don't reuse thresholds across forms.** A `sure` tuned on a yes/no
+  question doesn't carry over to a Choice asking the same thing, and a
+  question and its negation needn't add up to 100%.
+- **Name the evidence.** A question sees only the `run` outputs it names
+  (§6.3).
+
+Appendix E explains why multi-select and numeric answers are patterns, not
+features.
 
 ---
 
@@ -1786,6 +1829,13 @@ Also, where things live in the Markdown:
 - Jev stays the reference backend; its name remains where the text is about
   Jev itself.
 
+### Rev 15 (question forms and patterns)
+
+- **New §4.7** maps skop's four `ask` forms onto the three backend kinds
+  and Jev's types, lists the patterns built from them (multi-select,
+  thresholds, degrees, numbers, escape options), and collects the
+  question-writing rules from Jev's docs.
+
 ---
 
 ## Appendix D — `error-triage/SKILL.md` (v1.1)
@@ -1850,6 +1900,8 @@ flowchart LR
 ---
 
 ## Appendix E — Why not multi-select or numeric answers
+
+§4.7 shows the patterns that replace them.
 
 **Multi-select** (`any of [List]`). disk-full's Clean up loop is already a
 multi-select, asked one item at a time. That's better for ops:
