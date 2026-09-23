@@ -140,6 +140,12 @@ describe("dry run suppresses effects (SPEC §4.5, P3)", () => {
     expect(outcome).toEqual({ outcome: "stopped" });
   });
 
+  test("every read after a would_do is marked, not just the first", async () => {
+    const p = section([doStmt(3, VACUUM), runStmt(4, DF), runStmt(5, DF), stop(6)]);
+    const { events } = await run(p, { dry: true }, fakeExec({ [DF]: { exit: 0 } }));
+    expect(events.filter((e) => e.event === "run").map((e) => (e as { after_would_do: boolean }).after_would_do)).toEqual([true, true]);
+  });
+
   // DryRunNeverDoes proves this in Dafny. This checks the compiled code and
   // the adapter agree, over every run/do sequence up to six long.
   test("no program of up to six commands hands a do to the handler", async () => {
@@ -149,12 +155,15 @@ describe("dry run suppresses effects (SPEC §4.5, P3)", () => {
       const body = [...bits].map((b, i) => (b === "1" ? doStmt(i + 1, `do-${i}`) : runStmt(i + 1, `run-${i}`)));
       const dos = body.filter((s) => "do" in s).length;
       if (dos > 0) withDo++;
-      const kinds: string[] = [];
+      const handed: string[] = [];
       const { events } = await run(section([...body, stop(bits.length + 1)]), { dry: true }, async (req) => {
-        kinds.push(req.kind);
+        handed.push(`${req.kind}:${req.cmd}`);
         return { exit: 0 };
       });
-      expect(kinds).not.toContain("do");
+      // Exactly the run commands, in order: a do can't get out under any label.
+      expect(handed).toEqual(
+        body.filter((s) => "run" in s).map((s) => `run:${(s as { run: { cmd: { lit: string }[] } }).run.cmd[0]?.lit}`),
+      );
       expect(events.filter((e) => e.event === "would_do")).toHaveLength(dos);
     }
     expect(withDo).toBe(120); // every sequence except the seven all-run ones
