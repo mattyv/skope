@@ -193,7 +193,9 @@ describe("process start identity (SPEC §7 step 3, P2-6)", () => {
     const id = processStartId(pid);
     expect(typeof id).toBe("string");
     expect(processStartId(pid)).toBe(id);
-    expect(processStartId(process.pid)).not.toBe(id);
+    // Not this test's own process: on macOS `ps` gives the start time only to the second, and the
+    // child can start in the same second. PID 1 started long before either.
+    expect(processStartId(1)).not.toBe(id);
   });
 
   test("a dead process has none", () => {
