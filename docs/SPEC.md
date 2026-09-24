@@ -1086,8 +1086,8 @@ skope <path/to/SKILL.md> [options]
                           The report is the last stdout line; warning events come before it
   --trace events.jsonl    with --verify: check that one run's path is one the explorer can take (§12.4)
   --lint                  parse + static checks only
-  --test                  run the scenarios in tests/ next to the skill and check each (§7.3)
-  --scenario DIR          with --test: run only this scenario directory
+  --test                  run the scenarios in tests/ and tests.yaml next to the skill and check each (§7.3)
+  --scenario DIR or NAME  with --test: run only this scenario directory, or this tests.yaml scenario by name
   --live                  with --test: ask the configured backend, and repeat each scenario (§7.3)
   --runs N                with --live: runs per scenario (default: its live.runs, else 10)
   --fake answers.yaml     use the fake backend
@@ -1284,14 +1284,61 @@ Rules:
 ### 7.3 Skill tests (`--test`)
 
 `skope SKILL.md --test` runs every directory under `tests/` next to the
-skill as a scenario, skipping hidden ones (a name starting with `.`); `--scenario DIR` runs one. The design is
-`docs/design/skill-tests.md`. A scenario holds:
+skill as a scenario, skipping hidden ones (a name starting with `.`), plus
+every scenario a `tests.yaml` beside the skill defines; `--scenario DIR`
+runs one directory, `--scenario NAME` one `tests.yaml` scenario. Scenarios
+from both sources run together, sorted by name; an unknown `--scenario`
+name is invalid. The design is `docs/design/skill-tests.md`. A folder
+scenario holds:
 
 - `commands.yaml` (required) and `answers.yaml` (optional): the fake files
   (§5.4). Every ask the run reaches needs an answer, so without
-  `answers.yaml` a skill that asks fails its scenario.
+  `answers.yaml` a skill that asks fails its scenario, unless `expect.yaml`
+  names the ask in `asks` (below).
 - `expect.yaml` (`contracts/expect.schema.json`): what must happen. Or, for
   older scenarios, `expected-exit`: the exit code alone.
+
+A command result in `commands.yaml` may be a plain string instead of a
+mapping: shorthand for `{exit: 0, stdout: <the string>}`.
+
+**`tests.yaml`**, beside `SKILL.md` (not inside `tests/`), holds scenarios
+that don't need their own directory:
+
+```yaml
+defaults:                 # optional
+  commands: {...}         # optional, same shape as commands.yaml
+  answers: {...}          # optional, same shape as answers.yaml
+scenarios:                # required, non-empty
+  restart:
+    commands: {...}       # merged over defaults.commands, key by key
+    answers: {...}        # merged over defaults.answers, key by key
+    outcome: paged         # expect.yaml's own fields, at the scenario's top level
+    asks:
+      Triage: { chosen: Restart }
+```
+
+A scenario's `commands` and `answers` merge over `defaults.commands` and
+`defaults.answers` key by key, the scenario's own value winning; either may
+use the string shorthand. Every other field is checked exactly as
+`expect.yaml` is (§ below), with no `expect:` wrapper. A scenario name
+follows the same rules as a `tests/` directory name (non-empty, no `/`, not
+starting with `.`); a name that's also a `tests/` folder scenario is
+invalid, and reported, not silently preferred. A `tests.yaml` that isn't a
+mapping, has no non-empty `scenarios`, or has an unknown key anywhere is
+invalid; when its `scenarios` names can still be read, each of them is
+reported invalid, not just the file as a whole.
+
+**Derived answers.** In scripted mode, for each `asks.<key>.chosen` in a
+scenario's expectations that no answer already covers (by a stable key,
+`line:N`, or the ask's exact text), skope scripts one that confidently
+chooses it: the chosen option's probability clears any `sure` up to 99%,
+and the rest is split evenly over the other options, so the answer is valid
+and never a tie. Option ids are the core's own: a section option is
+`sectionId(label)`, a `one of` item its value, yes/no `"yes"`/`"no"`, and a
+Score level its level id. This means a scenario with `asks` and no
+`answers.yaml` at all can still pass; an ask `asks` doesn't name, with no
+answer either, is still `E-FAKE-UNMATCHED`. `--live` never derives answers:
+`answers.yaml` is ignored either way, and every ask goes to the backend.
 
 Each scenario runs as an `--apply` run with both fake handlers, so no real
 command runs and the configured pager is never called: a page succeeds

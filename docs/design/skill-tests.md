@@ -2,6 +2,33 @@
 
 Status: approved. Phases 1–3 (stable keys, scripted `--test`, `--live`; SPEC §7.3) are built; 4 (`--coverage`) is not.
 
+## Since approval: less repetition
+
+Folder scenarios turned out verbose in practice: every scenario repeats the
+shared `commands.yaml` entries, and every ask needs a full `answers.yaml`
+probability table even when the scenario only cares which option won. Three
+additions cut that repetition, all still under §7.3:
+
+- **`tests.yaml`**, beside `SKILL.md`. Scenarios that don't need their own
+  directory: `defaults.commands`/`defaults.answers`, then each scenario
+  merges its own `commands`/`answers` over them key by key, with
+  `expect.yaml`'s fields at the scenario's own top level (no `expect:`
+  wrapper). A folder scenario is still exactly what it was; the two sources
+  run together, sorted by name.
+- **The string shorthand** in `commands.yaml` (folder or `tests.yaml`): a
+  plain string result means `{exit: 0, stdout: <the string>}`. Most fake
+  commands only ever set `stdout` on success.
+- **Derived answers.** `expect.yaml`'s own `asks.<key>.chosen` already says
+  what a scenario expects an ask to choose; scripting that same choice
+  again in `answers.yaml` was pure duplication. Now, in scripted mode, an
+  `asks` entry with no answer already covering it gets one skope scripts
+  itself: the chosen option confident, the rest split evenly, so the answer
+  is valid and never a tie. `--live` is untouched: it never reads
+  `answers.yaml`, derived or not.
+
+None of this changes what a scenario checks or how `--live` behaves; it
+only changes how much of a scenario an author has to write by hand.
+
 ## Problem
 
 A skill author can rehearse a skill today (`--fake`, `--fake-exec`) and
