@@ -121,6 +121,12 @@ describe("skope --test", () => {
     expect(r.scenarios[0].mismatch).toContain("the run failed: E-FAKE-UNMATCHED");
   });
 
+  test("a param that fails the safe-value check makes the scenario invalid, even with only a path to check", async () => {
+    const r = await test_(skill({ restart: restart({ expect: { path: ["Triage"] } }) }), "--param", "mount=has space");
+    expect(r.code).toBe(40);
+    expect(r.scenarios[0].invalid).toContain("E-PARAM-UNSAFE");
+  });
+
   test("a scenario can expect the run to break by saying exit: 50", async () => {
     const { "Restart.used": _used, ...commands } = RESTART_COMMANDS;
     const r = await test_(skill({ restart: restart({ commands, expect: { exit: 50 } }) }));

@@ -30,9 +30,6 @@ export interface TestOptions {
 
 type Event = { event: string } & Record<string, unknown>;
 
-/** Codes that mean the scenario's own files, or the skill, can't be used: invalid, not failed. */
-const INVALID_CODES = new Set(["E-FAKE-AMBIGUOUS", "E-FAKE-UNUSED", "E-CONFIG", "E-USAGE", "E-PARAM-UNKNOWN", "E-PARAM-TYPE"]);
-
 type Result = { pass: true } | { pass: false; mismatch: string } | { invalid: string };
 
 export async function runTests(o: TestOptions): Promise<number> {
@@ -139,8 +136,15 @@ async function runScenario(o: TestOptions, program: CoreProgram | null, dir: str
     .filter(Boolean)
     .map((l) => JSON.parse(l) as Event);
 
-  const bad = events.find((e) => e.event === "error" && (INVALID_CODES.has(e.code as string) || e.stage === "parse" || e.stage === "lint"));
-  if (bad) return { invalid: `${bad.code}: ${bad.message}` };
+  // A run that ended invalid never started: the skill, a param, the config or the scenario's own
+  // files can't be used. That's the scenario being broken, whatever it expects.
+  if (code === EXIT.invalid) {
+    const bad = events.find((e) => e.event === "error");
+    return { invalid: bad ? `${bad.code}: ${bad.message}` : "the run ended invalid" };
+  }
+  // Two keys for one statement can only be seen as the run reaches it; it's still the fake file that's broken.
+  const ambiguous = events.find((e) => e.event === "error" && e.code === "E-FAKE-AMBIGUOUS");
+  if (ambiguous) return { invalid: `${ambiguous.code}: ${ambiguous.message}` };
   if (!program) return { invalid: "the skill doesn't parse" };
   const mismatch = check(expect, code, events, program);
   if (mismatch !== null && typeof mismatch === "object") return mismatch;

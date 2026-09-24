@@ -1318,8 +1318,11 @@ A scenario **fails** when the run differs from `expect.yaml`. It also fails
 when the run breaks with a runtime error, such as a command or question
 with no fake (`E-FAKE-UNMATCHED`), whatever else `expect.yaml` checks,
 unless it sets `exit: 50`. It's **invalid**
-when its own files can't be used: a bad `expect.yaml`, a strict key error,
-a skill that doesn't lint, or an `asks` key that names no single ask.
+when the run ends `invalid` (exit 40), whatever the reason: a skill that
+doesn't lint, a param that fails its checks, a bad config or fake file, or a
+strict key error. It's also invalid when its `expect.yaml` is bad or an
+`asks` key names no single ask, and when two fake keys answer one statement
+(`E-FAKE-AMBIGUOUS`, which can surface mid-run).
 
 Output: one JSON line per scenario on stdout,
 `{"scenario","pass","mismatch"}` (or `"invalid"` with the reason), with
