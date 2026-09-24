@@ -93,6 +93,21 @@ describe("resolveFakeKeys", () => {
       expect(resolveFakeKeys(p, { "fix.sh": 1 }, "commands", true).issues).toMatchObject([{ code: "W-FAKE-UNUSED" }]);
     });
 
+    test("a key an interpolated command could produce stays a warning", () => {
+      const p = program(
+        "---\nname: tiny\ndescription: t\nformat: 1\nparams:\n  ext: sh\n---\n\n## Main\nDo it.\n\n- **run** `fix.{ext}`\n- **stop**\n\n## Fix\nFix it.\n\n- **stop**\n",
+      );
+      expect(resolveFakeKeys(p, { "fix.sh": 1 }, "commands", true).issues).toMatchObject([{ code: "W-FAKE-UNUSED" }]);
+      expect(resolveFakeKeys(p, { "Fix.nope": 1 }, "commands", true).issues).toMatchObject([{ code: "E-FAKE-UNUSED" }]);
+    });
+
+    test("a key that's an action item's command stays a warning: do step can run it", () => {
+      const p = program(
+        "---\nname: tiny\ndescription: t\nformat: 1\n---\n\n## Main\nDo it.\n\n- **for each** step in [Steps]\n  - **do** step\n- **stop**\n\n## Steps\n- Clean — `clean.sh`\n\n## Clean\nIt.\n\n- **stop**\n",
+      );
+      expect(resolveFakeKeys(p, { "clean.sh": 1 }, "commands", true).issues).toMatchObject([{ code: "W-FAKE-UNUSED" }]);
+    });
+
     test("E-FAKE-AMBIGUOUS: a stable key and a line:N key for the same statement", () => {
       const { issues } = resolveFakeKeys(diskFull, { "line:23": 1, "Triage.used": 2 }, "commands", true);
       expect(issues).toMatchObject([{ code: "E-FAKE-AMBIGUOUS", key: "Triage.used" }]);

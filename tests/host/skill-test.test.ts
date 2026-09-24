@@ -35,10 +35,11 @@ interface Files {
   "expected-exit"?: string;
 }
 
-/** A copy of disk-full with the given scenarios under tests/. */
-function skill(scenarios: Record<string, Files>): string {
+/** A copy of disk-full, or the given skill, with the given scenarios under tests/. */
+function skill(scenarios: Record<string, Files>, text?: string): string {
   const dir = mkdtempSync(join(tmpdir(), "skope-skilltest-"));
-  copyFileSync(`${ROOT}/fixtures/disk-full/SKILL.md`, join(dir, "SKILL.md"));
+  if (text === undefined) copyFileSync(`${ROOT}/fixtures/disk-full/SKILL.md`, join(dir, "SKILL.md"));
+  else writeFileSync(join(dir, "SKILL.md"), text);
   for (const [name, files] of Object.entries(scenarios)) {
     const s = join(dir, "tests", name);
     mkdirSync(s, { recursive: true });
@@ -108,6 +109,41 @@ describe("skope --test", () => {
     const r = await test_(skill({ restart: restart({ commands }) }));
     expect(r.code).toBe(60);
     expect(r.scenarios[0].mismatch).toContain("E-FAKE-UNMATCHED");
+  });
+
+  test.each([
+    ["path", { path: ["Triage", "Restart", "Page"] }],
+    ["path_prefix", { path_prefix: ["Triage"] }],
+  ])("a run that breaks fails even when %s alone would match", async (_, expectDoc) => {
+    const { "Restart.used": _used, ...commands } = RESTART_COMMANDS;
+    const r = await test_(skill({ restart: restart({ commands, expect: expectDoc }) }));
+    expect(r.code).toBe(60);
+    expect(r.scenarios[0].mismatch).toContain("the run failed: E-FAKE-UNMATCHED");
+  });
+
+  test("a scenario can expect the run to break by saying exit: 50", async () => {
+    const { "Restart.used": _used, ...commands } = RESTART_COMMANDS;
+    const r = await test_(skill({ restart: restart({ commands, expect: { exit: 50 } }) }));
+    expect(r.code).toBe(0);
+  });
+
+  test("a list item that looks like a section id is compared as the item it is", async () => {
+    const text =
+      "---\nname: envs\ndescription: t\nformat: 1\n---\n\n## Main\nPick one.\n\n- **ask** Which env? → one of [Envs] as env · sure 80%\n- **stop**\n\n## Envs\n- s:prod\n- dev\n";
+    const r = await test_(
+      skill(
+        {
+          pick: {
+            commands: {},
+            answers: { "Main.env": { "s:prod": 0.9, dev: 0.1 } },
+            expect: { outcome: "stopped", asks: { "Main.env": { chosen: "s:prod" } } },
+          },
+        },
+        text,
+      ),
+    );
+    expect(r.scenarios[0], r.stderr).toMatchObject({ pass: true });
+    expect(r.code).toBe(0);
   });
 
   test("do statements run through the fakes, so a failing do can be tested", async () => {
