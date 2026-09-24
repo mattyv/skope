@@ -1284,7 +1284,7 @@ Rules:
 ### 7.3 Skill tests (`--test`)
 
 `skope SKILL.md --test` runs every directory under `tests/` next to the
-skill as a scenario; `--scenario DIR` runs one. The design is
+skill as a scenario, skipping hidden ones (a name starting with `.`); `--scenario DIR` runs one. The design is
 `docs/design/skill-tests.md`. A scenario holds:
 
 - `commands.yaml` (required) and `answers.yaml` (optional): the fake files
@@ -1297,7 +1297,11 @@ Each scenario runs as an `--apply` run with both fake handlers, so no real
 command runs and the configured pager is never called: a page succeeds
 unless `commands.yaml` answers the `pager.command` with a failure. `do`
 statements go through the fakes, so a failing `do` can be tested. The run
-takes no lock and keeps its run directory in a temporary directory. The fake
+takes no lock and keeps its run directory in a temporary directory. A
+scripted run reads no config file unless `--config` names one: it uses the
+defaults (§9), so a personal config's `redact` patterns and `on_handoff`
+can't change what a scenario sees. A live run reads the config as a real
+run does, for its backend. The fake
 files are held to strict key rules: every statement that runs matches
 exactly one key (`E-FAKE-AMBIGUOUS` otherwise), and a stable or `line:N`
 key that names nothing is `E-FAKE-UNUSED`, unless some command or question
@@ -1313,7 +1317,10 @@ with one ask, or `Section.var`; `chosen` is the option's label: a section
 name for an ask whose options are sections, else the list item, `yes` or
 `no`, or the Score level, compared as written; the ask
 must also have cleared `sure`; the last answer counts when the ask runs more
-than once), `page_contains`, and `max_ask_calls`.
+than once), `page_contains` (matched against each page's text as the
+skill wrote it, without the pager's zero-width spaces, §4.2), and
+`max_ask_calls`. `exit` must be 0 to 255, and `live.runs` 1 to 999999,
+the same cap as `--runs`.
 
 A scenario **fails** when the run differs from `expect.yaml`. It also fails
 when the run breaks with a runtime error, such as a command or question

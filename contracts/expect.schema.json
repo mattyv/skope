@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/mattyv/skope/contracts/expect.schema.json",
   "title": "Expect",
-  "description": "A --test scenario's expect.yaml, after YAML parsing: what the run must do (docs/design/skill-tests.md, SPEC §7.3). Every field is optional, but at least one of outcome, exit, path or path_prefix must be set, and path and path_prefix don't combine.",
+  "description": "A --test scenario's expect.yaml, after YAML parsing: what the run must do (docs/design/skill-tests.md, SPEC \u00a77.3). Every field is optional, but at least one of outcome, exit, path or path_prefix must be set, and path and path_prefix don't combine.",
   "type": "object",
   "additionalProperties": false,
   "properties": {
@@ -12,7 +12,9 @@
     },
     "exit": {
       "description": "The run's exit code.",
-      "type": "integer"
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 255
     },
     "path": {
       "description": "Every section entered, in order: the entry section, then the `to` of each transfer. Names match by slug.",
@@ -25,13 +27,18 @@
     "asks": {
       "description": "Keyed by a section with one ask, or Section.var for the ask that binds var. `chosen` is the option's label: a section name, a list item, yes or no, or a Score level. When the ask runs more than once, the last answer counts.",
       "type": "object",
-      "propertyNames": { "type": "string", "minLength": 1 },
+      "propertyNames": {
+        "type": "string",
+        "minLength": 1
+      },
       "additionalProperties": {
         "type": "object",
         "additionalProperties": false,
         "required": ["chosen"],
         "properties": {
-          "chosen": { "type": ["string", "integer"] }
+          "chosen": {
+            "type": ["string", "integer"]
+          }
         }
       }
     },
@@ -48,23 +55,51 @@
       "minimum": 0
     },
     "live": {
-      "description": "Used only with --live (SPEC §7.3): runs per scenario, the share of runs that must be hits (default 1), and the points by which each expected ask's lowest confidence must clear sure (without it, under 5 is a warning).",
+      "description": "Used only with --live (SPEC \u00a77.3): runs per scenario, the share of runs that must be hits (default 1), and the points by which each expected ask's lowest confidence must clear sure (without it, under 5 is a warning).",
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "runs": { "type": "integer", "minimum": 1 },
-        "min_hit_rate": { "type": "number", "minimum": 0, "maximum": 1 },
-        "min_margin": { "type": "number" }
+        "runs": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 999999
+        },
+        "min_hit_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "min_margin": {
+          "type": "number"
+        }
       }
     }
   },
-  "anyOf": [{ "required": ["outcome"] }, { "required": ["exit"] }, { "required": ["path"] }, { "required": ["path_prefix"] }],
-  "not": { "required": ["path", "path_prefix"] },
+  "anyOf": [
+    {
+      "required": ["outcome"]
+    },
+    {
+      "required": ["exit"]
+    },
+    {
+      "required": ["path"]
+    },
+    {
+      "required": ["path_prefix"]
+    }
+  ],
+  "not": {
+    "required": ["path", "path_prefix"]
+  },
   "$defs": {
     "sections": {
       "type": "array",
       "minItems": 1,
-      "items": { "type": "string", "minLength": 1 }
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
     }
   }
 }

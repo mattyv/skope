@@ -105,13 +105,18 @@ function readConfigFile(path: string, missingOk: boolean, warn: (message: string
  * must exist. Without it, the default path is used and may be missing.
  * `warn` gets non-fatal findings, such as a group-writable file.
  */
-export function loadConfig(path?: string, warn: (message: string) => void = () => {}): Config {
-  const cfg: Config = {
+/** The config with nothing read: the spec's defaults (SPEC §9). */
+export function defaultConfig(): Config {
+  return {
     ask: { backend: "jev", timeout_ms: 2000, retries: 1 },
     redact: { defaults: true, patterns: [] },
     on_handoff: "page",
     state_dir: join(xdgBase("XDG_STATE_HOME", ".local/state"), "skope"),
   };
+}
+
+export function loadConfig(path?: string, warn: (message: string) => void = () => {}): Config {
+  const cfg = defaultConfig();
   const file = path ?? defaultConfigPath();
   const text = readConfigFile(file, path === undefined, warn);
   if (text === null) return cfg;

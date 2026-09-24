@@ -19,7 +19,7 @@ import { CODE_MEANINGS } from "../contracts.gen.js";
 import { Interp, unsafeInputs } from "../interp.js";
 import { lint } from "../lint.js";
 import { preprocess } from "../preprocess/index.js";
-import { type Config, loadConfig } from "../runner/config.js";
+import { type Config, defaultConfig, loadConfig } from "../runner/config.js";
 import { type Diagnostic, diagnosticLine, plainText, type Stage } from "../runner/events.js";
 import { commandEnv, execCommand, stopAll } from "../runner/exec.js";
 import { createFakeClock, fakeExec } from "../runner/fakeExec.js";
@@ -50,9 +50,11 @@ export interface RunOptions {
    * Set by `--test` (docs/design/skill-tests.md): the run's output goes to
    * `out` and `err` instead of stdout and stderr, it takes no lock, writes
    * its run directory under `stateDir`, never calls the configured pager,
-   * and holds its fake files to the strict key rules.
+   * and holds its fake files to the strict key rules. With `builtinConfig`
+   * it reads no config file and uses the spec's defaults, so a scripted
+   * scenario doesn't depend on whose machine runs it.
    */
-  test?: { out(line: string): void; err(text: string): void; stateDir: string };
+  test?: { out(line: string): void; err(text: string): void; stateDir: string; builtinConfig?: boolean };
 }
 
 export const EXIT = { stopped: 0, paged: 10, handoff: 20, locked: 30, stale_lock: 31, invalid: 40, error: 50 } as const;
@@ -131,7 +133,9 @@ export async function runSkill(o: RunOptions): Promise<number> {
 
     let config: Config;
     try {
-      config = loadConfig(o.config, (message) => diag("warning", { code: "W-CONFIG-PERMS", stage: "args", message }));
+      config = o.test?.builtinConfig
+        ? defaultConfig()
+        : loadConfig(o.config, (message) => diag("warning", { code: "W-CONFIG-PERMS", stage: "args", message }));
     } catch (err) {
       return fail("E-CONFIG", "args", (err as Error).message);
     }
@@ -452,7 +456,7 @@ interface Backend {
 }
 
 // Printed when a skill asks and the selected backend has no config block (SPEC §9).
-const BLOCK_HINT: Record<string, string> = {
+const BLOCK_HINT: Record<Exclude<Config["ask"]["backend"], "fake">, string> = {
   jev:
     "Add to the config: jev: { model, key_env }. From TypeSafe: model jev-1.13.0, key_env TYPESAFE_API_KEY. " +
     "From OpenRouter: model typesafe/jev-1.13-20260917, key_env OPENROUTER_API_KEY, url https://openrouter.ai/api/v1/systemone.",
