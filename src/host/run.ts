@@ -9,7 +9,7 @@ import { hostname } from "node:os";
 import { join } from "node:path";
 import { load as loadYaml } from "js-yaml";
 import { askFake } from "../ask/fake.js";
-import { askJev } from "../ask/jev.js";
+import { askJev, isModelAlias } from "../ask/jev.js";
 import { JEV_LIMITS, OPENROUTER_LIMITS } from "../ask/limits.js";
 import { askOpenRouter, checkModel } from "../ask/openrouter.js";
 import { type AskOutput, checkAskLimits, isFailure } from "../ask/types.js";
@@ -420,6 +420,14 @@ interface Backend {
   ask(request: AskRequest): Promise<AskOutput>;
 }
 
+// Printed when a skill asks and the selected backend has no config block (SPEC §9).
+const BLOCK_HINT: Record<string, string> = {
+  jev:
+    "Add to the config: jev: { model, key_env }. From TypeSafe: model jev-1.13.0, key_env TYPESAFE_API_KEY. " +
+    "From OpenRouter: model typesafe/jev-1.13-20260917, key_env OPENROUTER_API_KEY, url https://openrouter.ai/api/v1/systemone.",
+  openrouter: "Add to the config: openrouter: { model, key_env }, with a model that returns logprobs and can run without reasoning.",
+};
+
 /** Checks the configured backend before the run (SPEC §6.2) and returns how to ask it. */
 async function checkBackend(
   program: CoreProgram,
@@ -438,7 +446,7 @@ async function checkBackend(
     return none;
   }
   const block = name === "jev" ? config.jev : config.openrouter;
-  if (!block) return fail("E-CONFIG", "args", `ask.backend is ${name}, but the config has no ${name} block`);
+  if (!block) return fail("E-CONFIG", "args", `ask.backend is ${name}, but the config has no ${name} block. ${BLOCK_HINT[name]}`);
   const apiKey = process.env[block.key_env];
   if (!apiKey) return fail("E-CONFIG", "args", `${name}: no API key in $${block.key_env}`);
   const limits = name === "jev" ? JEV_LIMITS : OPENROUTER_LIMITS;
@@ -449,11 +457,11 @@ async function checkBackend(
     if (!m.ok) fail("E-BACKEND-MODEL", "args", m.error ?? `openrouter model ${block.model} can't be used`);
     contextTokens = m.contextTokens ?? null;
     supportsReasoning = m.supportsReasoning;
-  } else if (!/^jev-\d+\.\d+\.\d+$/.test(block.model)) {
+  } else if (isModelAlias(block.model)) {
     diag("warning", {
       code: "W-MODEL-ALIAS",
       stage: "args",
-      message: `jev.model ${block.model} is an alias; pin a version like jev-1.13.0`,
+      message: `jev.model ${block.model} is an alias; pin a version like jev-1.13.0 (or typesafe/jev-1.13-20260917 on OpenRouter)`,
     });
   }
   for (const a of asks) {
@@ -471,7 +479,7 @@ async function checkBackend(
   const call = (request: AskRequest): Promise<AskOutput> => {
     const retry = { timeoutMs: request.timeout_ms, retries: config.ask.retries };
     return name === "jev"
-      ? askJev(request, { model, apiKey }, retry, { fetch })
+      ? askJev(request, { model, apiKey, url: config.jev?.url }, retry, { fetch })
       : askOpenRouter(request, { model, apiKey, minMass: config.openrouter?.min_mass, supportsReasoning }, retry, { fetch });
   };
   return {

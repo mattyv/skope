@@ -20,7 +20,7 @@ export type Backend = "jev" | "openrouter" | "fake";
 
 export interface Config {
   ask: { backend: Backend; timeout_ms: number; retries: number };
-  jev?: { model: string; key_env: string };
+  jev?: { model: string; key_env: string; url?: string };
   openrouter?: { model: string; key_env: string; min_mass: number };
   pager?: { command: string; timeout_ms: number };
   redact: { defaults: boolean; patterns: string[] };
@@ -136,8 +136,13 @@ export function loadConfig(path?: string, warn: (message: string) => void = () =
   }
 
   if (doc.jev !== undefined) {
-    const j = mapping(doc.jev, "jev", ["model", "key_env"]);
+    const j = mapping(doc.jev, "jev", ["model", "key_env", "url"]);
     cfg.jev = { model: str(j.model, "jev.model"), key_env: str(j.key_env, "jev.key_env") };
+    if (j.url !== undefined) {
+      const u = str(j.url, "jev.url");
+      if (!u.startsWith("https://")) fail(`jev.url must start with https://, got ${u}`);
+      cfg.jev.url = u;
+    }
   }
 
   if (doc.openrouter !== undefined) {
