@@ -1379,9 +1379,11 @@ string is `E-CONFIG`.
 **Config errors.** A missing config file at the default path means
 defaults. Anything else is `E-CONFIG`: a file that can't be read, a
 `--config` path that doesn't exist, invalid YAML, an unknown key at any
-level, a wrong type or out-of-range value, or `ask.backend` naming a
-backend with no config block. `state_dir` expands a leading
-`$XDG_STATE_HOME` or `~`, and must then be absolute.
+level, or a wrong type or out-of-range value. A run whose skill asks
+needs a block for the selected backend, whether or not the file exists,
+and without one it's `E-CONFIG` before the run starts; `--lint`,
+`--explain`, `--verify` and runs that never ask don't. `state_dir`
+expands a leading `$XDG_STATE_HOME` or `~`, and must then be absolute.
 
 ---
 

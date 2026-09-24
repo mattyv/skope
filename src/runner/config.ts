@@ -1,8 +1,10 @@
 // Config loading (SPEC §9): `$XDG_CONFIG_HOME/skop/config.yaml`. A missing
 // file at the default path means all defaults. Anything else wrong is
 // E-CONFIG, never a silent default: an unreadable file, a --config path
-// that doesn't exist, invalid YAML, an unknown key at any level, a wrong
-// type or out-of-range value, or the selected backend with no config block.
+// that doesn't exist, invalid YAML, an unknown key at any level, or a wrong
+// type or out-of-range value. The selected backend's block isn't required
+// here: only a run that asks needs it, with or without a file, so the run
+// checks it (src/host/run.ts checkBackend).
 
 import { closeSync, fstatSync, openSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
@@ -143,10 +145,6 @@ export function loadConfig(path?: string, warn: (message: string) => void = () =
     const m = o.min_mass ?? 0.5;
     if (typeof m !== "number" || !(m > 0 && m <= 1)) fail("openrouter.min_mass must be a number greater than 0 and at most 1");
     cfg.openrouter = { model: str(o.model, "openrouter.model"), key_env: str(o.key_env, "openrouter.key_env"), min_mass: m };
-  }
-
-  if (cfg.ask.backend !== "fake" && cfg[cfg.ask.backend] === undefined) {
-    fail(`ask.backend is ${cfg.ask.backend}, but the config has no ${cfg.ask.backend} block`);
   }
 
   if (doc.pager !== undefined) {

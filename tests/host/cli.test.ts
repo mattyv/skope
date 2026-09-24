@@ -139,6 +139,36 @@ describe("run flow", () => {
     expect(r.stderr).not.toMatch(CONTROLS);
   });
 
+  describe("S6: a config file without the selected backend's block is treated like no config file", () => {
+    const asks = () =>
+      skill(
+        "- **run** `df` as used\n- **ask** Given {used}, go on? · sure 80%\n  - [Other]\n  - [Third]\n\n## Other\nElse.\n\n- **stop**\n\n## Third\nOr this.\n\n- **stop**",
+      );
+    const pagerOnly = () => file("config.yaml", "pager:\n  command: 'cat > /dev/null'\n");
+    const noConfig = () => ({ env: { XDG_CONFIG_HOME: mkdtempSync(join(tmpdir(), "skop-noconfig-")) } });
+
+    test("--lint, --explain and --verify don't need a backend block", async () => {
+      for (const mode of ["--lint", "--explain", "--verify"]) {
+        const r = await runSkop([asks(), mode, "--config", pagerOnly()]);
+        expect(r.code, mode).toBe(0);
+        expect(find(r.events, "error"), mode).toBeUndefined();
+      }
+    });
+
+    test("a run that doesn't ask needs none either", async () => {
+      expect((await runSkop([skill("- **stop**"), "--dry-run", "--config", pagerOnly()])).code).toBe(0);
+      expect((await runSkop([skill("- **stop**"), "--dry-run"], noConfig())).code).toBe(0);
+    });
+
+    test("a run that asks is E-CONFIG before it starts, whether the file exists or not", async () => {
+      for (const r of [await runSkop([asks(), "--dry-run", "--config", pagerOnly()]), await runSkop([asks(), "--dry-run"], noConfig())]) {
+        expect(r.code).toBe(40);
+        expect(find(r.events, "error", "E-CONFIG")?.message).toMatch(/no jev block/);
+        expect(find(r.events, "run_start")).toBeUndefined();
+      }
+    });
+  });
+
   test("a skill with no asks needs no backend key", async () => {
     const config = file("config.yaml", "jev:\n  model: jev-1.13.0\n  key_env: NO_SUCH_KEY_VAR\n");
     const r = await runSkop([skill("- **stop**"), "--apply", "--config", config]);

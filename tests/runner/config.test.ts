@@ -131,8 +131,10 @@ describe("loadConfig (SPEC §9)", () => {
     ["jev (named)", "ask:\n  backend: jev\n"],
     ["jev (the default)", "on_handoff: page\n"],
     ["openrouter", "ask:\n  backend: openrouter\n"],
-  ])("the selected backend without its config block is E-CONFIG: %s", (_what, yaml) => {
-    configError(write(yaml));
+  ])("S6: the selected backend without its config block still loads; a run that asks checks it: %s", (_what, yaml) => {
+    const c = loadConfig(write(yaml));
+    expect(c.jev).toBeUndefined();
+    expect(c.openrouter).toBeUndefined();
   });
 
   test("the fake backend needs no block", () => {
