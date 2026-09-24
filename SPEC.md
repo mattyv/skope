@@ -925,7 +925,11 @@ fail again (§6.3).
   format, auth, and model names; do not guess.** Checked against the docs
   for `jev-1.13` in September 2026.
   - **Request.** `POST https://api.typesafe.ai/v1/systemone` with a bearer
-    key. The body has three top-level fields: `state` = the context object
+    key. `jev.url` overrides the endpoint for another host serving the same
+    System One API, such as OpenRouter
+    (`https://openrouter.ai/api/v1/systemone`, model `typesafe/jev-1.13`,
+    key `OPENROUTER_API_KEY`). It must be `https://` so the key never
+    travels in the clear. The body has three top-level fields: `state` = the context object
     (§6.3), `model` = `jev.model`, and `questions`, a map holding one
     question under the id `q`. The id isn't shown to the model. The
     question object has `type`, `instructions` and `criteria`:
@@ -1342,6 +1346,7 @@ ask:
 jev:
   model: jev-1.13.0       # a versioned id, not an alias (§6.2)
   key_env: TYPESAFE_API_KEY
+  url: https://api.typesafe.ai/v1/systemone   # optional; must be https (§6.2)
 openrouter:
   model: <model id>       # must support logprobs (§6.2)
   key_env: OPENROUTER_API_KEY

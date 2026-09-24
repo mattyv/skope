@@ -194,6 +194,16 @@ pager:
   command: /usr/local/bin/page-oncall   # reads the message on stdin
 ```
 
+Jev is also served by OpenRouter, billed to your OpenRouter account.
+Point the `jev` backend at it:
+
+```yaml
+jev:
+  model: typesafe/jev-1.13
+  key_env: OPENROUTER_API_KEY
+  url: https://openrouter.ai/api/v1/systemone
+```
+
 **OpenRouter is the alternative.** Any model on
 [OpenRouter](https://openrouter.ai) that exposes token probabilities can
 answer instead. skope reads the model's probability for each option's

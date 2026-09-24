@@ -471,7 +471,7 @@ async function checkBackend(
   const call = (request: AskRequest): Promise<AskOutput> => {
     const retry = { timeoutMs: request.timeout_ms, retries: config.ask.retries };
     return name === "jev"
-      ? askJev(request, { model, apiKey }, retry, { fetch })
+      ? askJev(request, { model, apiKey, url: config.jev?.url }, retry, { fetch })
       : askOpenRouter(request, { model, apiKey, minMass: config.openrouter?.min_mass, supportsReasoning }, retry, { fetch });
   };
   return {

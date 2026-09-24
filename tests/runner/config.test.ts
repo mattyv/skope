@@ -116,10 +116,19 @@ describe("loadConfig (SPEC §9)", () => {
     configError(write("- a\n- b\n"));
   });
 
+  test("jev.url points the jev backend at another System One endpoint, such as OpenRouter", () => {
+    const p = write(`${FAKE}jev:\n  model: typesafe/jev-1.13\n  key_env: K\n  url: https://openrouter.ai/api/v1/systemone\n`);
+    expect(loadConfig(p).jev).toEqual({ model: "typesafe/jev-1.13", key_env: "K", url: "https://openrouter.ai/api/v1/systemone" });
+  });
+
+  test("a jev.url that isn't https is E-CONFIG: it would send the API key in the clear", () => {
+    expect(configError(write(`${FAKE}jev:\n  model: m\n  key_env: K\n  url: http://x\n`)).message).toMatch(/jev\.url/);
+  });
+
   test.each([
     ["top level", `${FAKE}colour: blue\n`],
     ["ask", "ask:\n  backend: fake\n  timeout: 5\n"],
-    ["jev", `${FAKE}jev:\n  model: m\n  key_env: K\n  url: http://x\n`],
+    ["jev", `${FAKE}jev:\n  model: m\n  key_env: K\n  endpoint: https://x\n`],
     ["openrouter", `${FAKE}openrouter:\n  model: m\n  key_env: K\n  minmass: 0.5\n`],
     ["pager", `${FAKE}pager:\n  command: cat\n  timeout: 5\n`],
     ["redact", `${FAKE}redact:\n  default: false\n`],
