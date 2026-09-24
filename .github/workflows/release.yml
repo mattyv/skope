@@ -132,13 +132,18 @@ jobs:
             scenarios=("$dir"/fakes/*/)
             if [ ${#scenarios[@]} -eq 0 ]; then echo "$(basename "$dir") has no fake scenarios"; status=1; fi
             for scenario in "${scenarios[@]}"; do
-              want=$(cat "$scenario/expected-exit")
-              set +e
-              npx skope "$skill" --dry-run --fake "$scenario/answers.yaml" --fake-exec "$scenario/commands.yaml" > /dev/null
-              got=$?
-              set -e
-              if [ "$got" != "$want" ]; then
-                echo "$(basename "$dir")/$(basename "$scenario"): exit $got, expected $want"; status=1
+              name="$(basename "$dir")/$(basename "$scenario")"
+              # As in tests/acceptance/m3/exec.test.ts: only the dry-run scenario is a dry run. The rest
+              # need their do steps to run (through the fakes), which --test does with no config.
+              if [ "$(basename "$scenario")" = dry-run ]; then
+                want=$(cat "$scenario/expected-exit")
+                set +e
+                npx skope "$skill" --dry-run --fake "$scenario/answers.yaml" --fake-exec "$scenario/commands.yaml" > /dev/null
+                got=$?
+                set -e
+                [ "$got" = "$want" ] || { echo "$name: exit $got, expected $want"; status=1; }
+              else
+                npx skope "$skill" --test --scenario "$scenario" > /dev/null || { echo "$name: --test failed"; status=1; }
               fi
             done
           done
@@ -285,13 +290,18 @@ jobs:
             skope "$skill" --lint || { echo "lint failed: $skill"; status=1; }
             scenarios=("$dir"/fakes/*/)
             for scenario in "${scenarios[@]}"; do
-              want=$(cat "$scenario/expected-exit")
-              set +e
-              skope "$skill" --dry-run --fake "$scenario/answers.yaml" --fake-exec "$scenario/commands.yaml" > /dev/null
-              got=$?
-              set -e
-              if [ "$got" != "$want" ]; then
-                echo "$(basename "$dir")/$(basename "$scenario"): exit $got, expected $want"; status=1
+              name="$(basename "$dir")/$(basename "$scenario")"
+              # As in tests/acceptance/m3/exec.test.ts: only the dry-run scenario is a dry run. The rest
+              # need their do steps to run (through the fakes), which --test does with no config.
+              if [ "$(basename "$scenario")" = dry-run ]; then
+                want=$(cat "$scenario/expected-exit")
+                set +e
+                skope "$skill" --dry-run --fake "$scenario/answers.yaml" --fake-exec "$scenario/commands.yaml" > /dev/null
+                got=$?
+                set -e
+                [ "$got" = "$want" ] || { echo "$name: exit $got, expected $want"; status=1; }
+              else
+                skope "$skill" --test --scenario "$scenario" > /dev/null || { echo "$name: --test failed"; status=1; }
               fi
             done
           done
