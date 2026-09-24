@@ -9,10 +9,10 @@ import { hostname } from "node:os";
 import { join } from "node:path";
 import Ajv2020Module from "ajv/dist/2020.js";
 import { load as loadYaml } from "js-yaml";
-import { runAsk } from "../ask/cli.js";
 import { askFake } from "../ask/fake.js";
+import { askJev } from "../ask/jev.js";
 import { JEV_LIMITS, OPENROUTER_LIMITS } from "../ask/limits.js";
-import { checkModel } from "../ask/openrouter.js";
+import { askOpenRouter, checkModel } from "../ask/openrouter.js";
 import { type AskOutput, checkAskLimits, isFailure } from "../ask/types.js";
 import IDENTITY from "../build-identity.js";
 import type { CoreProgram, FakesAnswers, FakesCommands, Section } from "../contracts.gen.js";
@@ -284,10 +284,10 @@ export async function runSkill(o: RunOptions): Promise<number> {
           fail("E-IO", "runtime", `can't write ${path}: ${(err as Error).message}`);
         }
         const t = Date.now();
-        const out: AskOutput = answers ? askFake(answers, req, src) : await askBackend(body, backend);
+        const out: AskOutput = answers ? askFake(answers, req, src) : await backend.ask(req);
         askFailed = isFailure(out);
         if (isFailure(out)) say(`skop: the backend was unavailable: ${out.detail}\n`);
-        if (!answers && !isFailure(out) && config.jev && backend.SKOP_ASK_BACKEND === "jev" && out.model !== config.jev.model)
+        if (!answers && !isFailure(out) && config.jev && backend.name === "jev" && out.model !== config.jev.model)
           diag("warning", {
             code: "W-MODEL-ALIAS",
             stage: "runtime",
@@ -388,32 +388,42 @@ function params(program: CoreProgram, overrides: string[], fail: Fail): Record<s
   return out;
 }
 
-type BackendEnv = Record<string, string | undefined> & { model: string };
+/** The backend a run asks: its name and model for events, and the call itself. */
+interface Backend {
+  name: string;
+  model: string;
+  ask(request: AskRequest): Promise<AskOutput>;
+}
 
-/** Checks the configured backend before the run (SPEC §6.2) and returns skop-ask's environment (contracts/README.md). */
+/** Checks the configured backend before the run (SPEC §6.2) and returns how to ask it. */
 async function checkBackend(
   program: CoreProgram,
   config: Config,
   o: RunOptions,
   fail: Fail,
   diag: (kind: "warning", d: Diagnostic) => void,
-): Promise<BackendEnv> {
+): Promise<Backend> {
   const asks = Object.values(program.sections).flatMap((s) => ("body" in s ? allAsks(s.body) : []));
   const name = o.fake ? "fake" : config.ask.backend;
-  if (asks.length === 0) return { model: name };
+  // Never called: the skill doesn't ask, or --fake answers every ask.
+  const none: Backend = { name, model: name, ask: async () => ({ error: "unavailable", detail: "no backend", backend: name }) };
+  if (asks.length === 0) return none;
   if (name === "fake") {
     if (!o.fake) fail("E-CONFIG", "args", "ask.backend is fake, which needs --fake answers.yaml");
-    return { model: "fake" };
+    return none;
   }
   const block = name === "jev" ? config.jev : config.openrouter;
   if (!block) return fail("E-CONFIG", "args", `ask.backend is ${name}, but the config has no ${name} block`);
-  if (!process.env[block.key_env]) fail("E-CONFIG", "args", `${name}: no API key in $${block.key_env}`);
+  const apiKey = process.env[block.key_env];
+  if (!apiKey) return fail("E-CONFIG", "args", `${name}: no API key in $${block.key_env}`);
   const limits = name === "jev" ? JEV_LIMITS : OPENROUTER_LIMITS;
   let contextTokens = limits.contextTokens;
+  let supportsReasoning: boolean | undefined;
   if (name === "openrouter") {
     const m = await checkModel(block.model, { fetch });
     if (!m.ok) fail("E-BACKEND-MODEL", "args", m.error ?? `openrouter model ${block.model} can't be used`);
     contextTokens = m.contextTokens ?? null;
+    supportsReasoning = m.supportsReasoning;
   } else if (!/^jev-\d+\.\d+\.\d+$/.test(block.model)) {
     diag("warning", {
       code: "W-MODEL-ALIAS",
@@ -432,22 +442,20 @@ async function checkBackend(
     );
     if (!c.ok) fail("E-BACKEND-LIMIT", "args", `${name}: ${c.detail}`, a.src);
   }
-  return name === "jev"
-    ? {
-        SKOP_ASK_BACKEND: "jev",
-        SKOP_ASK_RETRIES: String(config.ask.retries),
-        JEV_KEY_ENV: block.key_env,
-        JEV_MODEL: block.model,
-        model: block.model,
-      }
-    : {
-        SKOP_ASK_BACKEND: "openrouter",
-        SKOP_ASK_RETRIES: String(config.ask.retries),
-        OPENROUTER_KEY_ENV: block.key_env,
-        OPENROUTER_MODEL: block.model,
-        OPENROUTER_MIN_MASS: String(config.openrouter?.min_mass ?? 0.5),
-        model: block.model,
-      };
+  const model = block.model;
+  const call = (request: AskRequest): Promise<AskOutput> => {
+    const retry = { timeoutMs: request.timeout_ms, retries: config.ask.retries };
+    return name === "jev"
+      ? askJev(request, { model, apiKey }, retry, { fetch })
+      : askOpenRouter(request, { model, apiKey, minMass: config.openrouter?.min_mass, supportsReasoning }, retry, { fetch });
+  };
+  return {
+    name,
+    model,
+    // In-process, so the key never reaches a child's environment. Any failure is the backend being unavailable (SPEC §4.2).
+    ask: (request) =>
+      call(request).catch((err: unknown) => ({ error: "unavailable" as const, detail: (err as Error).message, backend: name, model })),
+  };
 }
 
 type AskStmt = { src: number; ask: NonNullable<Extract<Section["body"][number], { ask: unknown }>["ask"]> };
@@ -459,23 +467,6 @@ function allAsks(body: Section["body"]): AskStmt[] {
 function listSize(program: CoreProgram, id: string | undefined): number {
   const s = id ? program.sections[id] : undefined;
   return s && "lists" in s ? (s.lists[0]?.items.length ?? 0) : 0;
-}
-
-/**
- * The backend, called in-process through skop-ask's own entry point with
- * the environment contracts/README.md documents, rather than as a child
- * process: same code and validation, no process to kill on interrupt, and
- * the key never reaches any child's environment. Any failure is the
- * backend being unavailable (SPEC §4.2).
- */
-async function askBackend(body: string, backend: BackendEnv): Promise<AskOutput> {
-  const { model, ...vars } = backend;
-  const key = vars.JEV_KEY_ENV ?? vars.OPENROUTER_KEY_ENV ?? "";
-  try {
-    return await runAsk(body, { ...vars, [key]: process.env[key] });
-  } catch (err) {
-    return { error: "unavailable", detail: (err as Error).message, backend: vars.SKOP_ASK_BACKEND ?? "unknown", model };
-  }
 }
 
 /**

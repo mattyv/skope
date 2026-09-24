@@ -169,6 +169,19 @@ describe("run flow", () => {
     });
   });
 
+  test("the configured backend is called in-process with the config's model; a failed call is unavailable", async () => {
+    const path = skill(
+      "- **run** `df` as used\n- **ask** Given {used}, go on? · sure 80%\n  - [Other]\n  - [Third]\n\n## Other\nElse.\n\n- **stop**\n\n## Third\nOr this.\n\n- **stop**",
+    );
+    // A 1 ms timeout and no retries: the call is abandoned before any answer can come back.
+    const config = file("config.yaml", "ask:\n  timeout_ms: 1\n  retries: 0\njev:\n  model: jev-1.13.0\n  key_env: SKOP_TEST_KEY\n");
+    const r = await runSkop([path, "--dry-run", "--config", config], { env: { SKOP_TEST_KEY: "k" } });
+    expect(r.code).toBe(20);
+    expect(find(r.events, "ask")).toMatchObject({ backend: "jev", model: "jev-1.13.0", detail: "unavailable", probs: null });
+    expect(find(r.events, "handoff_record")?.record).toMatchObject({ reason: "ask_unavailable" });
+    expect(r.stderr).toContain("skop: the backend was unavailable");
+  });
+
   test("a skill with no asks needs no backend key", async () => {
     const config = file("config.yaml", "jev:\n  model: jev-1.13.0\n  key_env: NO_SUCH_KEY_VAR\n");
     const r = await runSkop([skill("- **stop**"), "--apply", "--config", config]);

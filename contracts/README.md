@@ -20,10 +20,11 @@ test fails if it's stale.
 | `event.schema.json` | One line of skop's JSON Lines output (SPEC §10): one shape per event | everyone who emits events |
 | `examples/events.jsonl` | One example of every event kind; a test checks they cover the schema | G, F |
 
-**Host ↔ `skop-ask` environment variables.** The host launches `skop-ask`
-per run with these instead of re-reading `config.yaml` (PLAN.md §4 E owns
-parsing that file); `skop-ask` validates the numeric ones itself and fails
-fast as `E-CONFIG` before calling out to a backend:
+**`skop-ask` environment variables.** Run by hand, `skop-ask` takes its
+backend settings from these instead of reading `config.yaml`, and
+validates the numeric ones itself, failing fast as `E-CONFIG` before
+calling out to a backend. skop doesn't use them: it calls the backends'
+code in-process with the config it has already checked (SPEC §6.1):
 
 | Variable | Meaning | Validation |
 |---|---|---|
