@@ -23,7 +23,9 @@ export interface FakeKeyIssue {
   message: string;
 }
 
-const STABLE = /^(.+)\.([a-z_][a-z0-9_]*)$/;
+// The section part reads like a heading: it starts with a letter or digit and has no `/`, so a
+// script path such as `./fix.sh` or `bin/fix.sh` is never a stable key.
+const STABLE = /^([\p{L}\p{N}][^/]*)\.([a-z_][a-z0-9_]*)$/u;
 
 /** A statement the fake file can answer: its line and what a stable key can call it. */
 interface Target {
@@ -53,8 +55,11 @@ function targets(body: Stmt[], kind: FakeKind): Target[] {
  * The fake file with every stable key rewritten to `line:N`, and what's
  * wrong with its keys. A stable key replaces a `line:N` key for the same
  * statement. A key whose section part names no section isn't a stable key:
- * it stays an exact-text key, since a command like `./fix.sh` has the same
- * shape.
+ * it stays an exact-text key. One that names a section but nothing in it
+ * stays an exact-text key too, with a warning: a command like `fix.sh` in a
+ * skill with a `## Fix` section has the same shape. `.ask` means the
+ * section's ask only in answer files; in command files it's a variable
+ * named `ask`.
  */
 export function resolveFakeKeys<T extends Record<string, unknown>>(
   program: CoreProgram,
@@ -83,10 +88,17 @@ export function resolveFakeKeys<T extends Record<string, unknown>>(
       continue;
     }
     const name = m[2] as string;
-    const hits = found.filter((t) => (name === "ask" ? t.ask : t.binds === name));
-    const what = name === "ask" ? "asks" : `statements that bind ${name}`;
-    if (hits.length === 0) issues.push({ code: "W-FAKE-UNUSED", key, message: `${kind} key ${key}: section ${m[1]} has no ${what}` });
-    else if (hits.length > 1)
+    const asks = name === "ask" && kind === "answers";
+    const hits = found.filter((t) => (asks ? t.ask : t.binds === name));
+    const what = asks ? "asks" : `statements that bind ${name}`;
+    if (hits.length === 0) {
+      issues.push({
+        code: "W-FAKE-UNUSED",
+        key,
+        message: `${kind} key ${key}: section ${m[1]} has no ${what}; it's still matched as exact text`,
+      });
+      out[key] = value;
+    } else if (hits.length > 1)
       issues.push({
         code: "E-FAKE-AMBIGUOUS",
         key,

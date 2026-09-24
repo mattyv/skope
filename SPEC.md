@@ -762,12 +762,15 @@ Shipped Dafny code MUST NOT contain `assume`, `{:axiom}` or
 - **Fake keys.** Both fake files also take two keys that survive edits:
   `Section.var` names the statement in that section that binds `var` (a
   `run … as var` in `--fake-exec`, an ask that binds it in `--fake`), and
-  `Section.ask` names the section's only ask. The section part resolves by
-  slug (§3.4); a key whose section part names no section is an exact-text
-  key. When several keys match one statement, a stable key wins, then
-  `line:N`, then the text. A stable key that names more than one statement
-  is `E-FAKE-AMBIGUOUS`; a stable or `line:N` key that names none is
-  `W-FAKE-UNUSED`. Statements inside a `for each` are matched once per item.
+  `Section.ask` names the section's only ask (in `--fake` only; in
+  `--fake-exec` it's a variable named `ask`). The section part resolves by
+  slug (§3.4), and must start with a letter or digit and contain no `/`, so
+  a script path like `./fix.sh` stays exact text. A key whose section part
+  names no section is an exact-text key. When several keys match one
+  statement, a stable key wins, then `line:N`, then the text. A stable key
+  that names more than one statement is `E-FAKE-AMBIGUOUS`. A `line:N` key
+  that names no statement is `W-FAKE-UNUSED`, and so is a stable key that
+  names a section but nothing in it, which is still matched as exact text. Statements inside a `for each` are matched once per item.
 - **explore**: used by `--verify` and `--explain`. It must reach every path
   a real run could take.
   - Values from `run` are unknown. A comparison on an unknown value has three
