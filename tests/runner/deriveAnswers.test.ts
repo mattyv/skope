@@ -27,12 +27,9 @@ describe("deriveAnswers", () => {
     const out = deriveAnswers(diskFull, { Triage: { chosen: "Restart" } }, {});
     const probs = out["line:27"] as Record<string, number>;
     expect(probs).toBeDefined();
-    expect(probs["s:restart"]).toBeGreaterThan(0.99); // clears any sure up to 99%
-    expect(sum(probs)).toBeCloseTo(1, 6);
-    // The rest is spread evenly, so there's no tie with the chosen option, and no favourite among them.
-    expect(probs["s:clean_up"]).toBe(probs["s:page"]);
-    expect(probs["s:clean_up"]).toBe(probs["s:investigate"]);
-    expect(probs["s:clean_up"]).toBeGreaterThan(0);
+    // Certain, so it clears any sure, 100% included; every other option is named, at 0.
+    expect(probs).toEqual({ "s:clean_up": 0, "s:restart": 1, "s:page": 0, "s:investigate": 0 });
+    expect(sum(probs)).toBe(1);
   });
 
   test("a one-of ask's derived answer is keyed by the item's value", () => {

@@ -51,7 +51,8 @@ export const DEFAULT_RUNS = 10;
 export const WARN_MARGIN = 5;
 
 type Event = { event: string } & Record<string, unknown>;
-type Scenario = { name: string; expect: Expect; commands: unknown; answers?: unknown };
+/** `source` names its fakes in messages: the folder, or its entry in tests.yaml. */
+type Scenario = { name: string; expect: Expect; commands: unknown; answers?: unknown; source: string };
 type ScenarioRow = Scenario | { name: string; invalid: string };
 type Result = { pass: true } | { pass: false; mismatch: string } | { invalid: string };
 type Run = { code: number; events: Event[] } | { invalid: string };
@@ -65,7 +66,8 @@ export async function runTests(o: TestOptions): Promise<number> {
   const folderNames = new Set(folderDirs.map((d) => basename(d)));
   const yamlPath = join(dirname(resolve(o.file)), "tests.yaml");
   const live = o.live === true;
-  const yamlRows = readTestsYamlFile(yamlPath, folderNames, live);
+  const program = parse(o.file);
+  const yamlRows = readTestsYamlFile(yamlPath, folderNames, program, live);
 
   let scenarios: ScenarioRow[] = [...folderDirs.map((d) => readFolderScenario(d, live)), ...yamlRows].sort((a, b) =>
     a.name.localeCompare(b.name),
@@ -85,7 +87,6 @@ export async function runTests(o: TestOptions): Promise<number> {
     say(`skope: no scenarios: ${testsDir} has no scenario directories, and ${yamlPath} doesn't define any`);
     tally.invalid++;
   }
-  const program = parse(o.file);
   const summary: Record<string, unknown> = {};
 
   if (o.live) {
@@ -145,7 +146,7 @@ function scenarioDirs(root: string): string[] {
 
 /** tests.yaml's scenarios, or why each one (or, if it can't be read at all, a single entry named
  * tests.yaml) can't be used. No file at all contributes nothing. */
-function readTestsYamlFile(path: string, folderNames: ReadonlySet<string>, live: boolean): ScenarioRow[] {
+function readTestsYamlFile(path: string, folderNames: ReadonlySet<string>, program: CoreProgram | null, live: boolean): ScenarioRow[] {
   if (!existsSync(path)) return [];
   let doc: unknown;
   try {
@@ -153,7 +154,7 @@ function readTestsYamlFile(path: string, folderNames: ReadonlySet<string>, live:
   } catch (err) {
     return [{ name: "tests.yaml", invalid: `can't read tests.yaml: ${(err as Error).message}` }];
   }
-  return readTestsYaml(doc, folderNames, { ignoreAnswers: live }).map((r) => ("scenario" in r ? r.scenario : r));
+  return readTestsYaml(doc, folderNames, program, { ignoreAnswers: live }).map((r) => ("scenario" in r ? r.scenario : r));
 }
 
 function parse(file: string): CoreProgram | null {
@@ -188,7 +189,7 @@ function readFolderScenario(dir: string, live: boolean): ScenarioRow {
   } catch (err) {
     return bad(`can't read the fakes: ${(err as Error).message}`);
   }
-  const base = { name, commands, answers };
+  const base = { name, commands, answers, source: dir };
   const expectFile = join(dir, "expect.yaml");
   const exitFile = join(dir, "expected-exit");
   try {
@@ -261,15 +262,20 @@ async function runOnce(o: TestOptions, program: CoreProgram, s: Scenario, stateD
     .split("\n")
     .filter(Boolean)
     .map((l) => JSON.parse(l) as Event);
+  // The run read merged copies of the fakes; a message names what the user wrote instead.
+  const named = (e: Event) => {
+    const msg = `${e.code}: ${e.message}`.replaceAll(commandsPath, s.source);
+    return answersPath ? msg.replaceAll(answersPath, s.source) : msg;
+  };
   // A run that ended invalid never started: the skill, a param, the config or the scenario's own
   // files can't be used. That's the scenario being broken, whatever it expects.
   if (code === EXIT.invalid) {
     const bad = events.find((e) => e.event === "error");
-    return { invalid: bad ? `${bad.code}: ${bad.message}` : "the run ended invalid" };
+    return { invalid: bad ? named(bad) : "the run ended invalid" };
   }
   // Two keys for one statement can only be seen as the run reaches it; it's still the fake file that's broken.
   const ambiguous = events.find((e) => e.event === "error" && e.code === "E-FAKE-AMBIGUOUS");
-  if (ambiguous) return { invalid: `${ambiguous.code}: ${ambiguous.message}` };
+  if (ambiguous) return { invalid: named(ambiguous) };
   return { code, events };
 }
 

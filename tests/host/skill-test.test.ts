@@ -421,3 +421,71 @@ describe("the fixtures' scenarios pass under --test", () => {
     expect(r.code).toBe(0);
   });
 });
+
+describe("tests.yaml: what a user writes first", () => {
+  // Line 11 is the run; Big's ask is on line 18.
+  const probe = (sure: number) =>
+    [
+      "---",
+      "name: probe",
+      "description: a run, a check and one ask",
+      "format: 1",
+      "---",
+      "# Probe",
+      "",
+      "## Start",
+      "Measure.",
+      "",
+      "- **run** `echo n` as n",
+      "- **check** {n} > 5 → [Big]",
+      "- **stop**",
+      "",
+      "## Big",
+      "Big one.",
+      "",
+      `- **ask** Given {n}, page? · sure ${sure}%`,
+      "  - [Page]",
+      "  - [Quiet]",
+      "",
+      "## Page",
+      "Page it.",
+      "",
+      '- **page** "big {n}"',
+      "",
+      "## Quiet",
+      "Nothing.",
+      "",
+      "- **stop**",
+      "",
+    ].join("\n");
+  const big = { outcome: "paged", asks: { Big: { chosen: "Page" } }, page_contains: "big 7" };
+  const run = (sure: number, scenarios: Record<string, unknown>) =>
+    test_(skill({}, probe(sure), { defaults: { commands: { "Start.n": "1" } }, scenarios }));
+
+  test("an unquoted number is a command's output", async () => {
+    const r = await run(80, { t: { commands: { "Start.n": 7 }, ...big } });
+    expect(r.scenarios[0], r.stderr).toMatchObject({ pass: true });
+  });
+
+  test("a scenario overrides a default by any key for the same statement", async () => {
+    const r = await run(80, { byLine: { commands: { "line:11": "7" }, ...big }, byText: { commands: { "echo n": "7" }, ...big } });
+    expect(
+      r.scenarios.map((x: { scenario: string; pass: boolean }) => [x.scenario, x.pass]),
+      r.stderr,
+    ).toEqual([
+      ["byLine", true],
+      ["byText", true],
+    ]);
+  });
+
+  test("an answer filled in from asks clears sure 100%", async () => {
+    const r = await run(100, { t: { commands: { "Start.n": "7" }, ...big } });
+    expect(r.scenarios[0], r.stderr).toMatchObject({ pass: true });
+  });
+
+  test("a bad fake in tests.yaml is reported against tests.yaml, not a generated file", async () => {
+    const r = await run(80, { bad: { commands: { "Start.n": true }, outcome: "stopped" } });
+    expect(r.scenarios[0].invalid).toContain("tests.yaml scenarios.bad");
+    expect(r.scenarios[0].invalid).not.toContain("skope-test-");
+  });
+});

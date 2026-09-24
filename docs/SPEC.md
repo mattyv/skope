@@ -1320,8 +1320,10 @@ scenario holds:
 - `expect.yaml` (`contracts/expect.schema.json`): what must happen. Or, for
   older scenarios, `expected-exit`: the exit code alone.
 
-A command result in `commands.yaml` may be a plain string instead of a
-mapping: shorthand for `{exit: 0, stdout: <the string>}`.
+A command result in `commands.yaml` may be a plain string or number instead
+of a mapping: shorthand for `{exit: 0, stdout: <its text>}`, so `ready: 50000`
+works unquoted. Quote a value whose exact text matters: YAML reads `1.50`
+as 1.5.
 
 **`tests.yaml`**, beside `SKILL.md` (not inside `tests/`), holds scenarios
 that don't need their own directory:
@@ -1332,16 +1334,20 @@ defaults:                 # optional
   answers: {...}          # optional, same shape as answers.yaml
 scenarios:                # required, non-empty
   restart:
-    commands: {...}       # merged over defaults.commands, key by key
-    answers: {...}        # merged over defaults.answers, key by key
+    commands: {...}       # merged over defaults.commands, statement by statement
+    answers: {...}        # merged over defaults.answers, statement by statement
     outcome: paged         # expect.yaml's own fields, at the scenario's top level
     asks:
       Triage: { chosen: Restart }
 ```
 
 A scenario's `commands` and `answers` merge over `defaults.commands` and
-`defaults.answers` key by key, the scenario's own value winning; either may
-use the string shorthand. Every other field is checked exactly as
+`defaults.answers`, the scenario's own value winning. A scenario key replaces
+every default key for the same statement, whatever kind each is, so
+`line:11` overrides a default keyed `Start.n`. A key that names no single
+statement (exact text that could be several) replaces only the same key.
+Either may use the shorthand. Messages about a scenario's fakes name
+`tests.yaml scenarios.<name>`. Every other field is checked exactly as
 `expect.yaml` is (§ below), with no `expect:` wrapper. A scenario name
 follows the same rules as a `tests/` directory name (non-empty, no `/`, not
 starting with `.`); a name that's also a `tests/` folder scenario is
@@ -1353,9 +1359,9 @@ reported invalid, not just the file as a whole.
 **Derived answers.** In scripted mode, for each `asks.<key>.chosen` in a
 scenario's expectations that no answer already covers (by a stable key,
 `line:N`, or the ask's exact text), skope scripts one that confidently
-chooses it: the chosen option's probability clears any `sure` up to 99%,
-and the rest is split evenly over the other options, so the answer is valid
-and never a tie. Option ids are the core's own: a section option is
+chooses it: probability 1 for the chosen option and 0 for every other, so
+the answer is valid, never a tie, and clears any `sure`, `sure 100%`
+included. Option ids are the core's own: a section option is
 `sectionId(label)`, a `one of` item its value, yes/no `"yes"`/`"no"`, and a
 Score level its level id. This means a scenario with `asks` and no
 `answers.yaml` at all can still pass; an ask `asks` doesn't name, with no
