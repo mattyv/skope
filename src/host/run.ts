@@ -7,7 +7,6 @@ import { createHash, randomBytes } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { hostname } from "node:os";
 import { join } from "node:path";
-import Ajv2020Module from "ajv/dist/2020.js";
 import { load as loadYaml } from "js-yaml";
 import { askFake } from "../ask/fake.js";
 import { askJev } from "../ask/jev.js";
@@ -16,7 +15,7 @@ import { askOpenRouter, checkModel } from "../ask/openrouter.js";
 import { type AskOutput, checkAskLimits, isFailure } from "../ask/types.js";
 import IDENTITY from "../build-identity.js";
 import type { CoreProgram, FakesAnswers, FakesCommands, Section } from "../contracts.gen.js";
-import { CODE_MEANINGS, FAKES_SCHEMA } from "../contracts.gen.js";
+import { CODE_MEANINGS } from "../contracts.gen.js";
 import { Interp, unsafeInputs } from "../interp.js";
 import { lint } from "../lint.js";
 import { preprocess } from "../preprocess/index.js";
@@ -24,6 +23,7 @@ import { type Config, loadConfig } from "../runner/config.js";
 import { type Diagnostic, diagnosticLine, plainText, type Stage } from "../runner/events.js";
 import { commandEnv, execCommand, stopAll } from "../runner/exec.js";
 import { createFakeClock, fakeExec } from "../runner/fakeExec.js";
+import { fakesError } from "../runner/fakes.js";
 import { acquireLock, LockError } from "../runner/lock.js";
 import { sendPage } from "../runner/pager.js";
 import { buildRedactor } from "../runner/redact.js";
@@ -486,11 +486,6 @@ export function fitContext(context: Record<string, string>, maxChars: number): R
   return out;
 }
 
-// ajv is the one validator that reads contracts/fakes.schema.json exactly as the contract tests do.
-// ajv is CommonJS with a `default` export; unwrap it the same way under Node and in the bundle.
-const Ajv2020: any = (Ajv2020Module as any).default ?? Ajv2020Module;
-let fakesAjv: { getSchema(ref: string): ((v: unknown) => boolean) & { errors?: unknown } } | undefined;
-
 /** A --fake or --fake-exec file, checked against contracts/fakes.schema.json before the run (SPEC §7.1 E-CONFIG). */
 function readFakes(path: string, def: "answers" | "commands", fail: Fail): unknown {
   let doc: unknown;
@@ -500,9 +495,8 @@ function readFakes(path: string, def: "answers" | "commands", fail: Fail): unkno
   } catch (err) {
     return fail("E-CONFIG", "args", `can't read ${path}: ${(err as Error).message}`);
   }
-  fakesAjv ??= new Ajv2020({ strict: false }).addSchema(FAKES_SCHEMA);
-  const check = fakesAjv?.getSchema(`${FAKES_SCHEMA.$id}#/$defs/${def}`);
-  if (!check?.(doc)) fail("E-CONFIG", "args", `${path} isn't a valid fake ${def} file: ${JSON.stringify(check?.errors ?? null)}`);
+  const why = fakesError(doc, def);
+  if (why !== null) fail("E-CONFIG", "args", `${path} isn't a valid fake ${def} file: ${why}`);
   return doc;
 }
 
