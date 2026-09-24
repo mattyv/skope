@@ -86,10 +86,6 @@ Known caveats still open:
   original note below.
 - **`stdout_hash` values are real** — sha256 of the exact fake `stdout`
   string in the matching `commands.yaml` entry.
-- **`yes`/`no` are assumed as the option ids for a `yesno` ask.** SPEC.md
-  doesn't name these ids explicitly (§4.2 just says "bind NAME to
-  boolean"). If stream C/D picks different ids, the `yesno` events in every
-  scenario need updating.
 - **`transfer`/`handoff_record`/`handoff_page` line numbers on gate
   failure and Score-gate-failure-via-`else`** point at the `ask`
   statement's own `src` line, matching `contracts/examples/events.jsonl`.
@@ -136,17 +132,17 @@ Known caveats still open:
     necessarily exercises the tie mechanism and the below-`sure` gate
     failure together, not the tie in isolation. A skill with `sure` ≤ 50%
     would be needed to isolate it, and neither fixture has one.
-  - `command_failed`'s and `deadline`'s handoff-record `detail` shape
-    isn't pinned by SPEC §8.1 the way `gate_failed`/`ask_unavailable`'s
-    is (there's no worked example). For `command_failed` this pass uses
-    `{cmd, exit, timed_out, stderr_tail}` (matching §4.3's "exit code,
-    stderr tail, timeout flag"); `explicit` and `deadline` get `detail: null`
-    (SPEC §8.1; stream G changed this from omitting it). Confirm this shape
-    against the real core's output once it exists.
-  - The redaction replacement text (`"[REDACTED]"` in
-    `secret-redaction`) isn't specified by SPEC §9 either; that section
-    says only that built-in patterns are redacted, never what they're
-    replaced with.
+Settled since, and matched by the goldens: `yes`/`no` are the yes/no
+option ids (SPEC §6.1), a `command_failed` record's `detail` is `{cmd,
+exit, timed_out, stderr_tail}` or `{expr, left, right}` (SPEC §8.1), and
+redaction replaces each match with `[REDACTED]` (SPEC §9).
+
+## Sign-off
+
+- **Goldens:** all 33 scenarios reviewed before 0.1.0-beta.1. Approved,
+  no release blockers.
+- **Live backends:** Jev passed choice, yes/no and Score. OpenRouter
+  hasn't been run live yet.
 
 ## Scenario index
 
