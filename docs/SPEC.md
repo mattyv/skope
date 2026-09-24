@@ -1376,7 +1376,7 @@ unless it sets `exit: 50`. It's **invalid**
 when the run ends `invalid` (exit 40), whatever the reason: a skill that
 doesn't lint, a param that fails its checks, a bad config or fake file, or a
 strict key error. It's also invalid when its `expect.yaml` is bad or an
-`asks` key names no single ask, and when two fake keys answer one statement
+`asks` key names no single ask, or its `chosen` isn't one of that ask's options, and when two fake keys answer one statement
 (`E-FAKE-AMBIGUOUS`, which can surface mid-run).
 
 **Live** (`--test --live [--runs N]`) asks the configured backend instead

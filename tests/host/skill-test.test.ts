@@ -393,6 +393,15 @@ describe("tests.yaml", () => {
       expect(r.scenarios[0].mismatch).toContain("E-FAKE-UNMATCHED");
     });
 
+    test("an asks chosen that isn't one of the ask's options is invalid, and names the options", async () => {
+      const { answers: _answers, ...noAnswers } = restart({ expect: { outcome: "paged", asks: { Triage: { chosen: "Restrat" } } } });
+      const r = await test_(skill({ restart: noAnswers }));
+      expect(r.code).toBe(40);
+      expect(r.scenarios[0].invalid).toBe(
+        "asks.Triage.chosen: Restrat isn't an option; the options are Clean up, Restart, Page, Investigate",
+      );
+    });
+
     test("derived answers also work in a tests.yaml scenario", async () => {
       const r = await test_(skill({}, undefined, { scenarios: { restart: { commands: RESTART_COMMANDS, ...RESTART_EXPECT } } }));
       expect(r.code, r.stderr).toBe(0);

@@ -6,7 +6,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, test } from "vitest";
 import type { CoreProgram } from "../../src/contracts.gen.js";
 import { preprocess } from "../../src/preprocess/index.js";
-import { askOptionIds, chosenOptionId, findAsk } from "../../src/runner/askOptions.js";
+import { askOptionIds, asksError, chosenOptionId, findAsk } from "../../src/runner/askOptions.js";
 import { askLine } from "../../src/runner/fakeKeys.js";
 import { ROOT } from "../acceptance/lib/scenarios.js";
 
@@ -74,5 +74,18 @@ describe("chosenOptionId", () => {
 
   test("a Score level: as a string", () => {
     expect(chosenOptionId(askOn(errorTriage, "Triage"), 3)).toBe("3");
+  });
+});
+
+describe("asksError", () => {
+  test("names the first asks entry whose chosen isn't an option, with the options", () => {
+    expect(asksError(diskFull, { Triage: { chosen: "Restart" }, "Restart.service": { chosen: "myapp-worker" } })).toBeNull();
+    expect(asksError(diskFull, { "Restart.service": { chosen: "myapp" } })).toBe(
+      "asks.Restart.service.chosen: myapp isn't an option; the options are nginx, rsyslog, myapp-worker, myapp-api",
+    );
+  });
+
+  test("an asks key that names no single ask is reported", () => {
+    expect(asksError(diskFull, { Nowhere: { chosen: "x" } })).toBe("asks.Nowhere doesn't name exactly one ask");
   });
 });

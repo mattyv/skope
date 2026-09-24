@@ -5,6 +5,7 @@
 
 import type { Ask, CoreProgram, Section } from "../contracts.gen.js";
 import { sectionId } from "../preprocess/slug.js";
+import { askLine } from "./fakeKeys.js";
 
 type Stmt = Section["body"][number];
 
@@ -47,4 +48,19 @@ export function askOptionIds(program: CoreProgram, ask: Ask): string[] {
  * for `ask`: a section option compares by section id, everything else by the value as written. */
 export function chosenOptionId(ask: Ask, chosen: string | number): string {
   return ask.sections ? sectionId(String(chosen)) : String(chosen);
+}
+
+/** Why an expect.yaml `asks` can't be checked: a key that names no single ask, or a `chosen` that
+ * isn't one of its ask's options (a typo would otherwise surface as an unrelated mismatch). */
+export function asksError(program: CoreProgram, asks: Record<string, { chosen: string | number }> | undefined): string | null {
+  for (const [key, want] of Object.entries(asks ?? {})) {
+    const line = askLine(program, key);
+    const ask = line === null ? undefined : findAsk(program, line);
+    if (!ask) return `asks.${key} doesn't name exactly one ask`;
+    const ids = askOptionIds(program, ask);
+    if (ids.includes(chosenOptionId(ask, want.chosen))) continue;
+    const labels = ask.sections ? ids.map((id) => program.sections[id]?.name ?? id) : ids;
+    return `asks.${key}.chosen: ${want.chosen} isn't an option; the options are ${labels.join(", ")}`;
+  }
+  return null;
 }

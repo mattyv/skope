@@ -22,7 +22,7 @@ import type { CoreProgram } from "../contracts.gen.js";
 import { Interp } from "../interp.js";
 import { preprocess } from "../preprocess/index.js";
 import { sectionId } from "../preprocess/slug.js";
-import { findAsk } from "../runner/askOptions.js";
+import { asksError, findAsk } from "../runner/askOptions.js";
 import { type Config, loadConfig } from "../runner/config.js";
 import { deriveAnswers } from "../runner/deriveAnswers.js";
 import { plainText } from "../runner/events.js";
@@ -271,6 +271,8 @@ async function runOnce(o: TestOptions, program: CoreProgram, s: Scenario, stateD
 }
 
 async function scripted(o: TestOptions, program: CoreProgram, s: Scenario, stateDir: string): Promise<Result> {
+  const bad = asksError(program, s.expect.asks);
+  if (bad !== null) return { invalid: bad };
   const run = await runOnce(o, program, s, stateDir, false);
   if ("invalid" in run) return run;
   const mismatch = check(s.expect, run.code, run.events, program);
@@ -299,6 +301,8 @@ type LiveResult = (Result & { live: Record<string, unknown>; lines: string[] }) 
  * live.min_margin and the lowest confidence of an expected ask clears sure by less.
  */
 async function liveScenario(o: TestOptions, program: CoreProgram, s: Scenario, stateDir: string): Promise<LiveResult> {
+  const bad = asksError(program, s.expect.asks);
+  if (bad !== null) return { invalid: bad };
   const runs = runsFor(o, s.expect);
   const keys = new Map<number, string>();
   for (const key of Object.keys(s.expect.asks ?? {})) {
