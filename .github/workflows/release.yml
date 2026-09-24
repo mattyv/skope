@@ -114,8 +114,7 @@ jobs:
           out=$(npx skop --version)
           echo "$out"
           case "$out" in "skop $VERSION (build identity "*) ;; *) echo "expected skop $VERSION"; exit 1 ;; esac
-      # Only fixtures in fixtures/ ship with this release. Skills for later
-      # versions wait in fixtures-next/ (PLAN.md §3). Each scenario directory
+      # Every fixture in fixtures/ ships with this release. Each scenario directory
       # holds answers.yaml, commands.yaml and expected-exit, because paged
       # (10) and handoff (20) are correct results, not failures.
       - name: Every released scenario gives its expected exit code

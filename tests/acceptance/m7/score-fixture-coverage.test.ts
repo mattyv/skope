@@ -2,8 +2,7 @@
 // for each level, unsure, and backend unavailable." This file checks the
 // scenario set is complete, and that --verify reports the Score ask's
 // branches (SPEC §12.2). The exec-and-compare-to-golden runs of these
-// scenarios are in tests/acceptance/m3/exec.test.ts, which includes
-// fixtures-next.
+// scenarios are in tests/acceptance/m3/exec.test.ts, with the other fixtures.
 
 import { describe, expect, test } from "vitest";
 import { runSkop } from "../lib/cli.js";
@@ -13,7 +12,7 @@ import { allScenarios, readExpectedExit, readYaml } from "../lib/scenarios.js";
 // tests/acceptance/m1/lint-cli.test.ts: error-triage is the Appendix D fixture, which SPEC
 // §12.3 scopes to M7 ("Score asks (v1.1)"), not the M1 v1 fixture pair (disk-full,
 // cert-expiry).
-const ERROR_TRIAGE = new URL("../../../fixtures-next/error-triage/SKILL.md", import.meta.url).pathname;
+const ERROR_TRIAGE = new URL("../../../fixtures/error-triage/SKILL.md", import.meta.url).pathname;
 
 describe("M1 (v1.1 slice): --lint on error-triage (SPEC §7, §12.3)", () => {
   test("error-triage/SKILL.md lints clean and exits 0", async () => {

@@ -1,6 +1,6 @@
 // M3 (SPEC §12.3): "for each scenario, the event stream matches a golden
 // JSONL. Dry run issues no `do` and no page." Every scenario under
-// fixtures/*/fakes and fixtures-next/*/fakes is run for real, through the
+// fixtures/*/fakes and fixtures/*/fakes is run for real, through the
 // built CLI with --fake and --fake-exec, and its event stream (after the
 // golden helper's normalisation) must equal the hand-written golden in
 // tests/acceptance/m3/golden/.

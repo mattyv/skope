@@ -13,7 +13,7 @@ const cases = [
   { name: "cert-expiry", skill: "../../fixtures/cert-expiry/SKILL.md", golden: "../../contracts/examples/cert-expiry.core.json" },
   {
     name: "error-triage (v1.1 Score)",
-    skill: "../../fixtures-next/error-triage/SKILL.md",
+    skill: "../../fixtures/error-triage/SKILL.md",
     golden: "../../contracts/examples/error-triage.core.json",
   },
 ];

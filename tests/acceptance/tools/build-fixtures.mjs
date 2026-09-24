@@ -3,7 +3,7 @@
 // SPEC §12.1/§12.3) from scenarios encoded below, by hand, from the spec and
 // the core JSON in contracts/examples/. This is a build tool, not a test:
 // run it with `node tests/acceptance/tools/build-fixtures.mjs` to
-// (re)generate fixtures/*/fakes/**, fixtures-next/*/fakes/** and
+// (re)generate fixtures/*/fakes/**, fixtures/*/fakes/** and
 // tests/acceptance/m3/golden/**. Its output is committed; review any diff
 // the way you'd review a hand-edited golden (tests/helpers/golden.ts).
 //
@@ -1839,7 +1839,7 @@ function ceRunStart(dry_run) {
 console.log("wrote cert-expiry fakes and goldens");
 
 // =====================================================================
-// error-triage (fixtures-next/error-triage, M7/v1.1)
+// error-triage (fixtures/error-triage, M7/v1.1)
 // =====================================================================
 
 const ET = "error-triage";
@@ -1877,7 +1877,7 @@ function etAsk({ probs, chosen, confidence, passed }) {
     mk.outcome(ET, { outcome: "stopped", reason: null, ask_calls: 1, effects: 0, dry_run: false }),
   ];
   emit(
-    "fixtures-next/error-triage",
+    "fixtures/error-triage",
     "severity-1-stop",
     events,
     { "line:19": { 1: 0.875, 2: 0.0625, 3: 0.03125, 4: 0.03125 } },
@@ -1917,7 +1917,7 @@ function etAsk({ probs, chosen, confidence, passed }) {
     mk.outcome(ET, { outcome: "handoff", reason: "explicit", ask_calls: 1, effects: 0, dry_run: false }),
   ];
   emit(
-    "fixtures-next/error-triage",
+    "fixtures/error-triage",
     "severity-2-investigate",
     events,
     { "line:19": { 1: 0.03125, 2: 0.875, 3: 0.0625, 4: 0.03125 } },
@@ -1944,7 +1944,7 @@ function etAsk({ probs, chosen, confidence, passed }) {
     mk.outcome(ET, { outcome: "paged", reason: null, ask_calls: 1, effects: 0, dry_run: false }),
   ];
   emit(
-    "fixtures-next/error-triage",
+    "fixtures/error-triage",
     "severity-4-page",
     events,
     { "line:19": { 1: 0.03125, 2: 0.03125, 3: 0.0625, 4: 0.875 } },
@@ -1971,7 +1971,7 @@ function etAsk({ probs, chosen, confidence, passed }) {
     mk.outcome(ET, { outcome: "paged", reason: null, ask_calls: 1, effects: 0, dry_run: false }),
   ];
   emit(
-    "fixtures-next/error-triage",
+    "fixtures/error-triage",
     "severity-3-page",
     events,
     { "line:19": { 1: 0.03125, 2: 0.0625, 3: 0.875, 4: 0.03125 } },
@@ -1996,7 +1996,7 @@ function etAsk({ probs, chosen, confidence, passed }) {
     mk.outcome(ET, { outcome: "paged", reason: null, ask_calls: 1, effects: 0, dry_run: false }),
   ];
   emit(
-    "fixtures-next/error-triage",
+    "fixtures/error-triage",
     "unsure",
     events,
     { "line:19": { 1: 0.125, 2: 0.3125, 3: 0.375, 4: 0.1875 } },
@@ -2055,7 +2055,7 @@ function etAsk({ probs, chosen, confidence, passed }) {
     mk.outcome(ET, { outcome: "handoff", reason: "ask_unavailable", ask_calls: 1, effects: 0, dry_run: false }),
   ];
   emit(
-    "fixtures-next/error-triage",
+    "fixtures/error-triage",
     "unavailable",
     events,
     { "line:19": "unavailable" },

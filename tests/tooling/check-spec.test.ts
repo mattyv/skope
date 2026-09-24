@@ -1,6 +1,6 @@
 // Tests for scripts/check_spec.py. Each test builds a throwaway copy of
 // whatever the script reads, so nothing here touches SPEC.md, PLAN.md,
-// README.md, contracts/, fixtures/, fixtures-next/ or tests/acceptance/ in
+// README.md, contracts/, fixtures/ or tests/acceptance/ in
 // the real repo.
 import { execFileSync } from "node:child_process";
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
@@ -25,7 +25,6 @@ function makeDocsTree(): string {
   for (const f of ["SPEC.md", "PLAN.md", "README.md"]) cpSync(join(REPO, f), join(dir, f));
   cpSync(join(REPO, "contracts"), join(dir, "contracts"), { recursive: true });
   cpSync(join(REPO, "fixtures"), join(dir, "fixtures"), { recursive: true });
-  cpSync(join(REPO, "fixtures-next"), join(dir, "fixtures-next"), { recursive: true });
   mkdirSync(join(dir, "scripts"), { recursive: true });
   cpSync(join(REPO, "scripts", "check_spec.py"), join(dir, "scripts", "check_spec.py"));
   return dir;

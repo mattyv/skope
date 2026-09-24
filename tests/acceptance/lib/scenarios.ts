@@ -1,6 +1,6 @@
 // Shared helpers for the acceptance suite (PLAN.md §4 F). Enumerates the
 // fake scenario directories under fixtures/*/fakes and
-// fixtures-next/*/fakes (SPEC §12.1), each holding answers.yaml,
+// fixtures/*/fakes (SPEC §12.1), each holding answers.yaml,
 // commands.yaml and expected-exit.
 
 import { readdirSync, readFileSync } from "node:fs";
@@ -11,7 +11,7 @@ export const ROOT = fileURLToPath(new URL("../../../", import.meta.url));
 export interface Scenario {
   /** e.g. "disk-full" */
   fixture: string;
-  /** e.g. "fixtures/disk-full" or "fixtures-next/error-triage" */
+  /** e.g. "fixtures/disk-full" or "fixtures/error-triage" */
   fixtureDir: string;
   /** e.g. "clean-up-happy" */
   name: string;
@@ -55,7 +55,7 @@ export function allScenarios(): Scenario[] {
   return [
     ...listFixtureScenarios("fixtures/disk-full"),
     ...listFixtureScenarios("fixtures/cert-expiry"),
-    ...listFixtureScenarios("fixtures-next/error-triage"),
+    ...listFixtureScenarios("fixtures/error-triage"),
   ];
 }
 
