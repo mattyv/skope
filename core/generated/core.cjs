@@ -5831,6 +5831,25 @@ let SkopValues = (function() {
         return !(_dafny.Seq.contains(s, _0_c)) || (SkopValues.__default.IsDigit(_0_c));
       }));
     };
+    static Json(s) {
+      return _dafny.Seq.Concat(_dafny.Seq.Concat(_dafny.Seq.UnicodeFromString("\""), SkopValues.__default.JsonEsc(s)), _dafny.Seq.UnicodeFromString("\""));
+    };
+    static JsonEsc(s) {
+      let _0___accumulator = _dafny.Seq.of();
+      TAIL_CALL_START: while (true) {
+        if ((new BigNumber((s).length)).isEqualTo(_dafny.ZERO)) {
+          return _dafny.Seq.Concat(_0___accumulator, _dafny.Seq.UnicodeFromString(""));
+        } else {
+          _0___accumulator = _dafny.Seq.Concat(_0___accumulator, ((_dafny.areEqual((s)[_dafny.ZERO], new _dafny.CodePoint('"'.codePointAt(0)))) ? (_dafny.Seq.UnicodeFromString("\\\"")) : (((_dafny.areEqual((s)[_dafny.ZERO], new _dafny.CodePoint('\\'.codePointAt(0)))) ? (_dafny.Seq.UnicodeFromString("\\\\")) : ((((new BigNumber(((s)[_dafny.ZERO]).value)).isLessThan(new BigNumber(32))) ? (_dafny.Seq.Concat(_dafny.Seq.UnicodeFromString("\\u00"), _dafny.Seq.of(SkopValues.__default.HexDigit(_dafny.EuclideanDivision(new BigNumber(((s)[_dafny.ZERO]).value), new BigNumber(16))), SkopValues.__default.HexDigit((new BigNumber(((s)[_dafny.ZERO]).value)).mod(new BigNumber(16)))))) : (_dafny.Seq.of((s)[_dafny.ZERO]))))))));
+          let _in0 = (s).slice(_dafny.ONE);
+          s = _in0;
+          continue TAIL_CALL_START;
+        }
+      }
+    };
+    static HexDigit(d) {
+      return (_dafny.Seq.UnicodeFromString("0123456789abcdef"))[d];
+    };
     static Space(c) {
       return (((_dafny.areEqual(c, new _dafny.CodePoint(' '.codePointAt(0)))) || (_dafny.areEqual(c, new _dafny.CodePoint('\t'.codePointAt(0))))) || (_dafny.areEqual(c, new _dafny.CodePoint('\n'.codePointAt(0))))) || (_dafny.areEqual(c, new _dafny.CodePoint('\r'.codePointAt(0))));
     };
@@ -7118,19 +7137,14 @@ let SkopRun = (function() {
       }
     };
     static WouldDo(s, a) {
-      let _pat_let_tv0 = s;
       let _0_e = SkopRun.__default.Ev(s, SkopStep.EventBody.create_WouldDoEv(SkopState.__default.RenderCmd((s).dtor_vars, SkopState.__default.DoParts((s).dtor_vars, a))));
       let _1_s1 = function (_pat_let17_0) {
         return function (_2_dt__update__tmp_h0) {
           return function (_pat_let18_0) {
-            return function (_3_dt__update_heffects_h0) {
-              return function (_pat_let19_0) {
-                return function (_4_dt__update_hafterWouldDo_h0) {
-                  return SkopState.State.create_State((_2_dt__update__tmp_h0).dtor_prog, (_2_dt__update__tmp_h0).dtor_cfg, (_2_dt__update__tmp_h0).dtor_sec, (_2_dt__update__tmp_h0).dtor_tasks, (_2_dt__update__tmp_h0).dtor_vars, (_2_dt__update__tmp_h0).dtor_runNames, (_2_dt__update__tmp_h0).dtor_last, _4_dt__update_hafterWouldDo_h0, (_2_dt__update__tmp_h0).dtor_askCalls, _3_dt__update_heffects_h0);
-                }(_pat_let19_0);
-              }(true);
+            return function (_3_dt__update_hafterWouldDo_h0) {
+              return SkopState.State.create_State((_2_dt__update__tmp_h0).dtor_prog, (_2_dt__update__tmp_h0).dtor_cfg, (_2_dt__update__tmp_h0).dtor_sec, (_2_dt__update__tmp_h0).dtor_tasks, (_2_dt__update__tmp_h0).dtor_vars, (_2_dt__update__tmp_h0).dtor_runNames, (_2_dt__update__tmp_h0).dtor_last, _3_dt__update_hafterWouldDo_h0, (_2_dt__update__tmp_h0).dtor_askCalls, (_2_dt__update__tmp_h0).dtor_effects);
             }(_pat_let18_0);
-          }(((_pat_let_tv0).dtor_effects).plus(_dafny.ONE));
+          }(true);
         }(_pat_let17_0);
       }(s);
       return SkopRun.__default.Then(_0_e, SkopRun.__default.Continue(_1_s1, (s).dtor_vars));
@@ -7201,15 +7215,20 @@ let SkopRun = (function() {
       let _2_a = SkopValues.__default.Coerce(_0_l);
       let _3_b = SkopValues.__default.Coerce(_1_r);
       let _4_result = ((((_2_a).is_Some) && ((_3_b).is_Some)) ? (SkopAst.Option.create_Some(SkopValues.__default.Compare((c).dtor_op, (_2_a).dtor_value, (_3_b).dtor_value))) : (SkopAst.Option.create_None()));
-      let _5_e = SkopRun.__default.Ev(s, SkopStep.EventBody.create_CheckEv(SkopRun.__default.Expr(c), SkopValues.__default.NumText(_0_l), SkopValues.__default.NumText(_1_r), _4_result, (s).dtor_afterWouldDo));
-      return SkopRun.__default.Then(_5_e, (((_4_result).is_None) ? (SkopRun.__default.Failed(SkopRun.__default.Log(s, _5_e))) : (SkopRun.__default.CheckDone(SkopRun.__default.Log(s, _5_e), (_4_result).dtor_value))));
+      return SkopRun.__default.AfterCheck(s, SkopRun.__default.Ev(s, SkopStep.EventBody.create_CheckEv(SkopRun.__default.Expr(c), SkopValues.__default.NumText(_0_l), SkopValues.__default.NumText(_1_r), _4_result, (s).dtor_afterWouldDo)), _4_result, SkopAst.Option.create_Some(SkopRun.__default.CmpDetail(c, _0_l, _1_r)));
     };
-    static Failed(s) {
+    static AfterCheck(s, e, result, detail) {
+      return SkopRun.__default.Then(e, (((result).is_None) ? (SkopRun.__default.Failed(SkopRun.__default.Log(s, e), detail)) : (SkopRun.__default.CheckDone(SkopRun.__default.Log(s, e), (result).dtor_value))));
+    };
+    static CmpDetail(c, l, r) {
+      return _dafny.Seq.Concat(_dafny.Seq.Concat(_dafny.Seq.Concat(_dafny.Seq.Concat(_dafny.Seq.Concat(_dafny.Seq.Concat(_dafny.Seq.UnicodeFromString("{\"expr\":"), SkopValues.__default.Json(SkopRun.__default.Expr(c))), _dafny.Seq.UnicodeFromString(",\"left\":")), SkopValues.__default.Json(SkopValues.__default.Show(l))), _dafny.Seq.UnicodeFromString(",\"right\":")), SkopValues.__default.Json(SkopValues.__default.Show(r))), _dafny.Seq.UnicodeFromString("}"));
+    };
+    static Failed(s, detail) {
       let _0_st = SkopState.__default.Stmt0(s);
       let _source0 = (_0_st).dtor_els;
       {
         if (_source0.is_NoElse) {
-          return SkopRun.__default.Finish(s, SkopStep.Outcome.create_Handoff(SkopStep.Reason.create_CommandFailed(), SkopAst.Option.create_None()));
+          return SkopRun.__default.Finish(s, SkopStep.Outcome.create_Handoff(SkopStep.Reason.create_CommandFailed(), detail));
         }
       }
       {
@@ -7351,112 +7370,121 @@ let SkopRun = (function() {
         if (_source0.is_Unsure) {
           let _3_c = (_source0).chosen;
           let _4_conf = (_source0).conf;
-          let _5_e = SkopRun.__default.Ev(s, SkopStep.EventBody.create_AskEv((req).dtor_question, (req).dtor_kind, SkopAst.Option.create_Some((r).dtor_probs), SkopAst.Option.create_Some(SkopRun.__default.ChosenOf((st).dtor_form, _0_ids, _3_c)), SkopAst.Option.create_Some(_4_conf), (st).dtor_sure, false, SkopRun.__default.Range((st).dtor_form), SkopAst.Option.create_None(), (s).dtor_afterWouldDo));
-          return SkopRun.__default.Then(_5_e, SkopRun.__default.GateMiss(SkopRun.__default.Log(s, _5_e)));
+          return SkopRun.__default.GateMissed(s, st, req, r, _3_c, _4_conf);
         }
       }
       {
-        let _6_c = (_source0).chosen;
-        let _7_conf = (_source0).conf;
-        let _8_e = SkopRun.__default.Ev(s, SkopStep.EventBody.create_AskEv((req).dtor_question, (req).dtor_kind, SkopAst.Option.create_Some((r).dtor_probs), SkopAst.Option.create_Some(SkopRun.__default.ChosenOf((st).dtor_form, _0_ids, _6_c)), SkopAst.Option.create_Some(_7_conf), (st).dtor_sure, true, SkopRun.__default.Range((st).dtor_form), SkopAst.Option.create_None(), (s).dtor_afterWouldDo));
-        return SkopRun.__default.Then(_8_e, SkopRun.__default.Accept(SkopRun.__default.Log(s, _8_e), _6_c));
+        let _5_c = (_source0).chosen;
+        let _6_conf = (_source0).conf;
+        return SkopRun.__default.GatePassed(s, st, req, r, _5_c, _6_conf);
       }
+    };
+    static GateMissed(s, st, req, r, c, conf) {
+      let _0_e = SkopRun.__default.Ev(s, SkopStep.EventBody.create_AskEv((req).dtor_question, (req).dtor_kind, SkopAst.Option.create_Some((r).dtor_probs), SkopAst.Option.create_Some(SkopRun.__default.ChosenOf((st).dtor_form, SkopValues.__default.Ids((req).dtor_options), c)), SkopAst.Option.create_Some(conf), (st).dtor_sure, false, SkopRun.__default.Range((st).dtor_form), SkopAst.Option.create_None(), (s).dtor_afterWouldDo));
+      return SkopRun.__default.Then(_0_e, SkopRun.__default.GateMiss(SkopRun.__default.Log(s, _0_e)));
+    };
+    static GatePassed(s, st, req, r, c, conf) {
+      let _0_e = SkopRun.__default.Ev(s, SkopStep.EventBody.create_AskEv((req).dtor_question, (req).dtor_kind, SkopAst.Option.create_Some((r).dtor_probs), SkopAst.Option.create_Some(SkopRun.__default.ChosenOf((st).dtor_form, SkopValues.__default.Ids((req).dtor_options), c)), SkopAst.Option.create_Some(conf), (st).dtor_sure, true, SkopRun.__default.Range((st).dtor_form), SkopAst.Option.create_None(), (s).dtor_afterWouldDo));
+      return SkopRun.__default.Then(_0_e, SkopRun.__default.Accept(SkopRun.__default.Log(s, _0_e), c));
     };
     static Resume(s, r) {
       let _0_n = ((s).dtor_last).dtor_value;
       let _1_st = SkopState.__default.Stmt0(s);
-      let _2_s0 = function (_pat_let20_0) {
+      let _2_s0 = function (_pat_let19_0) {
         return function (_3_dt__update__tmp_h0) {
-          return function (_pat_let21_0) {
+          return function (_pat_let20_0) {
             return function (_4_dt__update_hlast_h0) {
               return SkopState.State.create_State((_3_dt__update__tmp_h0).dtor_prog, (_3_dt__update__tmp_h0).dtor_cfg, (_3_dt__update__tmp_h0).dtor_sec, (_3_dt__update__tmp_h0).dtor_tasks, (_3_dt__update__tmp_h0).dtor_vars, (_3_dt__update__tmp_h0).dtor_runNames, _4_dt__update_hlast_h0, (_3_dt__update__tmp_h0).dtor_afterWouldDo, (_3_dt__update__tmp_h0).dtor_askCalls, (_3_dt__update__tmp_h0).dtor_effects);
-            }(_pat_let21_0);
+            }(_pat_let20_0);
           }(SkopAst.Option.create_None());
-        }(_pat_let20_0);
+        }(_pat_let19_0);
       }(s);
       let _source0 = _1_st;
       {
         if (_source0.is_Run) {
-          let _5_b = (_source0).binding;
-          let _6_e = SkopRun.__default.Ev(_2_s0, SkopStep.EventBody.create_RunEv((_0_n).dtor_cmd, (r).dtor_exit, (r).dtor_timedOut, (s).dtor_afterWouldDo));
-          let _7_s1 = SkopRun.__default.Log(_2_s0, _6_e);
-          return SkopRun.__default.Then(_6_e, ((!(SkopRun.__default.Ok(r))) ? (SkopRun.__default.Failed(_7_s1)) : ((((_5_b).is_Some) ? (SkopRun.__default.Continue(_7_s1, ((_7_s1).dtor_vars).update((_5_b).dtor_value, SkopRun.__default.RunSlot((r).dtor_stdout)))) : (SkopRun.__default.Continue(_7_s1, (_7_s1).dtor_vars))))));
+          return SkopRun.__default.AfterRun(_2_s0, SkopRun.__default.Ev(_2_s0, SkopStep.EventBody.create_RunEv((_0_n).dtor_cmd, (r).dtor_exit, (r).dtor_timedOut, (s).dtor_afterWouldDo)), r);
         }
       }
       {
         if (_source0.is_IfYesRun) {
-          let _8_e = SkopRun.__default.Ev(_2_s0, SkopStep.EventBody.create_RunEv((_0_n).dtor_cmd, (r).dtor_exit, (r).dtor_timedOut, (s).dtor_afterWouldDo));
-          return SkopRun.__default.Then(_8_e, ((SkopRun.__default.Ok(r)) ? (SkopRun.__default.Continue(SkopRun.__default.Log(_2_s0, _8_e), (_2_s0).dtor_vars)) : (SkopRun.__default.Failed(SkopRun.__default.Log(_2_s0, _8_e)))));
+          return SkopRun.__default.AfterExec(_2_s0, SkopRun.__default.Ev(_2_s0, SkopStep.EventBody.create_RunEv((_0_n).dtor_cmd, (r).dtor_exit, (r).dtor_timedOut, (s).dtor_afterWouldDo)), r);
         }
       }
       {
         if (_source0.is_Do) {
-          let _9_e = SkopRun.__default.Ev(_2_s0, SkopStep.EventBody.create_EffectEndEv((_0_n).dtor_cmd, (r).dtor_exit, (r).dtor_timedOut));
-          return SkopRun.__default.Then(_9_e, ((SkopRun.__default.Ok(r)) ? (SkopRun.__default.Continue(SkopRun.__default.Log(_2_s0, _9_e), (_2_s0).dtor_vars)) : (SkopRun.__default.Failed(SkopRun.__default.Log(_2_s0, _9_e)))));
+          return SkopRun.__default.AfterExec(_2_s0, SkopRun.__default.Ev(_2_s0, SkopStep.EventBody.create_EffectEndEv((_0_n).dtor_cmd, (r).dtor_exit, (r).dtor_timedOut)), r);
         }
       }
       {
         if (_source0.is_IfYesDo) {
-          let _10_e = SkopRun.__default.Ev(_2_s0, SkopStep.EventBody.create_EffectEndEv((_0_n).dtor_cmd, (r).dtor_exit, (r).dtor_timedOut));
-          return SkopRun.__default.Then(_10_e, ((SkopRun.__default.Ok(r)) ? (SkopRun.__default.Continue(SkopRun.__default.Log(_2_s0, _10_e), (_2_s0).dtor_vars)) : (SkopRun.__default.Failed(SkopRun.__default.Log(_2_s0, _10_e)))));
+          return SkopRun.__default.AfterExec(_2_s0, SkopRun.__default.Ev(_2_s0, SkopStep.EventBody.create_EffectEndEv((_0_n).dtor_cmd, (r).dtor_exit, (r).dtor_timedOut)), r);
         }
       }
       {
         if (_source0.is_Check) {
-          let _11_cond = (_source0).cond;
-          if ((_11_cond).is_Succeeds) {
-            let _12_e = SkopRun.__default.Ev(_2_s0, SkopStep.EventBody.create_CheckCmdEv((_0_n).dtor_cmd, (r).dtor_exit, (r).dtor_timedOut, (s).dtor_afterWouldDo));
-            return SkopRun.__default.Then(_12_e, ((((r).dtor_timedOut) || (((r).dtor_exit).is_None)) ? (SkopRun.__default.Failed(SkopRun.__default.Log(_2_s0, _12_e))) : (SkopRun.__default.CheckDone(SkopRun.__default.Log(_2_s0, _12_e), _dafny.areEqual((r).dtor_exit, SkopAst.Option.create_Some(_dafny.ZERO))))));
+          let _5_cond = (_source0).cond;
+          if ((_5_cond).is_Succeeds) {
+            let _6_result = ((((r).dtor_timedOut) || (((r).dtor_exit).is_None)) ? (SkopAst.Option.create_None()) : (SkopAst.Option.create_Some(_dafny.areEqual((r).dtor_exit, SkopAst.Option.create_Some(_dafny.ZERO)))));
+            return SkopRun.__default.AfterCheck(_2_s0, SkopRun.__default.Ev(_2_s0, SkopStep.EventBody.create_CheckCmdEv((_0_n).dtor_cmd, (r).dtor_exit, (r).dtor_timedOut, (s).dtor_afterWouldDo)), _6_result, SkopAst.Option.create_None());
           } else {
-            let _13_l = SkopRun.__default.OperandVal((_2_s0).dtor_vars, (_11_cond).dtor_l);
-            let _14_rt = SkopRun.__default.OperandVal((_2_s0).dtor_vars, (_11_cond).dtor_r);
-            let _15_result = ((((r).dtor_i).isEqualTo(_dafny.ZERO)) ? (SkopAst.Option.create_Some(true)) : (((((r).dtor_i).isEqualTo(_dafny.ONE)) ? (SkopAst.Option.create_Some(false)) : (SkopAst.Option.create_None()))));
-            let _16_e = SkopRun.__default.Ev(_2_s0, SkopStep.EventBody.create_CheckEv(SkopRun.__default.Expr(_11_cond), SkopValues.__default.NumText(_13_l), SkopValues.__default.NumText(_14_rt), _15_result, (s).dtor_afterWouldDo));
-            return SkopRun.__default.Then(_16_e, (((_15_result).is_None) ? (SkopRun.__default.Failed(SkopRun.__default.Log(_2_s0, _16_e))) : (SkopRun.__default.CheckDone(SkopRun.__default.Log(_2_s0, _16_e), (_15_result).dtor_value))));
+            let _7_l = SkopRun.__default.OperandVal((_2_s0).dtor_vars, (_5_cond).dtor_l);
+            let _8_rt = SkopRun.__default.OperandVal((_2_s0).dtor_vars, (_5_cond).dtor_r);
+            let _9_result = ((((r).dtor_i).isEqualTo(_dafny.ZERO)) ? (SkopAst.Option.create_Some(true)) : (((((r).dtor_i).isEqualTo(_dafny.ONE)) ? (SkopAst.Option.create_Some(false)) : (SkopAst.Option.create_None()))));
+            return SkopRun.__default.AfterCheck(_2_s0, SkopRun.__default.Ev(_2_s0, SkopStep.EventBody.create_CheckEv(SkopRun.__default.Expr(_5_cond), SkopValues.__default.NumText(_7_l), SkopValues.__default.NumText(_8_rt), _9_result, (s).dtor_afterWouldDo)), _9_result, SkopAst.Option.create_Some(SkopRun.__default.CmpDetail(_5_cond, _7_l, _8_rt)));
           }
         }
       }
       {
         if (_source0.is_Ask) {
-          let _17_form = (_source0).form;
-          let _18_req = (_0_n).dtor_request;
-          let _19_s1 = function (_pat_let22_0) {
-            return function (_20_dt__update__tmp_h1) {
-              return function (_pat_let23_0) {
-                return function (_21_dt__update_haskCalls_h0) {
-                  return SkopState.State.create_State((_20_dt__update__tmp_h1).dtor_prog, (_20_dt__update__tmp_h1).dtor_cfg, (_20_dt__update__tmp_h1).dtor_sec, (_20_dt__update__tmp_h1).dtor_tasks, (_20_dt__update__tmp_h1).dtor_vars, (_20_dt__update__tmp_h1).dtor_runNames, (_20_dt__update__tmp_h1).dtor_last, (_20_dt__update__tmp_h1).dtor_afterWouldDo, _21_dt__update_haskCalls_h0, (_20_dt__update__tmp_h1).dtor_effects);
-                }(_pat_let23_0);
-              }(((_2_s0).dtor_askCalls).plus(_dafny.ONE));
-            }(_pat_let22_0);
-          }(_2_s0);
-          if ((r).is_AskFailed) {
-            let _22_e = SkopRun.__default.Ev(_19_s1, SkopStep.EventBody.create_AskEv((_18_req).dtor_question, (_18_req).dtor_kind, SkopAst.Option.create_None(), SkopAst.Option.create_None(), SkopAst.Option.create_None(), (_1_st).dtor_sure, false, SkopRun.__default.Range(_17_form), SkopAst.Option.create_Some((r).dtor_error), (s).dtor_afterWouldDo));
-            return SkopRun.__default.Then(_22_e, SkopRun.__default.Finish(SkopRun.__default.Log(_19_s1, _22_e), SkopStep.Outcome.create_Handoff(SkopStep.Reason.create_AskUnavailable(), SkopAst.Option.create_Some(SkopRun.__default.FailureText((r).dtor_error)))));
-          } else {
-            return SkopRun.__default.Answered(_19_s1, _1_st, _18_req, r);
-          }
+          return SkopRun.__default.ResumeAsk(_2_s0, _1_st, (_0_n).dtor_request, r);
         }
       }
       {
         if (_source0.is_Page) {
-          let _23_e = SkopRun.__default.Ev(_2_s0, SkopStep.EventBody.create_PageEv((_0_n).dtor_text, (r).dtor_ok));
-          return SkopRun.__default.Then(_23_e, SkopRun.__default.Finish(SkopRun.__default.Log(_2_s0, _23_e), SkopStep.Outcome.create_Paged()));
+          let _10_e = SkopRun.__default.Ev(_2_s0, SkopStep.EventBody.create_PageEv((_0_n).dtor_text, (r).dtor_ok));
+          return SkopRun.__default.Then(_10_e, SkopRun.__default.Finish(SkopRun.__default.Log(_2_s0, _10_e), SkopStep.Outcome.create_Paged()));
         }
       }
       {
         return SkopRun.__default.Finish(_2_s0, SkopStep.Outcome.create_Stopped());
       }
     };
+    static AfterRun(s, e, r) {
+      let _0_s1 = SkopRun.__default.Log(s, e);
+      let _1_b = (SkopState.__default.Stmt0(s)).dtor_binding;
+      return SkopRun.__default.Then(e, ((!(SkopRun.__default.Ok(r))) ? (SkopRun.__default.Failed(_0_s1, SkopAst.Option.create_None())) : ((((_1_b).is_Some) ? (SkopRun.__default.Continue(_0_s1, ((_0_s1).dtor_vars).update((_1_b).dtor_value, SkopRun.__default.RunSlot((r).dtor_stdout)))) : (SkopRun.__default.Continue(_0_s1, (_0_s1).dtor_vars))))));
+    };
+    static AfterExec(s, e, r) {
+      return SkopRun.__default.Then(e, ((SkopRun.__default.Ok(r)) ? (SkopRun.__default.Continue(SkopRun.__default.Log(s, e), (s).dtor_vars)) : (SkopRun.__default.Failed(SkopRun.__default.Log(s, e), SkopAst.Option.create_None()))));
+    };
+    static ResumeAsk(s0, st, req, r) {
+      let _pat_let_tv0 = s0;
+      let _0_s1 = function (_pat_let21_0) {
+        return function (_1_dt__update__tmp_h0) {
+          return function (_pat_let22_0) {
+            return function (_2_dt__update_haskCalls_h0) {
+              return SkopState.State.create_State((_1_dt__update__tmp_h0).dtor_prog, (_1_dt__update__tmp_h0).dtor_cfg, (_1_dt__update__tmp_h0).dtor_sec, (_1_dt__update__tmp_h0).dtor_tasks, (_1_dt__update__tmp_h0).dtor_vars, (_1_dt__update__tmp_h0).dtor_runNames, (_1_dt__update__tmp_h0).dtor_last, (_1_dt__update__tmp_h0).dtor_afterWouldDo, _2_dt__update_haskCalls_h0, (_1_dt__update__tmp_h0).dtor_effects);
+            }(_pat_let22_0);
+          }(((_pat_let_tv0).dtor_askCalls).plus(_dafny.ONE));
+        }(_pat_let21_0);
+      }(s0);
+      if ((r).is_AskFailed) {
+        let _3_e = SkopRun.__default.Ev(_0_s1, SkopStep.EventBody.create_AskEv((req).dtor_question, (req).dtor_kind, SkopAst.Option.create_None(), SkopAst.Option.create_None(), SkopAst.Option.create_None(), (st).dtor_sure, false, SkopRun.__default.Range((st).dtor_form), SkopAst.Option.create_Some((r).dtor_error), (s0).dtor_afterWouldDo));
+        return SkopRun.__default.Then(_3_e, SkopRun.__default.Finish(SkopRun.__default.Log(_0_s1, _3_e), SkopStep.Outcome.create_Handoff(SkopStep.Reason.create_AskUnavailable(), SkopAst.Option.create_Some(SkopRun.__default.FailureText((r).dtor_error)))));
+      } else {
+        return SkopRun.__default.Answered(_0_s1, st, req, r);
+      }
+    };
     static Step(s, r) {
       if ((r).is_DeadlineExceeded) {
-        return SkopRun.__default.Finish(function (_pat_let24_0) {
+        return SkopRun.__default.Finish(function (_pat_let23_0) {
           return function (_0_dt__update__tmp_h0) {
-            return function (_pat_let25_0) {
+            return function (_pat_let24_0) {
               return function (_1_dt__update_hlast_h0) {
                 return SkopState.State.create_State((_0_dt__update__tmp_h0).dtor_prog, (_0_dt__update__tmp_h0).dtor_cfg, (_0_dt__update__tmp_h0).dtor_sec, (_0_dt__update__tmp_h0).dtor_tasks, (_0_dt__update__tmp_h0).dtor_vars, (_0_dt__update__tmp_h0).dtor_runNames, _1_dt__update_hlast_h0, (_0_dt__update__tmp_h0).dtor_afterWouldDo, (_0_dt__update__tmp_h0).dtor_askCalls, (_0_dt__update__tmp_h0).dtor_effects);
-              }(_pat_let25_0);
+              }(_pat_let24_0);
             }(SkopAst.Option.create_None());
-          }(_pat_let24_0);
+          }(_pat_let23_0);
         }(s), SkopStep.Outcome.create_Handoff(SkopStep.Reason.create_Deadline(), SkopAst.Option.create_None()));
       } else if (((s).dtor_last).is_None) {
         return SkopRun.__default.Advance(s);
@@ -7475,20 +7503,22 @@ let SkopProofs = (function() {
     constructor(tag) {
       this.$tag = tag;
     }
-    static create_Trace(states, nexts, _$$_final) {
+    static create_Trace(states, nexts, events, _$$_final) {
       let $dt = new Trace(0);
       $dt.states = states;
       $dt.nexts = nexts;
+      $dt.events = events;
       $dt._$$_final = _$$_final;
       return $dt;
     }
     get is_Trace() { return this.$tag === 0; }
     get dtor_states() { return this.states; }
     get dtor_nexts() { return this.nexts; }
+    get dtor_events() { return this.events; }
     get dtor_final() { return this._$$_final; }
     toString() {
       if (this.$tag === 0) {
-        return "SkopProofs.Trace.Trace" + "(" + _dafny.toString(this.states) + ", " + _dafny.toString(this.nexts) + ", " + _dafny.toString(this._$$_final) + ")";
+        return "SkopProofs.Trace.Trace" + "(" + _dafny.toString(this.states) + ", " + _dafny.toString(this.nexts) + ", " + _dafny.toString(this.events) + ", " + _dafny.toString(this._$$_final) + ")";
       } else  {
         return "<unexpected>";
       }
@@ -7497,13 +7527,13 @@ let SkopProofs = (function() {
       if (this === other) {
         return true;
       } else if (this.$tag === 0) {
-        return other.$tag === 0 && _dafny.areEqual(this.states, other.states) && _dafny.areEqual(this.nexts, other.nexts) && _dafny.areEqual(this._$$_final, other._$$_final);
+        return other.$tag === 0 && _dafny.areEqual(this.states, other.states) && _dafny.areEqual(this.nexts, other.nexts) && _dafny.areEqual(this.events, other.events) && _dafny.areEqual(this._$$_final, other._$$_final);
       } else  {
         return false; // unexpected
       }
     }
     static Default() {
-      return SkopProofs.Trace.create_Trace(_dafny.Seq.of(), _dafny.Seq.of(), SkopState.State.Default());
+      return SkopProofs.Trace.create_Trace(_dafny.Seq.of(), _dafny.Seq.of(), _dafny.Seq.of(), SkopState.State.Default());
     }
     static Rtd() {
       return class {

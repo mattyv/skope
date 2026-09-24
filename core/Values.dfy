@@ -21,6 +21,16 @@ module SkopValues {
   // Digits pass the safe-value check (SafeValue, SPEC §3.5).
   lemma NatDigits(n: nat) ensures AllDigits(NatToString(n)) && SafeValue(NatToString(n)) {}
 
+  // A JSON string literal.
+  function Json(s: string): string { "\"" + JsonEsc(s) + "\"" }
+  function JsonEsc(s: string): string {
+    if |s| == 0 then ""
+    else (if s[0] == '"' then "\\\"" else if s[0] == '\\' then "\\\\"
+          else if (s[0] as int) < 32 then "\\u00" + [HexDigit(s[0] as int / 16), HexDigit(s[0] as int % 16)]
+          else [s[0]]) + JsonEsc(s[1..])
+  }
+  function HexDigit(d: nat): char requires d < 16 { "0123456789abcdef"[d] }
+
   // ---- coercion (SPEC §4.2: trim, strip one trailing %, parse as decimal) ----
 
   predicate Space(c: char) { c == ' ' || c == '\t' || c == '\n' || c == '\r' }
@@ -131,6 +141,11 @@ module SkopValues {
   // could lift to a tie.
   lemma GateSound(ids: seq<string>, probs: map<string, real>, u: real, sure: nat)
     ensures Gate(ids, probs, u, sure).Invalid? <==> !ValidAnswer(ids, probs, u)
+    // What a valid answer is (SPEC §6.1), spelled out: exactly the offered
+    // ids, every value and `unassigned` in [0, 1], summing to 1 within 1e-3.
+    ensures !Gate(ids, probs, u, sure).Invalid? ==>
+      probs.Keys == (set id <- ids) && 0.0 <= u <= 1.0 && (forall id <- ids :: 0.0 <= probs[id] <= 1.0)
+      && -0.001 <= SumFirst(ids, probs, 0) + u - 1.0 <= 0.001
     ensures !Gate(ids, probs, u, sure).Invalid? ==> Gate(ids, probs, u, sure).chosen < |ids|
     ensures var v := Gate(ids, probs, u, sure);
       v.Sure? ==>

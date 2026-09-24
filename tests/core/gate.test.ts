@@ -6,7 +6,9 @@ import { Unsupported } from "../../src/core.js";
 import { Interp, unsafeInputs } from "../../src/interp.js";
 import type { Response } from "../../src/step.js";
 import {
+  actions,
   answer,
+  askOneOf,
   askSections,
   askYesNo,
   bodies,
@@ -122,6 +124,9 @@ describe("invalid responses are handled as the backend being unavailable: ask_un
     ["NaN", answer({ "s:a": Number.NaN, "s:b": 0.1 })],
     ["values summing to 0.9", answer({ "s:a": 0.5, "s:b": 0.4 })],
     ["values summing to 0.995", answer({ "s:a": 0.9, "s:b": 0.095 })],
+    ["values summing to 1.0015 (the tolerance is 1e-3)", answer({ "s:a": 0.9, "s:b": 0.1015 })],
+    ["an infinite unassigned", answer({ "s:a": 0.9, "s:b": 0.1 }, Number.POSITIVE_INFINITY)],
+    ["a NaN unassigned", answer({ "s:a": 0.9, "s:b": 0.1 }, Number.NaN)],
     ["a negative unassigned", answer({ "s:a": 0.6, "s:b": 0.5 }, -0.1)],
   ];
   for (const [name, r] of cases) {
@@ -214,6 +219,18 @@ describe("question text by origin (SPEC §3.5, §6.3)", () => {
     });
   });
 
+  test("a yes/no answer is a trusted value: pasted into a later question, not sent as context", () => {
+    const q = program({
+      "s:a": section("A", [
+        askYesNo(2, [lit("Severe?")], 90, "severe"),
+        askYesNo(3, [lit("Severe was "), v("severe"), lit(". Page?")], 90, "_yn", skip),
+        stop(4),
+      ]),
+    });
+    const ask = last(drive(q, config(), [answer({ yes: 0.99, no: 0.01 })]).turns);
+    expect(ask).toMatchObject({ kind: "ask", request: { question: "Severe was yes. Page?", context: {} } });
+  });
+
   test("the same name is pasted or named by where its current value came from", () => {
     const q = program(
       {
@@ -302,6 +319,54 @@ describe("the adapter enforces Start's and Step's rules", () => {
     const b = a.fork();
     b.step(answer({ "s:a": 0.9, "s:b": 0.1 }));
     expect(b.key()).not.toBe(a.key());
+  });
+
+  test("key() tells apart two states that differ only in after_would_do", () => {
+    // Two cleanups: answering yes then no leaves a would_do behind; no then no doesn't.
+    const q = program({
+      "s:a": section("A", [
+        forEach(2, "step", "s:cleanups", [
+          askYesNo(3, [lit("Run "), v("step"), lit("?")], 90, "_yn", skip),
+          { src: 4, if_yes: { do: { item: "step" }, else: skip } },
+        ]),
+        run(5, cmd("df")),
+        stop(6),
+      ]),
+      "s:cleanups": actions("Cleanups", [
+        ["Clear the apt cache", "apt-get clean"],
+        ["Vacuum the journal", "journalctl --vacuum-size=500M"],
+      ]),
+    });
+    const yes = answer({ yes: 0.99, no: 0.01 });
+    const no = answer({ yes: 0.01, no: 0.99 });
+    const at = (a: Response) => {
+      const i = new Interp(q, config({}, true));
+      i.step({ kind: "none" });
+      i.step(a);
+      expect(i.step(no).next).toMatchObject({ kind: "exec", cmd: "df" });
+      return i;
+    };
+    expect(at(yes).key()).not.toBe(at(no).key());
+    expect(at(no).key()).toBe(at(no).key());
+  });
+
+  test("variables() holds what the run bound: loop items and one-of answers included", () => {
+    const q = program({
+      "s:a": section("A", [
+        askOneOf(2, [lit("Which?")], 90, "s:services", "service"),
+        forEach(3, "svc", "s:services", [page(4, [v("svc")])]),
+      ]),
+      "s:services": values("Services", ["nginx", "rsyslog"]),
+    });
+    const i = new Interp(q, config());
+    i.step({ kind: "none" });
+    expect(i.step(answer({ nginx: 0.05, rsyslog: 0.95 })).next).toMatchObject({ kind: "page", text: "nginx" });
+    expect(i.variables()).toEqual({ service: "rsyslog", svc: "nginx" });
+  });
+
+  test("context values are passed exactly as the core has them, not trimmed further", () => {
+    const ask = last(drive(triage(85), config(), [ok("disk errors\v")]).turns);
+    expect(ask?.kind === "ask" && ask.request.context).toEqual({ errors: "disk errors\v" });
   });
 
   test("the program must lint clean (so it's WellFormed): E-CYCLE is refused", () => {
