@@ -24,7 +24,7 @@ import { type Diagnostic, diagnosticLine, plainText, type Stage } from "../runne
 import { commandEnv, execCommand, stopAll } from "../runner/exec.js";
 import { createFakeClock, fakeExec } from "../runner/fakeExec.js";
 import { type FakeKind, resolveFakeKeys } from "../runner/fakeKeys.js";
-import { fakesError } from "../runner/fakes.js";
+import { expandCommands, fakesError } from "../runner/fakes.js";
 import { acquireLock, LockError } from "../runner/lock.js";
 import { sendPage } from "../runner/pager.js";
 import { buildRedactor, type Redactor, redactDeep } from "../runner/redact.js";
@@ -563,6 +563,9 @@ function readFakes(path: string, def: "answers" | "commands", fail: Fail): unkno
   } catch (err) {
     return fail("E-CONFIG", "args", `can't read ${path}: ${(err as Error).message}`);
   }
+  // The string shorthand (SPEC §7.3) is expanded before validation, so fakesError and everything
+  // downstream (the strict key rules, fakeExec) see only full result objects.
+  if (def === "commands") doc = expandCommands(doc);
   const why = fakesError(doc, def);
   if (why !== null) fail("E-CONFIG", "args", `${path} isn't a valid fake ${def} file: ${why}`);
   return doc;

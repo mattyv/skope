@@ -6,7 +6,7 @@
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { describe, expect, test } from "vitest";
-import { fakesError } from "../../src/runner/fakes.js";
+import { expandCommands, fakesError } from "../../src/runner/fakes.js";
 import { allScenarios, ROOT, readYaml } from "../acceptance/lib/scenarios.js";
 
 const require = createRequire(import.meta.url);
@@ -59,6 +59,8 @@ describe("fake files: the hand check agrees with contracts/fakes.schema.json", (
     { x: { exit: 1.0, ms: 0 } },
     { x: { exit: Number.POSITIVE_INFINITY } }, // JSON Schema's `integer`, as ajv checks it
     { "line:3": [{ exit: 1 }, { exit: 0, stdout: "", stderr: "", ms: 5 }] },
+    { "Triage.used": " 93%\n" }, // the string shorthand for {exit: 0, stdout: "..."}
+    { x: ["a", { exit: 1 }, ""] }, // shorthand mixes with full results in a list
   ];
   const invalidAnswers: unknown[] = [
     [],
@@ -83,6 +85,11 @@ describe("fake files: the hand check agrees with contracts/fakes.schema.json", (
   test("the hand-picked invalid files really are invalid", () => {
     for (const d of invalidCommands) expect(fakesError(d, "commands"), JSON.stringify(d)).not.toBeNull();
     for (const d of invalidAnswers) expect(fakesError(d, "answers"), JSON.stringify(d)).not.toBeNull();
+  });
+
+  test("the hand-picked valid files really are valid", () => {
+    for (const d of validCommands) expect(fakesError(d, "commands"), JSON.stringify(d)).toBeNull();
+    for (const d of validAnswers) expect(fakesError(d, "answers"), JSON.stringify(d)).toBeNull();
   });
 
   test("random documents: both agree", () => {
@@ -134,5 +141,22 @@ describe("fake files: the hand check agrees with contracts/fakes.schema.json", (
     // Both sides of the line get exercised.
     expect(valid.commands).toBeGreaterThan(300);
     expect(valid.answers).toBeGreaterThan(300);
+  });
+});
+
+describe("commands.yaml's string shorthand", () => {
+  test("a plain string expands to {exit: 0, stdout: <the string>}", () => {
+    expect(expandCommands({ "Triage.used": " 93%\n" })).toEqual({ "Triage.used": { exit: 0, stdout: " 93%\n" } });
+  });
+
+  test("a list mixes shorthand strings with full results, in order", () => {
+    expect(expandCommands({ x: ["a", { exit: 1 }, "b"] })).toEqual({
+      x: [{ exit: 0, stdout: "a" }, { exit: 1 }, { exit: 0, stdout: "b" }],
+    });
+  });
+
+  test("a full result is left as it is", () => {
+    const doc = { x: { exit: 0, stdout: "y", ms: 5 } };
+    expect(expandCommands(doc)).toEqual(doc);
   });
 });
