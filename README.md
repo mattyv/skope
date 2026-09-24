@@ -136,8 +136,9 @@ it.
 No API key, no config, and nothing real runs:
 
 ```console
-$ skope --demo                        # writes the disk-full skill, its tests and fakes to ./skope-demo
-$ skope skope-demo/SKILL.md --test    # its unit tests
+$ skope --demo              # writes the disk-full skill, its tests and fakes
+$ cd skope-demo
+$ skope SKILL.md --test     # its unit tests
 PASS    false-alarm
 PASS    model-unsure
 PASS    nothing-fits
@@ -145,8 +146,8 @@ PASS    restart-fixes-it
 PASS    restart-hangs
 PASS    restart-not-enough
 6 passed, 0 failed, 0 invalid
-$ skope skope-demo/SKILL.md --verify  # every path it can take, and how each ends
-$ skope skope-demo/SKILL.md --dry-run --fake skope-demo/answers.yaml --fake-exec skope-demo/commands.yaml
+$ skope SKILL.md --verify   # every path it can take, and how each ends
+$ skope SKILL.md --dry-run --fake answers.yaml --fake-exec commands.yaml
 ```
 
 The dry run prints one JSON event per step. The faked model picks Restart

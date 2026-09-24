@@ -18,17 +18,19 @@ from PIL import Image, ImageDraw, ImageFont
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "docs" / "demo.gif"
 
-COLS, ROWS = 106, 17
-FONT = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", 15)
-BOLD = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf", 15)
-CW, LH = int(FONT.getlength("m")), 20
-PAD, BAR = 16, 30
-W, H = PAD * 2 + CW * COLS, BAR + PAD * 2 + LH * ROWS
+# Narrow and drawn at 2x, so it's still readable when a phone shrinks it to fit.
+COLS, ROWS, X = 62, 17, 2
+FONT = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", 15 * X)
+BOLD = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf", 15 * X)
+CW, LH = FONT.getlength("m"), 20 * X
+PAD, BAR = 16 * X, 30 * X
+W, H = round(PAD * 2 + CW * COLS), BAR + PAD * 2 + LH * ROWS
 
 BG, BARBG, FG, DIM = "#1e2127", "#2c313a", "#d7dae0", "#7f848e"
 GREEN, CYAN, YELLOW, RED, MAGENTA = "#98c379", "#56b6c2", "#e5c07b", "#e06c75", "#c678dd"
 
-JQ = "jq -r '[.event, .cmd // .chosen // .outcome, .confidence // .reason] | @tsv'"
+# Split inside its quotes, which the shell keeps as a newline and jq ignores.
+JQ = "| jq -r '[.event, .cmd // .chosen // .outcome,\n         .confidence // .reason] | @tsv'"
 
 
 def colour(line):
@@ -54,6 +56,8 @@ def expand(line):
     return [out[i : i + COLS] for i in range(0, max(len(out), 1), COLS)]
 
 
+
+
 class Term:
     def __init__(self):
         self.lines = []  # (text, colour, bold)
@@ -64,9 +68,9 @@ class Term:
         d = ImageDraw.Draw(img)
         d.rectangle([0, 0, W, BAR], fill=BARBG)
         for i, c in enumerate(["#ff5f56", "#ffbd2e", "#27c93f"]):
-            d.ellipse([PAD + i * 20, 10, PAD + i * 20 + 11, 21], fill=c)
+            d.ellipse([PAD + i * 20 * X, 10 * X, PAD + (i * 20 + 11) * X, 21 * X], fill=c)
         title = "skope: no API key, nothing real runs"
-        d.text(((W - FONT.getlength(title)) / 2, 7), title, font=FONT, fill=DIM)
+        d.text(((W - FONT.getlength(title)) / 2, 7 * X), title, font=FONT, fill=DIM)
         for row, (text, fill, bold) in enumerate(self.lines[-ROWS:]):
             y = BAR + PAD + row * LH
             if text.startswith("$ "):
@@ -77,9 +81,9 @@ class Term:
         self.frames.append((img, ms))
 
     def type(self, text, fill=FG):
-        """Types a command a few characters per frame. A newline in it is a `\\` continuation."""
+        """Types a command a few characters per frame, a line at a time."""
         for n, part in enumerate(text.split("\n")):
-            lead = "$ " if n == 0 else "    "
+            lead = "$ " if n == 0 else "  "
             self.lines.append((lead, fill, False))
             for i in range(0, len(part), 3):
                 self.lines[-1] = (lead + part[: i + 3], fill, False)
@@ -121,34 +125,33 @@ def main():
     cwd = [work]
 
     def sh(cmd, each=0):
-        """Types cmd, runs it for real, and prints what it wrote. A newline in cmd shows as `\\`."""
-        t.type(cmd.replace("\n", " \\\n"))
-        cmd = cmd.replace("\n", " ")
+        """Types cmd, runs it for real, and prints what it wrote. It's run as typed, line breaks and all."""
+        t.type(cmd)
         r = subprocess.run(cmd, shell=True, cwd=cwd[0], env=env, capture_output=True, text=True)
         out = r.stdout + r.stderr
         if out.strip():
             t.print(out, each)
 
     t = Term()
-    t.comment("# Just the skope binary: no clone, no config, no API key.")
+    t.comment("# Just the binary: no clone, no config, no API key.")
     sh("skope --demo")
     t.pause(3500)
     t.clear()
 
-    t.comment("# The demo skill's unit tests: each scenario fakes the commands and the model.")
+    t.comment("# Its unit tests fake the commands and the model.")
     t.type("cd skope-demo")
     cwd[0] = work / "skope-demo"
     sh("skope SKILL.md --test > results.jsonl", each=180)
     t.pause(2500)
     t.clear()
 
-    t.comment("# One dry run: Jev (faked) is sure, so skope would restart myapp-worker.")
-    dry = "skope SKILL.md --dry-run --fake {} --fake-exec commands.yaml\n| " + JQ
+    t.comment("# The model is sure, so skope would restart it.")
+    dry = "skope SKILL.md --dry-run --fake {} \\\n  --fake-exec commands.yaml \\\n  " + JQ
     sh(dry.format("answers.yaml"), each=140)
     t.pause(3500)
     t.clear()
 
-    t.comment("# Now the model isn't sure. skope hands off instead of guessing.")
+    t.comment("# Unsure: skope hands off instead of guessing.")
     sh("echo 'Triage.ask: unsure' > unsure.yaml")
     sh(dry.format("unsure.yaml"), each=140)
     t.pause(5000)

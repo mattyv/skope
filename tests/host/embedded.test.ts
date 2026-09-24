@@ -62,7 +62,7 @@ describe("skope --demo", () => {
     const r = skope(["--demo", dir], env);
     expect(r.status).toBe(0);
     expect(r.stdout).toBe("");
-    expect(r.stderr).toContain(`skope ${join(dir, "SKILL.md")} --test`);
+    expect(r.stderr).toContain(`cd ${dir}\n  skope SKILL.md --verify`);
     expect(readFileSync(join(dir, "SKILL.md"), "utf8")).toBe(readFileSync(join(ROOT, "fixtures", "disk-full", "SKILL.md"), "utf8"));
 
     const test = skope([join(dir, "SKILL.md"), "--test"], env);

@@ -21,14 +21,13 @@ export function writeDemo(dir = "skope-demo"): number {
     say(`skope: couldn't write the demo into ${dir}: ${(err as Error).message}`);
     return 50;
   }
-  const skill = join(dir, "SKILL.md");
-  say(`skope: wrote a demo skill into ${dir}. Nothing below runs a real command or needs an API key.
+  say(`skope: wrote a demo skill into ${dir}.
+Nothing below runs a real command or needs an API key.
 
-  # every path the skill can take, and how each ends
-  skope ${skill} --verify
-  # its unit tests, from ${join(dir, "tests.yaml")}
-  skope ${skill} --test
-  # one run, as JSON events, with faked commands and model
-  skope ${skill} --dry-run --fake ${join(dir, "answers.yaml")} --fake-exec ${join(dir, "commands.yaml")}`);
+  cd ${dir}
+  skope SKILL.md --verify   # every path, and how each ends
+  skope SKILL.md --test     # its unit tests, in tests.yaml
+  skope SKILL.md --dry-run --fake answers.yaml \\
+    --fake-exec commands.yaml   # one run, as JSON events`);
   return 0;
 }
