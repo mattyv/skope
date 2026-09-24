@@ -5,13 +5,17 @@
 // scenario's own value winning), plus expect.yaml's fields at its own top
 // level, with no `expect:` wrapper.
 
+import type { CoreProgram } from "../contracts.gen.js";
 import { type Expect, expectError } from "./expect.js";
+import { type FakeKind, keyLine } from "./fakeKeys.js";
 
 export interface TestsYamlScenario {
   name: string;
   expect: Expect;
   commands: unknown;
   answers?: unknown;
+  /** What to call its fakes in a message: the file the user wrote, not the merged copy. */
+  source: string;
 }
 
 export type TestsYamlRow = { scenario: TestsYamlScenario } | { name: string; invalid: string };
@@ -47,11 +51,22 @@ function shapeError(doc: unknown): { why: string; names: string[] } | null {
   return null;
 }
 
+/** `over` on top of `base`. With the skill's program, a key in `over` also replaces any key in
+ * `base` for the same statement, whatever kind of key each is (`line:N`, stable, exact text). */
+function merge(program: CoreProgram | null, kind: FakeKind, base: Obj | undefined, over: Obj | undefined): Obj {
+  if (!program || !base || !over) return { ...base, ...over };
+  const replaced = new Set(Object.keys(over).map((k) => keyLine(program, k, kind)));
+  replaced.delete(null);
+  const kept = Object.entries(base).filter(([k]) => !replaced.has(keyLine(program, k, kind)));
+  return { ...Object.fromEntries(kept), ...over };
+}
+
 function readScenario(
   name: string,
   raw: unknown,
   defaults: { commands?: Obj; answers?: Obj },
   folderNames: ReadonlySet<string>,
+  program: CoreProgram | null,
 ): TestsYamlRow {
   if (!validName(name)) return { name, invalid: "a scenario name must not be empty, contain /, or start with ." };
   if (folderNames.has(name)) return { name, invalid: `tests/${name} is also a folder scenario; rename one` };
@@ -66,8 +81,9 @@ function readScenario(
     scenario: {
       name,
       expect: rest as Expect,
-      commands: { ...defaults.commands, ...(commands as Obj | undefined) },
-      answers: hasAnswers ? { ...defaults.answers, ...(answers as Obj | undefined) } : undefined,
+      commands: merge(program, "commands", defaults.commands, commands as Obj | undefined),
+      answers: hasAnswers ? merge(program, "answers", defaults.answers, answers as Obj | undefined) : undefined,
+      source: `tests.yaml scenarios.${name}`,
     },
   };
 }
@@ -75,7 +91,7 @@ function readScenario(
 /** Every scenario a parsed tests.yaml document defines, merged with its defaults, or why each one
  * can't be used. `folderNames` are the tests/ folder scenarios already found next to it: a
  * tests.yaml scenario with the same name is invalid rather than silently picked over. */
-export function readTestsYaml(doc: unknown, folderNames: ReadonlySet<string>): TestsYamlRow[] {
+export function readTestsYaml(doc: unknown, folderNames: ReadonlySet<string>, program: CoreProgram | null = null): TestsYamlRow[] {
   const bad = shapeError(doc);
   if (bad !== null) {
     // Nothing can be told apart from the document alone: one invalid entry stands for it all.
@@ -85,5 +101,5 @@ export function readTestsYaml(doc: unknown, folderNames: ReadonlySet<string>): T
   const d = doc as Obj;
   const defaults = (d.defaults ?? {}) as { commands?: Obj; answers?: Obj };
   const scenarios = d.scenarios as Record<string, unknown>;
-  return Object.entries(scenarios).map(([name, raw]) => readScenario(name, raw, defaults, folderNames));
+  return Object.entries(scenarios).map(([name, raw]) => readScenario(name, raw, defaults, folderNames, program));
 }

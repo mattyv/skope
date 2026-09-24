@@ -52,6 +52,7 @@ describe("fake files: the hand check agrees with contracts/fakes.schema.json", (
     { x: [{ exit: 0 }, { stdout: "" }] },
     { x: [[{ exit: 0 }]] },
     { x: null },
+    { x: true },
   ];
   const validCommands: unknown[] = [
     {},
@@ -60,6 +61,7 @@ describe("fake files: the hand check agrees with contracts/fakes.schema.json", (
     { x: { exit: Number.POSITIVE_INFINITY } }, // JSON Schema's `integer`, as ajv checks it
     { "line:3": [{ exit: 1 }, { exit: 0, stdout: "", stderr: "", ms: 5 }] },
     { "Triage.used": " 93%\n" }, // the string shorthand for {exit: 0, stdout: "..."}
+    { "Triage.used": 93 }, // an unquoted YAML number is shorthand too: {exit: 0, stdout: "93"}
     { x: ["a", { exit: 1 }, ""] }, // shorthand mixes with full results in a list
   ];
   const invalidAnswers: unknown[] = [

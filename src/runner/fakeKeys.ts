@@ -170,3 +170,18 @@ export function answerTemplate(program: CoreProgram, src: number): RegExp | unde
   }
   return undefined;
 }
+
+/** The line of the one statement a fake key names: a `line:N` key, a stable key, or exact text
+ * only one statement's command or question could be. Null when it names none or several. Lets a
+ * tests.yaml scenario override a default written with a different kind of key. */
+export function keyLine(program: CoreProgram, key: string, kind: FakeKind): number | null {
+  const line = /^line:(\d+)$/.exec(key);
+  if (line) return Number(line[1]);
+  const { doc } = resolveFakeKeys(program, { [key]: true }, kind, false);
+  const lineKey = Object.keys(doc).find((d) => /^line:\d+$/.test(d));
+  if (lineKey) return Number(lineKey.slice(5));
+  const hits = Object.values(program.sections)
+    .flatMap((s) => ("body" in s ? targets(s.body, kind) : []))
+    .filter((t) => t.text?.test(key));
+  return hits.length === 1 ? (hits[0] as Target).src : null;
+}

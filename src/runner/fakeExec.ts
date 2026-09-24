@@ -10,8 +10,8 @@ import { CAP_BYTES, type ExecResult } from "./exec.js";
 
 // The commands.yaml the host hands to fakeExec is always already expanded (src/runner/fakes.ts
 // expandCommands, called in src/host/run.ts before it reaches here), so every entry here is a
-// full result object, never the string shorthand.
-type FullResult = Exclude<Result, string>;
+// full result object, never the string or number shorthand.
+type FullResult = Exclude<Result, string | number>;
 
 export class FakeUnmatchedCommand extends Error {
   readonly code = "E-FAKE-UNMATCHED";
