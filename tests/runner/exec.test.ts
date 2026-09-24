@@ -31,6 +31,14 @@ function running(pid: number): boolean {
   }
 }
 
+/**
+ * A command whose shell dies on SIGTERM while a background child ignores it and holds no pipe.
+ * The child writes its pid only once it ignores SIGTERM, so a test that waits for the file can't
+ * stop it before then; it writes and renames, so the file is never seen half-written.
+ */
+const SURVIVOR = (pidFile: string) =>
+  `sh -c 'trap "" TERM; echo $$ > "$0.tmp" && mv "$0.tmp" "$0"; exec sleep 30' '${pidFile}' >/dev/null 2>&1 & sleep 30`;
+
 /** A path the command touches once its traps are set, so a test can wait for it. */
 function marker(name: string): string {
   dir ??= mkdtempSync(join(tmpdir(), "skope-exec-test-"));
@@ -112,7 +120,7 @@ describe("execCommand (SPEC §4.4)", () => {
     // `close` fires while the child still runs. It must still get SIGKILL before the result.
     const pidFile = marker("survivor");
     const start = Date.now();
-    const p = execCommand(`(trap "" TERM; exec sleep 30) >/dev/null 2>&1 & echo $! > '${pidFile}'; sleep 30`, {
+    const p = execCommand(SURVIVOR(pidFile), {
       timeoutMs: 200,
       graceMs: 600,
       env,
@@ -259,7 +267,7 @@ describe("stopAll (SPEC §4.4: skope interrupted, P2-13)", () => {
 
   test("waits for every process in a stopped group, not just the shell", async () => {
     const pidFile = marker("survivor");
-    const p = execCommand(`(trap "" TERM; exec sleep 30) >/dev/null 2>&1 & echo $! > '${pidFile}'; sleep 30`, {
+    const p = execCommand(SURVIVOR(pidFile), {
       timeoutMs: 60_000,
       env,
     });
