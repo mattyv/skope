@@ -82,6 +82,7 @@ describe("explore", () => {
     expect(s.maxMs).toBe(1000 + 5000 + 100 + 10);
     expect([...s.sections].sort()).toEqual(["Main", "Page"]);
     expect([...s.transfers]).toEqual(["Main → Page"]);
+    expect(s.asks).toEqual([{ section: "Main", line: 2, kind: "choice", branches: { options: 2, unsure: 1, unavailable: 1 } }]);
   });
 
   test("memoises on the abstract state: 3^30 paths explored in 30 visits", () => {

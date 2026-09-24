@@ -36,6 +36,14 @@ export interface Summary {
 
 type Branch = { response: Response; ms: number };
 
+/** An ask the explorer reached, and the branches it took there (SPEC §5.6). */
+export interface AskBranches {
+  section: string;
+  line: number;
+  kind: string;
+  branches: { options: number; unsure: number; unavailable: number };
+}
+
 /** Every answer a real run could get to `next` (SPEC §5.4), with its worst-case time. */
 export function branches(next: Exclude<Next, { kind: "done" }>, costs: Costs): Branch[] {
   switch (next.kind) {
@@ -110,8 +118,9 @@ function merge(a: Summary, b: Summary): Summary {
 const EMPTY: Summary = { paths: 0n, maxAsks: 0, maxEffects: 0, maxMs: 0, outcomes: new Set(), sections: new Set(), transfers: new Set() };
 
 /** Explores every path from the start of a run (P1 makes the graph finite). */
-export function explore(start: Explorable, costs: Costs): Summary {
+export function explore(start: Explorable, costs: Costs): Summary & { asks: AskBranches[] } {
   const memo = new Map<string, Summary>();
+  const asks = new Map<number, Omit<AskBranches, "branches"> & { taken: Set<string> }>();
   const visit = (run: Explorable, next: Next): Summary => {
     if (next.kind === "done") {
       // A handoff may page (SPEC §8), so its worst case includes the pager's timeout.
@@ -125,13 +134,36 @@ export function explore(start: Explorable, costs: Costs): Summary {
     for (const b of branches(next, costs)) {
       const child = run.fork();
       const out = child.step(b.response);
+      const at = out.events.find((e) => e.event === "ask")?.at;
+      if (next.kind === "ask" && at) {
+        // Distinct branches at this line, however many states reach it.
+        const seen = asks.get(next.src) ?? { section: at.section, line: next.src, kind: next.request.kind, taken: new Set<string>() };
+        asks.set(next.src, seen);
+        const r = b.response;
+        const top = r.kind === "answer" ? Object.keys(r.probs).find((k) => r.probs[k] === 1) : undefined;
+        seen.taken.add(r.kind === "ask_failed" ? "unavailable" : top === undefined ? "unsure" : `option ${top}`);
+      }
       sum = merge(sum, edge(out.events, b.ms, visit(child, out.next)));
     }
     memo.set(key, sum);
     return sum;
   };
   const first = start.step({ kind: "none" });
-  return edge(first.events, 0, visit(start, first.next));
+  const summary = edge(first.events, 0, visit(start, first.next));
+  const count = (t: Set<string>, f: (x: string) => boolean) => [...t].filter(f).length;
+  return {
+    ...summary,
+    asks: [...asks.values()]
+      .sort((a, b) => a.line - b.line)
+      .map(({ taken, ...a }) => ({
+        ...a,
+        branches: {
+          options: count(taken, (x) => x.startsWith("option ")),
+          unsure: count(taken, (x) => x === "unsure"),
+          unavailable: count(taken, (x) => x === "unavailable"),
+        },
+      })),
+  };
 }
 
 /** The core's event kinds: the ones a trace is replayed on. */

@@ -61,6 +61,16 @@ describe("M2: --verify (SPEC §5.4, §5.6)", () => {
     expect(report.max_effects).toBeLessThanOrEqual(5);
   });
 
+  test("lists each ask with the branches the explorer took there: one per option, unsure and unavailable (SPEC §5.6)", async () => {
+    const r = await runSkop([DISK_FULL, "--verify"]);
+    const report = JSON.parse(r.stdout.trim().split("\n").at(-1) as string) as { asks: object[] };
+    expect(report.asks).toEqual([
+      { section: "Triage", line: 27, kind: "choice", branches: { options: 4, unsure: 1, unavailable: 1 } },
+      { section: "Clean up", line: 37, kind: "yesno", branches: { options: 2, unsure: 1, unavailable: 1 } },
+      { section: "Restart", line: 46, kind: "choice", branches: { options: 4, unsure: 1, unavailable: 1 } },
+    ]);
+  });
+
   test("the report stamps the same build identity `skop --version` prints (SPEC §7.2)", async () => {
     const version = await runSkop(["--version"]);
     const report = await verify(DISK_FULL);

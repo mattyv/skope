@@ -1,11 +1,9 @@
 // M7 (SPEC §12.3, v1.1): "the Appendix D fixture passes M1-M3 with fakes
-// for each level, unsure, and backend unavailable." This is a coverage
-// check over fixtures-next/error-triage/fakes/, not a run of the CLI, so it
-// passes now: it's the acceptance-level promise that the scenario set is
-// complete, independent of whether the Score gate is implemented yet. The
-// actual exec-and-compare-to-golden test for these scenarios is
-// tests/acceptance/m3/exec.test.ts (which includes fixtures-next), marked
-// as an expected failure there.
+// for each level, unsure, and backend unavailable." This file checks the
+// scenario set is complete, and that --verify reports the Score ask's
+// branches (SPEC §12.2). The exec-and-compare-to-golden runs of these
+// scenarios are in tests/acceptance/m3/exec.test.ts, which includes
+// fixtures-next.
 
 import { describe, expect, test } from "vitest";
 import { runSkop } from "../lib/cli.js";
@@ -22,6 +20,15 @@ describe("M1 (v1.1 slice): --lint on error-triage (SPEC §7, §12.3)", () => {
     const r = await runSkop([ERROR_TRIAGE, "--lint"]);
     expect(r.code).toBe(0);
     expect(r.events.some((e: { event: string }) => e.event === "error")).toBe(false);
+  });
+});
+
+describe("M7: --verify on error-triage (SPEC §12.2)", () => {
+  test("reports 4 level branches, 1 unsure and 1 unavailable at the Score ask", async () => {
+    const r = await runSkop([ERROR_TRIAGE, "--verify"]);
+    expect(r.code).toBe(0);
+    const report = JSON.parse(r.stdout.trim().split("\n").at(-1) as string);
+    expect(report.asks).toEqual([{ section: "Triage", line: 19, kind: "score", branches: { options: 4, unsure: 1, unavailable: 1 } }]);
   });
 });
 

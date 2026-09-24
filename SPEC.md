@@ -826,6 +826,7 @@ identity (§7.2), then:
   timeouts plus kill grace, every backend attempt allowed by `ask.retries` with its wait, and the pager
   timeout. The enforced limit is `limits.deadline` (§7).
 - sections never reached (warning `W-SECTION-UNREACHED`)
+- each ask reached, with its section, line, kind and the branches explored there: one per option (Score: per level), plus unsure and unavailable (§5.4)
 
 ---
 

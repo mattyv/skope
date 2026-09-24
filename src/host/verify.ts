@@ -55,7 +55,7 @@ export function readOnly(mode: ReadOnly, v: VerifyInput): number {
   // Lint already warns about these (W-SECTION-UNREACHED); the report lists them.
   const unreached = sections.filter(([, x]) => "body" in x && !s.sections.has(x.name)).map(([, x]) => x as Section);
   const { version, build } = IDENTITY;
-  const maxima = { max_ask_calls: s.maxAsks, max_effects: s.maxEffects, worst_case_ms: s.maxMs };
+  const maxima = { max_ask_calls: s.maxAsks, max_effects: s.maxEffects, worst_case_ms: s.maxMs, asks: s.asks };
   if ("explain" in mode) {
     v.emit({
       skop_version: version,
