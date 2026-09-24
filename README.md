@@ -92,6 +92,8 @@ or `npm install -g skope@beta`, or `ghcr.io/mattyv/skope:0.1.0-beta.1`.
 
 ## Use
 
+### Check
+
 Check a skill before it ever runs. Lint catches dead ends, cycles, dangling
 links, and command output that could leak into a command:
 
@@ -100,6 +102,8 @@ $ skope disk-full/SKILL.md --lint
 $ skope disk-full/SKILL.md --explain    # sections, transfer graph, worst-case cost
 $ skope disk-full/SKILL.md --verify     # every path the run can take, and how each ends
 ```
+
+### Rehearse
 
 Rehearse it with fake command results and fake answers. Nothing real runs:
 
@@ -132,9 +136,12 @@ Leave out `--fake` to rehearse against the real backend with fake command
 results: that's how you check a skill's questions and thresholds.
 [`fixtures/`](fixtures/) has worked pairs for the example skills.
 
+### Test
+
 To keep a rehearsal, save it as a test. Put each scenario in its own
 directory under `tests/` next to the skill, with its fakes and an
-`expect.yaml` that says what should happen:
+`expect.yaml` that says what should happen. skope skips hidden directories
+such as `tests/.cache`.
 
 ```
 disk-full/
@@ -161,10 +168,33 @@ PASS    restart
 1 passed, 0 failed, 0 invalid
 ```
 
+`expect.yaml` can check:
+
+| Field | Passes when |
+|---|---|
+| `outcome`, `exit` | the run ends this way (`exit` follows from `outcome` if left out) |
+| `path` or `path_prefix` | the run enters these sections, in order (all of them, or the first few) |
+| `asks` | each named ask chose this option and cleared `sure` |
+| `page_contains` | some page includes this text, as the skill wrote it |
+| `handoff_reason` | a handoff happened for this reason, such as `gate_failed` |
+| `max_ask_calls` | the run asked no more than this many questions |
+
+A scenario must set `outcome`, `exit`, `path` or `path_prefix`. The full
+rules are in [`docs/SPEC.md`](docs/SPEC.md) §7.3 and
+[`contracts/expect.schema.json`](contracts/expect.schema.json).
+
 Nothing real runs, not even the pager, and `do` steps go through the fakes,
-so you can test what happens when one fails. It exits 0 when every scenario
-passes, 60 when one fails, and 40 when a scenario itself is broken, so it
-fits in CI. `--scenario tests/restart` runs just one.
+so you can test what happens when one fails. Scripted tests don't read your
+config either, so they need no API key and give the same result on every
+machine; pass `--config` to test against one. It exits 0 when every
+scenario passes, 60 when one fails, and 40 when a scenario itself is
+broken, so it fits in CI. `--scenario tests/restart` runs just one.
+
+A failing scenario prints the first difference and where its events are:
+
+```console
+FAIL    restart: asks.Triage: expected Restart, got Clean up (events: /tmp/skope-test-x1Y2/restart/events.jsonl)
+```
 
 Scripted tests check the skill's logic, not its questions. `--live` checks
 the questions: every ask goes to the real backend, and each scenario runs
@@ -181,7 +211,11 @@ PASS    restart
 
 A run is a hit when it does everything `expect.yaml` says. A thin margin
 over `sure` warns; set `live.min_margin` to make it fail, and
-`live.min_hit_rate` to allow some misses.
+`live.min_hit_rate` to allow some misses. Live tests read your config for
+the backend, and they cost what the calls cost: skope prints the most it
+will make before it starts.
+
+### Run
 
 Then run it for real. A dry run runs the read-only `run` and `check`
 commands, but never a `do` and never a page. It does ask the backend, so a
@@ -219,7 +253,7 @@ is a section, and a run moves from section to section until it ends.
 
 A bold word that looks like a keyword but isn't one is an error, never
 prose, so a typo can't silently skip a step. The full grammar is in
-[`SPEC.md`](SPEC.md).
+[`docs/SPEC.md`](docs/SPEC.md).
 
 ## How a run ends
 
@@ -346,10 +380,12 @@ $ DAFNY=/path/to/dafny npm run core   # verify the proofs and rebuild core/gener
 
 ## Read more
 
-- [`SPEC.md`](SPEC.md) is the language: syntax, semantics, proofs, backends
+- [`docs/SPEC.md`](docs/SPEC.md) is the language: syntax, semantics, proofs, backends
   and the CLI.
-- [`PLAN.md`](PLAN.md) is how it's built: phases, parallel agents,
+- [`docs/PLAN.md`](docs/PLAN.md) is how it's built: phases, parallel agents,
   test-first streams, reviews and releases.
+- [`docs/design/`](docs/design/) holds designs for work in progress, such
+  as [skill tests](docs/design/skill-tests.md).
 - [`contracts/`](contracts/) holds the shapes the parts of skope agree on,
   with worked examples.
 

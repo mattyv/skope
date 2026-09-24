@@ -109,10 +109,11 @@ export async function runTests(o: TestOptions): Promise<number> {
   return tally.invalid > 0 ? EXIT.invalid : tally.failed > 0 ? 60 : 0;
 }
 
-/** Every directory directly under `root`, in name order. */
+/** Every directory directly under `root`, in name order, except hidden ones like `.cache`. */
 function scenarioDirs(root: string): string[] {
   if (!existsSync(root)) return [];
   return readdirSync(root)
+    .filter((n) => !n.startsWith("."))
     .map((n) => join(root, n))
     .filter((p) => statSync(p).isDirectory())
     .sort();
@@ -196,7 +197,9 @@ async function runOnce(o: TestOptions, s: Scenario, stateDir: string, live: bool
     fake: live ? undefined : answers,
     fakeExec: s.commands,
     config: o.config,
-    test: { out: (l) => lines.push(l), err: () => {}, stateDir },
+    // Scripted runs don't read the personal config: its redact patterns and on_handoff would change
+    // what a scenario sees. Live runs need it for the backend; an explicit --config always applies.
+    test: { out: (l) => lines.push(l), err: () => {}, stateDir, builtinConfig: !live && o.config === undefined },
   });
   writeFileSync(join(stateDir, "events.jsonl"), lines.join(""));
   const events = lines
@@ -333,6 +336,9 @@ function labelOf(program: CoreProgram, line: number, chosen: string | number | n
   return sectionOptions(program, line) && typeof chosen === "string" ? (program.sections[chosen]?.name ?? chosen) : String(chosen);
 }
 
+// The pager's link escaping (src/host/loop.ts) puts a zero-width space after `@`, in `://` and after a
+// dot between letters; page_contains is written against the page as the skill wrote it.
+const PAGER_ESCAPE = "\u200b";
 const same = (a: string, b: string) => sectionId(a) === sectionId(b);
 const arrow = (p: string[]) => p.join(" → ");
 
@@ -375,7 +381,9 @@ export function check(expect: Expect, code: number, events: Event[], program: Co
   }
 
   if (expect.page_contains !== undefined) {
-    const pages = events.filter((e) => ["page", "would_page", "handoff_page"].includes(e.event)).map((e) => String(e.text));
+    const pages = events
+      .filter((e) => ["page", "would_page", "handoff_page"].includes(e.event))
+      .map((e) => String(e.text).replaceAll(PAGER_ESCAPE, ""));
     if (!pages.some((t) => t.includes(expect.page_contains as string)))
       return `page_contains: no page contains "${expect.page_contains}"${pages.length ? `; pages: ${pages.join(" | ")}` : "; the run sent no page"}`;
   }

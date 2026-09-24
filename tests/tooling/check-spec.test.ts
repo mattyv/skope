@@ -22,7 +22,7 @@ afterEach(() => {
 function makeDocsTree(): string {
   const dir = mkdtempSync(join(tmpdir(), "check-spec-"));
   dirsMade.push(dir);
-  for (const f of ["SPEC.md", "PLAN.md", "README.md"]) cpSync(join(REPO, f), join(dir, f));
+  for (const f of ["docs/SPEC.md", "docs/PLAN.md", "README.md"]) cpSync(join(REPO, f), join(dir, f), { recursive: true });
   cpSync(join(REPO, "contracts"), join(dir, "contracts"), { recursive: true });
   cpSync(join(REPO, "fixtures"), join(dir, "fixtures"), { recursive: true });
   mkdirSync(join(dir, "scripts"), { recursive: true });

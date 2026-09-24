@@ -18,6 +18,10 @@ type Obj = Record<string, unknown>;
 const isObj = (v: unknown): v is Obj => typeof v === "object" && v !== null && !Array.isArray(v);
 const isInt = (v: unknown) => typeof v === "number" && !(v % 1) && !Number.isNaN(v);
 const nonEmpty = (v: unknown) => typeof v === "string" && v.length > 0;
+/** Exit codes are 0 to 255. */
+export const MAX_EXIT = 255;
+/** The same cap as --runs (src/cli.ts): without one, live.runs: .inf repeats backend calls forever. */
+export const MAX_RUNS = 999999;
 const KEYS = ["outcome", "exit", "path", "path_prefix", "asks", "page_contains", "handoff_reason", "max_ask_calls", "live"];
 const REASONS = ["explicit", "gate_failed", "command_failed", "ask_unavailable", "deadline"];
 
@@ -30,7 +34,8 @@ export function expectError(doc: unknown): string | null {
   if ("path" in doc && "path_prefix" in doc) return "set path or path_prefix, not both";
   if ("outcome" in doc && !["stopped", "paged", "handoff"].includes(doc.outcome as string))
     return "outcome must be stopped, paged or handoff";
-  if ("exit" in doc && !isInt(doc.exit)) return "exit must be an integer";
+  if ("exit" in doc && !(isInt(doc.exit) && (doc.exit as number) >= 0 && (doc.exit as number) <= MAX_EXIT))
+    return `exit must be a whole number from 0 to ${MAX_EXIT}`;
   for (const k of ["path", "path_prefix"])
     if (k in doc && !(Array.isArray(doc[k]) && (doc[k] as unknown[]).length > 0 && (doc[k] as unknown[]).every(nonEmpty)))
       return `${k} must be a list of section names`;
@@ -52,7 +57,8 @@ export function expectError(doc: unknown): string | null {
     if (!isObj(l)) return "live must be a mapping";
     const lx = Object.keys(l).find((k) => !["runs", "min_hit_rate", "min_margin"].includes(k));
     if (lx !== undefined) return `unknown key live.${lx}`;
-    if ("runs" in l && !(isInt(l.runs) && (l.runs as number) >= 1)) return "live.runs must be a whole number of 1 or more";
+    if ("runs" in l && !(isInt(l.runs) && (l.runs as number) >= 1 && (l.runs as number) <= MAX_RUNS))
+      return `live.runs must be a whole number from 1 to ${MAX_RUNS}`;
     if ("min_hit_rate" in l && !(typeof l.min_hit_rate === "number" && l.min_hit_rate >= 0 && l.min_hit_rate <= 1))
       return "live.min_hit_rate must be from 0 to 1";
     if ("min_margin" in l && typeof l.min_margin !== "number") return "live.min_margin must be a number";

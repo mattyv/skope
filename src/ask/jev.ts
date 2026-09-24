@@ -20,7 +20,9 @@ export interface JevConfig {
 
 const DEFAULT_URL = "https://api.typesafe.ai/v1/systemone";
 
-// TypeSafe pins as jev-X.Y.Z; OpenRouter pins as a dated snapshot, typesafe/jev-X.Y-YYYYMMDD.
+// TypeSafe pins as jev-X.Y.Z. On OpenRouter, typesafe/jev-1.13 answered as typesafe/jev-1.13-20260917
+// (September 2026), so a dated id is taken to name one snapshot. That's inferred from its responses,
+// not documented by OpenRouter: if a dated id turns out to move, drop the second alternative.
 const PINNED_MODEL = /^(jev-\d+\.\d+\.\d+|typesafe\/jev-\d+\.\d+-\d{8})$/;
 
 /** An alias like `jev-latest` (SPEC §6.2): anything that isn't a pinned version. */

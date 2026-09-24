@@ -66,6 +66,57 @@ async function test_(path: string, ...args: string[]) {
 }
 
 describe("skope --test", () => {
+  const PAGER_SKILL = [
+    "---",
+    "name: pagetext",
+    "description: pages text the pager escapes",
+    "format: 1",
+    "---",
+    "# Page text",
+    "",
+    "## Start",
+    "Measure and page.",
+    "",
+    "- **run** `echo x` as v",
+    '- **page** "queue orders.v2 at https://broker.example for ops@example.com: {v}"',
+    "",
+  ].join("\n");
+  const PAGER_COMMANDS = { "Start.v": { exit: 0, stdout: "1" } };
+
+  test("page_contains matches the page as written, not the pager's link-escaped text", async () => {
+    const r = await test_(
+      skill(
+        Object.fromEntries(
+          ["orders.v2", "https://broker.example", "ops@example.com"].map((text, i) => [
+            `t${i}`,
+            { commands: PAGER_COMMANDS, expect: { outcome: "paged", page_contains: text } },
+          ]),
+        ),
+        PAGER_SKILL,
+      ),
+    );
+    expect(r.scenarios.map((s: { mismatch: string | null }) => s.mismatch)).toEqual([null, null, null]);
+    expect(r.code).toBe(0);
+  });
+
+  test("a hidden directory under tests/ isn't a scenario", async () => {
+    const path = skill({ restart: restart() });
+    mkdirSync(join(path, "..", "tests", ".cache"));
+    const r = await test_(path);
+    expect(r.scenarios.map((s: { scenario: string }) => s.scenario)).toEqual(["restart"]);
+    expect(r.code).toBe(0);
+  });
+
+  test("a scripted run ignores the personal config, so a scenario passes the same on every machine", async () => {
+    const home = mkdtempSync(join(tmpdir(), "skope-xdg-"));
+    mkdirSync(join(home, "skope"));
+    writeFileSync(join(home, "skope", "config.yaml"), "redact:\n  patterns:\n    - 'orders'\n", { mode: 0o600 });
+    const path = skill({ t: { commands: PAGER_COMMANDS, expect: { outcome: "paged", page_contains: "queue orders" } } }, PAGER_SKILL);
+    const r = await runSkope([path, "--test"], { env: { XDG_CONFIG_HOME: home } });
+    expect(r.stderr).toContain("PASS    t");
+    expect(r.code).toBe(0);
+  });
+
   test("a scenario that does what expect.yaml says passes: exit 0", async () => {
     const r = await test_(skill({ restart: restart() }));
     expect(r.code).toBe(0);

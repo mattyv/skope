@@ -96,7 +96,10 @@ describe("build-id.mjs (SPEC §7.2)", () => {
     const gitDir = makeTree();
     execFileSync("git", ["init", "-q"], { cwd: gitDir });
     execFileSync("git", ["add", "-A"], { cwd: gitDir });
-    execFileSync("git", ["-c", "user.email=a@b.c", "-c", "user.name=t", "commit", "-q", "-m", "x"], { cwd: gitDir });
+    // No signing: a developer's global commit.gpgsign would prompt for a key mid-test.
+    execFileSync("git", ["-c", "user.email=a@b.c", "-c", "user.name=t", "-c", "commit.gpgsign=false", "commit", "-q", "-m", "x"], {
+      cwd: gitDir,
+    });
 
     const plainDir = makeTree();
 
@@ -168,7 +171,7 @@ describe("build-id.mjs (SPEC §7.2)", () => {
     git("init", "-q");
     writeFileSync(join(dir, ".gitignore"), "src/ignored.ts\n");
     git("add", "-A");
-    git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "base");
+    git("-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", "commit", "-qm", "base");
     const before = buildOf(dir);
     writeFileSync(join(dir, "src", "ignored.ts"), "export const x = 1;\n");
     expect(buildOf(dir)).toBe(before);
