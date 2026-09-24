@@ -122,6 +122,12 @@ $ curl -fsSL https://github.com/mattyv/skope/releases/download/v0.1.0-beta.1/ins
 
 or `npm install -g skope@beta`, or `ghcr.io/mattyv/skope:0.1.0-beta.1`.
 
+If you use Claude Code (`~/.claude` exists), both the installer and
+`npm install -g` also install the
+[`write-skope-skill`](skills/write-skope-skill/SKILL.md) agent skill, which
+has an agent write skope skills test first. Set `SKOPE_NO_SKILL=1` to skip
+it.
+
 ## Use
 
 ### Check
@@ -271,12 +277,13 @@ over `sure` warns; set `live.min_margin` to make it fail, and
 the backend, and they cost what the calls cost: skope prints the most it
 will make before it starts.
 
-**Having an agent write the skill?** Give it
-[`skills/write-skope-skill`](skills/write-skope-skill/SKILL.md). It makes
-the agent write `tests.yaml` first, watch it fail, then write the skill
-until `--lint`, `--verify` and `--test` are clean, and finally check the
-questions with `--live`. For Claude Code, copy the folder into
-`~/.claude/skills/` (or `.claude/skills/` in your repo).
+**Having an agent write the skill?** skope comes with
+[`write-skope-skill`](skills/write-skope-skill/SKILL.md), an agent skill
+that makes the agent write `tests.yaml` first, watch it fail, then write
+the skill until `--lint`, `--verify` and `--test` are clean, and finally
+check the questions with `--live`. Installing skope puts it in Claude
+Code's skills directory if you have one; `skope --install-skill [DIR]`
+installs it anywhere else, such as `.claude/skills` in your repo.
 
 ### Run
 
