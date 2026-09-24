@@ -364,7 +364,8 @@ export async function runSkill(o: RunOptions): Promise<number> {
 function detail(r: LoopResult): Record<string, unknown> | null {
   if (r.outcome.kind !== "handoff") return null;
   if (r.outcome.reason === "gate_failed" || r.outcome.reason === "ask_unavailable") return r.lastAsk;
-  if (r.outcome.reason === "command_failed") return r.failedCheck ?? r.lastExec;
+  // A comparison that couldn't coerce: the core gives {expr, left, right} as JSON (SPEC §4.2). Otherwise the command.
+  if (r.outcome.reason === "command_failed") return r.outcome.detail ? JSON.parse(r.outcome.detail) : r.lastExec;
   return null;
 }
 

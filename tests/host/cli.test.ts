@@ -218,7 +218,8 @@ describe("run flow", () => {
     expect(check.result).toBeNull();
     expect(find(r.events, "handoff_record")?.record).toMatchObject({ reason: "command_failed" });
     const detail = (find(r.events, "handoff_record")?.record as { detail: unknown } | undefined)?.detail;
-    expect(detail).toEqual({ expr: "{x} > 1", left: check.left, right: check.right });
+    // The operands as the comparison saw them: the raw text that failed to coerce.
+    expect(detail).toEqual({ expr: "{x} > 1", left: "abc", right: "1" });
   });
 
   test("a command that fails after a comparison that couldn't coerce (else skip) gets the command's detail", async () => {
