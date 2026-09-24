@@ -136,6 +136,14 @@ describe("M4: exit codes match the outcome table (SPEC §4.1)", () => {
     expect(r.code).toBe(20);
   });
 
+  test("bare skope prints the options to stderr and exits 40, with no events (SPEC §7)", async () => {
+    const r = await runSkope([]);
+    expect(r.code).toBe(40);
+    expect(r.stdout).toBe("");
+    expect(r.stderr).toContain("--dry-run");
+    expect(r.stderr).not.toContain("E-USAGE");
+  });
+
   test("--version still works and exits 0 (Phase 0 baseline, not an expected failure)", async () => {
     const r = await runSkope(["--version"]);
     expect(r.code).toBe(0);

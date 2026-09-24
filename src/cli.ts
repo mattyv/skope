@@ -27,6 +27,11 @@ const HELP = `usage: skope <path/to/SKILL.md> [options]
   --help                  print this`;
 
 async function main(argv: string[]): Promise<number> {
+  // Bare `skope` is someone finding out what it does: the options, not an error event.
+  if (argv.length === 0) {
+    process.stderr.write(`${HELP}\n`);
+    return 40;
+  }
   // Only the flag itself, not a value that happens to spell it.
   if (argv.length === 1 && argv[0] === "--version") {
     const { version, build } = IDENTITY;

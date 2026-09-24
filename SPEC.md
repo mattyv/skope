@@ -1072,6 +1072,9 @@ skope <path/to/SKILL.md> [options]
   --help                  print these options to stdout and exit 0
 ~~~
 
+`skope` with no arguments prints the same options to stderr and exits 40,
+with no events.
+
 Responsibilities, in order:
 0. Check the mode. A run needs exactly one of `--apply` and `--dry-run`.
    Neither or both → print why to stderr and exit 40 before anything runs.
