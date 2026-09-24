@@ -50,7 +50,9 @@ describe("E-FRONTMATTER (parse): a frontmatter field is missing or invalid", () 
 
   test("2147483s (just under 2^31 − 1 ms) is accepted for every duration", () => {
     for (const key of ["run_timeout", "do_timeout", "deadline"]) {
-      const md = ["---", "name: test", "description: x", "format: 1", "limits:", `  ${key}: 2147483s`, "---", "## T", "- **stop**"].join("\n");
+      const md = ["---", "name: test", "description: x", "format: 1", "limits:", `  ${key}: 2147483s`, "---", "## T", "- **stop**"].join(
+        "\n",
+      );
       expect("errors" in preprocess(md), key).toBe(false);
     }
   });

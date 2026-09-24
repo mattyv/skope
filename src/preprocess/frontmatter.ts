@@ -140,7 +140,8 @@ export function parseFrontmatter(lines: string[], errors: ParseError[]): Frontma
         const target = Object.hasOwn(DURATIONS, key) ? DURATIONS[key] : undefined;
         const n = target ? parseDurationMs(value) : key === "ask_context" ? parseTokens(value) : null;
         if (n !== null) limits[target ?? "ask_context_tokens"] = n;
-        else if (target) bad(`limits.${key}`, `\`${key}\` must be a duration from 1s to 596h (2^31 − 1 ms), like "30s", "5m" or "1h"`, "limits");
+        else if (target)
+          bad(`limits.${key}`, `\`${key}\` must be a duration from 1s to 596h (2^31 − 1 ms), like "30s", "5m" or "1h"`, "limits");
         else if (key === "ask_context") bad(`limits.${key}`, '`ask_context` must be a positive size, like "4k tokens"', "limits");
         else bad(`limits.${key}`, `unknown limit \`${key}\` (run_timeout, do_timeout, deadline, ask_context)`, "limits");
       }
