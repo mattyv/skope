@@ -216,6 +216,8 @@ describe("host loop", () => {
     expect(escapePage("[x](http://e.io)")).toBe("\\[x\\](http:/\u200b/e.\u200bio)");
     expect(escapePage("@channel a & b")).toBe("@\u200bchannel a &amp; b");
     expect(escapePage("/ at 91%. Run r-1 now")).toBe("/ at 91%. Run r-1 now");
+    // Only link-like text is touched: versions, addresses and plain brackets stay copyable.
+    expect(escapePage("v1.2 at 10.0.0.1, [x] y. Done")).toBe("v1.2 at 10.0.0.1, [x] y. Done");
   });
 
   test("page text is escaped in the event and to the pager: no mentions, no links", async () => {

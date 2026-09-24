@@ -1270,7 +1270,9 @@ a terminal.
 
 - An agent that runs skop SHOULD set `SKOP_CALLER=agent`.
 - The handoff page says: `{host}: skop {skill} handed off ({reason}) in
-  {section}. Record: {path}`. It is escaped like any page.
+  {section}. Record: {path}`. Only `{section}`, which the author wrote, is
+  escaped like page text; the host and record path are skop's own and stay
+  exactly as they are, so they can be copied.
 - A pager failure is logged and doesn't change the outcome. The outcome
   stays `handoff`, exit 20.
 - In dry run the page is logged as `would_page` (§4.5).

@@ -202,9 +202,8 @@ export async function runSkill(o: RunOptions): Promise<number> {
       process.stderr.write(
         `skop: stale lock at ${lock.path}, left by a run that died. Check nothing is running, then remove it: rm ${lock.path}\n`,
       );
-      const message = escapePage(
-        `${host}: skop ${program.skill} found a stale lock at ${lock.path}. Check no run is live, then remove it.`,
-      );
+      // All skop's own words, so nothing is escaped: the path must stay copyable.
+      const message = `${host}: skop ${program.skill} found a stale lock at ${lock.path}. Check no run is live, then remove it.`;
       if (dryRun) emit({ event: "would_page", text: message });
       else emit({ event: "page", text: message, ok: await page(message) });
       return end("stale_lock");
@@ -319,9 +318,8 @@ export async function runSkill(o: RunOptions): Promise<number> {
       emit({ event: "handoff_record", ...at, path, record });
       const optedOut = o.noPage || process.env.SKOP_CALLER === "agent" || config.on_handoff === "none";
       if (!optedOut) {
-        const message = escapePage(
-          `${host}: skop ${program.skill} handed off (${result.outcome.reason}) in ${at.section}. Record: ${path}`,
-        );
+        // Only the section name is the author's; the host and record path stay copyable.
+        const message = `${host}: skop ${program.skill} handed off (${result.outcome.reason}) in ${escapePage(at.section)}. Record: ${path}`;
         if (dryRun) emit({ event: "would_page", ...at, text: message });
         else emit({ event: "handoff_page", ...at, text: message, ok: await page(message) });
       }

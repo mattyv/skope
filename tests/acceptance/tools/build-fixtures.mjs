@@ -159,8 +159,7 @@ const mk = {
   wouldDo: (skill, { section, line, cmd }) => wrap(skill, { event: "would_do", section, line, cmd }),
   page: (skill, { section, line, text, ok = true }) => wrap(skill, { event: "page", section, line, text: escapePage(text), ok }),
   wouldPage: (skill, { section, line, text }) => wrap(skill, { event: "would_page", section, line, text: escapePage(text) }),
-  handoffPage: (skill, { section, line, text, ok = true }) =>
-    wrap(skill, { event: "handoff_page", section, line, text: escapePage(text), ok }),
+  handoffPage: (skill, { section, line, text, ok = true }) => wrap(skill, { event: "handoff_page", section, line, text, ok }),
   transfer: (skill, { section, line, from, to }) => wrap(skill, { event: "transfer", section, line, from, to }),
   outcome: (skill, { outcome, reason, ask_calls, effects, dry_run }) =>
     wrap(skill, { event: "outcome", outcome, reason, ask_calls, effects, dry_run }),
@@ -168,18 +167,19 @@ const mk = {
     wrap(skill, { event: "handoff_record", section, line, path: `${RUN_DIR}/handoff.json`, record }),
 };
 
-// Page text as skop escapes it for the pager (SPEC §3.5: no mentions, no links): entities for
-// & < >, backslashes before [ ], and a zero-width space after @, inside ://, and after a dot
-// inside a word, so `example.com` or `handoff.json` can't become a link.
+// Page text as skop escapes the skill's page text for the pager (SPEC §3.5: no mentions, no
+// links): entities for & < >, backslashes on a markdown link's brackets, and a zero-width space
+// after @, inside ://, and after a dot between a word and a letter, so `example.com` can't become
+// a link. skop's own handoff page (host, section, record path) isn't escaped, so the path copies.
 function escapePage(t) {
   return t
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/[[\]]/g, "\\$&")
-    .replace(/@/g, "@\u200b")
-    .replace(/:\/\//g, ":/\u200b/")
-    .replace(/\.(?=[\p{L}\p{N}])/gu, ".\u200b");
+    .replace(/\[([^[\]\n]*)\]\(/g, "\\[$1\\](")
+    .replace(/@/g, "@​")
+    .replace(/:\/\//g, ":/​/")
+    .replace(/(?<=[\p{L}\p{N}])\.(?=\p{L})/gu, ".​");
 }
 
 const EXIT = { stopped: 0, paged: 10, handoff: 20, locked: 30, stale_lock: 31, invalid: 40, error: 50 };

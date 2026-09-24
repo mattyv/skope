@@ -61,21 +61,24 @@ const sha256 = (s: string) => `sha256:${createHash("sha256").update(s).digest("h
 const TAIL_BYTES = 2048;
 
 /**
- * Page text is escaped for the pager (SPEC §3.5, §11 rule 8): no mentions,
- * no links. HTML-style entities stop `<…>` links and `<!here>`; a
- * zero-width space after `@` stops mentions, and one inside `://` or after
- * a dot inside a word stops URLs and bare domains (`evil.example`) being
- * linked; `[` and `]` are backslash-escaped so `[x](…)` isn't a link.
+ * Page text from the skill is escaped for the pager (SPEC §3.5, §11 rule
+ * 8): no mentions, no links. The core's text mixes author words with
+ * values, so everything link-like is broken, and nothing else: HTML-style
+ * entities stop `<…>` links and `<!here>`; a zero-width space after `@`
+ * stops mentions, and one inside `://` or after a dot between a word and a
+ * letter stops URLs, `www.` and bare domains (`evil.example`); a markdown
+ * link `[x](…)` gets its brackets backslash-escaped. skop's own parts of a
+ * page (host, run dir, record path) are never passed through this.
  */
 export function escapePage(text: string): string {
   return text
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/[[\]]/g, "\\$&")
-    .replace(/@/g, "@\u200b")
-    .replace(/:\/\//g, ":/\u200b/")
-    .replace(/\.(?=[\p{L}\p{N}])/gu, ".\u200b");
+    .replace(/\[([^[\]\n]*)\]\(/g, "\\[$1\\](")
+    .replace(/@/g, "@​")
+    .replace(/:\/\//g, ":/​/")
+    .replace(/(?<=[\p{L}\p{N}])\.(?=\p{L})/gu, ".​");
 }
 
 export async function runLoop(interp: Interp, ctx: LoopContext): Promise<LoopResult> {

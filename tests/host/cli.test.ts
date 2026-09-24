@@ -148,7 +148,7 @@ describe("run flow", () => {
     const check = find(r.events, "check") as SkopEvent;
     expect(check.result).toBeNull();
     expect(find(r.events, "handoff_record")?.record).toMatchObject({ reason: "command_failed" });
-    const detail = (find(r.events, "handoff_record")?.record as { detail: unknown }).detail;
+    const detail = (find(r.events, "handoff_record")?.record as { detail: unknown } | undefined)?.detail;
     expect(detail).toEqual({ expr: "{x} > 1", left: check.left, right: check.right });
   });
 
@@ -159,7 +159,7 @@ describe("run flow", () => {
       "--no-page",
     ]);
     expect(r.code).toBe(20);
-    expect((find(r.events, "handoff_record")?.record as { detail: unknown }).detail).toMatchObject({ cmd: "exit 3", exit: 3 });
+    expect((find(r.events, "handoff_record")?.record as { detail: unknown } | undefined)?.detail).toMatchObject({ cmd: "exit 3", exit: 3 });
   });
 
   test("the saved ask request fits limits.ask_context, keeping the end of the output (SPEC §6.3)", async () => {
@@ -206,6 +206,8 @@ describe("lock (SPEC §7 step 3)", () => {
     expect(r.code).toBe(31);
     expect(find(r.events, "stale_lock")).toMatchObject({ path: lock, holder_pid: 2 ** 22 + 1 });
     expect(find(r.events, "page")).toMatchObject({ ok: true });
+    // S4: skop's own parts of a page aren't escaped, so the path can be copied.
+    expect(find(r.events, "page")?.text).toContain(`stale lock at ${lock}.`);
     expect(existsSync(lock)).toBe(true);
     expect(r.stderr).toContain(lock);
   });
@@ -329,11 +331,20 @@ describe("review fixes", () => {
     expect(statSync(find(r.events, "run_start")?.run_dir as string).mode & 0o777).toBe(0o700);
   });
 
-  test("the handoff page is escaped like any page: its record path can't become a link", async () => {
+  test("S4: the handoff page's host and record path are copyable byte for byte", async () => {
     const r = await runSkop([skill("- **hand off**"), "--apply"]);
     const text = find(r.events, "handoff_page")?.text as string;
-    expect(text).toContain("handoff.​json");
-    expect(text).not.toContain("handoff.json");
+    const path = find(r.events, "handoff_record")?.path as string;
+    expect(text).toBe(`${find(r.events, "run_start")?.host}: skop tiny handed off (explicit) in Main. Record: ${path}`);
+    expect(text).not.toContain("​");
+  });
+
+  test("S4: links and mentions from run output are still broken in a page", async () => {
+    const out = "see https://evil.example/x, www.evil.com, [x](y) and @here";
+    const r = await runSkop([skill(`- **run** \`echo '${out}'\` as out\n- **page** "look: {out}"`), "--apply"]);
+    const text = find(r.events, "page")?.text as string;
+    expect(text).not.toMatch(/:\/\/|www\.e|evil\.e|\[x\]\(|@here/);
+    expect(text.replace(/​/g, "").replace(/\\/g, "")).toBe(`look: ${out}`);
   });
 
   test("with no pager configured, a page reports ok: false and the message goes to stderr", async () => {
