@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, test } from "vitest";
 import type { CoreProgram } from "../../src/contracts.gen.js";
 import { preprocess } from "../../src/preprocess/index.js";
-import { resolveFakeKeys } from "../../src/runner/fakeKeys.js";
+import { answerTemplate, askLine, resolveFakeKeys } from "../../src/runner/fakeKeys.js";
 import { ROOT } from "../acceptance/lib/scenarios.js";
 
 function program(md: string): CoreProgram {
@@ -112,5 +112,32 @@ describe("resolveFakeKeys", () => {
       const { issues } = resolveFakeKeys(diskFull, { "line:23": 1, "Triage.used": 2 }, "commands", true);
       expect(issues).toMatchObject([{ code: "E-FAKE-AMBIGUOUS", key: "Triage.used" }]);
     });
+  });
+});
+
+describe("askLine", () => {
+  test("a Section with one ask resolves to its line", () => {
+    expect(askLine(diskFull, "Triage")).toBe(27);
+  });
+
+  test("Section.var resolves to the ask that binds var", () => {
+    expect(askLine(diskFull, "Restart.service")).toBe(46);
+  });
+
+  test("a key that names no ask is null", () => {
+    expect(askLine(diskFull, "Nope")).toBeNull();
+  });
+});
+
+describe("answerTemplate", () => {
+  test("matches the ask's literal text, wildcards where a variable interpolates", () => {
+    const p = skill("- **ask** Is this ok? → yes | no · sure 80%\n- **stop**");
+    const t = answerTemplate(p, askLine(p, "Main") as number);
+    expect(t?.test("Is this ok?")).toBe(true);
+    expect(t?.test("Is this not ok?")).toBe(false);
+  });
+
+  test("undefined for a line with no ask", () => {
+    expect(answerTemplate(diskFull, 999999)).toBeUndefined();
   });
 });

@@ -147,3 +147,26 @@ export function resolveFakeKeys<T extends Record<string, unknown>>(
   }
   return { doc: out as T, issues };
 }
+
+/** The line of the ask an `asks` key (docs/design/skill-tests.md) names: `Section` (its only ask)
+ * or `Section.var` (the ask that binds var), or null if it doesn't name exactly one. */
+export function askLine(program: CoreProgram, key: string): number | null {
+  for (const k of [key, `${key}.ask`]) {
+    const { doc, issues } = resolveFakeKeys(program, { [k]: true }, "answers", true);
+    const lineKey = Object.keys(doc).find((d) => /^line:\d+$/.test(d));
+    if (lineKey && issues.length === 0) return Number(lineKey.slice(5));
+  }
+  return null;
+}
+
+/** The pattern an answers.yaml key would need to match to answer the ask on line `src` by its
+ * exact text, or undefined if there's no ask there. Used to tell whether an existing literal key
+ * already answers an ask a derived answer (src/runner/deriveAnswers.ts) would otherwise add. */
+export function answerTemplate(program: CoreProgram, src: number): RegExp | undefined {
+  for (const s of Object.values(program.sections)) {
+    if (!("body" in s)) continue;
+    const found = targets(s.body, "answers").find((t) => t.src === src);
+    if (found) return found.text;
+  }
+  return undefined;
+}

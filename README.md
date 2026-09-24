@@ -138,37 +138,54 @@ results: that's how you check a skill's questions and thresholds.
 
 ### Test
 
-To keep a rehearsal, save it as a test. Put each scenario in its own
-directory under `tests/` next to the skill, with its fakes and an
-`expect.yaml` that says what should happen. skope skips hidden directories
-such as `tests/.cache`.
+To keep a rehearsal, save it as a test. The easiest way is one `tests.yaml`
+beside the skill: shared defaults, then each scenario's own commands,
+answers and what should happen, all in one file.
 
 ```
 disk-full/
   SKILL.md
-  tests/
-    restart/
-      commands.yaml
-      answers.yaml
-      expect.yaml
+  tests.yaml
 ```
 
 ```yaml
-outcome: paged
-path: [Triage, Restart, Page]
-asks:
-  Triage: { chosen: Restart }
-  Restart.service: { chosen: myapp-worker }
-page_contains: "at 91%"
+defaults:
+  commands:
+    Triage.used: "93%\n"              # a plain string is shorthand for {exit: 0, stdout: "..."}
+    Triage.errors: "myapp-worker OOM\n"
+    Triage.biggest: "40G\t/var\n"
+    systemctl restart myapp-worker: { exit: 0 }
+scenarios:
+  restart:
+    commands:
+      Restart.used: "91%\n"           # overrides the default for this scenario only
+    outcome: paged
+    path: [Triage, Restart, Page]
+    asks:
+      Triage: { chosen: Restart }
+      Restart.service: { chosen: myapp-worker }
+    page_contains: "at 91%"
+  investigate:
+    outcome: handoff
+    asks:
+      Triage: { chosen: Investigate }
 ```
+
+Neither scenario has an `answers.yaml`: naming an ask's expected choice in
+`asks` is enough, in scripted mode, for skope to script that answer itself,
+confidently. Give an explicit answer only for an ask you want to script
+differently.
 
 ```console
 $ skope disk-full/SKILL.md --test
+PASS    investigate
 PASS    restart
-1 passed, 0 failed, 0 invalid
+2 passed, 0 failed, 0 invalid
 ```
 
-`expect.yaml` can check:
+A scenario's own `commands` and `answers` merge over `defaults`' key by
+key, and every other field (`outcome`, `path`, `asks`, ...) is
+`expect.yaml`'s own field, at the scenario's top level:
 
 | Field | Passes when |
 |---|---|
@@ -188,7 +205,14 @@ so you can test what happens when one fails. Scripted tests don't read your
 config either, so they need no API key and give the same result on every
 machine; pass `--config` to test against one. It exits 0 when every
 scenario passes, 60 when one fails, and 40 when a scenario itself is
-broken, so it fits in CI. `--scenario tests/restart` runs just one.
+broken, so it fits in CI. `--scenario restart` runs just that one.
+
+A scenario can still live in its own directory under `tests/`, with
+`commands.yaml`, `answers.yaml` and `expect.yaml` as separate files
+(`--scenario tests/restart` runs one this way); skope skips hidden
+directories such as `tests/.cache`. `tests.yaml` and `tests/` scenarios run
+together, sorted by name, and the string shorthand and derived `asks`
+answers work the same in both.
 
 A failing scenario prints the first difference and where its events are:
 

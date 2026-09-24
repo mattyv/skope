@@ -320,23 +320,29 @@ export interface FakesAnswers {
 }
 
 /**
+ * A plain string is shorthand for {exit: 0, stdout: <the string>}.
+ */
+export type Result =
+  | string
+  | {
+      /**
+       * null when it timed out.
+       */
+      exit: number | null;
+      stdout?: string;
+      stderr?: string;
+      timed_out?: boolean;
+      /**
+       * Simulated duration. Under --fake-exec the host's clock advances by it, so deadline scenarios can be written.
+       */
+      ms?: number;
+    };
+
+/**
  * commands.yaml: how each command ends. A list is used in order, one result per run of the command, with the last repeating: a loop that re-reads usage can see it fall. An unmatched command is E-FAKE-UNMATCHED; no real command ever runs.
  */
 export interface FakesCommands {
   [k: string]: Result | [Result, ...Result[]];
-}
-export interface Result {
-  /**
-   * null when it timed out.
-   */
-  exit: number | null;
-  stdout?: string;
-  stderr?: string;
-  timed_out?: boolean;
-  /**
-   * Simulated duration. Under --fake-exec the host's clock advances by it, so deadline scenarios can be written.
-   */
-  ms?: number;
 }
 
 /**
