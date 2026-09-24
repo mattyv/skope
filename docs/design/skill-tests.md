@@ -1,6 +1,6 @@
 # Design: skill tests (`skope --test`)
 
-Status: approved. Phase 1 (stable keys) is built; phases 2–4 are not.
+Status: approved. Phases 1 (stable keys) and 2 (scripted `--test`, SPEC §7.3) are built; 3 and 4 are not.
 
 ## Problem
 

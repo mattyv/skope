@@ -4,10 +4,12 @@
 import { parseArgs } from "node:util";
 import IDENTITY from "./build-identity.js";
 import { runSkill } from "./host/run.js";
+import { runTests } from "./host/test.js";
 import { plainText } from "./runner/events.js";
 
 const USAGE = `usage: skope <SKILL.md> (--apply | --dry-run) [--no-page] [--param k=v]... [--fake answers.yaml] [--fake-exec cmds.yaml] [--config path]
        skope <SKILL.md> --lint | --explain | --verify [--trace events.jsonl]
+       skope <SKILL.md> --test [--scenario DIR] [--param k=v]... [--config path]
        skope --version | --help`;
 
 // SPEC §7's option list.
@@ -20,6 +22,8 @@ const HELP = `usage: skope <path/to/SKILL.md> [options]
   --verify                run the explore handler and print the verify report; run nothing
   --trace events.jsonl    with --verify: check that one run's path is one the explorer can take
   --lint                  parse + static checks only
+  --test                  run the scenarios in tests/ next to the skill and check each against its expect.yaml; nothing real runs
+  --scenario DIR          with --test: run only this scenario directory
   --fake answers.yaml     use the fake backend
   --fake-exec cmds.yaml   use the fake command handler; no real command runs
   --config path           default: $XDG_CONFIG_HOME/skope/config.yaml
@@ -50,11 +54,17 @@ async function main(argv: string[]): Promise<number> {
     const modes = [values.lint, values.verify, values.explain, values.apply || values["dry-run"]].filter(Boolean).length;
     if (positionals.length !== 1) usage = "give exactly one skill file";
     else if (values.trace !== undefined && !values.verify) usage = "--trace goes with --verify";
-    else if (modes > 1) usage = "--lint, --verify, --explain and a run (--apply or --dry-run) don't combine";
+    else if (modes > 1 || (values.test && modes > 0))
+      usage = "--lint, --verify, --explain, --test and a run (--apply or --dry-run) don't combine";
+    else if (values.scenario !== undefined && !values.test) usage = "--scenario goes with --test";
+    else if (values.test && (values.fake !== undefined || values["fake-exec"] !== undefined || values["no-page"]))
+      usage = "--test takes its fakes from each scenario: --fake, --fake-exec and --no-page don't apply";
   } catch (err) {
     usage = (err as Error).message;
   }
   if (usage) process.stderr.write(`${USAGE}\n`);
+  else if (values.test)
+    return runTests({ file: positionals[0] as string, scenario: values.scenario, params: values.param ?? [], config: values.config });
   return runSkill({
     usage,
     file: positionals[0] ?? "",
@@ -83,6 +93,8 @@ function parse(argv: string[]) {
       verify: { type: "boolean" },
       trace: { type: "string" },
       lint: { type: "boolean" },
+      test: { type: "boolean" },
+      scenario: { type: "string" },
       fake: { type: "string" },
       "fake-exec": { type: "string" },
       config: { type: "string" },

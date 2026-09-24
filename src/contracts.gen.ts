@@ -1024,6 +1024,7 @@ export const CODE_MEANINGS: Record<string, string> = {
   "E-BACKEND-MODEL": "the `openrouter` model doesn't support logprobs, or its reasoning can't be turned off (§6.2)",
   "E-BACKEND-LIMIT": "the skill exceeds the configured backend's limits: options, Score levels or context (§6.2)",
   "E-FAKE-UNMATCHED": "`--fake-exec` has no answer for a command, or `--fake` has none for a question (§5.4)",
+  "E-FAKE-UNUSED": "under `--test`, a fake key names no statement: a `line:N` with nothing on that line, or a `Section.var` / `Section.ask` the section doesn't have (§7.3)",
   "E-FAKE-AMBIGUOUS": "a `Section.var` or `Section.ask` fake key names more than one statement (§5.4)",
   "E-IO": "skope can't write its run directory or lock file",
   "E-INTERRUPTED": "skope was interrupted (SIGINT or SIGTERM); it stopped the running command and released the lock (§4.4)",

@@ -195,6 +195,11 @@
     "meaning": "`--fake-exec` has no answer for a command, or `--fake` has none for a question (§5.4)"
   },
   {
+    "code": "E-FAKE-UNUSED",
+    "stage": "args",
+    "meaning": "under `--test`, a fake key names no statement: a `line:N` with nothing on that line, or a `Section.var` / `Section.ask` the section doesn't have (§7.3)"
+  },
+  {
     "code": "E-FAKE-AMBIGUOUS",
     "stage": "args",
     "meaning": "a `Section.var` or `Section.ask` fake key names more than one statement (§5.4)"

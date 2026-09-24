@@ -18,7 +18,7 @@ type Stmt = Section["body"][number];
 export type FakeKind = "commands" | "answers";
 
 export interface FakeKeyIssue {
-  code: "W-FAKE-UNUSED" | "E-FAKE-AMBIGUOUS";
+  code: "W-FAKE-UNUSED" | "E-FAKE-UNUSED" | "E-FAKE-AMBIGUOUS";
   key: string;
   message: string;
 }
@@ -33,7 +33,15 @@ interface Target {
   /** The variable it binds, if any. */
   binds?: string;
   ask: boolean;
+  /** Its command or question, when that has no variables: the text an exact-text key would use. */
+  text?: string;
 }
+
+type Parts = { lit?: string; var?: string }[];
+const literal = (parts: unknown): string | undefined =>
+  Array.isArray(parts) && (parts as Parts).every((p) => typeof p.lit === "string")
+    ? (parts as Parts).map((p) => p.lit).join("")
+    : undefined;
 
 /** The statements in a body, loops included, that `kind`'s fake handler answers. */
 function targets(body: Stmt[], kind: FakeKind): Target[] {
@@ -42,11 +50,13 @@ function targets(body: Stmt[], kind: FakeKind): Target[] {
     if (kind === "answers") {
       if (!("ask" in st)) return [];
       const a = st.ask;
-      return [{ src: st.src, binds: a.yesno?.as ?? a.one_of?.as ?? a.score?.as, ask: true }];
+      return [{ src: st.src, binds: a.yesno?.as ?? a.one_of?.as ?? a.score?.as, ask: true, text: literal(a.question) }];
     }
-    if ("run" in st) return [{ src: st.src, binds: st.run.as, ask: false }];
-    if ("do" in st || "if_yes" in st) return [{ src: st.src, ask: false }];
-    if ("check" in st && "succeeds" in st.check.cond) return [{ src: st.src, ask: false }];
+    const cmd = (body: unknown) => literal((body as { cmd?: unknown } | undefined)?.cmd);
+    if ("run" in st) return [{ src: st.src, binds: st.run.as, ask: false, text: cmd(st.run) }];
+    if ("do" in st) return [{ src: st.src, ask: false, text: cmd(st.do) }];
+    if ("if_yes" in st) return [{ src: st.src, ask: false, text: cmd(st.if_yes.run ?? st.if_yes.do) }];
+    if ("check" in st && "succeeds" in st.check.cond) return [{ src: st.src, ask: false, text: literal(st.check.cond.succeeds) }];
     return [];
   });
 }
@@ -57,7 +67,8 @@ function targets(body: Stmt[], kind: FakeKind): Target[] {
  * statement. A key whose section part names no section isn't a stable key:
  * it stays an exact-text key. One that names a section but nothing in it
  * stays an exact-text key too, with a warning: a command like `fix.sh` in a
- * skill with a `## Fix` section has the same shape. `.ask` means the
+ * skill with a `## Fix` section has the same shape. Under --test that's an
+ * error unless the key is some statement's exact text. `.ask` means the
  * section's ask only in answer files; in command files it's a variable
  * named `ask`.
  */
@@ -65,10 +76,15 @@ export function resolveFakeKeys<T extends Record<string, unknown>>(
   program: CoreProgram,
   doc: T,
   kind: FakeKind,
+  /** `--test`: an unused key is an error, and so are two keys for one statement. */
+  strict = false,
 ): { doc: T; issues: FakeKeyIssue[] } {
+  const unused = strict ? "E-FAKE-UNUSED" : "W-FAKE-UNUSED";
   const bySection = new Map<string, Target[]>();
   for (const [id, s] of Object.entries(program.sections)) if ("body" in s) bySection.set(id, targets(s.body, kind));
-  const lines = new Set([...bySection.values()].flat().map((t) => t.src));
+  const all = [...bySection.values()].flat();
+  const lines = new Set(all.map((t) => t.src));
+  const texts = new Set(all.map((t) => t.text));
 
   const issues: FakeKeyIssue[] = [];
   const out: Record<string, unknown> = {};
@@ -77,7 +93,7 @@ export function resolveFakeKeys<T extends Record<string, unknown>>(
     const line = /^line:(\d+)$/.exec(key);
     if (line) {
       if (!lines.has(Number(line[1])))
-        issues.push({ code: "W-FAKE-UNUSED", key, message: `${kind} key ${key}: no statement on line ${line[1]} uses it` });
+        issues.push({ code: unused, key, message: `${kind} key ${key}: no statement on line ${line[1]} uses it` });
       out[key] = value;
       continue;
     }
@@ -93,7 +109,8 @@ export function resolveFakeKeys<T extends Record<string, unknown>>(
     const what = asks ? "asks" : `statements that bind ${name}`;
     if (hits.length === 0) {
       issues.push({
-        code: "W-FAKE-UNUSED",
+        // Under --test, still only a warning when it is some statement's exact text.
+        code: texts.has(key) ? "W-FAKE-UNUSED" : unused,
         key,
         message: `${kind} key ${key}: section ${m[1]} has no ${what}; it's still matched as exact text`,
       });
@@ -107,6 +124,14 @@ export function resolveFakeKeys<T extends Record<string, unknown>>(
     else stable.push([`line:${(hits[0] as Target).src}`, key]);
   }
   // Stable keys go last, so they win over a line:N key for the same statement.
-  for (const [lineKey, key] of stable) out[lineKey] = doc[key];
+  for (const [lineKey, key] of stable) {
+    if (strict && Object.hasOwn(out, lineKey))
+      issues.push({
+        code: "E-FAKE-AMBIGUOUS",
+        key,
+        message: `${kind} key ${key} names line ${lineKey.slice(5)}, which another key also answers; under --test each statement takes one key`,
+      });
+    out[lineKey] = doc[key];
+  }
   return { doc: out as T, issues };
 }

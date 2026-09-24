@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/mattyv/skope/contracts/expect.schema.json",
+  "title": "Expect",
+  "description": "A --test scenario's expect.yaml, after YAML parsing: what the run must do (docs/design/skill-tests.md, SPEC §7.3). Every field is optional, but at least one of outcome, exit, path or path_prefix must be set, and path and path_prefix don't combine.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "outcome": {
+      "description": "The run's outcome.",
+      "enum": ["stopped", "paged", "handoff"]
+    },
+    "exit": {
+      "description": "The run's exit code.",
+      "type": "integer"
+    },
+    "path": {
+      "description": "Every section entered, in order: the entry section, then the `to` of each transfer. Names match by slug.",
+      "$ref": "#/$defs/sections"
+    },
+    "path_prefix": {
+      "description": "The start of the path, as for path.",
+      "$ref": "#/$defs/sections"
+    },
+    "asks": {
+      "description": "Keyed by a section with one ask, or Section.var for the ask that binds var. `chosen` is the option's label: a section name, a list item, yes or no, or a Score level. When the ask runs more than once, the last answer counts.",
+      "type": "object",
+      "propertyNames": { "type": "string", "minLength": 1 },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["chosen"],
+        "properties": {
+          "chosen": { "type": ["string", "integer"] }
+        }
+      }
+    },
+    "page_contains": {
+      "description": "Text that some page's message must contain.",
+      "type": "string",
+      "minLength": 1
+    },
+    "handoff_reason": {
+      "enum": ["explicit", "gate_failed", "command_failed", "ask_unavailable", "deadline"]
+    },
+    "max_ask_calls": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "live": {
+      "description": "Used only with --live (not yet built).",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "runs": { "type": "integer", "minimum": 1 },
+        "min_hit_rate": { "type": "number", "minimum": 0, "maximum": 1 },
+        "min_margin": { "type": "number" }
+      }
+    }
+  },
+  "anyOf": [{ "required": ["outcome"] }, { "required": ["exit"] }, { "required": ["path"] }, { "required": ["path_prefix"] }],
+  "not": { "required": ["path", "path_prefix"] },
+  "$defs": {
+    "sections": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    }
+  }
+}

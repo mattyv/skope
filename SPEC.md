@@ -389,6 +389,10 @@ included as test fixtures.
 | `invalid` | parse / lint / param failure (nothing ran) | 40 |
 | `error` | internal runner error | 50 |
 
+`skope --test` has its own exit codes, since they describe the tests, not a
+run: 0 when every scenario passed, 60 when any failed, 40 when the skill or
+a scenario is invalid (§7.3).
+
 - Lint errors:
   - falling off the end of an instruction section (every path MUST end in
     `stop`, `page`, `hand off`, or a transfer);
@@ -1082,6 +1086,8 @@ skope <path/to/SKILL.md> [options]
                           The report is the last stdout line; warning events come before it
   --trace events.jsonl    with --verify: check that one run's path is one the explorer can take (§12.4)
   --lint                  parse + static checks only
+  --test                  run the scenarios in tests/ next to the skill and check each (§7.3)
+  --scenario DIR          with --test: run only this scenario directory
   --fake answers.yaml     use the fake backend
   --fake-exec cmds.yaml   use the fake command handler; no real command runs
   --config path           default: $XDG_CONFIG_HOME/skope/config.yaml
@@ -1220,6 +1226,7 @@ and have no codes.
 | `E-BACKEND-MODEL` | args | the `openrouter` model doesn't support logprobs, or its reasoning can't be turned off (§6.2) | |
 | `E-BACKEND-LIMIT` | args | the skill exceeds the configured backend's limits: options, Score levels or context (§6.2) | 21 options on `openrouter`; `ask_context: 40k tokens` on `jev` |
 | `E-FAKE-UNMATCHED` | runtime | `--fake-exec` has no answer for a command, or `--fake` has none for a question (§5.4) | |
+| `E-FAKE-UNUSED` | args | under `--test`, a fake key names no statement: a `line:N` with nothing on that line, or a `Section.var` / `Section.ask` the section doesn't have (§7.3) | `line:21` on a prose line |
 | `E-FAKE-AMBIGUOUS` | args | a `Section.var` or `Section.ask` fake key names more than one statement (§5.4) | `Counters.used` when Counters binds `used` twice |
 | `E-IO` | runtime | skope can't write its run directory or lock file | |
 | `E-INTERRUPTED` | runtime | skope was interrupted (SIGINT or SIGTERM); it stopped the running command and released the lock (§4.4) | Ctrl-C during a `do` |
@@ -1271,6 +1278,50 @@ Rules:
   made by the skope I have?" compares the build identity, never the release
   version. Golden files are the exception: they ignore both numbers, since
   the build identity changes on every source edit (§12.3).
+
+### 7.3 Skill tests (`--test`)
+
+`skope SKILL.md --test` runs every directory under `tests/` next to the
+skill as a scenario; `--scenario DIR` runs one. The design is
+`docs/design/skill-tests.md`. A scenario holds:
+
+- `commands.yaml` (required) and `answers.yaml` (optional): the fake files
+  (§5.4). Every ask the run reaches needs an answer, so without
+  `answers.yaml` a skill that asks fails its scenario.
+- `expect.yaml` (`contracts/expect.schema.json`): what must happen. Or, for
+  older scenarios, `expected-exit`: the exit code alone.
+
+Each scenario runs as an `--apply` run with both fake handlers, so no real
+command runs and the configured pager is never called: a page succeeds
+unless `commands.yaml` answers the `pager.command` with a failure. `do`
+statements go through the fakes, so a failing `do` can be tested. The run
+takes no lock and keeps its run directory in a temporary directory. The fake
+files are held to strict key rules: every statement that runs matches
+exactly one key (`E-FAKE-AMBIGUOUS` otherwise), and a stable or `line:N`
+key that names nothing is `E-FAKE-UNUSED`, unless it's exactly the text of
+some command or question in the skill, like `fix.sh` next to a `## Fix`
+section, which stays a warning.
+
+`expect.yaml` checks, in this order, and reports the first difference:
+`outcome` and `exit` (implied by `outcome` when not given),
+`handoff_reason`, `path` (the entry section, then the `to` of every
+`transfer`, matched by slug) or `path_prefix`, `asks` (keyed by a section
+with one ask, or `Section.var`; `chosen` is the option's label, and the ask
+must also have cleared `sure`; the last answer counts when the ask runs more
+than once), `page_contains`, and `max_ask_calls`. `live` is read but not yet
+used.
+
+A scenario **fails** when the run differs from `expect.yaml`, including when
+a command or question has no fake (`E-FAKE-UNMATCHED`). It's **invalid**
+when its own files can't be used: a bad `expect.yaml`, a strict key error,
+a skill that doesn't lint, or an `asks` key that names no single ask.
+
+Output: one JSON line per scenario on stdout,
+`{"scenario","pass","mismatch"}` (or `"invalid"` with the reason), with
+`events` naming the file that holds that run's own events; then a summary
+line, `{"skope_version","skope_build","scenarios","passed","failed","invalid"}`.
+stderr gets a readable line for each. Exit 0 when every scenario passed, 60
+when any failed, 40 when any is invalid or there are none.
 
 ---
 

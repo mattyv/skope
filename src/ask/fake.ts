@@ -21,8 +21,15 @@ export class FakeAskUnmatched extends Error {
   readonly code = "E-FAKE-UNMATCHED";
 }
 
-export function askFake(answers: FakesAnswers, request: AskRequest, src?: number): AskOutput {
+/** Two keys answer the same question: only an error under `--test` (strict). */
+export class FakeAskAmbiguous extends Error {
+  readonly code = "E-FAKE-AMBIGUOUS";
+}
+
+export function askFake(answers: FakesAnswers, request: AskRequest, src?: number, strict = false): AskOutput {
   const lineKey = src !== undefined ? `line:${src}` : undefined;
+  if (strict && lineKey !== undefined && Object.hasOwn(answers, lineKey) && Object.hasOwn(answers, request.question))
+    throw new FakeAskAmbiguous(`--fake has two answers for line ${src}: ${lineKey} and its text, ${request.question}`);
   const key = lineKey !== undefined && Object.hasOwn(answers, lineKey) ? lineKey : request.question;
   if (!Object.hasOwn(answers, key)) {
     throw new FakeAskUnmatched(`--fake has no answer for: ${key}`);
