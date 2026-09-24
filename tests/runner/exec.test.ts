@@ -222,7 +222,14 @@ describe("groupAlive", () => {
     try {
       const zombie = Number((await new Promise<Buffer>((res) => parent.stdout.once("data", res))).toString().trim());
       await vi.waitFor(() => expect(running(zombie)).toBe(false)); // it has exited, and is a zombie
-      expect(() => process.kill(-zombie, 0)).not.toThrow(); // kill still counts the group
+      // kill still sees the group: no error on Linux, EPERM on macOS for a group of zombies.
+      let seen = "ok";
+      try {
+        process.kill(-zombie, 0);
+      } catch (err) {
+        seen = (err as NodeJS.ErrnoException).code ?? "error";
+      }
+      expect(["ok", "EPERM"]).toContain(seen);
       expect(groupAlive(zombie)).toBe(false);
     } finally {
       parent.kill("SIGKILL");
