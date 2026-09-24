@@ -271,6 +271,13 @@ over `sure` warns; set `live.min_margin` to make it fail, and
 the backend, and they cost what the calls cost: skope prints the most it
 will make before it starts.
 
+**Having an agent write the skill?** Give it
+[`skills/write-skope-skill`](skills/write-skope-skill/SKILL.md). It makes
+the agent write `tests.yaml` first, watch it fail, then write the skill
+until `--lint`, `--verify` and `--test` are clean, and finally check the
+questions with `--live`. For Claude Code, copy the folder into
+`~/.claude/skills/` (or `.claude/skills/` in your repo).
+
 ### Run
 
 Then run it for real. A dry run runs the read-only `run` and `check`
@@ -467,6 +474,8 @@ $ DAFNY=/path/to/dafny npm run core   # verify the proofs and rebuild core/gener
   test-first streams, reviews and releases.
 - [`docs/design/`](docs/design/) holds designs for work in progress, such
   as [skill tests](docs/design/skill-tests.md).
+- [`skills/write-skope-skill`](skills/write-skope-skill/SKILL.md) teaches
+  an agent to write skope skills test first.
 - [`contracts/`](contracts/) holds the shapes the parts of skope agree on,
   with worked examples.
 
