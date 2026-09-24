@@ -51,33 +51,41 @@
       }
     },
     "result": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["exit"],
-      "properties": {
-        "exit": {
-          "type": ["integer", "null"],
-          "description": "null when it timed out."
+      "description": "A plain string is shorthand for {exit: 0, stdout: <the string>}.",
+      "oneOf": [
+        {
+          "type": "string"
         },
-        "stdout": {
-          "type": "string",
-          "default": ""
-        },
-        "stderr": {
-          "type": "string",
-          "default": ""
-        },
-        "timed_out": {
-          "type": "boolean",
-          "default": false
-        },
-        "ms": {
-          "type": "integer",
-          "minimum": 0,
-          "default": 0,
-          "description": "Simulated duration. Under --fake-exec the host's clock advances by it, so deadline scenarios can be written."
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["exit"],
+          "properties": {
+            "exit": {
+              "type": ["integer", "null"],
+              "description": "null when it timed out."
+            },
+            "stdout": {
+              "type": "string",
+              "default": ""
+            },
+            "stderr": {
+              "type": "string",
+              "default": ""
+            },
+            "timed_out": {
+              "type": "boolean",
+              "default": false
+            },
+            "ms": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "description": "Simulated duration. Under --fake-exec the host's clock advances by it, so deadline scenarios can be written."
+            }
+          }
         }
-      }
+      ]
     }
   }
 }

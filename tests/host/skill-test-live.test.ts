@@ -166,6 +166,13 @@ describe("skope --test --live", () => {
     expect(seen.calls).toBe(2);
   });
 
+  test("derived answers from asks aren't used either: with no answers.yaml at all, every ask still goes to the backend", async () => {
+    const seen = backend([RESTART]);
+    const r = await live(setup({ ...EXPECT, live: { runs: 1 } }));
+    expect(r.code).toBe(0);
+    expect(seen.calls).toBe(2);
+  });
+
   test("a backend that fails makes misses, not a crash", async () => {
     vi.stubGlobal("fetch", async () => new Response("down", { status: 503 }));
     const r = await live(setup({ ...EXPECT, live: { runs: 2 } }));

@@ -8,6 +8,11 @@
 import type { FakesCommands, Result } from "../contracts.gen.js";
 import { CAP_BYTES, type ExecResult } from "./exec.js";
 
+// The commands.yaml the host hands to fakeExec is always already expanded (src/runner/fakes.ts
+// expandCommands, called in src/host/run.ts before it reaches here), so every entry here is a
+// full result object, never the string shorthand.
+type FullResult = Exclude<Result, string>;
+
 export class FakeUnmatchedCommand extends Error {
   readonly code = "E-FAKE-UNMATCHED";
 }
@@ -54,11 +59,11 @@ export function fakeExec(commands: FakesCommands, clock?: FakeClock, strict = fa
       throw new FakeAmbiguous(`--fake-exec has two answers for line ${req.src}: ${lineKey} and its text, ${req.cmd}`);
     const key = Object.hasOwn(commands, lineKey) ? lineKey : Object.hasOwn(commands, req.cmd) ? req.cmd : undefined;
     if (key === undefined) throw new FakeUnmatchedCommand(`--fake-exec has no answer for: ${req.cmd} (line ${req.src})`);
-    const entry = commands[key] as Result | Result[];
+    const entry = commands[key] as FullResult | FullResult[];
     const list = Array.isArray(entry) ? entry : [entry];
     const n = counts.get(key) ?? 0;
     counts.set(key, n + 1);
-    const result = list[Math.min(n, list.length - 1)] as Result;
+    const result = list[Math.min(n, list.length - 1)] as FullResult;
     const timedOut = result.timed_out ?? false;
     if (timedOut && result.exit !== null) {
       throw new FakeInvalidResult(`--fake-exec answer for ${key} has timed_out: true, so its exit must be null, not ${result.exit}`);

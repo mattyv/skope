@@ -9,7 +9,7 @@ import { plainText } from "./runner/events.js";
 
 const USAGE = `usage: skope <SKILL.md> (--apply | --dry-run) [--no-page] [--param k=v]... [--fake answers.yaml] [--fake-exec cmds.yaml] [--config path]
        skope <SKILL.md> --lint | --explain | --verify [--trace events.jsonl]
-       skope <SKILL.md> --test [--scenario DIR] [--live] [--runs N] [--param k=v]... [--config path]
+       skope <SKILL.md> --test [--scenario DIR or NAME] [--live] [--runs N] [--param k=v]... [--config path]
        skope --version | --help`;
 
 // SPEC §7's option list.
@@ -22,8 +22,8 @@ const HELP = `usage: skope <path/to/SKILL.md> [options]
   --verify                run the explore handler and print the verify report; run nothing
   --trace events.jsonl    with --verify: check that one run's path is one the explorer can take
   --lint                  parse + static checks only
-  --test                  run the scenarios in tests/ next to the skill and check each against its expect.yaml; nothing real runs
-  --scenario DIR          with --test: run only this scenario directory
+  --test                  run the scenarios in tests/ and tests.yaml next to the skill and check each against its expect.yaml; nothing real runs
+  --scenario DIR or NAME  with --test: run only this scenario directory, or this tests.yaml scenario by name
   --live                  with --test: ask the configured backend instead of answers.yaml, and repeat each scenario
   --runs N                with --live: run each scenario N times (default: its live.runs, else 10)
   --fake answers.yaml     use the fake backend

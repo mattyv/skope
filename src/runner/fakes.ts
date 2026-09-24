@@ -11,7 +11,8 @@ const isInt = (v: unknown) => typeof v === "number" && !(v % 1) && !Number.isNaN
 const RESULT_KEYS = ["exit", "stdout", "stderr", "timed_out", "ms"];
 
 function resultError(r: unknown): string | null {
-  if (!isObj(r)) return "a result must be a mapping";
+  if (typeof r === "string") return null; // shorthand for {exit: 0, stdout: r}
+  if (!isObj(r)) return "a result must be a mapping or a string";
   const extra = Object.keys(r).find((k) => !RESULT_KEYS.includes(k));
   if (extra !== undefined) return `unknown key ${extra}`;
   if (!("exit" in r)) return "exit is required";
@@ -26,6 +27,22 @@ function answerError(a: unknown): string | null {
   if (a === "unsure" || a === "unavailable") return null;
   if (!isObj(a) || Object.keys(a).length === 0) return 'an answer must be "unsure", "unavailable" or probabilities by option id';
   return Object.values(a).every((p) => typeof p === "number") ? null : "every probability must be a number";
+}
+
+/** commands.yaml's string shorthand (SPEC §7.3): a plain string result. */
+const SHORTHAND_EXIT = 0;
+
+const expandResult = (r: unknown): unknown => (typeof r === "string" ? { exit: SHORTHAND_EXIT, stdout: r } : r);
+
+/**
+ * `commands.yaml` (or a tests.yaml scenario's `commands`) with every string-shorthand result
+ * expanded to `{exit: 0, stdout: <the string>}`, so downstream code (the strict key rules,
+ * `fakeExec`) only ever sees full result objects. Only commands.yaml has the shorthand: call this
+ * for `def === "commands"` only.
+ */
+export function expandCommands(doc: unknown): unknown {
+  if (!isObj(doc)) return doc;
+  return Object.fromEntries(Object.entries(doc).map(([k, v]) => [k, Array.isArray(v) ? v.map(expandResult) : expandResult(v)]));
 }
 
 /** Why `doc` isn't a valid fake `def` file, or null if it is. */
