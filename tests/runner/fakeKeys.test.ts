@@ -54,6 +54,25 @@ describe("resolveFakeKeys", () => {
     ]);
   });
 
+  test("a script path is never a stable key, even with a section of that name", () => {
+    const p = skill("- **run** `./fix.sh`\n- **run** `bin/fix.sh`\n- **stop**\n\n## Fix\nFix it.\n\n- **stop**");
+    const keys = { "./fix.sh": 1, "bin/fix.sh": 2 };
+    expect(resolveFakeKeys(p, keys, "commands")).toEqual({ doc: keys, issues: [] });
+  });
+
+  test("a stable-looking key that names nothing in its section still matches as exact text", () => {
+    const p = skill("- **run** `fix.sh`\n- **stop**\n\n## Fix\nFix it.\n\n- **stop**");
+    const { doc, issues } = resolveFakeKeys(p, { "fix.sh": 1 }, "commands");
+    expect(doc).toEqual({ "fix.sh": 1 });
+    expect(issues).toMatchObject([{ code: "W-FAKE-UNUSED", key: "fix.sh" }]);
+  });
+
+  test("in a command file, Section.ask is a variable named ask, not the section's ask", () => {
+    const p = skill("- **run** `echo hi` as ask\n- **ask** Is {ask} ok? → yes | no · sure 80%\n- **stop**");
+    expect(resolveFakeKeys(p, { "Main.ask": 1 }, "commands")).toEqual({ doc: { "line:10": 1 }, issues: [] });
+    expect(resolveFakeKeys(p, { "Main.ask": 2 }, "answers")).toEqual({ doc: { "line:11": 2 }, issues: [] });
+  });
+
   test("E-FAKE-AMBIGUOUS: a stable key that names more than one statement", () => {
     const p = skill(
       "- **run** `echo 1` as n\n- **run** `echo 2` as n\n- **ask** Is {n} ok? → yes | no · sure 80%\n- **ask** And {n}? → yes | no as again · sure 80%\n- **stop**",
