@@ -1,6 +1,11 @@
 # skope
 
-**Runbooks that an agent can read and a proven runtime can run.**
+**Write the runbook once. An agent can follow it, or skope can run it in
+milliseconds.**
+
+skope only acts when Jev is confident, hands everything else to a person or
+an agent, and the part that decides what runs is mathematically proven, not
+just tested.
 
 A skope skill is an ordinary Markdown file. A person or a language model can
 read it and follow it. skope can also *execute* it: it runs the commands,
@@ -63,6 +68,15 @@ and decides who does each step:
 
 The common case costs about a tenth of a second of Jev time per question,
 instead of an agent session, and every decision is logged.
+
+**Why trust it with production?** The core that decides what runs next is
+written in [Dafny](https://dafny.org), a language whose compiler checks
+mathematical proofs alongside the code. Tests show a bug isn't there for the
+inputs you tried; a proof shows it can't happen for any skill or any run. So
+"a dry run never runs a `do`" and "command output never ends up in a command"
+aren't hopes backed by a test suite. They're checked on every commit, with no
+shortcuts (no `assume`, no skipped proofs). The rest of skope, which talks to
+the shell, the pager and the backend, is ordinary tested TypeScript.
 
 ## Install
 
@@ -378,6 +392,10 @@ questions, and re-check them when you change the model version.
 
 ## What skope guarantees
 
+"Proven" below means a Dafny proof over every possible skill and every
+possible run, re-checked by CI on every commit. A change that broke one of
+these wouldn't get through CI, even if every test still passed.
+
 | Guarantee | How |
 |---|---|
 | The model only ever picks one of the author's options. It never writes a command. | The grammar can't express anything else, and it's proven. |
@@ -385,7 +403,7 @@ questions, and re-check them when you change the model version.
 | A dry run never executes a `do`. | Proven over every possible run. |
 | Every run ends, with exactly one outcome. | Proven. |
 | Every skill is checked before it runs. | Lint, proven sound: a skill that passes can't hit an internal error. |
-| Confidence is measured, never self-reported. | Jev's calibrated distribution, or token probabilities. |
+| Confidence is measured, never self-reported. | The probability Jev gives each option, or a model's token probabilities; never a confidence the model writes about itself. |
 
 ## How it works
 
