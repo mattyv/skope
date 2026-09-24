@@ -506,7 +506,7 @@ let _dafny = (function() {
       return Seq.from({length: n}, (_, i) => init(new BigNumber(i)));
     }
     static UnicodeFromString(s) {
-      return new Seq(...([...s].map(c => new _dafny.CodePoint(c.codePointAt(0)))))
+      const r = new Seq(); for (const c of s) r.push(new _dafny.CodePoint(c.codePointAt(0))); return r;
     }
     toString() {
       return "[" + arrayElementsToString(this) + "]";
@@ -558,7 +558,7 @@ let _dafny = (function() {
       return this;
     }
     get UniqueElements() {
-      return _dafny.Set.fromElements(...this);
+      const s = new _dafny.Set(); for (const k of this) s.add(k); return s;
     }
     static Concat(a, b) {
       if (typeof a === "string" || typeof b === "string") {
@@ -574,8 +574,9 @@ let _dafny = (function() {
         return a + b;
       } else {
         // ordinary concatenation
-        let r = Seq.of(...a);
-        r.push(...b);
+        let r = new Seq();
+        for (const x of a) r.push(x);
+        for (const x of b) r.push(x);
         return r;
       }
     }

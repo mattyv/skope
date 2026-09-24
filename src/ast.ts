@@ -57,7 +57,10 @@ function name(v: unknown, at: string): D {
 
 function seq<T>(v: unknown, at: string, f: (x: unknown, at: string) => T): D {
   if (!Array.isArray(v)) throw new Unsupported(`${at}: expected a list`);
-  return _dafny.Seq.of(...v.map((x, i) => f(x, `${at}[${i}]`)));
+  // A loop, not Seq.of(...items): spreading a long list overflows the stack.
+  const out = new _dafny.Seq();
+  v.forEach((x, i) => out.push(f(x, `${at}[${i}]`)));
+  return out;
 }
 
 function map(v: unknown, at: string, f: (x: unknown, at: string) => D, key = str): D {
