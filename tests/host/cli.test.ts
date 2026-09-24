@@ -142,6 +142,26 @@ describe("run flow", () => {
     expect(find(r.events, "handoff_record")).toMatchObject({ record: { dry_run: true, reason: "explicit", detail: null } });
   });
 
+  test("S3: a comparison that can't coerce hands off with detail {expr, left, right}, not the last command (SPEC §4.2, §8.1)", async () => {
+    const r = await runSkop([skill("- **run** `echo abc` as x\n- **check** {x} > 1 → stop\n- **hand off**"), "--apply", "--no-page"]);
+    expect(r.code).toBe(20);
+    const check = find(r.events, "check") as SkopEvent;
+    expect(check.result).toBeNull();
+    expect(find(r.events, "handoff_record")?.record).toMatchObject({ reason: "command_failed" });
+    const detail = (find(r.events, "handoff_record")?.record as { detail: unknown }).detail;
+    expect(detail).toEqual({ expr: "{x} > 1", left: check.left, right: check.right });
+  });
+
+  test("a command that fails right after a comparison still gets the command's detail", async () => {
+    const r = await runSkop([
+      skill("- **run** `echo 5` as x\n- **check** {x} > 9 → stop\n- **run** `exit 3`\n- **stop**"),
+      "--apply",
+      "--no-page",
+    ]);
+    expect(r.code).toBe(20);
+    expect((find(r.events, "handoff_record")?.record as { detail: unknown }).detail).toMatchObject({ cmd: "exit 3", exit: 3 });
+  });
+
   test("the saved ask request fits limits.ask_context, keeping the end of the output (SPEC §6.3)", async () => {
     const path = skill(
       "- **run** `seq 1 50` as log\n- **ask** Given {log}, which? · sure 80%\n  - [Other]\n  - [Third]\n\n## Other\nElse.\n\n- **stop**\n\n## Third\nOr this.\n\n- **stop**",

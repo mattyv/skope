@@ -43,6 +43,8 @@ export interface LoopResult {
   /** The request and result the run ended on, for the handoff record's detail (SPEC §8.1). */
   lastAsk: Record<string, unknown> | null;
   lastExec: { cmd: string; exit: number | null; timed_out: boolean; stderr_tail: string } | null;
+  /** When the run ended on a comparison that couldn't coerce its operands, that comparison (SPEC §4.2). */
+  failedCheck: { expr: string; left: string | null; right: string | null } | null;
   variables: Record<string, Val>;
 }
 
@@ -81,6 +83,7 @@ export async function runLoop(interp: Interp, ctx: LoopContext): Promise<LoopRes
   const effects: Effect[] = [];
   let lastAsk: LoopResult["lastAsk"] = null;
   let lastExec: LoopResult["lastExec"] = null;
+  let failedCheck: LoopResult["failedCheck"] = null;
   // Host fields for the core event that reports the request just answered.
   let pending: Record<string, unknown> = {};
   let response: Response = { kind: "none" };
@@ -99,8 +102,10 @@ export async function runLoop(interp: Interp, ctx: LoopContext): Promise<LoopRes
       if (body.event === "outcome") {
         if (next.kind !== "done") throw new Error("the core reported an outcome but didn't finish");
         // The caller emits the outcome last, after any handoff events (SPEC §8).
-        return { outcome: next.outcome, at, effects, lastAsk, lastExec, variables: interp.variables() };
+        return { outcome: next.outcome, at, effects, lastAsk, lastExec, failedCheck, variables: interp.variables() };
       }
+      // Only a failed comparison right before the outcome is what the run ended on.
+      failedCheck = body.event === "check" && body.result === null ? { expr: body.expr, left: body.left, right: body.right } : null;
       const out: Record<string, unknown> = { ...(at ?? {}), ...body };
       const hostFields = EVENT_FIELDS[body.event]?.host ?? [];
       for (const k of hostFields) if (k in pending) out[k] = pending[k];
