@@ -56,7 +56,7 @@ describe("build-id.mjs (SPEC §7.2)", () => {
     const r = runBuildId(dir);
     expect(r.status).toBe(0);
     const parsed = JSON.parse(r.stdout);
-    expect(parsed.version).toBe("0.1.0");
+    expect(parsed.version).toBe(JSON.parse(readFileSync(join(REPO, "package.json"), "utf8")).version);
     expect(parsed.build).toMatch(/^[0-9a-f]{64}$/);
   });
 

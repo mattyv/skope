@@ -38,7 +38,7 @@ describe("bundle (SPEC §5.5)", () => {
       // No node_modules directory exists anywhere above `isolated`; a
       // single-file bundle must not need one.
       const out = execFileSync(process.execPath, [isolatedBundle, "--version"], { cwd: isolated, encoding: "utf8" });
-      expect(out).toMatch(/^skope \d+\.\d+\.\d+ \(build identity [0-9a-f]{64}\)\n$/);
+      expect(out).toMatch(/^skope \d+\.\d+\.\d+(-[\w.]+)? \(build identity [0-9a-f]{64}\)\n$/);
     } finally {
       rmSync(isolated, { recursive: true, force: true });
     }
