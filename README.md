@@ -151,7 +151,7 @@ disk-full/
 ```yaml
 defaults:
   commands:
-    Triage.used: "93%\n"              # a plain string is shorthand for {exit: 0, stdout: "..."}
+    Triage.used: "93%\n"              # a string or number is shorthand for {exit: 0, stdout: "..."}
     Triage.errors: "myapp-worker OOM\n"
     Triage.biggest: "40G\t/var\n"
     systemctl restart myapp-worker: { exit: 0 }

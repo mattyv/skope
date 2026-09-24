@@ -11,12 +11,13 @@ additions cut that repetition, all still under §7.3:
 
 - **`tests.yaml`**, beside `SKILL.md`. Scenarios that don't need their own
   directory: `defaults.commands`/`defaults.answers`, then each scenario
-  merges its own `commands`/`answers` over them key by key, with
+  merges its own `commands`/`answers` over them statement by statement
+  (any kind of key overrides any other for the same statement), with
   `expect.yaml`'s fields at the scenario's own top level (no `expect:`
   wrapper). A folder scenario is still exactly what it was; the two sources
   run together, sorted by name.
 - **The string shorthand** in `commands.yaml` (folder or `tests.yaml`): a
-  plain string result means `{exit: 0, stdout: <the string>}`. Most fake
+  plain string or number result means `{exit: 0, stdout: <its text>}`. Most fake
   commands only ever set `stdout` on success.
 - **Derived answers.** `expect.yaml`'s own `asks.<key>.chosen` already says
   what a scenario expects an ask to choose; scripting that same choice

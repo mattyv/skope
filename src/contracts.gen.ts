@@ -320,10 +320,11 @@ export interface FakesAnswers {
 }
 
 /**
- * A plain string is shorthand for {exit: 0, stdout: <the string>}.
+ * A plain string or number is shorthand for {exit: 0, stdout: <its text>}.
  */
 export type Result =
   | string
+  | number
   | {
       /**
        * null when it timed out.

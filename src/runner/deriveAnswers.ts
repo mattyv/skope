@@ -9,15 +9,13 @@ import { askOptionIds, chosenOptionId, findAsk } from "./askOptions.js";
 import type { Expect } from "./expect.js";
 import { answerTemplate, askLine, resolveFakeKeys } from "./fakeKeys.js";
 
-/** The chosen option's probability: comfortably above any `sure` up to 99%, with room for the
- * core's 1e-3 normalisation tolerance (SPEC §6.1), so a derived answer never reads as a near-miss. */
-const CHOSEN_CONFIDENCE = 0.995;
+/** The chosen option's probability: certain, so it clears any `sure`, `sure 100%` included. */
+const CHOSEN_CONFIDENCE = 1;
 
 /**
  * `answers` with a `line:N` entry added for every `asks` key not already answered: by an existing
  * stable key, `line:N` key, or exact-text key for that ask. The chosen option gets
- * `CHOSEN_CONFIDENCE`; every other real option splits what's left evenly, so the answer is valid
- * (its probabilities sum to 1) and never a tie.
+ * `CHOSEN_CONFIDENCE` and every other option 0, so the answer is valid and never a tie.
  */
 export function deriveAnswers(program: CoreProgram, asks: Expect["asks"], answers: Record<string, unknown>): Record<string, unknown> {
   if (!asks || Object.keys(asks).length === 0) return answers;
@@ -33,9 +31,8 @@ export function deriveAnswers(program: CoreProgram, asks: Expect["asks"], answer
     if (!ask) continue;
     const chosen = chosenOptionId(ask, want.chosen);
     const others = askOptionIds(program, ask).filter((id) => id !== chosen);
-    const spread = others.length > 0 ? (1 - CHOSEN_CONFIDENCE) / others.length : 0;
-    const probs: Record<string, number> = { [chosen]: others.length > 0 ? CHOSEN_CONFIDENCE : 1 };
-    for (const id of others) probs[id] = spread;
+    const probs: Record<string, number> = { [chosen]: CHOSEN_CONFIDENCE };
+    for (const id of others) probs[id] = 0;
     out[`line:${line}`] = probs;
   }
   return out;

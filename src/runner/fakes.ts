@@ -11,8 +11,8 @@ const isInt = (v: unknown) => typeof v === "number" && !(v % 1) && !Number.isNaN
 const RESULT_KEYS = ["exit", "stdout", "stderr", "timed_out", "ms"];
 
 function resultError(r: unknown): string | null {
-  if (typeof r === "string") return null; // shorthand for {exit: 0, stdout: r}
-  if (!isObj(r)) return "a result must be a mapping or a string";
+  if (isShorthand(r)) return null; // shorthand for {exit: 0, stdout: r}
+  if (!isObj(r)) return "a result must be a mapping, a string or a number";
   const extra = Object.keys(r).find((k) => !RESULT_KEYS.includes(k));
   if (extra !== undefined) return `unknown key ${extra}`;
   if (!("exit" in r)) return "exit is required";
@@ -32,7 +32,10 @@ function answerError(a: unknown): string | null {
 /** commands.yaml's string shorthand (SPEC §7.3): a plain string result. */
 const SHORTHAND_EXIT = 0;
 
-const expandResult = (r: unknown): unknown => (typeof r === "string" ? { exit: SHORTHAND_EXIT, stdout: r } : r);
+// An unquoted YAML number is output too: `ready: 50000` reads as the text it prints. Quote a value
+// whose exact text matters, such as `1.50`, which YAML would read as 1.5.
+const isShorthand = (r: unknown): r is string | number => typeof r === "string" || (typeof r === "number" && Number.isFinite(r));
+const expandResult = (r: unknown): unknown => (isShorthand(r) ? { exit: SHORTHAND_EXIT, stdout: String(r) } : r);
 
 /**
  * `commands.yaml` (or a tests.yaml scenario's `commands`) with every string-shorthand result
