@@ -71,7 +71,10 @@ function patchRuntime(js) {
       "return new Seq(...([...s].map(c => new _dafny.CodePoint(c.codePointAt(0)))))",
       "const r = new Seq(); for (const c of s) r.push(new _dafny.CodePoint(c.codePointAt(0))); return r;",
     ],
-    ["let r = Seq.of(...a);\n        r.push(...b);", "let r = new Seq();\n        for (const x of a) r.push(x);\n        for (const x of b) r.push(x);"],
+    [
+      "let r = Seq.of(...a);\n        r.push(...b);",
+      "let r = new Seq();\n        for (const x of a) r.push(x);\n        for (const x of b) r.push(x);",
+    ],
     ["return _dafny.Set.fromElements(...this);", "const s = new _dafny.Set(); for (const k of this) s.add(k); return s;"],
   ];
   for (const [from, to] of patches) {
@@ -83,4 +86,3 @@ function patchRuntime(js) {
   }
   return js;
 }
-

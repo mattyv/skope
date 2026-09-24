@@ -59,7 +59,7 @@ function seq<T>(v: unknown, at: string, f: (x: unknown, at: string) => T): D {
   if (!Array.isArray(v)) throw new Unsupported(`${at}: expected a list`);
   // A loop, not Seq.of(...items): spreading a long list overflows the stack.
   const out = new _dafny.Seq();
-  v.forEach((x, i) => out.push(f(x, `${at}[${i}]`)));
+  for (const [i, x] of v.entries()) out.push(f(x, `${at}[${i}]`));
   return out;
 }
 
