@@ -1088,6 +1088,8 @@ skope <path/to/SKILL.md> [options]
   --lint                  parse + static checks only
   --test                  run the scenarios in tests/ next to the skill and check each (§7.3)
   --scenario DIR          with --test: run only this scenario directory
+  --live                  with --test: ask the configured backend, and repeat each scenario (§7.3)
+  --runs N                with --live: runs per scenario (default: its live.runs, else 10)
   --fake answers.yaml     use the fake backend
   --fake-exec cmds.yaml   use the fake command handler; no real command runs
   --config path           default: $XDG_CONFIG_HOME/skope/config.yaml
@@ -1311,8 +1313,7 @@ with one ask, or `Section.var`; `chosen` is the option's label: a section
 name for an ask whose options are sections, else the list item, `yes` or
 `no`, or the Score level, compared as written; the ask
 must also have cleared `sure`; the last answer counts when the ask runs more
-than once), `page_contains`, and `max_ask_calls`. `live` is read but not yet
-used.
+than once), `page_contains`, and `max_ask_calls`.
 
 A scenario **fails** when the run differs from `expect.yaml`. It also fails
 when the run breaks with a runtime error, such as a command or question
@@ -1323,6 +1324,26 @@ doesn't lint, a param that fails its checks, a bad config or fake file, or a
 strict key error. It's also invalid when its `expect.yaml` is bad or an
 `asks` key names no single ask, and when two fake keys answer one statement
 (`E-FAKE-AMBIGUOUS`, which can surface mid-run).
+
+**Live** (`--test --live [--runs N]`) asks the configured backend instead
+of `answers.yaml`, with the commands still faked, and runs each scenario
+several times: `--runs N`, else its `live.runs`, else 10. A run is a **hit**
+when it satisfies the whole `expect.yaml`; an expected ask the run never
+reached is a miss. The scenario fails when its hit rate is under
+`live.min_hit_rate` (default 1), or when it sets `live.min_margin` and an ask
+named in `asks` has a margin under it. The margin is that ask's lowest
+confidence, in points, minus `sure`, over the runs that reached it: 81%
+against sure 80 is +1. Without `min_margin`, a margin under 5 is a warning.
+Before running, skope prints the most backend calls the runs could make:
+the most asks any path can reach (from the explorer, as `--explain`
+counts), times each scenario's runs. It can't know the exact number, since a
+wrong answer can lead down a path with more asks. Answers are never cached.
+A live scenario's line adds `runs`, `hits`, `hit_rate`, `min_hit_rate`,
+`warnings`, and `asks`: for each ask reached, `chosen` (label → count),
+`confidence_min`, `confidence_median`, `sure`, `margin` and
+`gate_failures`. The summary adds `live`, `backend`, `model` and
+`max_backend_calls`. `events` is then the directory with one
+`run-N/events.jsonl` per run.
 
 Output: one JSON line per scenario on stdout,
 `{"scenario","pass","mismatch"}` (or `"invalid"` with the reason), with

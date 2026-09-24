@@ -48,7 +48,7 @@
       "minimum": 0
     },
     "live": {
-      "description": "Used only with --live (not yet built).",
+      "description": "Used only with --live (SPEC §7.3): runs per scenario, the share of runs that must be hits (default 1), and the points by which each expected ask's lowest confidence must clear sure (without it, under 5 is a warning).",
       "type": "object",
       "additionalProperties": false,
       "properties": {
