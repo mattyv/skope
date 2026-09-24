@@ -81,6 +81,15 @@ installing anything. Set `SKOPE_VERSION` to pin a version, or
 Or, with Node 20 or newer, `npm install -g skope`. Or run the container
 image, `ghcr.io/mattyv/skope`.
 
+**Beta.** Until 0.1.0 is out, `latest` has nothing to install. Install the
+beta by name:
+
+```console
+$ curl -fsSL https://github.com/mattyv/skope/releases/download/v0.1.0-beta.1/install.sh | SKOPE_VERSION=0.1.0-beta.1 sh
+```
+
+or `npm install -g skope@beta`, or `ghcr.io/mattyv/skope:0.1.0-beta.1`.
+
 ## Use
 
 Check a skill before it ever runs. Lint catches dead ends, cycles, dangling

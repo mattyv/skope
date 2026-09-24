@@ -139,6 +139,6 @@ describe("M4: exit codes match the outcome table (SPEC §4.1)", () => {
   test("--version still works and exits 0 (Phase 0 baseline, not an expected failure)", async () => {
     const r = await runSkope(["--version"]);
     expect(r.code).toBe(0);
-    expect(r.stdout).toMatch(/^skope \d+\.\d+\.\d+ \(build identity [0-9a-f]{64}\)/);
+    expect(r.stdout).toMatch(/^skope \d+\.\d+\.\d+(-[\w.]+)? \(build identity [0-9a-f]{64}\)/);
   });
 });
