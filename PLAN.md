@@ -192,7 +192,7 @@ and options nothing in the spec needs (§6).
 - The example skills copied out of the spec: disk-full and cert-expiry into
   `fixtures/`, and error-triage into `fixtures-next/`. Only `fixtures/`
   ships with a release, so the Score example (v1.1) moves across as part of
-  M7. Each fake scenario directory holds `answers.yaml`, `commands.yaml` and
+  M7 (done: all three are in `fixtures/`). Each fake scenario directory holds `answers.yaml`, `commands.yaml` and
   `expected-exit`, since paged (10) and handoff (20) are correct results
   that the release smoke test must not treat as failures.
 - **Spec coverage check.** `scripts/check_spec.py coverage` fails CI if a
@@ -212,6 +212,27 @@ TypeScript, every contract has a schema, a generated type and at least one
 example that validates against it, `skop --version` prints the release
 version and build identity, and the Phase 0 milestone review (§6.3) has no
 open blocking findings.
+
+---
+
+## Status
+
+**Phases 0–4 are built; milestones M1–M7 are closed** (`tests/acceptance/CLOSED`),
+so CI now requires every milestone's acceptance tests to pass, none skipped,
+and every error code to have a test. Every stream was reviewed by an
+independent Opus agent (a proof reviewer for Dafny), and a final
+end-to-end review found one blocker (1 MiB command output overflowing
+Dafny's runtime), since fixed with a test.
+
+Left before a release, and needing a human:
+- Run the opt-in live backend tests (`SKOP_LIVE=1` with real Jev and
+  OpenRouter keys) so the recordings come from the real APIs (§4 D).
+- Review the goldens listed in `tests/acceptance/REVIEW.md` (§4 F).
+- A first tagged release proves the release workflow end to end
+  (per-platform binaries, attestations, container, npm).
+
+Follow-ups: lint messages that name the variable or reference (the codes
+and lines are right today; the messages give only the code's meaning).
 
 ---
 

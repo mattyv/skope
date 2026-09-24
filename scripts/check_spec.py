@@ -34,7 +34,7 @@ ACCEPTANCE = ROOT / "tests" / "acceptance"
 NOT_COVERAGE = {"tests/contracts.test.ts", "tests/golden.test.ts"}
 
 
-FIXTURE_DIRS = {"disk-full": "fixtures", "cert-expiry": "fixtures", "error-triage": "fixtures-next"}
+FIXTURE_DIRS = {"disk-full": "fixtures", "cert-expiry": "fixtures", "error-triage": "fixtures"}
 CODES_FILE = ROOT / "contracts" / "error-codes.json"
 
 

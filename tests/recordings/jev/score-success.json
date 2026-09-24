@@ -1,0 +1,18 @@
+{
+  "model": "jev-1.13.0",
+  "answers": {
+    "q": {
+      "type": "score",
+      "score": 2.2,
+      "legend": {
+        "0": "known noise, nothing to do",
+        "1": "worth a human look, not urgent",
+        "2": "degraded service",
+        "3": "outage or data at risk"
+      },
+      "probabilities": { "0": 0.05, "1": 0.1, "2": 0.45, "3": 0.4 },
+      "confidence": 0.62
+    }
+  },
+  "usage": { "input_tokens": 640, "output_tokens": 12 }
+}

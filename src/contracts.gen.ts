@@ -125,7 +125,7 @@ export interface RunBody {
   as?: Name;
 }
 /**
- * A reference to a section. `anchor` is present only for a real link `[text](#anchor)`: `given` is the anchor written, `expected` the GitHub slug of the link text. The core reports E-UNRESOLVED if they differ.
+ * A reference to a section. `anchor` is present only for a real link `[text](#anchor)`: `given` is the anchor written; `expected` is the GitHub slug of the heading of the section the link text resolves to (SPEC §3.4), or of the link text itself when it resolves to no section. The core reports E-UNRESOLVED if they differ.
  */
 export interface SectionRef {
   section: SectionId;
@@ -977,5 +977,62 @@ export interface StaleLockEvent {
   line?: number;
   event: "stale_lock";
   path: string;
-  holder_pid: number;
+  /**
+   * null when the lock can't be read or parsed (SPEC §7).
+   */
+  holder_pid: number | null;
 }
+
+/** SPEC §7.1: each error and warning code's meaning, from contracts/error-codes.json. */
+export const CODE_MEANINGS: Record<string, string> = {
+  "E-NOT-RUNNABLE": "no `format: 1` in the frontmatter (§3.1)",
+  "E-FRONTMATTER": "a frontmatter field is missing or invalid",
+  "E-DUP-SECTION": "two sections have the same slug (§3.4)",
+  "E-SECTION-KIND": "a section used as a list doesn't contain exactly one list (§3.2)",
+  "E-MISPLACED": "a list item starting with a keyword where instructions aren't recognised (§3.3 rule 7)",
+  "E-SECTION-NAME": "a `##` heading has no letters or digits, so it has no slug (§3.2)",
+  "E-DATA-ITEM": "a data list item isn't a plain-text value or ``Label — `command` `` (§3.6)",
+  "E-UNKNOWN-BOLD": "bold text that isn't a keyword and doesn't end in `:`, including a misspelled keyword (§3.3 rules 3 and 5)",
+  "E-GRAMMAR": "a keyword item doesn't match §3.4",
+  "E-NESTED-LIST": "a nested list under an instruction that doesn't take one",
+  "E-OPTION-ITEM": "an option item isn't exactly one `[Section]` link",
+  "E-RUBRIC-ITEM": "a rubric line isn't `INT: text` (v1.1)",
+  "E-UNRESOLVED": "a `[Section]` or `[List]` reference doesn't resolve",
+  "E-REF-KIND": "a data section used as a target, or an instruction section used as a list",
+  "E-CYCLE": "the transfer graph has a cycle (§4.6)",
+  "E-FALLS-OFF": "a path reaches the end of a section without ending or transferring",
+  "E-UNREACHABLE": "an instruction can never run (§4.1)",
+  "E-TAINT": "an untrusted value in a command (§3.5)",
+  "E-ACTION-IN-CMD": "an action item interpolated into a command (§3.5)",
+  "E-UNSAFE-VALUE": "a param default or value item reaching a command fails the safe-value check",
+  "E-UNBOUND": "a name in a command or comparison may be unbound, is never bound, or is out of scope",
+  "E-IF-YES": "`if yes` has no governing `yes | no` ask (§4.2)",
+  "E-ELSE-SKIP": "`else skip` where it isn't allowed",
+  "E-OPTION-COUNT": "a section-option ask has fewer than 2 or more than 255 options",
+  "E-LIST-KIND": "the wrong kind of list for the instruction",
+  "E-LIST-EMPTY": "a data list has no items",
+  "E-LIST-MIXED": "a data list mixes action and value items",
+  "E-LIST-DUP": "two items in a data list have the same label, ignoring case (§3.6)",
+  "E-SCORE-RANGE": "Score bounds invalid, or not 2–10 levels (v1.1)",
+  "E-SCORE-RUBRIC": "Score rubric missing, incomplete, out of range or duplicated (v1.1)",
+  "E-USAGE": "an unknown flag, a missing or malformed flag value, a missing or unreadable skill path, or an unreadable or malformed `--trace` file (§7)",
+  "E-MODE": "neither or both of `--apply` and `--dry-run` (§7 step 0)",
+  "E-PARAM-UNKNOWN": "`--param` names a param the skill doesn't declare",
+  "E-PARAM-TYPE": "a `--param` value has the wrong type",
+  "E-PARAM-UNSAFE": "a param override or built-in fails the safe-value check",
+  "E-CONFIG": "the config file, or a `--fake` or `--fake-exec` file, is unreadable or invalid (fake files are checked against `contracts/fakes.schema.json` before the run)",
+  "E-BACKEND-MODEL": "the `openrouter` model doesn't support logprobs, or its reasoning can't be turned off (§6.2)",
+  "E-BACKEND-LIMIT": "the skill exceeds the configured backend's limits: options, Score levels or context (§6.2)",
+  "E-FAKE-UNMATCHED": "`--fake-exec` has no answer for a command, or `--fake` has none for a question (§5.4)",
+  "E-IO": "skop can't write its run directory or lock file",
+  "E-INTERRUPTED": "skop was interrupted (SIGINT or SIGTERM); it stopped the running command and released the lock (§4.4)",
+  "E-INTERNAL": "a runner bug. Unreachable by P6, so always a bug report",
+  "W-SCORE-THRESHOLD": "a Score variable is only used in one comparison against one threshold; a `yes | no` ask gates more reliably (v1.1)",
+  "W-SCORE-UNUSED": "a Score variable is never used after it's bound (v1.1)",
+  "W-SECTION-UNREACHED": "no path reaches a section (§5.6)",
+  "W-ASK-NO-CONTEXT": "an `ask` question names nothing that could hold `run` output, so the model gets no evidence (§6.3)",
+  "W-MODEL-ALIAS": "`jev.model` is an alias, or a response came from a different model than configured (§6.2)",
+  "W-NO-GUIDANCE": "a section offered as an `ask` option has no guidance paragraph (§3.2)",
+  "W-CONFIG-PERMS": "the config file is group-writable or owned by someone other than this user or root; `pager.command` runs through `sh`, so whoever can write the file can run commands (§9). A world-writable config is `E-CONFIG`.",
+  "W-REDACT-OFF": "built-in redaction patterns are turned off (§9)"
+};

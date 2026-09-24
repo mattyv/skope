@@ -115,6 +115,7 @@ limits:                         # optional; defaults shown
   run_timeout: 30s              # run and check commands
   do_timeout: 5m                # do commands
   deadline: 15m                 # whole run; checked between steps (§7)
+                                # each duration: 1s to 2³¹−1 ms, as §4.4 says
   ask_context: 4k tokens        # must fit the backend's context limit (§6.2)
 ---
 ```
@@ -127,11 +128,19 @@ limits:                         # optional; defaults shown
 - Level 3+ headings are prose. They don't split a section: everything up to
   the next `##` belongs to the enclosing section.
 - A section is one of:
-  - an **instruction section**: contains at least one instruction (§3.3);
+  - an **instruction section**: contains at least one instruction (§3.3),
+    wherever it appears among the section's lists;
   - any other section, which is prose. Prose-only sections, like
-    `## Background`, are fine. A section used as a list (`[List]`) is a
-    **data section** and MUST contain exactly one list (§3.6), or it's
-    `E-SECTION-KIND`.
+    `## Background`, are fine, whatever lists they contain. A section used
+    as a list (`[List]`) is a **data section** and MUST contain exactly one
+    list (§3.6), or it's `E-SECTION-KIND`. Only a data section's items are
+    held to §3.6's forms (`E-DATA-ITEM`), and only data sections get the
+    core's list checks. Core JSON gives any other non-instruction section
+    just the list items that parse as data items.
+- A skill with no instruction section and no `entry` has nowhere to start:
+  lint reports its entry as `E-UNRESOLVED`.
+- A heading with no letters or digits has no slug, so no id: it's
+  `E-SECTION-NAME`.
 - An instruction section's **guidance** is its first paragraph before its
   first list. If there's none, it's the first paragraph anywhere in the
   section. If there's none at all, the section has no guidance. Guidance is
@@ -166,10 +175,17 @@ Rules:
    item that doesn't match its form exactly is a parse error: `**4**: outage`
    in a rubric is an error, not prose. In an instruction list, an item that
    starts with bold text is classified as follows:
-   - bold text ending in `:` (inside or right after the bold, e.g.
-     `**Note:**` or `**Note**:`) → prose;
-   - a keyword → instruction;
+   - a keyword, even with a `:` inside or right after the bold
+     (`**run**:`, `**Stop:**`) → instruction, so a colon can never turn a
+     keyword into prose (it then fails the grammar, rule 4);
+   - other bold text ending in `:` (inside or right after the bold, e.g.
+     `**Note:**` or `**Note**:`) → prose, unless dropping case, `_`, `-`
+     and spaces leaves a keyword (`**for_each:**`), which is
+     `E-UNKNOWN-BOLD`;
    - anything else → **parse error**. This catches typos like `**rn**`.
+   `__bold__` counts as bold, the same as `**bold**`. HTML bold
+   (`<b>run</b>`, `<strong>`) leading an item is `E-UNKNOWN-BOLD`: it
+   renders like a keyword, so it can't quietly be prose.
 
    Items that don't start with bold text are prose.
 4. A keyword item whose remaining text does **not** match the grammar in §3.4
@@ -185,9 +201,21 @@ Rules:
    separator. `yes | no` is a fixed token, not a separator.
 7. **Misplaced instructions.** A list item that starts with a keyword
    anywhere rule 1 doesn't cover is `E-MISPLACED`, never prose. That
-   includes before the first section, inside a blockquote, and in a list
-   nested under a prose item. Skop must never quietly skip something that
-   looks like an instruction.
+   includes before the first section, inside a blockquote (at any depth),
+   in a list nested under a prose, option, rubric or data item, and in a
+   data section. Skop must never quietly skip something that looks like an
+   instruction.
+8. **What counts as a list item** is what CommonMark renders as one:
+   `-`, `*`, `+`, `1.` and `1)` markers, tab or space indentation, CRLF or
+   LF line endings. Code blocks (fenced with backticks or tildes, or
+   indented) and HTML blocks, including `<!-- comments -->`, are opaque:
+   nothing inside them is an instruction, because nothing inside them
+   renders as a list item. The preprocessor uses a CommonMark parser, so
+   what runs is what a reader sees. A line break inside an item counts as
+   a space between tokens; a tab between tokens is `E-GRAMMAR`. Lists
+   nested more than 100 deep are `E-NESTED-LIST`. `[Name]` in an
+   instruction is always a section reference, even if the file also
+   defines a Markdown link called `Name`.
 
 ### 3.4 Instruction grammar (surface)
 Whitespace between tokens is one or more spaces. `CMD` is exactly one inline
@@ -256,11 +284,17 @@ variables bound by `run … as`, `ask … as`, `for each`.
 
 **Taint rule (MUST be enforced statically by the core lint):**
 - *Trusted*: params, built-ins, value items (bound by `for each` or chosen by
-  `one of`), and Score answers. A Score answer is an integer, so it always
-  passes the safe-value check and may be interpolated into a `CMD`.
+  `one of`), yes/no answers (`yes` or `no`), and Score answers. A Score
+  answer is an integer, so it always passes the safe-value check and may be
+  interpolated into a `CMD`.
 - *Untrusted*: anything bound by `run … as`.
 - *Action items*: `{item}` renders the item's label. An action item MUST NOT
   be interpolated into a `CMD`. Use `do item` to run its command.
+- An action item's own command is a `CMD` too, but it runs wherever
+  `do item` is, so it may interpolate only params and built-ins that no
+  instruction in the skill rebinds (`run … as`, `ask … as`, `for each`).
+  A name bound nowhere is `E-UNBOUND`; a param or built-in that something
+  rebinds is `E-TAINT`. Both are reported at the item's line.
 - `CMD` (in `run`, `do`, `check`) MUST NOT interpolate untrusted values or
   action items. Violation = lint error.
 - `QUOTED` (page text) may interpolate anything, and MUST be escaped for
@@ -301,7 +335,9 @@ nothing to escape, and mounts, domains and unit names never need more.
   `(unavailable)`. For a `run` output named in `Q`, that's its value in the
   context.
 - A name that is never bound anywhere is a lint error wherever it's used.
-- A `for each` variable is scoped to the loop body.
+- A `for each` variable is scoped to the loop body. When the loop ends, or a
+  transfer leaves it, the name is unbound, even if it had a value before
+  the loop.
 - A Score answer is bound only on paths where its gate passed.
 
 As a result the runtime never meets an unbound name (proven, §5.3).
@@ -380,8 +416,10 @@ timeout `limits.do_timeout`.
 **`check COND → TARGET [else]`**:
 - `CMD succeeds`: run CMD per §4.4 with `limits.run_timeout`. True iff exit 0.
   Timeout → failure handling, not false.
-- Comparison: operands coerced to numbers: trim, strip one trailing `%`,
-  parse as decimal. Coercion failure → failure handling.
+- Comparison: operands coerced to numbers: trim spaces, tabs, `\r` and
+  `\n`, strip one trailing `%`, parse as `-?DIGITS(.DIGITS)?`. Coercion
+  failure → failure handling; the handoff record's detail is then
+  `{expr, left, right}`, not a command's exit.
 - True → transfer to TARGET (`stop` ends the run with `stopped`).
 - False → if `else [X]`, transfer to X; `else skip` or no else → continue.
 - `check COND else …` (no arrow): true → continue; false → else.
@@ -401,7 +439,7 @@ timeout `limits.do_timeout`.
   the chosen one.
 - Confidence ≥ `sure` → proceed:
   - section options: transfer to the chosen section.
-  - `yes | no`: bind NAME (default `_yn`) to boolean.
+  - `yes | no`: bind NAME (default `_yn`) to the string `yes` or `no`.
   - `one of [L] as NAME`: bind NAME to the chosen list item.
 - Confidence < `sure`, or a tie → gate failed:
   - no else → outcome `handoff` (reason `gate_failed`).
@@ -486,13 +524,23 @@ tells whoever picks up the record what to do (§8).
 - Run with `/bin/sh -c` (author-written text; interpolated values passed the
   safe-value check).
 - stdin is `/dev/null`, except for the pager, which gets its message on
-  stdin. Environment adds `LC_ALL=C` so output is parseable.
+  stdin. The environment is skop's own, minus the backend key variables
+  (`jev.key_env`, `openrouter.key_env`), plus `LC_ALL=C` so output is
+  parseable. Skill commands never see the backend's key, and the key's
+  value is also redacted like any secret (§9).
 - Each command runs in its own process group. On timeout: `SIGTERM` to the
   group, 5s grace, then `SIGKILL` to the group.
 - stdout and stderr are captured separately, each capped at 1 MiB **at
   capture time**, keeping the tail. A capped stream sets `truncated: true` in
   the log.
 - Timeouts are implemented by the host in Node, not with `timeout(1)`.
+  Every timeout, from a skill or config, is 1 ms to 2³¹−1 ms (about 24
+  days); anything else is `E-FRONTMATTER` or `E-CONFIG`.
+- **If skop itself is interrupted** (SIGINT or SIGTERM) while a command
+  runs, it sends that command's group `SIGTERM`, waits the grace period,
+  sends `SIGKILL`, releases the lock, and ends with outcome `error`,
+  `E-INTERRUPTED`, exit 50. A `do` interrupted this way has effect status
+  `unknown`.
 
 ### 4.5 Dry run (`--dry-run`)
 There is no default mode. A run without `--apply` or `--dry-run` refuses to
@@ -662,6 +710,15 @@ sequenceDiagram
   `Page`.
 - `runConfig` carries params, built-ins, dry-run flag and mode
   (`concrete` or `explore`).
+- **Events are split between core and host.** `Step` returns core events
+  (`CoreEvent` in `core/Step.dfy`) carrying what the core decides: section,
+  line, commands, comparisons, answers, gates, transfers, `would_do`,
+  `after_would_do`, the outcome and its counts. The host adds what only it
+  knows (timestamps, run ids, durations, output hashes and tails, backend,
+  model, request paths) and emits the host-only events (`run_start`,
+  `handoff_page`, `handoff_record`, `error`, `warning`, `locked`,
+  `stale_lock`). `EVENT_FIELDS` in `src/step.ts` says which side fills each
+  field, and a test checks it against `contracts/event.schema.json`.
 
 ### 5.3 Proven properties (MUST)
 CI runs `dafny verify` and fails on any unproven obligation.
@@ -696,8 +753,9 @@ Shipped Dafny code MUST NOT contain `assume`, `{:axiom}` or
 - **fake**: `--fake` answers backend questions from a file (§6.2). `--fake-exec` answers
   commands from a file keyed by command text (after interpolation) or
   source-map id; value is `{exit, stdout, stderr, timed_out}`. An unmatched
-  command is an error (exit 50). With `--fake-exec`, no real command ever
-  runs.
+  command is an error (exit 50). With `--fake-exec`, no skill command
+  ever really runs. The pager isn't a skill command: it still runs the
+  configured `pager.command`, so tests configure a harmless one.
 - **explore**: used by `--verify` and `--explain`. It must reach every path
   a real run could take.
   - Values from `run` are unknown. A comparison on an unknown value has three
@@ -769,6 +827,7 @@ identity (§7.2), then:
   timeouts plus kill grace, every backend attempt allowed by `ask.retries` with its wait, and the pager
   timeout. The enforced limit is `limits.deadline` (§7).
 - sections never reached (warning `W-SECTION-UNREACHED`)
+- each ask reached, with its section, line, kind and the branches explored there: one per option (Score: per level), plus unsure and unavailable (§5.4)
 
 ---
 
@@ -778,6 +837,9 @@ identity (§7.2), then:
 ~~~
 skop-ask --request /path/req.json   # prints one JSON object to stdout
 ~~~
+skop itself calls the same code in-process, with the same inputs and
+validation, so the backend key never reaches a child process. The
+command exists for testing backends by hand.
 Request:
 ```json
 {"kind":"choice","question":"Given `used`, `errors` and `biggest`, what's the best next step?",
@@ -996,12 +1058,15 @@ skop <path/to/SKILL.md> [options]
   --no-page               with --apply: don't page on handoff (§8)
   --param k=v             override a frontmatter param (repeatable, typed, safe-value checked)
   --explain               print sections, transfer graph, and worst-case cost; run nothing
-  --verify                run the explore handler and print the verify report; run nothing
+  --verify                run the explore handler and print the verify report; run nothing.
+                          The report is the last stdout line; warning events come before it
+  --trace events.jsonl    with --verify: check that one run's path is one the explorer can take (§12.4)
   --lint                  parse + static checks only
   --fake answers.yaml     use the fake backend
   --fake-exec cmds.yaml   use the fake command handler; no real command runs
   --config path           default: $XDG_CONFIG_HOME/skop/config.yaml
   --version               print the release version and build identity (§7.2)
+  --help                  print these options to stdout and exit 0
 ~~~
 
 Responsibilities, in order:
@@ -1013,9 +1078,16 @@ Responsibilities, in order:
 2. Validate params and built-ins: types, and the safe-value check for any
    value that reaches a `CMD`. On failure, exit 40. This applies whoever the
    caller is, agents included.
-3. Acquire the lock at `$XDG_RUNTIME_DIR/skop/<name>.lock` (fallback: the OS
-   temp dir). No native modules.
-   - Create it with exclusive create (`wx`), writing pid and start time.
+3. Acquire the lock at `$XDG_RUNTIME_DIR/skop/<name>.lock`. Without
+   `XDG_RUNTIME_DIR`, as under a systemd system unit, use a per-user
+   directory `<OS temp dir>/skop-<uid>`, created with mode 0700; skop
+   refuses it (`E-IO`) unless it's a real directory, not a symlink, owned
+   by this user and not writable by anyone else. No native modules.
+   - Create it atomically (write a temporary file, then hard-link it into
+     place, which fails if it exists), holding pid and start time.
+   - A holder is alive only if its pid is running and started when the
+     lock says, so a reused pid doesn't keep a dead run's lock. A lock
+     that can't be read or parsed is stale, with an unknown holder.
    - It exists and the holder is alive → emit `locked`, exit 30. Don't page.
      Another run is already on it.
    - It exists and the holder is dead → emit `stale_lock`, print the lock
@@ -1038,7 +1110,10 @@ Responsibilities, in order:
 5. Enforce `limits.deadline`. Check it between steps only, never in the
    middle of a command: each command already has its own timeout, and
    killing a `do` halfway leaves the system in an unknown state. Past the
-   deadline → `handoff` with reason `deadline`.
+   deadline → `handoff` with reason `deadline`. Its `section` and `line`
+   are those of the next request the host would have started (the core
+   runs pure steps, like a comparison, within one `Step`, so the deadline
+   can't fall between them).
 6. On `handoff`, write the handoff record, page if §8 says to, and exit 20.
 7. Exit with the outcome's code.
 
@@ -1088,6 +1163,7 @@ and have no codes.
 | `E-DUP-SECTION` | parse | two sections have the same slug (§3.4) | `## Page` twice; `## Clean up` and `## Clean-up` |
 | `E-SECTION-KIND` | lint | a section used as a list doesn't contain exactly one list (§3.2) | `[Notes]` where Notes has two lists |
 | `E-MISPLACED` | parse | a list item starting with a keyword where instructions aren't recognised (§3.3 rule 7) | `- **run** …` in a blockquote |
+| `E-SECTION-NAME` | parse | a `##` heading has no letters or digits, so it has no slug (§3.2) | `## 🔥`; `## ---` |
 | `E-DATA-ITEM` | parse | a data list item isn't a plain-text value or ``Label — `command` `` (§3.6) | value item `` `nginx` `` |
 | `E-UNKNOWN-BOLD` | parse | bold text that isn't a keyword and doesn't end in `:`, including a misspelled keyword (§3.3 rules 3 and 5) | ``**rn** `df -h` `` |
 | `E-GRAMMAR` | parse | a keyword item doesn't match §3.4 | `**Run** the tests first`; `**run** df -h` |
@@ -1112,15 +1188,17 @@ and have no codes.
 | `E-LIST-DUP` | lint | two items in a data list have the same label, ignoring case (§3.6) | `nginx` twice |
 | `E-SCORE-RANGE` | lint | Score bounds invalid, or not 2–10 levels (v1.1) | `→ 5 to 1`; `→ 1 to 11` |
 | `E-SCORE-RUBRIC` | lint | Score rubric missing, incomplete, out of range or duplicated (v1.1) | no line for level 2 |
+| `E-USAGE` | args | an unknown flag, a missing or malformed flag value, a missing or unreadable skill path, or an unreadable or malformed `--trace` file (§7) | `--aply`; `--param k` |
 | `E-MODE` | args | neither or both of `--apply` and `--dry-run` (§7 step 0) | |
 | `E-PARAM-UNKNOWN` | args | `--param` names a param the skill doesn't declare | |
 | `E-PARAM-TYPE` | args | a `--param` value has the wrong type | `threshold=high` |
 | `E-PARAM-UNSAFE` | args | a param override or built-in fails the safe-value check | `mount='/; rm -rf /'` |
-| `E-CONFIG` | args | the config file is unreadable or invalid | |
+| `E-CONFIG` | args | the config file, or a `--fake` or `--fake-exec` file, is unreadable or invalid (fake files are checked against `contracts/fakes.schema.json` before the run) | |
 | `E-BACKEND-MODEL` | args | the `openrouter` model doesn't support logprobs, or its reasoning can't be turned off (§6.2) | |
 | `E-BACKEND-LIMIT` | args | the skill exceeds the configured backend's limits: options, Score levels or context (§6.2) | 21 options on `openrouter`; `ask_context: 40k tokens` on `jev` |
-| `E-FAKE-UNMATCHED` | runtime | `--fake-exec` has no answer for a command (§5.4) | |
+| `E-FAKE-UNMATCHED` | runtime | `--fake-exec` has no answer for a command, or `--fake` has none for a question (§5.4) | |
 | `E-IO` | runtime | skop can't write its run directory or lock file | |
+| `E-INTERRUPTED` | runtime | skop was interrupted (SIGINT or SIGTERM); it stopped the running command and released the lock (§4.4) | Ctrl-C during a `do` |
 | `E-INTERNAL` | runtime | a runner bug. Unreachable by P6, so always a bug report | |
 
 Warnings don't stop a run:
@@ -1133,6 +1211,7 @@ Warnings don't stop a run:
 | `W-ASK-NO-CONTEXT` | an `ask` question names nothing that could hold `run` output, so the model gets no evidence (§6.3) |
 | `W-MODEL-ALIAS` | `jev.model` is an alias, or a response came from a different model than configured (§6.2) |
 | `W-NO-GUIDANCE` | a section offered as an `ask` option has no guidance paragraph (§3.2) |
+| `W-CONFIG-PERMS` | the config file is group-writable or owned by someone other than this user or root; `pager.command` runs through `sh`, so whoever can write the file can run commands (§9). A world-writable config is `E-CONFIG`. |
 | `W-REDACT-OFF` | built-in redaction patterns are turned off (§9) |
 
 Parse codes come from the preprocessor. Lint codes come from the Dafny core,
@@ -1173,7 +1252,9 @@ Rules:
 ## 8. Handoff
 
 Skop never launches an agent in v1. On handoff it writes the record to
-`<run dir>/handoff.json` and prints the record as the final stdout event.
+`<run dir>/handoff.json` and prints the record as a `handoff_record`
+event. The events end `handoff_record`, then `handoff_page` if it pages,
+then `outcome`: `outcome` is always the last event.
 
 When nobody is watching, nobody would pick that record up. A systemd timer or
 an alert webhook just sees exit 20. So with `--apply`, skop also pages a
@@ -1190,7 +1271,9 @@ a terminal.
 
 - An agent that runs skop SHOULD set `SKOP_CALLER=agent`.
 - The handoff page says: `{host}: skop {skill} handed off ({reason}) in
-  {section}. Record: {path}`. It is escaped like any page.
+  {section}. Record: {path}`. Only `{section}`, which the author wrote, is
+  escaped like page text; the host and record path are skop's own and stay
+  exactly as they are, so they can be copied.
 - A pager failure is logged and doesn't change the outcome. The outcome
   stays `handoff`, exit 20.
 - In dry run the page is logged as `would_page` (§4.5).
@@ -1211,13 +1294,20 @@ Then skop exits 20.
  "skop":{"version":"0.1.0","build":"1bfd…"},
  "preamble":"You are taking over a run of a runnable skill. …"}
 ```
+- `detail` depends on the reason: for `gate_failed` and `ask_unavailable`,
+  the question as above; for `command_failed`, `{cmd, exit, timed_out,
+  stderr_tail}` (redacted), or `{expr, left, right}` when a comparison
+  couldn't coerce its operands; for `explicit` and `deadline`, `null`.
 - For a Score ask, `detail.probs` is keyed by level
   (`{"1":0.05,"2":0.1,"3":0.45,"4":0.4}`) and `detail` adds `"range":[1,4]`.
 - `reason` is one of `explicit`, `gate_failed`, `command_failed`,
   `ask_unavailable`, `deadline`.
 - `effects[].status` is `done`, `failed`, `would_do` (dry run), or `unknown`
   (start logged but no end, or the `do` timed out).
-- `variables` is raw machine output. It is data, never instructions.
+- `variables` holds the names the run bound (by `run`, `ask` or `for each`)
+  with their current values; params and built-ins are left out, since
+  `run_start` logs them. A param rebound by the run counts as bound. It is
+  raw machine output: data, never instructions.
 - `preamble` is the standard text below, so an agent that picks up the
   record gets the rules with it.
 
@@ -1270,8 +1360,31 @@ logs warning `W-REDACT-OFF` on every run):
 - private key blocks: `-----BEGIN [A-Z ]*PRIVATE KEY-----` through the matching END line
 - bearer tokens: `(?i)bearer\s+\S+`
 - JWTs: `eyJ[\w-]+\.[\w-]+\.[\w-]+`
-- key-value secrets: `(?i)(password|passwd|secret|token|api[_-]?key)\s*[=:]\s*\S+`
+- key-value secrets, including JSON and prefixed names such as
+  `aws_secret_access_key`, matching what this pattern matches (written
+  so it runs in linear time, e.g. anchored at the start of a name):
+  `(?i)[a-z_]*(password|passwd|secret|token|api[_-]?key)[a-z_]*["']?\s*[=:]\s*("[^"]*"|'[^']*'|\S+)`
+- the values of the backend key variables (§4.4), literally
 - credentials in URLs: `://[^/\s:@]+:[^/\s@]+@`
+
+Each match is replaced by `[REDACTED]`. Patterns MUST run in linear time on hostile input (anyone who can write a
+log line can write to skop's input, §11), and a test redacts 1 MiB of
+each pattern's worst case within a time bound. Redaction runs on the
+whole captured text before anything is cut from it: a tail cut from
+unredacted text could start mid-secret. When the 1 MiB capture cap cut the
+start, the partial first line is dropped before redacting, and a private
+key block missing its BEGIN or END line is redacted to the edge of the
+text. Custom patterns may start with `(?i)`; one that matches the empty
+string is `E-CONFIG`.
+
+**Config errors.** A missing config file at the default path means
+defaults. Anything else is `E-CONFIG`: a file that can't be read, a
+`--config` path that doesn't exist, invalid YAML, an unknown key at any
+level, or a wrong type or out-of-range value. A run whose skill asks
+needs a block for the selected backend, whether or not the file exists,
+and without one it's `E-CONFIG` before the run starts; `--lint`,
+`--explain`, `--verify` and runs that never ask don't. `state_dir`
+expands a leading `$XDG_STATE_HOME` or `~`, and must then be absolute.
 
 ---
 
@@ -1288,20 +1401,20 @@ logs warning `W-REDACT-OFF` on every run):
 | `event` | Extra fields |
 |---|---|
 | `run_start` | `params`, `dry_run`, `caller`, `run_dir`, `skop_version`, `skop_build` (§7.2) |
-| `run` / `check_cmd` | `cmd`, `exit`, `ms`, `timed_out`, `truncated`, `stdout_hash`, `stdout_tail` (redacted, ≤2KB), `after_would_do` |
-| `check` | `expr`, `left`, `right`, `result`, `after_would_do` |
-| `ask` | `question`, `kind`, `probs`, `chosen`, `confidence`, `sure`, `passed`, `backend`, `model`, `ms`, `request_path`, `request_sha256`, `after_would_do`; for `score`, `range`, and `chosen` is an integer. If the backend failed, `probs`, `chosen` and `confidence` are `null` and `detail` is `unavailable` or `request_too_large` |
+| `run` / `check_cmd` | `cmd`, `exit`, `ms`, `timed_out`, `truncated`, `stdout_hash` (of the redacted output, so a log can't be used to test guesses of a secret), `stdout_tail` (redacted, ≤2KB), `after_would_do` |
+| `check` | `expr`, `left`, `right`, `result`, `after_would_do`. `expr` is rendered from the core program: operands as `{name}` or the number, e.g. `{used} < {threshold}` (a decorative `%` is gone by then) |
+| `ask` | `probs` keyed by option id only; unassigned probability stays in the request file. `question` (as sent, §3.5: trusted values pasted in, `run` outputs named in backticks), `kind`, `probs`, `chosen`, `confidence`, `sure`, `passed`, `backend`, `model`, `ms`, `request_path`, `request_sha256`, `after_would_do`; for `score`, `range`, and `chosen` is an integer. If the backend failed, `probs`, `chosen` and `confidence` are `null` and `detail` is `unavailable` or `request_too_large` |
 | `effect_start` / `effect_end` | `cmd`, `exit`, `ms`, `timed_out` (end only) |
 | `would_do` | `cmd` |
 | `page` | `text`, `ok` (did the pager command succeed) |
 | `would_page` | `text` |
 | `handoff_page` | `text`, `ok` (did the pager command succeed) |
 | `transfer` | `from`, `to` |
-| `outcome` | `outcome`, `reason` (a §8.1 reason, or `null`), `ask_calls`, `effects`, `dry_run` (`null` if the mode was never set) |
+| `outcome` | `outcome`, `reason` (a §8.1 reason, or `null`), `ask_calls`, `effects` (`do` commands started, so 0 in a dry run), `dry_run` (`null` if the mode was never set) |
 | `handoff_record` | `path`, `record` |
 | `error` / `warning` | `code`, `stage`, `file`, `line`, `message` (§7.1). A warning's `stage` is the stage that found it: `parse`, `lint`, `args` or `runtime` |
 | `locked` | `holder_pid` |
-| `stale_lock` | `path`, `holder_pid` |
+| `stale_lock` | `path`, `holder_pid` (`null` if the lock can't be read) |
 
 ### 10.1 Run directory
 `<state_dir>/runs/<run_id>/` holds `ask-<n>.json` and `handoff.json`. Retention is out of scope for v1.
@@ -1327,6 +1440,9 @@ logs warning `W-REDACT-OFF` on every run):
 7. Redact before sending anything to the backend, and before logging. Built-in patterns are on by
    default.
 8. Page text is escaped. A pager failure never blocks the outcome.
+   C0 and C1 control characters other than newline and tab are removed
+   from page text and from everything skop writes to stderr, so command
+   output can't drive a terminal.
 9. Backend probabilities are measured, never self-reported: Jev's own
    distribution, or token logprobs from OpenRouter.
 10. If the backend is down or answers badly, the result is a handoff, never "act
@@ -1443,7 +1559,10 @@ file paths.
   fixtures terminates, reports every path ending in an outcome, and reports
   max backend calls. (disk-full: Clean up loop is 5 items, bounded.)
 - **M3 Exec with fakes**: for each scenario, the event stream matches a golden
-  JSONL. Dry run issues no `do` and no page.
+  JSONL. Dry run issues no `do` and no page. A golden ignores the fields
+  that change from run to run or from build to build: `ts`, `ms`,
+  `run_id`, `host`, `skill_hash`, `run_dir`, `request_path`,
+  `request_sha256`, `path`, `file`, `skop_version` and `skop_build`.
 - **M4 Real backends + runner features**: both `jev` and `openrouter`
   against recorded responses. For `jev` that covers option labels (not
   ids) as Choice keys, mapped back to ids; context holding only the named
@@ -1494,7 +1613,17 @@ Installer tests (§5.5), in M6, against a local download server via
 
 ### 12.4 Differential check (optional but cheap)
 For each fake scenario, the concrete trace MUST appear among the explore
-handler's paths. Deadline scenarios are excluded (§5.4). This tests the host glue, since both share one interpreter.
+handler's paths. `skop SKILL.md --verify --trace events.jsonl` checks one:
+it replays the trace's sequence of (section, line, response class) through
+the explorer's graph and exits 0 if the explorer can take that path, 40
+if it can't. Either way it prints one JSON line on stdout,
+`{"skop_version","skop_build","trace_fits":true}`, or with `false` and a
+`mismatch`: the first of the trace's core events no explored path takes,
+as `{index, event, section, line, class}` (`class` is the response class;
+all but `index` are `null` when the trace ends where every path goes on),
+and a readable line on stderr. A mismatch is a verify result, not an
+error, so it has no code. Deadline scenarios are excluded (§5.4). This
+tests the host glue, since both share one interpreter.
 Run in CI.
 
 ---
@@ -1983,6 +2112,47 @@ Also, where things live in the Markdown:
 - **Standalone binaries and `install.sh`** (§5.5), so skop can run on a
   machine without Node. The installer checks each download against the
   release's `SHA256SUMS`.
+- **Host details from review:** `stdout_hash` hashes the redacted output;
+  fake files are schema-checked (`E-CONFIG`); an unreadable skill or trace
+  file is `E-USAGE`; the host calls `skop-ask`'s code in-process; warnings
+  about a run that goes ahead are emitted after `run_start`, so they carry
+  its `run_id`.
+- **Integration details:** a deadline handoff points at the next request
+  the host would have started; `ask.probs` holds option ids only; an unknown
+  flag is `E-USAGE`; `--verify` prints its report as the last stdout line.
+- **Unreachable sections aren't flow-checked:** they get
+  `W-SECTION-UNREACHED`, but no `E-UNBOUND` or `E-TAINT`, since no path
+  reaches them, and their transfers don't affect what reachable sections
+  may assume. A `check` with neither a target nor an else is `E-GRAMMAR`.
+- **Action-item commands are checked:** they may interpolate only params
+  and built-ins that nothing rebinds (§3.5). Yes/no answers are trusted
+  values. A loop variable is dropped when its loop ends or a transfer
+  leaves it; an outer value of the same name isn't restored.
+- **Runner hardening:** skill commands don't get the backend keys;
+  timeouts are bounded; an interrupted run stops its command and releases
+  the lock (`E-INTERRUPTED`); the lock's fallback directory is per-user
+  and checked, is created atomically, and a reused pid or unreadable lock
+  counts as stale; redaction is linear-time, runs before cutting, and
+  covers JSON and prefixed keys; config errors are never silent defaults.
+- **A keyword with a colon is still a keyword** (`**run**:` is an
+  instruction or an error, never prose), `__bold__` counts as bold, and
+  what counts as a list item follows CommonMark: code and HTML blocks are
+  opaque (§3.3 rules 3, 7, 8).
+- **A section is an instruction section if any item is an instruction**,
+  and only data sections' items are held to §3.6 (`E-SECTION-NAME` for a
+  heading with no slug).
+- **Goldens list what they ignore**, including `request_sha256`, whose
+  exact bytes are an implementation detail.
+- **A deadline handoff points at the next instruction** it didn't start.
+- **Event order and fields pinned for goldens:** `outcome` is always last,
+  after `handoff_record` and `handoff_page`; `check.expr` is rendered from
+  the core program; `ask.question` is the question as sent; `effects`
+  counts `do` commands started. The pager still runs under `--fake-exec`.
+  The differential check is `--verify --trace`.
+- **A link's anchor is checked against the heading it resolves to**, not
+  its link text, so `[Clean_Up](#clean-up)` finds `## Clean up`.
+- **The step interface includes events**, split between what the core
+  decides and what the host adds (§5.2).
 - **A Score rubric in core JSON is a list** of `{src, level, text}`, so
   each line keeps its source line.
 - **The event contract is one shape per event**, with an example of each

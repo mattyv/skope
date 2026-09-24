@@ -17,7 +17,7 @@ const partsText = (parts: Part[]): string => parts.map((p) => ("lit" in p ? p.li
 const cases: { name: string; core: string; skill: string }[] = [
   { name: "disk-full", core: "examples/disk-full.core.json", skill: "fixtures/disk-full/SKILL.md" },
   { name: "cert-expiry", core: "examples/cert-expiry.core.json", skill: "fixtures/cert-expiry/SKILL.md" },
-  { name: "error-triage", core: "examples/error-triage.core.json", skill: "fixtures-next/error-triage/SKILL.md" },
+  { name: "error-triage", core: "examples/error-triage.core.json", skill: "fixtures/error-triage/SKILL.md" },
 ];
 
 for (const { name, core, skill } of cases) {

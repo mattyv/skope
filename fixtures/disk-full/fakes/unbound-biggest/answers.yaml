@@ -1,0 +1,8 @@
+{
+  "line:27": {
+    "s:clean_up": 0.03125,
+    "s:restart": 0.03125,
+    "s:page": 0.875,
+    "s:investigate": 0.0625
+  }
+}

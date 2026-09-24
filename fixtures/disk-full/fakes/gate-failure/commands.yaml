@@ -1,0 +1,14 @@
+{
+  "line:23": {
+    "exit": 0,
+    "stdout": " 91%\n"
+  },
+  "line:25": {
+    "exit": 0,
+    "stdout": "ambiguous\n"
+  },
+  "line:26": {
+    "exit": 0,
+    "stdout": "ambiguous\n"
+  }
+}

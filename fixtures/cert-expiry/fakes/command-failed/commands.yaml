@@ -1,0 +1,15 @@
+{
+  "line:23": {
+    "exit": 1,
+    "stdout": "Certificate will expire\n"
+  },
+  "line:24": {
+    "exit": 1,
+    "stdout": "Certificate will expire\n"
+  },
+  "line:25": {
+    "exit": 1,
+    "stdout": "",
+    "stderr": "systemctl: command not found\n"
+  }
+}

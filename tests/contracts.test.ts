@@ -44,7 +44,6 @@ describe("core program schema (SPEC §5.1)", () => {
     ["a section id without the s: prefix", (p) => (p.entry.section = "triage")],
     ["an id that isn't a slug", (p) => (p.entry.section = "s:Triage")],
     ["a list reference as a bare id", (p) => (p.sections["s:clean_up"].body[0].for_each.list = "s:cleanups")],
-    // biome-ignore lint/suspicious/noThenProperty: `then` is the check's target field in the core program
     ["a check with neither a target nor an else", (p) => (triage(p)[1].check.then = null)],
     [
       "an if_yes run with a binding",
@@ -118,13 +117,6 @@ describe("error-code contract (SPEC §7.1)", () => {
       expect(["parse", "lint", "args", "runtime", "warning"]).toContain(c.stage);
       expect(c.meaning.length).toBeGreaterThan(0);
     }
-  });
-});
-
-describe("the spike example is a valid core program section", () => {
-  test("spike-program.json matches the section definition", () => {
-    const section = schema("core-program", "#/$defs/section");
-    expect(section(read("examples/spike-program.json")), JSON.stringify(section.errors)).toBe(true);
   });
 });
 

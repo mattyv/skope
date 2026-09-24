@@ -25,6 +25,11 @@
     "meaning": "a list item starting with a keyword where instructions aren't recognised (§3.3 rule 7)"
   },
   {
+    "code": "E-SECTION-NAME",
+    "stage": "parse",
+    "meaning": "a `##` heading has no letters or digits, so it has no slug (§3.2)"
+  },
+  {
     "code": "E-DATA-ITEM",
     "stage": "parse",
     "meaning": "a data list item isn't a plain-text value or ``Label — `command` `` (§3.6)"
@@ -145,6 +150,11 @@
     "meaning": "Score rubric missing, incomplete, out of range or duplicated (v1.1)"
   },
   {
+    "code": "E-USAGE",
+    "stage": "args",
+    "meaning": "an unknown flag, a missing or malformed flag value, a missing or unreadable skill path, or an unreadable or malformed `--trace` file (§7)"
+  },
+  {
     "code": "E-MODE",
     "stage": "args",
     "meaning": "neither or both of `--apply` and `--dry-run` (§7 step 0)"
@@ -167,7 +177,7 @@
   {
     "code": "E-CONFIG",
     "stage": "args",
-    "meaning": "the config file is unreadable or invalid"
+    "meaning": "the config file, or a `--fake` or `--fake-exec` file, is unreadable or invalid (fake files are checked against `contracts/fakes.schema.json` before the run)"
   },
   {
     "code": "E-BACKEND-MODEL",
@@ -182,12 +192,17 @@
   {
     "code": "E-FAKE-UNMATCHED",
     "stage": "runtime",
-    "meaning": "`--fake-exec` has no answer for a command (§5.4)"
+    "meaning": "`--fake-exec` has no answer for a command, or `--fake` has none for a question (§5.4)"
   },
   {
     "code": "E-IO",
     "stage": "runtime",
     "meaning": "skop can't write its run directory or lock file"
+  },
+  {
+    "code": "E-INTERRUPTED",
+    "stage": "runtime",
+    "meaning": "skop was interrupted (SIGINT or SIGTERM); it stopped the running command and released the lock (§4.4)"
   },
   {
     "code": "E-INTERNAL",
@@ -223,6 +238,11 @@
     "code": "W-NO-GUIDANCE",
     "stage": "warning",
     "meaning": "a section offered as an `ask` option has no guidance paragraph (§3.2)"
+  },
+  {
+    "code": "W-CONFIG-PERMS",
+    "stage": "warning",
+    "meaning": "the config file is group-writable or owned by someone other than this user or root; `pager.command` runs through `sh`, so whoever can write the file can run commands (§9). A world-writable config is `E-CONFIG`."
   },
   {
     "code": "W-REDACT-OFF",

@@ -1,0 +1,39 @@
+{
+  "id": "gen-fixture-gate-971",
+  "model": "test/model",
+  "choices": [
+    {
+      "message": { "role": "assistant", "content": "A" },
+      "logprobs": {
+        "content": [
+          {
+            "token": "A",
+            "logprob": -0.6733445532637656,
+            "top_logprobs": [
+              { "token": "A", "logprob": -0.6733445532637656 },
+              { "token": "x1", "logprob": -3.6888794541139363 },
+              { "token": "x2", "logprob": -3.6888794541139363 },
+              { "token": "x3", "logprob": -3.6888794541139363 },
+              { "token": "x4", "logprob": -3.6888794541139363 },
+              { "token": "x5", "logprob": -3.6888794541139363 },
+              { "token": "x6", "logprob": -3.6888794541139363 },
+              { "token": "x7", "logprob": -3.6888794541139363 },
+              { "token": "x8", "logprob": -3.6888794541139363 },
+              { "token": "x9", "logprob": -3.6888794541139363 },
+              { "token": "x10", "logprob": -3.6888794541139363 },
+              { "token": "x11", "logprob": -3.6888794541139363 },
+              { "token": "x12", "logprob": -3.6888794541139363 },
+              { "token": "x13", "logprob": -3.6888794541139363 },
+              { "token": "x14", "logprob": -3.6888794541139363 },
+              { "token": "x15", "logprob": -3.6888794541139363 },
+              { "token": "x16", "logprob": -3.6888794541139363 },
+              { "token": "x17", "logprob": -3.6888794541139363 },
+              { "token": "x18", "logprob": -3.6888794541139363 },
+              { "token": "x19", "logprob": -3.6888794541139363 }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

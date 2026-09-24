@@ -1,0 +1,11 @@
+{
+  "line:23": {
+    "exit": 0,
+    "stdout": " 89%\n"
+  },
+  "line:25": {
+    "exit": 1,
+    "stdout": "",
+    "stderr": "journalctl: unrecognized option\n"
+  }
+}

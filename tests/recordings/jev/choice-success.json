@@ -1,0 +1,17 @@
+{
+  "model": "jev-1.13.0",
+  "answers": {
+    "q": {
+      "type": "choice",
+      "choice": "Clean up",
+      "confidence": 0.76,
+      "probabilities": {
+        "Clean up": 0.82,
+        "Restart": 0.12,
+        "Page": 0.04,
+        "Investigate": 0.02
+      }
+    }
+  },
+  "usage": { "input_tokens": 1180, "output_tokens": 30 }
+}

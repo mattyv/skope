@@ -1118,8 +1118,9 @@
           "type": "string"
         },
         "holder_pid": {
-          "type": "integer",
-          "minimum": 1
+          "type": ["integer", "null"],
+          "minimum": 1,
+          "description": "null when the lock can't be read or parsed (SPEC §7)."
         }
       },
       "required": ["ts", "run_id", "skill", "skill_hash", "host", "event", "path", "holder_pid"],

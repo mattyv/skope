@@ -49,7 +49,9 @@ function listFiles(dir) {
 
 function trackedFiles() {
   try {
-    return execFileSync("git", ["ls-files", "-z", "--", ...INPUT_DIRS], {
+    // Tracked files plus untracked ones git doesn't ignore: a new module
+    // that isn't committed yet still changes what skop does.
+    return execFileSync("git", ["ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", ...INPUT_DIRS], {
       cwd: ROOT,
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],
@@ -85,5 +87,7 @@ if (writeAt !== -1) {
   if (!out) throw new Error("build-id: --write needs a file path");
   mkdirSync(dirname(join(ROOT, out)), { recursive: true });
   writeFileSync(join(ROOT, out), `${json}\n`);
+  // The same identity as a module, next to the JSON, so a bundled CLI carries it (SPEC §7.2).
+  writeFileSync(join(ROOT, out.replace(/\.json$/, ".js")), `export default ${json};\n`);
 }
 console.log(json);

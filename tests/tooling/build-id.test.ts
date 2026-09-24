@@ -60,7 +60,7 @@ describe("build-id.mjs (SPEC §7.2)", () => {
     expect(parsed.build).toMatch(/^[0-9a-f]{64}$/);
   });
 
-  test.each(["src/core.ts", "core/Interp.dfy", "contracts/error-codes.json", "package-lock.json"])(
+  test.each(["src/core.ts", "core/Run.dfy", "contracts/error-codes.json", "package-lock.json"])(
     "changing a byte under %s changes the build id",
     (rel) => {
       const dir = makeTree();
@@ -160,5 +160,19 @@ describe("build-id.mjs (SPEC §7.2)", () => {
     expect(r.status).toBe(0);
     const written = JSON.parse(readFileSync(out, "utf8"));
     expect(written).toEqual(JSON.parse(r.stdout));
+  });
+
+  test("in a git checkout, an untracked source file changes the identity and an ignored one doesn't", () => {
+    const dir = makeTree();
+    const git = (...a: string[]) => execFileSync("git", a, { cwd: dir, stdio: "ignore" });
+    git("init", "-q");
+    writeFileSync(join(dir, ".gitignore"), "src/ignored.ts\n");
+    git("add", "-A");
+    git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "base");
+    const before = buildOf(dir);
+    writeFileSync(join(dir, "src", "ignored.ts"), "export const x = 1;\n");
+    expect(buildOf(dir)).toBe(before);
+    writeFileSync(join(dir, "src", "new-module.ts"), "export const y = 2;\n");
+    expect(buildOf(dir)).not.toBe(before);
   });
 });

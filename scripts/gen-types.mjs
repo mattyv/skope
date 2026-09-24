@@ -42,6 +42,12 @@ export async function generate() {
       );
     }
   }
+  // Data the runtime needs from the contracts, so the built CLI never reads contracts/ (it isn't shipped).
+  const codes = JSON.parse(readFileSync(join(ROOT, "contracts", "error-codes.json"), "utf8"));
+  const meanings = Object.fromEntries(codes.map((c) => [c.code, c.meaning]));
+  parts.push(`/** SPEC §7.1: each error and warning code's meaning, from contracts/error-codes.json. */
+export const CODE_MEANINGS: Record<string, string> = ${JSON.stringify(meanings, null, 2)};
+`);
   return parts.join("\n");
 }
 

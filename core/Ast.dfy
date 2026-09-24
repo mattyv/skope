@@ -2,8 +2,7 @@
 // contracts/core-program.schema.json. The adapter (src/core.ts) builds these
 // from the preprocessor's JSON and rejects anything the schema rejects.
 //
-// Phase 0 contract: stream C builds lint and the interpreter on these types
-// and retires the spike's SkopSyntax when it does.
+// Phase 0 contract: lint and the interpreter are built on these types.
 module SkopAst {
   type Src = nat          // 1-based line in SKILL.md
   type SectionId = string // "s:" + slug (SPEC §3.4)
