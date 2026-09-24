@@ -1,4 +1,4 @@
-// src/ast.ts: core program JSON to Dafny's SkopAst and back, exactly.
+// src/ast.ts: core program JSON to Dafny's SkopeAst and back, exactly.
 
 import { readFileSync } from "node:fs";
 import { describe, expect, test } from "vitest";
@@ -84,7 +84,7 @@ const everything = {
   },
 };
 
-describe("core program JSON round-trips through SkopAst exactly", () => {
+describe("core program JSON round-trips through SkopeAst exactly", () => {
   for (const name of ["disk-full", "cert-expiry", "error-triage"]) {
     test(name, () => {
       const p = example(name);

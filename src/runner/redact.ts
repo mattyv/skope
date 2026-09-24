@@ -87,6 +87,23 @@ export function buildRedactor(opts: RedactOptions = {}): Redactor {
   };
 }
 
+/**
+ * Every string in a JSON value redacted, keys left as they are. For what
+ * leaves skope as a whole (events, the handoff record); values used to run
+ * commands are never passed through this.
+ */
+export function redactDeep<T>(r: Redactor, value: T): T {
+  const walk = (v: unknown): unknown =>
+    typeof v === "string"
+      ? r.redact(v)
+      : Array.isArray(v)
+        ? v.map(walk)
+        : v !== null && typeof v === "object"
+          ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, walk(x)]))
+          : v;
+  return walk(value) as T;
+}
+
 /** The last `maxBytes` bytes of `text` as UTF-8, starting on a character boundary. */
 export function tailBytes(text: string, maxBytes: number): string {
   const b = Buffer.from(text, "utf8");

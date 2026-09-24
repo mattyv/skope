@@ -1,6 +1,6 @@
 // The run lock (SPEC §7 step 3), with no native modules.
 //
-// - Where: `$XDG_RUNTIME_DIR/skop`, else a per-user `<tmpdir>/skop-<uid>`
+// - Where: `$XDG_RUNTIME_DIR/skope`, else a per-user `<tmpdir>/skope-<uid>`
 //   created 0700. Either is refused (E-IO) unless it's a real directory,
 //   not a symlink, owned by us and not writable by anyone else.
 // - Created atomically: a temporary file holding our pid and start time is
@@ -9,7 +9,7 @@
 // - Held → locked. A holder is alive only if its pid is running and it
 //   started when the lock says, so a reused pid doesn't keep a dead run's
 //   lock. Otherwise → stale_lock, and an unreadable or unparsable lock is
-//   stale with an unknown holder. Skop never takes over or deletes a lock
+//   stale with an unknown holder. Skope never takes over or deletes a lock
 //   it doesn't own, since two runs could race to do it.
 // - On exit, the lock is deleted only if it still holds exactly what this
 //   run wrote.
@@ -45,7 +45,7 @@ interface LockInfo {
 export function lockDir(): string {
   const runtime = process.env.XDG_RUNTIME_DIR;
   // A relative XDG_RUNTIME_DIR is ignored, per the XDG spec.
-  const dir = runtime && isAbsolute(runtime) ? join(runtime, "skop") : join(tmpdir(), `skop-${process.geteuid?.()}`);
+  const dir = runtime && isAbsolute(runtime) ? join(runtime, "skope") : join(tmpdir(), `skope-${process.geteuid?.()}`);
   try {
     mkdirSync(dir, { mode: 0o700 });
   } catch (err) {

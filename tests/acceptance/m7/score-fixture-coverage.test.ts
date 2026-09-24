@@ -5,7 +5,7 @@
 // scenarios are in tests/acceptance/m3/exec.test.ts, with the other fixtures.
 
 import { describe, expect, test } from "vitest";
-import { runSkop } from "../lib/cli.js";
+import { runSkope } from "../lib/cli.js";
 import { allScenarios, readExpectedExit, readYaml } from "../lib/scenarios.js";
 
 // M1's slice of error-triage's --lint coverage lives here, not in
@@ -16,7 +16,7 @@ const ERROR_TRIAGE = new URL("../../../fixtures/error-triage/SKILL.md", import.m
 
 describe("M1 (v1.1 slice): --lint on error-triage (SPEC §7, §12.3)", () => {
   test("error-triage/SKILL.md lints clean and exits 0", async () => {
-    const r = await runSkop([ERROR_TRIAGE, "--lint"]);
+    const r = await runSkope([ERROR_TRIAGE, "--lint"]);
     expect(r.code).toBe(0);
     expect(r.events.some((e: { event: string }) => e.event === "error")).toBe(false);
   });
@@ -24,7 +24,7 @@ describe("M1 (v1.1 slice): --lint on error-triage (SPEC §7, §12.3)", () => {
 
 describe("M7: --verify on error-triage (SPEC §12.2)", () => {
   test("reports 4 level branches, 1 unsure and 1 unavailable at the Score ask", async () => {
-    const r = await runSkop([ERROR_TRIAGE, "--verify"]);
+    const r = await runSkope([ERROR_TRIAGE, "--verify"]);
     expect(r.code).toBe(0);
     const report = JSON.parse(r.stdout.trim().split("\n").at(-1) as string);
     expect(report.asks).toEqual([{ section: "Triage", line: 19, kind: "score", branches: { options: 4, unsure: 1, unavailable: 1 } }]);

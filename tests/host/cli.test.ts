@@ -7,37 +7,37 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vitest";
-import { runSkop, type SkopEvent } from "../acceptance/lib/cli.js";
+import { runSkope, type SkopeEvent } from "../acceptance/lib/cli.js";
 
 const CLI = fileURLToPath(new URL("../../dist/cli.js", import.meta.url));
 
 function skill(body: string, frontmatter = ""): string {
-  const dir = mkdtempSync(join(tmpdir(), "skop-skill-"));
+  const dir = mkdtempSync(join(tmpdir(), "skope-skill-"));
   const path = join(dir, "SKILL.md");
   writeFileSync(path, `---\nname: tiny\ndescription: a test skill\nformat: 1\n${frontmatter}---\n\n## Main\nDo the thing.\n\n${body}\n`);
   return path;
 }
 
 function file(name: string, text: string, mode = 0o600): string {
-  const path = join(mkdtempSync(join(tmpdir(), "skop-file-")), name);
+  const path = join(mkdtempSync(join(tmpdir(), "skope-file-")), name);
   writeFileSync(path, text);
   chmodSync(path, mode);
   return path;
 }
 
-const find = (events: SkopEvent[], event: string, code?: string) =>
+const find = (events: SkopeEvent[], event: string, code?: string) =>
   events.find((e) => e.event === event && (code === undefined || e.code === code));
 
 describe("run flow", () => {
   test("E-FAKE-UNMATCHED: a command --fake-exec has no answer for ends the run with error, exit 50", async () => {
-    const r = await runSkop([skill("- **run** `df -h`\n- **stop**"), "--apply", "--fake-exec", file("c.yaml", "{}")]);
+    const r = await runSkope([skill("- **run** `df -h`\n- **stop**"), "--apply", "--fake-exec", file("c.yaml", "{}")]);
     expect(r.code).toBe(50);
     expect(find(r.events, "error", "E-FAKE-UNMATCHED")).toMatchObject({ stage: "runtime" });
     expect(r.events.at(-1)).toMatchObject({ event: "outcome", outcome: "error" });
   });
 
   test("real commands don't see the backend key, and its value is redacted from output (SPEC §4.4, §9)", async () => {
-    const r = await runSkop([skill('- **run** `echo s3cr3t-value; test -z "$TYPESAFE_API_KEY"`\n- **stop**'), "--apply"], {
+    const r = await runSkope([skill('- **run** `echo s3cr3t-value; test -z "$TYPESAFE_API_KEY"`\n- **stop**'), "--apply"], {
       env: { TYPESAFE_API_KEY: "s3cr3t-value" },
     });
     expect(r.code).toBe(0);
@@ -46,7 +46,7 @@ describe("run flow", () => {
 
   test("W-CONFIG-PERMS: a group-writable config is warned about, and the run goes on", async () => {
     const config = file("config.yaml", "ask:\n  backend: fake\n", 0o664);
-    const r = await runSkop([skill("- **stop**"), "--apply", "--config", config]);
+    const r = await runSkope([skill("- **stop**"), "--apply", "--config", config]);
     expect(find(r.events, "warning", "W-CONFIG-PERMS")).toMatchObject({ stage: "args" });
     expect(r.stderr).toContain("W-CONFIG-PERMS");
     expect(r.code).toBe(0);
@@ -57,7 +57,7 @@ describe("run flow", () => {
 
   test("W-REDACT-OFF: turning off the built-in patterns is warned about on every run", async () => {
     const config = file("config.yaml", "ask:\n  backend: fake\nredact:\n  defaults: false\n");
-    const r = await runSkop([skill("- **stop**"), "--dry-run", "--config", config]);
+    const r = await runSkope([skill("- **stop**"), "--dry-run", "--config", config]);
     expect(find(r.events, "warning", "W-REDACT-OFF")).toBeDefined();
     expect(r.code).toBe(0);
   });
@@ -68,7 +68,7 @@ describe("run flow", () => {
       "limits:\n  ask_context: 40k tokens\n",
     );
     const config = file("config.yaml", "jev:\n  model: jev-1.13.0\n  key_env: TYPESAFE_API_KEY\n");
-    const r = await runSkop([path, "--apply", "--config", config], { env: { TYPESAFE_API_KEY: "k" } });
+    const r = await runSkope([path, "--apply", "--config", config], { env: { TYPESAFE_API_KEY: "k" } });
     expect(r.code).toBe(40);
     expect(find(r.events, "error", "E-BACKEND-LIMIT")).toBeDefined();
     expect(find(r.events, "run_start")).toBeUndefined();
@@ -79,7 +79,7 @@ describe("run flow", () => {
       "- **run** `df` as used\n- **ask** Given {used}, go on? · sure 80%\n  - [Other]\n  - [Third]\n\n## Other\nElse.\n\n- **stop**\n\n## Third\nOr this.\n\n- **stop**",
     );
     const config = file("config.yaml", "jev:\n  model: jev-1.13.0\n  key_env: NO_SUCH_KEY_VAR\n");
-    const r = await runSkop([path, "--apply", "--config", config]);
+    const r = await runSkope([path, "--apply", "--config", config]);
     expect(r.code).toBe(40);
     expect(find(r.events, "error", "E-CONFIG")).toBeDefined();
   });
@@ -91,7 +91,7 @@ describe("run flow", () => {
       ["--apply"],
       ["a", "b", "--lint"],
     ]) {
-      const r = await runSkop(args);
+      const r = await runSkope(args);
       expect(r.code, args.join(" ")).toBe(40);
       expect(r.events.map((e) => [e.event, e.code ?? e.outcome])).toEqual([
         ["error", "E-USAGE"],
@@ -102,17 +102,68 @@ describe("run flow", () => {
   });
 
   test("E-USAGE: --trace without --verify", async () => {
-    const r = await runSkop([skill("- **stop**"), "--trace", "t.jsonl"]);
+    const r = await runSkope([skill("- **stop**"), "--trace", "t.jsonl"]);
     expect(r.code).toBe(40);
     expect(find(r.events, "error", "E-USAGE")).toBeDefined();
   });
 
   test("a pager failure prints the page to stderr and keeps the outcome (SPEC §4.2)", async () => {
     const config = file("config.yaml", "ask:\n  backend: fake\npager:\n  command: 'exit 1'\n");
-    const r = await runSkop([skill('- **page** "disk is full"'), "--apply", "--config", config]);
+    const r = await runSkope([skill('- **page** "disk is full"'), "--apply", "--config", config]);
     expect(r.code).toBe(10);
     expect(find(r.events, "page")).toMatchObject({ ok: false, text: "disk is full" });
     expect(r.stderr).toContain("disk is full");
+  });
+
+  test("a secret in a param is redacted from events, stderr, the pager, the ask request and the handoff record (SPEC §9)", async () => {
+    const secret = "FAKE_SECRET_123";
+    const sent = join(mkdtempSync(join(tmpdir(), "skope-pager-")), "page.txt");
+    const state = mkdtempSync(join(tmpdir(), "skope-state-"));
+    const config = file("config.yaml", `ask:\n  backend: fake\npager:\n  command: 'cat > ${sent}; exit 1'\nstate_dir: ${state}\n`);
+    const path = skill(
+      '- **ask** Is {note} fine? · sure 80%\n  - [Other]\n  - [Third]\n\n## Other\nElse.\n\n- **page** "rotated {note}"\n\n## Third\nOr this.\n\n- **hand off**',
+      "params:\n  note: x\n",
+    );
+    const answers = file("answers.yaml", JSON.stringify({ "line:12": { "s:other": 0.95, "s:third": 0.05 } }));
+    const note = `password=${secret}`;
+    const paged = await runSkope([path, "--apply", "--config", config, "--fake", answers, "--param", `note=${note}`]);
+    expect(paged.code).toBe(10);
+    expect(find(paged.events, "page")?.text).toBe("rotated [REDACTED]");
+    expect(readFileSync(sent, "utf8")).toBe("rotated [REDACTED]");
+    const request = readFileSync(find(paged.events, "ask")?.request_path as string, "utf8");
+    expect(JSON.parse(request).question).toBe("Is [REDACTED] fine?");
+    const handedOff = await runSkope([
+      path,
+      "--apply",
+      "--no-page",
+      "--config",
+      config,
+      "--fake",
+      file("answers.yaml", JSON.stringify({ "line:12": { "s:other": 0.05, "s:third": 0.95 } })),
+      "--param",
+      `note=${note}`,
+    ]);
+    expect(handedOff.code).toBe(20);
+    const record = readFileSync(find(handedOff.events, "handoff_record")?.path as string, "utf8");
+    for (const [what, text] of [
+      ["stdout", paged.stdout + handedOff.stdout],
+      ["stderr", paged.stderr + handedOff.stderr],
+      ["ask request", request],
+      ["handoff record", record],
+    ])
+      expect(text, what).not.toContain(secret);
+  });
+
+  test("with --fake-exec the pager never runs; commands.yaml can answer it (SPEC §5.4)", async () => {
+    const ran = join(mkdtempSync(join(tmpdir(), "skope-pager-")), "ran");
+    const config = file("config.yaml", `ask:\n  backend: fake\npager:\n  command: 'touch ${ran}'\n`);
+    const path = skill('- **page** "disk is full"');
+    const quiet = await runSkope([path, "--apply", "--config", config, "--fake-exec", file("c.yaml", "{}")]);
+    expect(find(quiet.events, "page")).toMatchObject({ ok: true });
+    const failing = file("c.yaml", JSON.stringify({ [`touch ${ran}`]: { exit: 1 } }));
+    const failed = await runSkope([path, "--apply", "--config", config, "--fake-exec", failing]);
+    expect(find(failed.events, "page")).toMatchObject({ ok: false });
+    expect(existsSync(ran)).toBe(false);
   });
 
   // C0 and C1 controls except \n and \t: OSC title, clear screen, BEL, CR, NUL, CSI (U+009B), DEL.
@@ -120,10 +171,10 @@ describe("run flow", () => {
   const CONTROLS = /[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/;
 
   test("S5: control characters from command output never reach the pager, the page event or stderr", async () => {
-    const sent = join(mkdtempSync(join(tmpdir(), "skop-pager-")), "page.txt");
+    const sent = join(mkdtempSync(join(tmpdir(), "skope-pager-")), "page.txt");
     const config = file("config.yaml", `ask:\n  backend: fake\npager:\n  command: 'cat > ${sent}; exit 1'\n`);
     const cmd = "printf 'a\\033]0;x\\007b\\033[2Jc\\rd\\000e\\302\\233f\\177g'";
-    const r = await runSkop([skill(`- **run** \`${cmd}\` as out\n- **page** "got {out}"`), "--apply", "--config", config]);
+    const r = await runSkope([skill(`- **run** \`${cmd}\` as out\n- **page** "got {out}"`), "--apply", "--config", config]);
     expect(r.code).toBe(10);
     const text = find(r.events, "page")?.text as string;
     expect(text).toBe("got a]0;xb[2Jcdefg");
@@ -133,7 +184,7 @@ describe("run flow", () => {
   });
 
   test("S5: a diagnostic can't carry control characters to stderr either", async () => {
-    const r = await runSkop([join(tmpdir(), "no-such-\u001b]0;x\u0007-\r-\u009b.md"), "--apply"]);
+    const r = await runSkope([join(tmpdir(), "no-such-\u001b]0;x\u0007-\r-\u009b.md"), "--apply"]);
     expect(r.code).toBe(40);
     expect(r.stderr).toContain("E-USAGE");
     // The diagnostic line shows them escaped, so the operator can see they were there.
@@ -147,23 +198,23 @@ describe("run flow", () => {
         "- **run** `df` as used\n- **ask** Given {used}, go on? · sure 80%\n  - [Other]\n  - [Third]\n\n## Other\nElse.\n\n- **stop**\n\n## Third\nOr this.\n\n- **stop**",
       );
     const pagerOnly = () => file("config.yaml", "pager:\n  command: 'cat > /dev/null'\n");
-    const noConfig = () => ({ env: { XDG_CONFIG_HOME: mkdtempSync(join(tmpdir(), "skop-noconfig-")) } });
+    const noConfig = () => ({ env: { XDG_CONFIG_HOME: mkdtempSync(join(tmpdir(), "skope-noconfig-")) } });
 
     test("--lint, --explain and --verify don't need a backend block", async () => {
       for (const mode of ["--lint", "--explain", "--verify"]) {
-        const r = await runSkop([asks(), mode, "--config", pagerOnly()]);
+        const r = await runSkope([asks(), mode, "--config", pagerOnly()]);
         expect(r.code, mode).toBe(0);
         expect(find(r.events, "error"), mode).toBeUndefined();
       }
     });
 
     test("a run that doesn't ask needs none either", async () => {
-      expect((await runSkop([skill("- **stop**"), "--dry-run", "--config", pagerOnly()])).code).toBe(0);
-      expect((await runSkop([skill("- **stop**"), "--dry-run"], noConfig())).code).toBe(0);
+      expect((await runSkope([skill("- **stop**"), "--dry-run", "--config", pagerOnly()])).code).toBe(0);
+      expect((await runSkope([skill("- **stop**"), "--dry-run"], noConfig())).code).toBe(0);
     });
 
     test("a run that asks is E-CONFIG before it starts, whether the file exists or not", async () => {
-      for (const r of [await runSkop([asks(), "--dry-run", "--config", pagerOnly()]), await runSkop([asks(), "--dry-run"], noConfig())]) {
+      for (const r of [await runSkope([asks(), "--dry-run", "--config", pagerOnly()]), await runSkope([asks(), "--dry-run"], noConfig())]) {
         expect(r.code).toBe(40);
         expect(find(r.events, "error", "E-CONFIG")?.message).toMatch(/no jev block/);
         expect(find(r.events, "run_start")).toBeUndefined();
@@ -176,17 +227,17 @@ describe("run flow", () => {
       "- **run** `df` as used\n- **ask** Given {used}, go on? · sure 80%\n  - [Other]\n  - [Third]\n\n## Other\nElse.\n\n- **stop**\n\n## Third\nOr this.\n\n- **stop**",
     );
     // A 1 ms timeout and no retries: the call is abandoned before any answer can come back.
-    const config = file("config.yaml", "ask:\n  timeout_ms: 1\n  retries: 0\njev:\n  model: jev-1.13.0\n  key_env: SKOP_TEST_KEY\n");
-    const r = await runSkop([path, "--dry-run", "--config", config], { env: { SKOP_TEST_KEY: "k" } });
+    const config = file("config.yaml", "ask:\n  timeout_ms: 1\n  retries: 0\njev:\n  model: jev-1.13.0\n  key_env: SKOPE_TEST_KEY\n");
+    const r = await runSkope([path, "--dry-run", "--config", config], { env: { SKOPE_TEST_KEY: "sk-test-0123456789" } });
     expect(r.code).toBe(20);
     expect(find(r.events, "ask")).toMatchObject({ backend: "jev", model: "jev-1.13.0", detail: "unavailable", probs: null });
     expect(find(r.events, "handoff_record")?.record).toMatchObject({ reason: "ask_unavailable" });
-    expect(r.stderr).toContain("skop: the backend was unavailable");
+    expect(r.stderr).toContain("skope: the backend was unavailable");
   });
 
   test("a skill with no asks needs no backend key", async () => {
     const config = file("config.yaml", "jev:\n  model: jev-1.13.0\n  key_env: NO_SUCH_KEY_VAR\n");
-    const r = await runSkop([skill("- **stop**"), "--apply", "--config", config]);
+    const r = await runSkope([skill("- **stop**"), "--apply", "--config", config]);
     expect(r.code).toBe(0);
     expect(r.events.map((e) => e.event)).toEqual(["run_start", "outcome"]);
   });
@@ -194,27 +245,27 @@ describe("run flow", () => {
   test("E-PARAM-TYPE: an int param takes only a plain decimal integer", async () => {
     const path = skill("- **run** `echo {n}`\n- **stop**", "params:\n  n: 1\n");
     for (const v of ["1e3", "0x10", "1.5", "", "99999999999999999999"]) {
-      const r = await runSkop([path, "--apply", "--param", `n=${v}`]);
+      const r = await runSkope([path, "--apply", "--param", `n=${v}`]);
       expect(find(r.events, "error", "E-PARAM-TYPE"), v).toBeDefined();
     }
   });
 
   test("--lint prints nothing for a clean skill: no run, no outcome", async () => {
-    const r = await runSkop([skill("- **stop**"), "--lint"]);
+    const r = await runSkope([skill("- **stop**"), "--lint"]);
     expect(r.code).toBe(0);
     expect(r.stdout).toBe("");
   });
 
   test("a dry-run handoff record says dry_run: true (SPEC §8.1)", async () => {
-    const r = await runSkop([skill("- **hand off**"), "--dry-run"]);
+    const r = await runSkope([skill("- **hand off**"), "--dry-run"]);
     expect(r.code).toBe(20);
     expect(find(r.events, "handoff_record")).toMatchObject({ record: { dry_run: true, reason: "explicit", detail: null } });
   });
 
   test("S3: a comparison that can't coerce hands off with detail {expr, left, right}, not the last command (SPEC §4.2, §8.1)", async () => {
-    const r = await runSkop([skill("- **run** `echo abc` as x\n- **check** {x} > 1 → stop\n- **hand off**"), "--apply", "--no-page"]);
+    const r = await runSkope([skill("- **run** `echo abc` as x\n- **check** {x} > 1 → stop\n- **hand off**"), "--apply", "--no-page"]);
     expect(r.code).toBe(20);
-    const check = find(r.events, "check") as SkopEvent;
+    const check = find(r.events, "check") as SkopeEvent;
     expect(check.result).toBeNull();
     expect(find(r.events, "handoff_record")?.record).toMatchObject({ reason: "command_failed" });
     const detail = (find(r.events, "handoff_record")?.record as { detail: unknown } | undefined)?.detail;
@@ -223,7 +274,7 @@ describe("run flow", () => {
   });
 
   test("a command that fails after a comparison that couldn't coerce (else skip) gets the command's detail", async () => {
-    const r = await runSkop([
+    const r = await runSkope([
       skill("- **run** `echo abc` as x\n- **check** {x} > 9 → stop · else skip\n- **run** `exit 3`\n- **stop**"),
       "--apply",
       "--no-page",
@@ -238,7 +289,7 @@ describe("run flow", () => {
       "limits:\n  ask_context: 3 tokens\n",
     );
     const answers = file("a.yaml", '{"line:13": {"s:other": 1, "s:third": 0}}');
-    const r = await runSkop([path, "--apply", "--fake", answers]);
+    const r = await runSkope([path, "--apply", "--fake", answers]);
     expect(r.code).toBe(0);
     const request = JSON.parse(readFileSync(find(r.events, "ask")?.request_path as string, "utf8"));
     // 3 tokens is 12 chars: the last whole lines that fit.
@@ -247,7 +298,7 @@ describe("run flow", () => {
 
   test("an int --param override is typed and reaches the command", async () => {
     const path = skill("- **run** `echo {n}`\n- **stop**", "params:\n  n: 1\n");
-    const r = await runSkop([path, "--apply", "--param", "n=42"]);
+    const r = await runSkope([path, "--apply", "--param", "n=42"]);
     expect(find(r.events, "run_start")).toMatchObject({ params: { n: "42" } });
     expect(find(r.events, "run")).toMatchObject({ cmd: "echo 42" });
   });
@@ -255,15 +306,15 @@ describe("run flow", () => {
 
 describe("lock (SPEC §7 step 3)", () => {
   function withLock(holder: object) {
-    const runtime = mkdtempSync(join(tmpdir(), "skop-rt-"));
-    mkdirSync(join(runtime, "skop"), { mode: 0o700 });
-    writeFileSync(join(runtime, "skop", "tiny.lock"), JSON.stringify(holder));
-    return { runtime, lock: join(runtime, "skop", "tiny.lock") };
+    const runtime = mkdtempSync(join(tmpdir(), "skope-rt-"));
+    mkdirSync(join(runtime, "skope"), { mode: 0o700 });
+    writeFileSync(join(runtime, "skope", "tiny.lock"), JSON.stringify(holder));
+    return { runtime, lock: join(runtime, "skope", "tiny.lock") };
   }
 
   test("locked: a live holder exits 30 with a locked event, no page", async () => {
     const { runtime } = withLock({ pid: process.pid, startTime: null });
-    const r = await runSkop([skill("- **stop**"), "--apply"], { env: { XDG_RUNTIME_DIR: runtime } });
+    const r = await runSkope([skill("- **stop**"), "--apply"], { env: { XDG_RUNTIME_DIR: runtime } });
     expect(r.code).toBe(30);
     expect(find(r.events, "locked")).toMatchObject({ holder_pid: process.pid });
     expect(find(r.events, "page")).toBeUndefined();
@@ -272,11 +323,11 @@ describe("lock (SPEC §7 step 3)", () => {
 
   test("stale_lock: a dead holder exits 31, pages, and the lock is left alone", async () => {
     const { runtime, lock } = withLock({ pid: 2 ** 22 + 1, startTime: null });
-    const r = await runSkop([skill("- **stop**"), "--apply"], { env: { XDG_RUNTIME_DIR: runtime } });
+    const r = await runSkope([skill("- **stop**"), "--apply"], { env: { XDG_RUNTIME_DIR: runtime } });
     expect(r.code).toBe(31);
     expect(find(r.events, "stale_lock")).toMatchObject({ path: lock, holder_pid: 2 ** 22 + 1 });
     expect(find(r.events, "page")).toMatchObject({ ok: true });
-    // S4: skop's own parts of a page aren't escaped, so the path can be copied.
+    // S4: skope's own parts of a page aren't escaped, so the path can be copied.
     expect(find(r.events, "page")?.text).toContain(`stale lock at ${lock}.`);
     expect(existsSync(lock)).toBe(true);
     expect(r.stderr).toContain(lock);
@@ -284,31 +335,31 @@ describe("lock (SPEC §7 step 3)", () => {
 
   test("stale_lock in a dry run never pages: would_page instead", async () => {
     const { runtime } = withLock({ pid: 2 ** 22 + 1, startTime: null });
-    const r = await runSkop([skill("- **stop**"), "--dry-run"], { env: { XDG_RUNTIME_DIR: runtime } });
+    const r = await runSkope([skill("- **stop**"), "--dry-run"], { env: { XDG_RUNTIME_DIR: runtime } });
     expect(r.code).toBe(31);
     expect(find(r.events, "page")).toBeUndefined();
     expect(find(r.events, "would_page")).toBeDefined();
   });
 
   test("the lock is released when the run ends", async () => {
-    const runtime = mkdtempSync(join(tmpdir(), "skop-rt-"));
-    const r = await runSkop([skill("- **stop**"), "--apply"], { env: { XDG_RUNTIME_DIR: runtime } });
+    const runtime = mkdtempSync(join(tmpdir(), "skope-rt-"));
+    const r = await runSkope([skill("- **stop**"), "--apply"], { env: { XDG_RUNTIME_DIR: runtime } });
     expect(r.code).toBe(0);
-    expect(existsSync(join(runtime, "skop", "tiny.lock"))).toBe(false);
+    expect(existsSync(join(runtime, "skope", "tiny.lock"))).toBe(false);
   });
 
   test("E-IO: a lock directory others can write to is refused, exit 50", async () => {
-    const runtime = mkdtempSync(join(tmpdir(), "skop-rt-"));
-    mkdirSync(join(runtime, "skop"));
-    chmodSync(join(runtime, "skop"), 0o777);
-    const r = await runSkop([skill("- **stop**"), "--apply"], { env: { XDG_RUNTIME_DIR: runtime } });
+    const runtime = mkdtempSync(join(tmpdir(), "skope-rt-"));
+    mkdirSync(join(runtime, "skope"));
+    chmodSync(join(runtime, "skope"), 0o777);
+    const r = await runSkope([skill("- **stop**"), "--apply"], { env: { XDG_RUNTIME_DIR: runtime } });
     expect(r.code).toBe(50);
     expect(find(r.events, "error", "E-IO")).toBeDefined();
   });
 });
 
 test("E-INTERRUPTED: SIGINT during a do stops it, releases the lock, exits 50 (SPEC §4.4)", async () => {
-  const runtime = mkdtempSync(join(tmpdir(), "skop-rt-"));
+  const runtime = mkdtempSync(join(tmpdir(), "skope-rt-"));
   const env = { ...process.env, XDG_RUNTIME_DIR: runtime, XDG_CONFIG_HOME: runtime, XDG_STATE_HOME: runtime };
   const child = spawn(process.execPath, [CLI, skill("- **do** `sleep 30`\n- **stop**"), "--apply"], { env });
   let out = "";
@@ -316,7 +367,7 @@ test("E-INTERRUPTED: SIGINT during a do stops it, releases the lock, exits 50 (S
   const code = await new Promise<number | null>((resolve) => {
     child.stdout.on("data", (d) => {
       out += d;
-      // Twice: a second signal while skop is stopping must not cut the cleanup short.
+      // Twice: a second signal while skope is stopping must not cut the cleanup short.
       if (out.includes('"effect_start"') && !child.killed) {
         child.kill("SIGINT");
         child.kill("SIGINT");
@@ -331,7 +382,7 @@ test("E-INTERRUPTED: SIGINT during a do stops it, releases the lock, exits 50 (S
   expect(code).toBe(50);
   expect(events.filter((e) => e.code === "E-INTERRUPTED")).toEqual([expect.objectContaining({ event: "error", stage: "runtime" })]);
   expect(events.at(-1)).toMatchObject({ event: "outcome", outcome: "error" });
-  expect(existsSync(join(runtime, "skop", "tiny.lock"))).toBe(false);
+  expect(existsSync(join(runtime, "skope", "tiny.lock"))).toBe(false);
   expect(Date.now() - started).toBeLessThan(20_000);
 }, 30_000);
 
@@ -342,7 +393,7 @@ describe("review fixes", () => {
     );
 
   test("a reader closing stdout early doesn't leak the lock: the run finishes with its exit code", async () => {
-    const runtime = mkdtempSync(join(tmpdir(), "skop-rt-"));
+    const runtime = mkdtempSync(join(tmpdir(), "skope-rt-"));
     const env = { ...process.env, XDG_RUNTIME_DIR: runtime, XDG_CONFIG_HOME: runtime, XDG_STATE_HOME: runtime };
     const path = skill('- **run** `echo a`\n- **run** `echo b`\n- **page** "done"');
     const child = spawn(process.execPath, [CLI, path, "--dry-run"], { env });
@@ -350,7 +401,7 @@ describe("review fixes", () => {
     child.stdout.once("data", () => child.stdout.destroy());
     const code = await new Promise<number | null>((resolve) => child.on("close", resolve));
     expect(code).toBe(10);
-    expect(existsSync(join(runtime, "skop", "tiny.lock"))).toBe(false);
+    expect(existsSync(join(runtime, "skope", "tiny.lock"))).toBe(false);
   });
 
   test("E-USAGE: an unreadable skill path, --param without =, and two modes at once (SPEC §7.1)", async () => {
@@ -362,7 +413,7 @@ describe("review fixes", () => {
       [path, "--apply", "--verify"],
       [path, "--dry-run", "--explain"],
     ]) {
-      const r = await runSkop(args);
+      const r = await runSkope(args);
       expect(r.code, args.join(" ")).toBe(40);
       expect(find(r.events, "error", "E-USAGE"), args.join(" ")).toBeDefined();
     }
@@ -370,25 +421,25 @@ describe("review fixes", () => {
 
   test("S10: --verify --trace that doesn't fit says which step the explorer couldn't follow (SPEC §12.4)", async () => {
     const path = skill("- **run** `true`\n- **run** `true`\n- **stop**");
-    const run = await runSkop([path, "--apply"]);
+    const run = await runSkope([path, "--apply"]);
     expect(run.code).toBe(0);
     // Move the second command to a line no path has.
     const events = run.events.map((e) => (e.event === "run" && e.line === 11 ? { ...e, line: 99 } : e));
     const trace = file("t.jsonl", events.map((e) => JSON.stringify(e)).join("\n"));
-    const r = await runSkop([path, "--verify", "--trace", trace]);
+    const r = await runSkope([path, "--verify", "--trace", trace]);
     expect(r.code).toBe(40);
     const report = JSON.parse(r.stdout.trim().split("\n").at(-1) as string);
     expect(report).toMatchObject({ trace_fits: false, mismatch: { index: 1, event: "run", section: "Main", line: 99, class: "ok" } });
     expect(r.stderr).toMatch(/run at Main:99 \(ok\)/);
 
-    const ok = await runSkop([path, "--verify", "--trace", file("t.jsonl", run.stdout)]);
+    const ok = await runSkope([path, "--verify", "--trace", file("t.jsonl", run.stdout)]);
     expect(ok.code).toBe(0);
     expect(JSON.parse(ok.stdout.trim().split("\n").at(-1) as string)).toMatchObject({ trace_fits: true });
   });
 
   test("E-USAGE: an unreadable or malformed --trace file", async () => {
     for (const trace of [join(tmpdir(), "no-such-trace.jsonl"), file("t.jsonl", "not json\n"), file("t.jsonl", "[1]\n")]) {
-      const r = await runSkop([skill("- **stop**"), "--verify", "--trace", trace]);
+      const r = await runSkope([skill("- **stop**"), "--verify", "--trace", trace]);
       expect(r.code, trace).toBe(40);
       expect(find(r.events, "error", "E-USAGE"), trace).toBeDefined();
     }
@@ -402,7 +453,7 @@ describe("review fixes", () => {
       ["--fake-exec", file("c.yaml", "{ not yaml")],
     ];
     for (const [flag, path] of cases) {
-      const r = await runSkop([ask(), "--apply", flag as string, path as string]);
+      const r = await runSkope([ask(), "--apply", flag as string, path as string]);
       expect(r.code, `${flag} ${path}`).toBe(40);
       expect(find(r.events, "error", "E-CONFIG"), `${flag} ${path}`).toBeDefined();
       expect(find(r.events, "run_start")).toBeUndefined();
@@ -411,7 +462,7 @@ describe("review fixes", () => {
 
   test("ask requests and the handoff record are private files (0600) in a fresh run directory", async () => {
     const answers = file("a.yaml", '{"line:11": {"s:other": 0, "s:third": 1}}');
-    const r = await runSkop([ask(), "--apply", "--no-page", "--fake", answers], { env: {} });
+    const r = await runSkope([ask(), "--apply", "--no-page", "--fake", answers], { env: {} });
     expect(r.code).toBe(20);
     const ask1 = find(r.events, "ask")?.request_path as string;
     const record = find(r.events, "handoff_record")?.path as string;
@@ -420,23 +471,23 @@ describe("review fixes", () => {
   });
 
   test("S4: the handoff page's host and record path are copyable byte for byte", async () => {
-    const r = await runSkop([skill("- **hand off**"), "--apply"]);
+    const r = await runSkope([skill("- **hand off**"), "--apply"]);
     const text = find(r.events, "handoff_page")?.text as string;
     const path = find(r.events, "handoff_record")?.path as string;
-    expect(text).toBe(`${find(r.events, "run_start")?.host}: skop tiny handed off (explicit) in Main. Record: ${path}`);
+    expect(text).toBe(`${find(r.events, "run_start")?.host}: skope tiny handed off (explicit) in Main. Record: ${path}`);
     expect(text).not.toContain("\u200b");
   });
 
   test("S4: links and mentions from run output are still broken in a page", async () => {
     const out = "see https://evil.example/x, www.evil.com, [x](y) and @here";
-    const r = await runSkop([skill(`- **run** \`echo '${out}'\` as out\n- **page** "look: {out}"`), "--apply"]);
+    const r = await runSkope([skill(`- **run** \`echo '${out}'\` as out\n- **page** "look: {out}"`), "--apply"]);
     const text = find(r.events, "page")?.text as string;
     expect(text).not.toMatch(/:\/\/|www\.e|evil\.e|\[x\]\(|@here/);
     expect(text.replace(/\u200b/g, "").replace(/\\/g, "")).toBe(`look: ${out}`);
   });
 
   test("with no pager configured, a page reports ok: false and the message goes to stderr", async () => {
-    const r = await runSkop([skill('- **page** "disk is full"'), "--apply", "--config", file("config.yaml", "ask:\n  backend: fake\n")]);
+    const r = await runSkope([skill('- **page** "disk is full"'), "--apply", "--config", file("config.yaml", "ask:\n  backend: fake\n")]);
     expect(r.code).toBe(10);
     expect(find(r.events, "page")).toMatchObject({ ok: false });
     expect(r.stderr).toContain("disk is full");
@@ -446,7 +497,7 @@ describe("review fixes", () => {
     const path = skill(
       "- **run** `a` as x\n- **check** {x} > 1 → stop\n- **then** [Hand]\n\n## Hand\n- **hand off**\n\n## Lost\nNever.\n\n- **stop**",
     );
-    const r = await runSkop([path, "--verify"]);
+    const r = await runSkope([path, "--verify"]);
     expect(r.code).toBe(0);
     const report = JSON.parse(r.stdout.trim().split("\n").at(-1) as string);
     // run ok, fail, timeout; the check on unknown output is true, false or not a number.
@@ -468,7 +519,7 @@ describe("review fixes", () => {
 
 describe("final review nits", () => {
   test("--help prints every flag in SPEC §7 to stdout and exits 0", async () => {
-    const r = await runSkop(["--help"]);
+    const r = await runSkope(["--help"]);
     expect(r.code).toBe(0);
     for (const flag of [
       "--apply",
@@ -491,40 +542,40 @@ describe("final review nits", () => {
 
   test("--lint success prints one ok line to stderr; stdout stays empty", async () => {
     const path = skill("- **stop**");
-    const r = await runSkop([path, "--lint"]);
+    const r = await runSkope([path, "--lint"]);
     expect(r.code).toBe(0);
     expect(r.stdout).toBe("");
-    expect(r.stderr).toBe(`skop: ${path}: ok\n`);
+    expect(r.stderr).toBe(`skope: ${path}: ok\n`);
   });
 
   test("--explain prints its JSON on stdout and a short summary on stderr", async () => {
-    const r = await runSkop([skill("- **do** `x`\n- **stop**"), "--explain"]);
+    const r = await runSkope([skill("- **do** `x`\n- **stop**"), "--explain"]);
     expect(r.code).toBe(0);
     expect(r.stdout.trim().split("\n")).toHaveLength(1);
     expect(JSON.parse(r.stdout)).toMatchObject({ entry: "Main", max_effects: 1 });
-    expect(r.stderr).toMatch(/^skop: 1 section, entry Main; at most 0 asks and 1 effect; worst case \d+(\.\d+)?s\n$/);
+    expect(r.stderr).toMatch(/^skope: 1 section, entry Main; at most 0 asks and 1 effect; worst case \d+(\.\d+)?s\n$/);
   });
 
   test("locked prints who holds the lock and where", async () => {
-    const runtime = mkdtempSync(join(tmpdir(), "skop-rt-"));
-    mkdirSync(join(runtime, "skop"), { mode: 0o700 });
-    const lock = join(runtime, "skop", "tiny.lock");
+    const runtime = mkdtempSync(join(tmpdir(), "skope-rt-"));
+    mkdirSync(join(runtime, "skope"), { mode: 0o700 });
+    const lock = join(runtime, "skope", "tiny.lock");
     writeFileSync(lock, JSON.stringify({ pid: process.pid, startTime: null }));
-    const r = await runSkop([skill("- **stop**"), "--apply"], { env: { XDG_RUNTIME_DIR: runtime } });
+    const r = await runSkope([skill("- **stop**"), "--apply"], { env: { XDG_RUNTIME_DIR: runtime } });
     expect(r.code).toBe(30);
-    expect(r.stderr).toContain(`skop: another run (pid ${process.pid}) holds the lock at ${lock}`);
+    expect(r.stderr).toContain(`skope: another run (pid ${process.pid}) holds the lock at ${lock}`);
   });
 
-  test("<b>run</b> says HTML bold isn't skop bold", async () => {
-    const r = await runSkop([skill("- <b>run</b> `df`\n- **stop**"), "--lint"]);
+  test("<b>run</b> says HTML bold isn't skope bold", async () => {
+    const r = await runSkope([skill("- <b>run</b> `df`\n- **stop**"), "--lint"]);
     expect(r.code).toBe(40);
-    expect(find(r.events, "error", "E-UNKNOWN-BOLD")?.message).toContain("HTML bold isn't skop bold; use **run**");
+    expect(find(r.events, "error", "E-UNKNOWN-BOLD")?.message).toContain("HTML bold isn't skope bold; use **run**");
   });
 
   test("E-USAGE: a skill file that isn't valid UTF-8 is refused, not patched with U+FFFD", async () => {
     const path = skill("- **stop**");
     writeFileSync(path, Buffer.concat([readFileSync(path), Buffer.from([0xff, 0xfe, 0x0a])]));
-    const r = await runSkop([path, "--lint"]);
+    const r = await runSkope([path, "--lint"]);
     expect(r.code).toBe(40);
     expect(find(r.events, "error", "E-USAGE")?.message).toMatch(/UTF-8/);
   });
@@ -534,15 +585,15 @@ describe("final review nits", () => {
       "- **run** `df` as used\n- **ask** Given {used}, which? · sure 80%\n  - [Other]\n  - [Third]\n\n## Other\nElse.\n\n- **stop**\n\n## Third\nOr this.\n\n- **stop**",
     );
     const answers = file("a.yaml", '{"line:11": {"s:other": 0.5, "s:third": 0.9}}');
-    const r = await runSkop([path, "--apply", "--no-page", "--fake", answers]);
+    const r = await runSkope([path, "--apply", "--no-page", "--fake", answers]);
     expect(r.code).toBe(20);
     expect(find(r.events, "ask")).toMatchObject({ detail: "unavailable" });
-    expect(r.stderr).toMatch(/skop: the backend's answer was invalid/);
+    expect(r.stderr).toMatch(/skope: the backend's answer was invalid/);
   });
 
   test("E-PARAM-UNSAFE says which characters are allowed", async () => {
     const path = skill("- **run** `echo {m}`\n- **stop**", "params:\n  m: /\n");
-    const r = await runSkop([path, "--apply", "--param", "m=/; rm -rf /"]);
+    const r = await runSkope([path, "--apply", "--param", "m=/; rm -rf /"]);
     expect(r.code).toBe(40);
     expect(find(r.events, "error", "E-PARAM-UNSAFE")?.message).toContain("A-Z a-z 0-9 . _ / : @ % + = , -");
   });

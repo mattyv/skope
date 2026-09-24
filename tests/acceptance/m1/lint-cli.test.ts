@@ -10,7 +10,7 @@
 // the CLI does more than --version.
 
 import { describe, expect, test } from "vitest";
-import { runSkop } from "../lib/cli.js";
+import { runSkope } from "../lib/cli.js";
 
 const SKILLS = [
   new URL("../../../fixtures/disk-full/SKILL.md", import.meta.url).pathname,
@@ -20,14 +20,14 @@ const SKILLS = [
 describe("M1: --lint on every example skill (SPEC §7)", () => {
   for (const skill of SKILLS) {
     test(`${skill.split("/").slice(-2).join("/")} lints clean and exits 0`, async () => {
-      const r = await runSkop([skill, "--lint"]);
+      const r = await runSkope([skill, "--lint"]);
       expect(r.code).toBe(0);
       expect(r.events.some((e: { event: string }) => e.event === "error")).toBe(false);
     });
   }
 
   test("--lint runs nothing: no run, do, would_do, check_cmd, ask or page event", async () => {
-    const r = await runSkop([SKILLS[0] as string, "--lint"]);
+    const r = await runSkope([SKILLS[0] as string, "--lint"]);
     expect(r.code).toBe(0); // pins real behaviour, not just the absence of events below
     const ran = new Set(["run", "check_cmd", "do", "would_do", "ask", "page", "would_page", "effect_start"]);
     expect(r.events.some((e: { event: string }) => ran.has(e.event))).toBe(false);

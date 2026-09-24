@@ -7,7 +7,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
-import { runSkop } from "../acceptance/lib/cli.js";
+import { runSkope } from "../acceptance/lib/cli.js";
 
 const SKILL = `---
 name: big-output
@@ -38,7 +38,7 @@ Nothing to do.
 const LOG = "Sep 24 03:12:44 host kernel: EXT4-fs error on device sda1\n".repeat(Math.ceil((1 << 20) / 58)).slice(0, 1 << 20);
 
 function scenario(answer: unknown): string[] {
-  const dir = mkdtempSync(join(tmpdir(), "skop-big-"));
+  const dir = mkdtempSync(join(tmpdir(), "skope-big-"));
   writeFileSync(join(dir, "SKILL.md"), SKILL);
   // JSON is YAML; the fake files accept either.
   writeFileSync(join(dir, "commands.json"), JSON.stringify({ "journalctl -n 100000": { exit: 0, stdout: LOG } }));
@@ -48,7 +48,7 @@ function scenario(answer: unknown): string[] {
 
 describe("1 MiB of command output runs end to end (SPEC §4.4)", () => {
   test("bound, sent as context, and paged: exit 10, no E-INTERNAL", async () => {
-    const r = await runSkop(scenario({ "s:page": 1, "s:fix": 0 }));
+    const r = await runSkope(scenario({ "s:page": 1, "s:fix": 0 }));
     expect(r.stderr).not.toMatch(/E-INTERNAL/);
     expect(r.code).toBe(10);
     const page = r.events.find((e) => e.event === "page") as { text: string } | undefined;
@@ -56,7 +56,7 @@ describe("1 MiB of command output runs end to end (SPEC §4.4)", () => {
   }, 60_000);
 
   test("kept in the handoff record when the backend is unavailable: exit 20, no E-INTERNAL", async () => {
-    const r = await runSkop(scenario("unavailable"));
+    const r = await runSkope(scenario("unavailable"));
     expect(r.stderr).not.toMatch(/E-INTERNAL/);
     expect(r.code).toBe(20);
     const rec = r.events.find((e) => e.event === "handoff_record") as { record: { variables: { log: string } } } | undefined;

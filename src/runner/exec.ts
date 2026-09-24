@@ -38,7 +38,7 @@ export const CAP_BYTES = 1024 * 1024;
 const MAX_TIMER_MS = 2 ** 31 - 1;
 
 /**
- * The environment for every command (SPEC §4.4): skop's own, minus the
+ * The environment for every command (SPEC §4.4): skope's own, minus the
  * backend key variables, plus `LC_ALL=C`, which wins over an inherited one.
  */
 export function commandEnv(base: NodeJS.ProcessEnv, keyVars: readonly string[]): NodeJS.ProcessEnv {
@@ -78,27 +78,46 @@ function killGroup(pid: number, signal: NodeJS.Signals) {
   }
 }
 
-/** Live commands: process group id → a promise that settles when the command closes. */
-const live = new Map<number, Promise<void>>();
+/**
+ * Whether any process is left in the group. EPERM means one is, owned by
+ * someone else (a setuid child).
+ */
+function groupAlive(pid: number): boolean {
+  try {
+    process.kill(-pid, 0);
+    return true;
+  } catch (err) {
+    return (err as NodeJS.ErrnoException).code === "EPERM";
+  }
+}
+
+const POLL_MS = 20;
+/** After SIGKILL, anything still in the group is a zombie waiting to be reaped: it can't run, so stop waiting. */
+const ZOMBIE_MS = 1000;
+
+interface LiveCommand {
+  /** SIGTERM to the group once, then SIGKILL after `graceMs`, or sooner if an earlier call asked for sooner. */
+  stop(graceMs: number): void;
+  /** Settles once the command has closed and, if it was stopped, its whole group is gone. */
+  gone: Promise<void>;
+}
+
+/** Live commands by process group id. */
+const live = new Map<number, LiveCommand>();
 
 export function liveCommands(): number {
   return live.size;
 }
 
 /**
- * Stops every live command (SPEC §4.4, skop interrupted): SIGTERM to each
+ * Stops every live command (SPEC §4.4, skope interrupted): SIGTERM to each
  * group, up to `graceMs` for them to exit, then SIGKILL to any left.
- * Resolves once every command has closed. The host's SIGINT/SIGTERM
- * handler calls this, then releases the lock and ends with E-INTERRUPTED.
+ * Resolves once every group is gone. The host's SIGINT/SIGTERM handler
+ * calls this, then releases the lock and ends with E-INTERRUPTED.
  */
 export async function stopAll(graceMs: number = DEFAULT_GRACE_MS): Promise<void> {
-  if (live.size === 0) return;
-  for (const pid of live.keys()) killGroup(pid, "SIGTERM");
-  let timer: NodeJS.Timeout | undefined;
-  await Promise.race([Promise.all(live.values()), new Promise((res) => (timer = setTimeout(res, graceMs)))]);
-  clearTimeout(timer);
-  for (const pid of live.keys()) killGroup(pid, "SIGKILL");
-  await Promise.all(live.values());
+  for (const c of live.values()) c.stop(graceMs);
+  await Promise.all([...live.values()].map((c) => c.gone));
 }
 
 const validMs = (ms: number, min: number) => Number.isInteger(ms) && ms >= min && ms <= MAX_TIMER_MS;
@@ -123,12 +142,36 @@ export function execCommand(cmd: string, opts: ExecOptions): Promise<ExecResult>
     });
     const pid = child.pid;
     let closed = () => {};
-    if (pid !== undefined) live.set(pid, new Promise<void>((res) => (closed = res)));
+    let killTimer: NodeJS.Timeout | undefined;
+    let stopping = false;
+    let killDue = Number.POSITIVE_INFINITY;
+    let killedAt: number | undefined;
+    const stop = (grace: number) => {
+      if (pid === undefined || killedAt !== undefined) return;
+      if (!stopping) killGroup(pid, "SIGTERM");
+      stopping = true;
+      // A later stop with a shorter grace (skope interrupted during a timeout's grace) brings SIGKILL forward.
+      if (Date.now() + grace >= killDue) return;
+      killDue = Date.now() + grace;
+      clearTimeout(killTimer);
+      killTimer = setTimeout(() => {
+        killedAt = Date.now();
+        killGroup(pid, "SIGKILL");
+      }, grace);
+    };
+    if (pid !== undefined) live.set(pid, { stop, gone: new Promise<void>((res) => (closed = res)) });
     const done = () => {
       clearTimeout(timeoutTimer);
       clearTimeout(killTimer);
       if (pid !== undefined) live.delete(pid);
       closed();
+    };
+    // The shell can exit on SIGTERM while the rest of its group ignores it. A stopped command
+    // stays live, with its SIGKILL still due, until the whole group is gone: nothing it started
+    // may outlive the run's lock.
+    const groupGone = async () => {
+      while (pid !== undefined && groupAlive(pid) && (killedAt === undefined || Date.now() - killedAt < ZOMBIE_MS))
+        await new Promise((res) => setTimeout(res, POLL_MS));
     };
 
     if (opts.input !== undefined) {
@@ -139,12 +182,9 @@ export function execCommand(cmd: string, opts: ExecOptions): Promise<ExecResult>
     }
 
     let timedOut = false;
-    let killTimer: NodeJS.Timeout | undefined;
     const timeoutTimer = setTimeout(() => {
       timedOut = true;
-      if (pid === undefined) return;
-      killGroup(pid, "SIGTERM");
-      killTimer = setTimeout(() => killGroup(pid, "SIGKILL"), graceMs);
+      stop(graceMs);
     }, opts.timeoutMs);
 
     child.stdout?.on("data", (c: Buffer) => stdout.push(c));
@@ -153,7 +193,8 @@ export function execCommand(cmd: string, opts: ExecOptions): Promise<ExecResult>
       done();
       reject(err);
     });
-    child.on("close", (code, signal) => {
+    child.on("close", async (code, signal) => {
+      if (stopping) await groupGone();
       done();
       const out = stdout.toString();
       const err = stderr.toString();

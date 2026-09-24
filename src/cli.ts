@@ -1,17 +1,17 @@
 #!/usr/bin/env node
-// skop's command line (SPEC §7).
+// skope's command line (SPEC §7).
 
 import { parseArgs } from "node:util";
 import IDENTITY from "./build-identity.js";
 import { runSkill } from "./host/run.js";
 import { plainText } from "./runner/events.js";
 
-const USAGE = `usage: skop <SKILL.md> (--apply | --dry-run) [--no-page] [--param k=v]... [--fake answers.yaml] [--fake-exec cmds.yaml] [--config path]
-       skop <SKILL.md> --lint | --explain | --verify [--trace events.jsonl]
-       skop --version | --help`;
+const USAGE = `usage: skope <SKILL.md> (--apply | --dry-run) [--no-page] [--param k=v]... [--fake answers.yaml] [--fake-exec cmds.yaml] [--config path]
+       skope <SKILL.md> --lint | --explain | --verify [--trace events.jsonl]
+       skope --version | --help`;
 
 // SPEC §7's option list.
-const HELP = `usage: skop <path/to/SKILL.md> [options]
+const HELP = `usage: skope <path/to/SKILL.md> [options]
   --apply                 execute \`do\` commands and invoke the pager
   --dry-run               don't; a run needs exactly one of these two
   --no-page               with --apply: don't page on handoff
@@ -22,7 +22,7 @@ const HELP = `usage: skop <path/to/SKILL.md> [options]
   --lint                  parse + static checks only
   --fake answers.yaml     use the fake backend
   --fake-exec cmds.yaml   use the fake command handler; no real command runs
-  --config path           default: $XDG_CONFIG_HOME/skop/config.yaml
+  --config path           default: $XDG_CONFIG_HOME/skope/config.yaml
   --version               print the release version and build identity
   --help                  print this`;
 
@@ -30,7 +30,7 @@ async function main(argv: string[]): Promise<number> {
   // Only the flag itself, not a value that happens to spell it.
   if (argv.length === 1 && argv[0] === "--version") {
     const { version, build } = IDENTITY;
-    console.log(`skop ${version} (build identity ${build})`);
+    console.log(`skope ${version} (build identity ${build})`);
     return 0;
   }
   let values: ReturnType<typeof parse>["values"] = {};
@@ -86,7 +86,7 @@ function parse(argv: string[]) {
   });
 }
 
-// A reader that closes stdout early (`skop … | head -n1`) doesn't stop the run: a run that
+// A reader that closes stdout early (`skope … | head -n1`) doesn't stop the run: a run that
 // stopped half way would leave its effects unknown. Later events are dropped, the run finishes,
 // and the exit code still reports its outcome.
 process.stdout.on("error", () => {});
@@ -96,7 +96,7 @@ main(process.argv.slice(2)).then(
     process.exitCode = code;
   },
   (err) => {
-    process.stderr.write(plainText(`skop: internal error: ${err instanceof Error ? err.stack : String(err)}\n`));
+    process.stderr.write(plainText(`skope: internal error: ${err instanceof Error ? err.stack : String(err)}\n`));
     process.exitCode = 50;
   },
 );

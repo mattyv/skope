@@ -1187,7 +1187,7 @@ let _System = (function() {
 
   return $module;
 })(); // end of module _System
-let SkopAst = (function() {
+let SkopeAst = (function() {
   let $module = {};
 
 
@@ -1209,9 +1209,9 @@ let SkopAst = (function() {
     get dtor_value() { return this.value; }
     toString() {
       if (this.$tag === 0) {
-        return "SkopAst.Option.None";
+        return "SkopeAst.Option.None";
       } else if (this.$tag === 1) {
-        return "SkopAst.Option.Some" + "(" + _dafny.toString(this.value) + ")";
+        return "SkopeAst.Option.Some" + "(" + _dafny.toString(this.value) + ")";
       } else  {
         return "<unexpected>";
       }
@@ -1228,7 +1228,7 @@ let SkopAst = (function() {
       }
     }
     static Default() {
-      return SkopAst.Option.create_None();
+      return SkopeAst.Option.create_None();
     }
     static Rtd() {
       return class {
@@ -1259,9 +1259,9 @@ let SkopAst = (function() {
     get dtor_name() { return this.name; }
     toString() {
       if (this.$tag === 0) {
-        return "SkopAst.Part.Lit" + "(" + this.s.toVerbatimString(true) + ")";
+        return "SkopeAst.Part.Lit" + "(" + this.s.toVerbatimString(true) + ")";
       } else if (this.$tag === 1) {
-        return "SkopAst.Part.Var" + "(" + this.name.toVerbatimString(true) + ")";
+        return "SkopeAst.Part.Var" + "(" + this.name.toVerbatimString(true) + ")";
       } else  {
         return "<unexpected>";
       }
@@ -1278,7 +1278,7 @@ let SkopAst = (function() {
       }
     }
     static Default() {
-      return SkopAst.Part.create_Lit(_dafny.Seq.UnicodeFromString(""));
+      return SkopeAst.Part.create_Lit(_dafny.Seq.UnicodeFromString(""));
     }
     static Rtd() {
       return class {
@@ -1304,7 +1304,7 @@ let SkopAst = (function() {
     get dtor_expected() { return this.expected; }
     toString() {
       if (this.$tag === 0) {
-        return "SkopAst.Anchor.Anchor" + "(" + this.given.toVerbatimString(true) + ", " + this.expected.toVerbatimString(true) + ")";
+        return "SkopeAst.Anchor.Anchor" + "(" + this.given.toVerbatimString(true) + ", " + this.expected.toVerbatimString(true) + ")";
       } else  {
         return "<unexpected>";
       }
@@ -1319,7 +1319,7 @@ let SkopAst = (function() {
       }
     }
     static Default() {
-      return SkopAst.Anchor.create_Anchor(_dafny.Seq.UnicodeFromString(""), _dafny.Seq.UnicodeFromString(""));
+      return SkopeAst.Anchor.create_Anchor(_dafny.Seq.UnicodeFromString(""), _dafny.Seq.UnicodeFromString(""));
     }
     static Rtd() {
       return class {
@@ -1345,7 +1345,7 @@ let SkopAst = (function() {
     get dtor_anchor() { return this.anchor; }
     toString() {
       if (this.$tag === 0) {
-        return "SkopAst.SectionRef.SectionRef" + "(" + this.id.toVerbatimString(true) + ", " + _dafny.toString(this.anchor) + ")";
+        return "SkopeAst.SectionRef.SectionRef" + "(" + this.id.toVerbatimString(true) + ", " + _dafny.toString(this.anchor) + ")";
       } else  {
         return "<unexpected>";
       }
@@ -1360,7 +1360,7 @@ let SkopAst = (function() {
       }
     }
     static Default() {
-      return SkopAst.SectionRef.create_SectionRef(_dafny.Seq.UnicodeFromString(""), SkopAst.Option.Default());
+      return SkopeAst.SectionRef.create_SectionRef(_dafny.Seq.UnicodeFromString(""), SkopeAst.Option.Default());
     }
     static Rtd() {
       return class {
@@ -1394,11 +1394,11 @@ let SkopAst = (function() {
     get dtor_ref() { return this.ref; }
     toString() {
       if (this.$tag === 0) {
-        return "SkopAst.Else.NoElse";
+        return "SkopeAst.Else.NoElse";
       } else if (this.$tag === 1) {
-        return "SkopAst.Else.Skip";
+        return "SkopeAst.Else.Skip";
       } else if (this.$tag === 2) {
-        return "SkopAst.Else.ElseTo" + "(" + _dafny.toString(this.ref) + ")";
+        return "SkopeAst.Else.ElseTo" + "(" + _dafny.toString(this.ref) + ")";
       } else  {
         return "<unexpected>";
       }
@@ -1417,7 +1417,7 @@ let SkopAst = (function() {
       }
     }
     static Default() {
-      return SkopAst.Else.create_NoElse();
+      return SkopeAst.Else.create_NoElse();
     }
     static Rtd() {
       return class {
@@ -1446,9 +1446,9 @@ let SkopAst = (function() {
     get dtor_ref() { return this.ref; }
     toString() {
       if (this.$tag === 0) {
-        return "SkopAst.Target.StopTarget";
+        return "SkopeAst.Target.StopTarget";
       } else if (this.$tag === 1) {
-        return "SkopAst.Target.To" + "(" + _dafny.toString(this.ref) + ")";
+        return "SkopeAst.Target.To" + "(" + _dafny.toString(this.ref) + ")";
       } else  {
         return "<unexpected>";
       }
@@ -1465,7 +1465,7 @@ let SkopAst = (function() {
       }
     }
     static Default() {
-      return SkopAst.Target.create_StopTarget();
+      return SkopeAst.Target.create_StopTarget();
     }
     static Rtd() {
       return class {
@@ -1496,9 +1496,9 @@ let SkopAst = (function() {
     get dtor_item() { return this.item; }
     toString() {
       if (this.$tag === 0) {
-        return "SkopAst.DoBody.DoCmd" + "(" + _dafny.toString(this.cmd) + ")";
+        return "SkopeAst.DoBody.DoCmd" + "(" + _dafny.toString(this.cmd) + ")";
       } else if (this.$tag === 1) {
-        return "SkopAst.DoBody.DoItem" + "(" + this.item.toVerbatimString(true) + ")";
+        return "SkopeAst.DoBody.DoItem" + "(" + this.item.toVerbatimString(true) + ")";
       } else  {
         return "<unexpected>";
       }
@@ -1515,7 +1515,7 @@ let SkopAst = (function() {
       }
     }
     static Default() {
-      return SkopAst.DoBody.create_DoCmd(_dafny.Seq.of());
+      return SkopeAst.DoBody.create_DoCmd(_dafny.Seq.of());
     }
     static Rtd() {
       return class {
@@ -1573,17 +1573,17 @@ let SkopAst = (function() {
     }
     toString() {
       if (this.$tag === 0) {
-        return "SkopAst.CmpOp.Lt";
+        return "SkopeAst.CmpOp.Lt";
       } else if (this.$tag === 1) {
-        return "SkopAst.CmpOp.Le";
+        return "SkopeAst.CmpOp.Le";
       } else if (this.$tag === 2) {
-        return "SkopAst.CmpOp.Gt";
+        return "SkopeAst.CmpOp.Gt";
       } else if (this.$tag === 3) {
-        return "SkopAst.CmpOp.Ge";
+        return "SkopeAst.CmpOp.Ge";
       } else if (this.$tag === 4) {
-        return "SkopAst.CmpOp.Eq";
+        return "SkopeAst.CmpOp.Eq";
       } else if (this.$tag === 5) {
-        return "SkopAst.CmpOp.Ne";
+        return "SkopeAst.CmpOp.Ne";
       } else  {
         return "<unexpected>";
       }
@@ -1608,7 +1608,7 @@ let SkopAst = (function() {
       }
     }
     static Default() {
-      return SkopAst.CmpOp.create_Lt();
+      return SkopeAst.CmpOp.create_Lt();
     }
     static Rtd() {
       return class {
@@ -1639,9 +1639,9 @@ let SkopAst = (function() {
     get dtor_text() { return this.text; }
     toString() {
       if (this.$tag === 0) {
-        return "SkopAst.Operand.VarOp" + "(" + this.name.toVerbatimString(true) + ")";
+        return "SkopeAst.Operand.VarOp" + "(" + this.name.toVerbatimString(true) + ")";
       } else if (this.$tag === 1) {
-        return "SkopAst.Operand.Num" + "(" + this.text.toVerbatimString(true) + ")";
+        return "SkopeAst.Operand.Num" + "(" + this.text.toVerbatimString(true) + ")";
       } else  {
         return "<unexpected>";
       }
@@ -1658,7 +1658,7 @@ let SkopAst = (function() {
       }
     }
     static Default() {
-      return SkopAst.Operand.create_VarOp(_dafny.Seq.UnicodeFromString(""));
+      return SkopeAst.Operand.create_VarOp(_dafny.Seq.UnicodeFromString(""));
     }
     static Rtd() {
       return class {
@@ -1693,9 +1693,9 @@ let SkopAst = (function() {
     get dtor_r() { return this.r; }
     toString() {
       if (this.$tag === 0) {
-        return "SkopAst.Cond.Succeeds" + "(" + _dafny.toString(this.cmd) + ")";
+        return "SkopeAst.Cond.Succeeds" + "(" + _dafny.toString(this.cmd) + ")";
       } else if (this.$tag === 1) {
-        return "SkopAst.Cond.Cmp" + "(" + _dafny.toString(this.op) + ", " + _dafny.toString(this.l) + ", " + _dafny.toString(this.r) + ")";
+        return "SkopeAst.Cond.Cmp" + "(" + _dafny.toString(this.op) + ", " + _dafny.toString(this.l) + ", " + _dafny.toString(this.r) + ")";
       } else  {
         return "<unexpected>";
       }
@@ -1712,7 +1712,7 @@ let SkopAst = (function() {
       }
     }
     static Default() {
-      return SkopAst.Cond.create_Succeeds(_dafny.Seq.of());
+      return SkopeAst.Cond.create_Succeeds(_dafny.Seq.of());
     }
     static Rtd() {
       return class {
@@ -1738,7 +1738,7 @@ let SkopAst = (function() {
     get dtor_ref() { return this.ref; }
     toString() {
       if (this.$tag === 0) {
-        return "SkopAst.AskOption.AskOption" + "(" + _dafny.toString(this.src) + ", " + _dafny.toString(this.ref) + ")";
+        return "SkopeAst.AskOption.AskOption" + "(" + _dafny.toString(this.src) + ", " + _dafny.toString(this.ref) + ")";
       } else  {
         return "<unexpected>";
       }
@@ -1753,7 +1753,7 @@ let SkopAst = (function() {
       }
     }
     static Default() {
-      return SkopAst.AskOption.create_AskOption(_dafny.ZERO, SkopAst.SectionRef.Default());
+      return SkopeAst.AskOption.create_AskOption(_dafny.ZERO, SkopeAst.SectionRef.Default());
     }
     static Rtd() {
       return class {
@@ -1781,7 +1781,7 @@ let SkopAst = (function() {
     get dtor_text() { return this.text; }
     toString() {
       if (this.$tag === 0) {
-        return "SkopAst.RubricLine.RubricLine" + "(" + _dafny.toString(this.src) + ", " + _dafny.toString(this.level) + ", " + this.text.toVerbatimString(true) + ")";
+        return "SkopeAst.RubricLine.RubricLine" + "(" + _dafny.toString(this.src) + ", " + _dafny.toString(this.level) + ", " + this.text.toVerbatimString(true) + ")";
       } else  {
         return "<unexpected>";
       }
@@ -1796,7 +1796,7 @@ let SkopAst = (function() {
       }
     }
     static Default() {
-      return SkopAst.RubricLine.create_RubricLine(_dafny.ZERO, _dafny.ZERO, _dafny.Seq.UnicodeFromString(""));
+      return SkopeAst.RubricLine.create_RubricLine(_dafny.ZERO, _dafny.ZERO, _dafny.Seq.UnicodeFromString(""));
     }
     static Rtd() {
       return class {
@@ -1847,13 +1847,13 @@ let SkopAst = (function() {
     get dtor_rubric() { return this.rubric; }
     toString() {
       if (this.$tag === 0) {
-        return "SkopAst.AskForm.Sections" + "(" + _dafny.toString(this.options) + ")";
+        return "SkopeAst.AskForm.Sections" + "(" + _dafny.toString(this.options) + ")";
       } else if (this.$tag === 1) {
-        return "SkopAst.AskForm.YesNo" + "(" + this.binding.toVerbatimString(true) + ")";
+        return "SkopeAst.AskForm.YesNo" + "(" + this.binding.toVerbatimString(true) + ")";
       } else if (this.$tag === 2) {
-        return "SkopAst.AskForm.OneOf" + "(" + _dafny.toString(this.list) + ", " + this.binding.toVerbatimString(true) + ")";
+        return "SkopeAst.AskForm.OneOf" + "(" + _dafny.toString(this.list) + ", " + this.binding.toVerbatimString(true) + ")";
       } else if (this.$tag === 3) {
-        return "SkopAst.AskForm.Score" + "(" + _dafny.toString(this.low) + ", " + _dafny.toString(this.high) + ", " + _dafny.toString(this.rubric) + ", " + this.binding.toVerbatimString(true) + ")";
+        return "SkopeAst.AskForm.Score" + "(" + _dafny.toString(this.low) + ", " + _dafny.toString(this.high) + ", " + _dafny.toString(this.rubric) + ", " + this.binding.toVerbatimString(true) + ")";
       } else  {
         return "<unexpected>";
       }
@@ -1874,7 +1874,7 @@ let SkopAst = (function() {
       }
     }
     static Default() {
-      return SkopAst.AskForm.create_Sections(_dafny.Seq.of());
+      return SkopeAst.AskForm.create_Sections(_dafny.Seq.of());
     }
     static Rtd() {
       return class {
@@ -1993,27 +1993,27 @@ let SkopAst = (function() {
     get dtor_text() { return this.text; }
     toString() {
       if (this.$tag === 0) {
-        return "SkopAst.Stmt.Run" + "(" + _dafny.toString(this.src) + ", " + _dafny.toString(this.cmd) + ", " + _dafny.toString(this.binding) + ", " + _dafny.toString(this.els) + ")";
+        return "SkopeAst.Stmt.Run" + "(" + _dafny.toString(this.src) + ", " + _dafny.toString(this.cmd) + ", " + _dafny.toString(this.binding) + ", " + _dafny.toString(this.els) + ")";
       } else if (this.$tag === 1) {
-        return "SkopAst.Stmt.Do" + "(" + _dafny.toString(this.src) + ", " + _dafny.toString(this.action) + ", " + _dafny.toString(this.els) + ")";
+        return "SkopeAst.Stmt.Do" + "(" + _dafny.toString(this.src) + ", " + _dafny.toString(this.action) + ", " + _dafny.toString(this.els) + ")";
       } else if (this.$tag === 2) {
-        return "SkopAst.Stmt.Check" + "(" + _dafny.toString(this.src) + ", " + _dafny.toString(this.cond) + ", " + _dafny.toString(this.onTrue) + ", " + _dafny.toString(this.els) + ")";
+        return "SkopeAst.Stmt.Check" + "(" + _dafny.toString(this.src) + ", " + _dafny.toString(this.cond) + ", " + _dafny.toString(this.onTrue) + ", " + _dafny.toString(this.els) + ")";
       } else if (this.$tag === 3) {
-        return "SkopAst.Stmt.Ask" + "(" + _dafny.toString(this.src) + ", " + _dafny.toString(this.question) + ", " + _dafny.toString(this.sure) + ", " + _dafny.toString(this.form) + ", " + _dafny.toString(this.els) + ")";
+        return "SkopeAst.Stmt.Ask" + "(" + _dafny.toString(this.src) + ", " + _dafny.toString(this.question) + ", " + _dafny.toString(this.sure) + ", " + _dafny.toString(this.form) + ", " + _dafny.toString(this.els) + ")";
       } else if (this.$tag === 4) {
-        return "SkopAst.Stmt.ForEach" + "(" + _dafny.toString(this.src) + ", " + this.loopVar.toVerbatimString(true) + ", " + _dafny.toString(this.list) + ", " + _dafny.toString(this.body) + ")";
+        return "SkopeAst.Stmt.ForEach" + "(" + _dafny.toString(this.src) + ", " + this.loopVar.toVerbatimString(true) + ", " + _dafny.toString(this.list) + ", " + _dafny.toString(this.body) + ")";
       } else if (this.$tag === 5) {
-        return "SkopAst.Stmt.IfYesRun" + "(" + _dafny.toString(this.src) + ", " + _dafny.toString(this.cmd) + ", " + _dafny.toString(this.els) + ")";
+        return "SkopeAst.Stmt.IfYesRun" + "(" + _dafny.toString(this.src) + ", " + _dafny.toString(this.cmd) + ", " + _dafny.toString(this.els) + ")";
       } else if (this.$tag === 6) {
-        return "SkopAst.Stmt.IfYesDo" + "(" + _dafny.toString(this.src) + ", " + _dafny.toString(this.action) + ", " + _dafny.toString(this.els) + ")";
+        return "SkopeAst.Stmt.IfYesDo" + "(" + _dafny.toString(this.src) + ", " + _dafny.toString(this.action) + ", " + _dafny.toString(this.els) + ")";
       } else if (this.$tag === 7) {
-        return "SkopAst.Stmt.Then" + "(" + _dafny.toString(this.src) + ", " + _dafny.toString(this.ref) + ")";
+        return "SkopeAst.Stmt.Then" + "(" + _dafny.toString(this.src) + ", " + _dafny.toString(this.ref) + ")";
       } else if (this.$tag === 8) {
-        return "SkopAst.Stmt.Page" + "(" + _dafny.toString(this.src) + ", " + _dafny.toString(this.text) + ")";
+        return "SkopeAst.Stmt.Page" + "(" + _dafny.toString(this.src) + ", " + _dafny.toString(this.text) + ")";
       } else if (this.$tag === 9) {
-        return "SkopAst.Stmt.HandOff" + "(" + _dafny.toString(this.src) + ")";
+        return "SkopeAst.Stmt.HandOff" + "(" + _dafny.toString(this.src) + ")";
       } else if (this.$tag === 10) {
-        return "SkopAst.Stmt.Stop" + "(" + _dafny.toString(this.src) + ")";
+        return "SkopeAst.Stmt.Stop" + "(" + _dafny.toString(this.src) + ")";
       } else  {
         return "<unexpected>";
       }
@@ -2048,7 +2048,7 @@ let SkopAst = (function() {
       }
     }
     static Default() {
-      return SkopAst.Stmt.create_Run(_dafny.ZERO, _dafny.Seq.of(), SkopAst.Option.Default(), SkopAst.Else.Default());
+      return SkopeAst.Stmt.create_Run(_dafny.ZERO, _dafny.Seq.of(), SkopeAst.Option.Default(), SkopeAst.Else.Default());
     }
     static Rtd() {
       return class {
@@ -2084,9 +2084,9 @@ let SkopAst = (function() {
     get dtor_value() { return this.value; }
     toString() {
       if (this.$tag === 0) {
-        return "SkopAst.Item.Action" + "(" + _dafny.toString(this.src) + ", " + this.text.toVerbatimString(true) + ", " + _dafny.toString(this.cmd) + ")";
+        return "SkopeAst.Item.Action" + "(" + _dafny.toString(this.src) + ", " + this.text.toVerbatimString(true) + ", " + _dafny.toString(this.cmd) + ")";
       } else if (this.$tag === 1) {
-        return "SkopAst.Item.Value" + "(" + _dafny.toString(this.src) + ", " + this.value.toVerbatimString(true) + ")";
+        return "SkopeAst.Item.Value" + "(" + _dafny.toString(this.src) + ", " + this.value.toVerbatimString(true) + ")";
       } else  {
         return "<unexpected>";
       }
@@ -2103,7 +2103,7 @@ let SkopAst = (function() {
       }
     }
     static Default() {
-      return SkopAst.Item.create_Action(_dafny.ZERO, _dafny.Seq.UnicodeFromString(""), _dafny.Seq.of());
+      return SkopeAst.Item.create_Action(_dafny.ZERO, _dafny.Seq.UnicodeFromString(""), _dafny.Seq.of());
     }
     static Rtd() {
       return class {
@@ -2129,7 +2129,7 @@ let SkopAst = (function() {
     get dtor_items() { return this.items; }
     toString() {
       if (this.$tag === 0) {
-        return "SkopAst.List.List" + "(" + _dafny.toString(this.src) + ", " + _dafny.toString(this.items) + ")";
+        return "SkopeAst.List.List" + "(" + _dafny.toString(this.src) + ", " + _dafny.toString(this.items) + ")";
       } else  {
         return "<unexpected>";
       }
@@ -2144,7 +2144,7 @@ let SkopAst = (function() {
       }
     }
     static Default() {
-      return SkopAst.List.create_List(_dafny.ZERO, _dafny.Seq.of());
+      return SkopeAst.List.create_List(_dafny.ZERO, _dafny.Seq.of());
     }
     static Rtd() {
       return class {
@@ -2183,9 +2183,9 @@ let SkopAst = (function() {
     get dtor_lists() { return this.lists; }
     toString() {
       if (this.$tag === 0) {
-        return "SkopAst.Section.Instructions" + "(" + this.name.toVerbatimString(true) + ", " + _dafny.toString(this.src) + ", " + _dafny.toString(this.guidance) + ", " + _dafny.toString(this.body) + ")";
+        return "SkopeAst.Section.Instructions" + "(" + this.name.toVerbatimString(true) + ", " + _dafny.toString(this.src) + ", " + _dafny.toString(this.guidance) + ", " + _dafny.toString(this.body) + ")";
       } else if (this.$tag === 1) {
-        return "SkopAst.Section.Other" + "(" + this.name.toVerbatimString(true) + ", " + _dafny.toString(this.src) + ", " + _dafny.toString(this.lists) + ")";
+        return "SkopeAst.Section.Other" + "(" + this.name.toVerbatimString(true) + ", " + _dafny.toString(this.src) + ", " + _dafny.toString(this.lists) + ")";
       } else  {
         return "<unexpected>";
       }
@@ -2202,7 +2202,7 @@ let SkopAst = (function() {
       }
     }
     static Default() {
-      return SkopAst.Section.create_Instructions(_dafny.Seq.UnicodeFromString(""), _dafny.ZERO, SkopAst.Option.Default(), _dafny.Seq.of());
+      return SkopeAst.Section.create_Instructions(_dafny.Seq.UnicodeFromString(""), _dafny.ZERO, SkopeAst.Option.Default(), _dafny.Seq.of());
     }
     static Rtd() {
       return class {
@@ -2236,9 +2236,9 @@ let SkopAst = (function() {
     get dtor_i() { return this.i; }
     toString() {
       if (this.$tag === 0) {
-        return "SkopAst.Param.PStr" + "(" + this.s.toVerbatimString(true) + ", " + _dafny.toString(this.src) + ")";
+        return "SkopeAst.Param.PStr" + "(" + this.s.toVerbatimString(true) + ", " + _dafny.toString(this.src) + ")";
       } else if (this.$tag === 1) {
-        return "SkopAst.Param.PInt" + "(" + _dafny.toString(this.i) + ", " + _dafny.toString(this.src) + ")";
+        return "SkopeAst.Param.PInt" + "(" + _dafny.toString(this.i) + ", " + _dafny.toString(this.src) + ")";
       } else  {
         return "<unexpected>";
       }
@@ -2255,7 +2255,7 @@ let SkopAst = (function() {
       }
     }
     static Default() {
-      return SkopAst.Param.create_PStr(_dafny.Seq.UnicodeFromString(""), _dafny.ZERO);
+      return SkopeAst.Param.create_PStr(_dafny.Seq.UnicodeFromString(""), _dafny.ZERO);
     }
     static Rtd() {
       return class {
@@ -2285,7 +2285,7 @@ let SkopAst = (function() {
     get dtor_askContextTokens() { return this.askContextTokens; }
     toString() {
       if (this.$tag === 0) {
-        return "SkopAst.Limits.Limits" + "(" + _dafny.toString(this.runTimeoutMs) + ", " + _dafny.toString(this.doTimeoutMs) + ", " + _dafny.toString(this.deadlineMs) + ", " + _dafny.toString(this.askContextTokens) + ")";
+        return "SkopeAst.Limits.Limits" + "(" + _dafny.toString(this.runTimeoutMs) + ", " + _dafny.toString(this.doTimeoutMs) + ", " + _dafny.toString(this.deadlineMs) + ", " + _dafny.toString(this.askContextTokens) + ")";
       } else  {
         return "<unexpected>";
       }
@@ -2300,7 +2300,7 @@ let SkopAst = (function() {
       }
     }
     static Default() {
-      return SkopAst.Limits.create_Limits(_dafny.ZERO, _dafny.ZERO, _dafny.ZERO, _dafny.ZERO);
+      return SkopeAst.Limits.create_Limits(_dafny.ZERO, _dafny.ZERO, _dafny.ZERO, _dafny.ZERO);
     }
     static Rtd() {
       return class {
@@ -2326,7 +2326,7 @@ let SkopAst = (function() {
     get dtor_src() { return this.src; }
     toString() {
       if (this.$tag === 0) {
-        return "SkopAst.Entry.Entry" + "(" + this.section.toVerbatimString(true) + ", " + _dafny.toString(this.src) + ")";
+        return "SkopeAst.Entry.Entry" + "(" + this.section.toVerbatimString(true) + ", " + _dafny.toString(this.src) + ")";
       } else  {
         return "<unexpected>";
       }
@@ -2341,7 +2341,7 @@ let SkopAst = (function() {
       }
     }
     static Default() {
-      return SkopAst.Entry.create_Entry(_dafny.Seq.UnicodeFromString(""), _dafny.ZERO);
+      return SkopeAst.Entry.create_Entry(_dafny.Seq.UnicodeFromString(""), _dafny.ZERO);
     }
     static Rtd() {
       return class {
@@ -2373,7 +2373,7 @@ let SkopAst = (function() {
     get dtor_sections() { return this.sections; }
     toString() {
       if (this.$tag === 0) {
-        return "SkopAst.Program.Program" + "(" + this.skill.toVerbatimString(true) + ", " + _dafny.toString(this.entry) + ", " + _dafny.toString(this.params) + ", " + _dafny.toString(this.limits) + ", " + _dafny.toString(this.sections) + ")";
+        return "SkopeAst.Program.Program" + "(" + this.skill.toVerbatimString(true) + ", " + _dafny.toString(this.entry) + ", " + _dafny.toString(this.params) + ", " + _dafny.toString(this.limits) + ", " + _dafny.toString(this.sections) + ")";
       } else  {
         return "<unexpected>";
       }
@@ -2388,7 +2388,7 @@ let SkopAst = (function() {
       }
     }
     static Default() {
-      return SkopAst.Program.create_Program(_dafny.Seq.UnicodeFromString(""), SkopAst.Entry.Default(), _dafny.Map.Empty, SkopAst.Limits.Default(), _dafny.Map.Empty);
+      return SkopeAst.Program.create_Program(_dafny.Seq.UnicodeFromString(""), SkopeAst.Entry.Default(), _dafny.Map.Empty, SkopeAst.Limits.Default(), _dafny.Map.Empty);
     }
     static Rtd() {
       return class {
@@ -2399,13 +2399,13 @@ let SkopAst = (function() {
     }
   }
   return $module;
-})(); // end of module SkopAst
-let SkopWellFormed = (function() {
+})(); // end of module SkopeAst
+let SkopeWellFormed = (function() {
   let $module = {};
 
   $module.__default = class __default {
     constructor () {
-      this._tname = "SkopWellFormed._default";
+      this._tname = "SkopeWellFormed._default";
     }
     _parentTraits() {
       return [];
@@ -2429,7 +2429,7 @@ let SkopWellFormed = (function() {
       if ((new BigNumber((body).length)).isEqualTo(_dafny.ZERO)) {
         return _dafny.Seq.of();
       } else {
-        return _dafny.Seq.Concat(_dafny.Seq.Concat(_dafny.Seq.of((body)[_dafny.ZERO]), ((((body)[_dafny.ZERO]).is_ForEach) ? (SkopWellFormed.__default.Flat(((body)[_dafny.ZERO]).dtor_body)) : (_dafny.Seq.of()))), SkopWellFormed.__default.Flat((body).slice(_dafny.ONE)));
+        return _dafny.Seq.Concat(_dafny.Seq.Concat(_dafny.Seq.of((body)[_dafny.ZERO]), ((((body)[_dafny.ZERO]).is_ForEach) ? (SkopeWellFormed.__default.Flat(((body)[_dafny.ZERO]).dtor_body)) : (_dafny.Seq.of()))), SkopeWellFormed.__default.Flat((body).slice(_dafny.ONE)));
       }
     };
     static Stmts(p) {
@@ -2438,9 +2438,9 @@ let SkopWellFormed = (function() {
         for (const _compr_0 of ((p).dtor_sections).Keys.Elements) {
           let _0_id = _compr_0;
           if ((((p).dtor_sections).contains(_0_id)) && ((((p).dtor_sections).get(_0_id)).is_Instructions)) {
-            for (const _compr_1 of (SkopWellFormed.__default.Flat((((p).dtor_sections).get(_0_id)).dtor_body)).Elements) {
+            for (const _compr_1 of (SkopeWellFormed.__default.Flat((((p).dtor_sections).get(_0_id)).dtor_body)).Elements) {
               let _1_s = _compr_1;
-              if (_dafny.Seq.contains(SkopWellFormed.__default.Flat((((p).dtor_sections).get(_0_id)).dtor_body), _1_s)) {
+              if (_dafny.Seq.contains(SkopeWellFormed.__default.Flat((((p).dtor_sections).get(_0_id)).dtor_body), _1_s)) {
                 _coll0.add(_1_s);
               }
             }
@@ -2451,7 +2451,7 @@ let SkopWellFormed = (function() {
     };
     static ElseJump(e, src) {
       if ((e).is_ElseTo) {
-        return _dafny.Set.fromElements(SkopWellFormed.Jump.create_Jump((e).dtor_ref, src));
+        return _dafny.Set.fromElements(SkopeWellFormed.Jump.create_Jump((e).dtor_ref, src));
       } else {
         return _dafny.Set.fromElements();
       }
@@ -2462,14 +2462,14 @@ let SkopWellFormed = (function() {
         if (_source0.is_Run) {
           let _0_src = (_source0).src;
           let _1_els = (_source0).els;
-          return SkopWellFormed.__default.ElseJump(_1_els, _0_src);
+          return SkopeWellFormed.__default.ElseJump(_1_els, _0_src);
         }
       }
       {
         if (_source0.is_Do) {
           let _2_src = (_source0).src;
           let _3_els = (_source0).els;
-          return SkopWellFormed.__default.ElseJump(_3_els, _2_src);
+          return SkopeWellFormed.__default.ElseJump(_3_els, _2_src);
         }
       }
       {
@@ -2477,7 +2477,7 @@ let SkopWellFormed = (function() {
           let _4_src = (_source0).src;
           let _5_onTrue = (_source0).onTrue;
           let _6_els = (_source0).els;
-          return (((((_5_onTrue).is_Some) && (((_5_onTrue).dtor_value).is_To)) ? (_dafny.Set.fromElements(SkopWellFormed.Jump.create_Jump(((_5_onTrue).dtor_value).dtor_ref, _4_src))) : (_dafny.Set.fromElements()))).Union(SkopWellFormed.__default.ElseJump(_6_els, _4_src));
+          return (((((_5_onTrue).is_Some) && (((_5_onTrue).dtor_value).is_To)) ? (_dafny.Set.fromElements(SkopeWellFormed.Jump.create_Jump(((_5_onTrue).dtor_value).dtor_ref, _4_src))) : (_dafny.Set.fromElements()))).Union(SkopeWellFormed.__default.ElseJump(_6_els, _4_src));
         }
       }
       {
@@ -2490,11 +2490,11 @@ let SkopWellFormed = (function() {
             for (const _compr_0 of _dafny.IntegerRange(_dafny.ZERO, new BigNumber(((_8_form).dtor_options).length))) {
               let _10_k = _compr_0;
               if (((_dafny.ZERO).isLessThanOrEqualTo(_10_k)) && ((_10_k).isLessThan(new BigNumber(((_8_form).dtor_options).length)))) {
-                _coll0.add(SkopWellFormed.Jump.create_Jump((((_8_form).dtor_options)[_10_k]).dtor_ref, (((_8_form).dtor_options)[_10_k]).dtor_src));
+                _coll0.add(SkopeWellFormed.Jump.create_Jump((((_8_form).dtor_options)[_10_k]).dtor_ref, (((_8_form).dtor_options)[_10_k]).dtor_src));
               }
             }
             return _coll0;
-          }()) : (_dafny.Set.fromElements()))).Union(SkopWellFormed.__default.ElseJump(_9_els, _7_src));
+          }()) : (_dafny.Set.fromElements()))).Union(SkopeWellFormed.__default.ElseJump(_9_els, _7_src));
         }
       }
       {
@@ -2506,21 +2506,21 @@ let SkopWellFormed = (function() {
         if (_source0.is_IfYesRun) {
           let _11_src = (_source0).src;
           let _12_els = (_source0).els;
-          return SkopWellFormed.__default.ElseJump(_12_els, _11_src);
+          return SkopeWellFormed.__default.ElseJump(_12_els, _11_src);
         }
       }
       {
         if (_source0.is_IfYesDo) {
           let _13_src = (_source0).src;
           let _14_els = (_source0).els;
-          return SkopWellFormed.__default.ElseJump(_14_els, _13_src);
+          return SkopeWellFormed.__default.ElseJump(_14_els, _13_src);
         }
       }
       {
         if (_source0.is_Then) {
           let _15_src = (_source0).src;
           let _16_r = (_source0).ref;
-          return _dafny.Set.fromElements(SkopWellFormed.Jump.create_Jump(_16_r, _15_src));
+          return _dafny.Set.fromElements(SkopeWellFormed.Jump.create_Jump(_16_r, _15_src));
         }
       }
       {
@@ -2566,17 +2566,17 @@ let SkopWellFormed = (function() {
         let _1_a = _forall_var_1;
         return _dafny.Quantifier(_dafny.IntegerRange((_1_a).plus(_dafny.ONE), new BigNumber(((l).dtor_items).length)), true, function (_forall_var_2) {
           let _2_b = _forall_var_2;
-          return !((((_dafny.ZERO).isLessThanOrEqualTo(_1_a)) && ((_1_a).isLessThan(_2_b))) && ((_2_b).isLessThan(new BigNumber(((l).dtor_items).length)))) || (!_dafny.areEqual(SkopWellFormed.__default.Lower(SkopWellFormed.__default.Label(((l).dtor_items)[_1_a])), SkopWellFormed.__default.Lower(SkopWellFormed.__default.Label(((l).dtor_items)[_2_b]))));
+          return !((((_dafny.ZERO).isLessThanOrEqualTo(_1_a)) && ((_1_a).isLessThan(_2_b))) && ((_2_b).isLessThan(new BigNumber(((l).dtor_items).length)))) || (!_dafny.areEqual(SkopeWellFormed.__default.Lower(SkopeWellFormed.__default.Label(((l).dtor_items)[_1_a])), SkopeWellFormed.__default.Lower(SkopeWellFormed.__default.Label(((l).dtor_items)[_2_b]))));
         });
       }));
     };
     static Terminal(s) {
-      return (((((((s).is_Then) || ((s).is_Page)) || ((s).is_HandOff)) || ((s).is_Stop)) || (((s).is_Ask) && (((s).dtor_form).is_Sections))) || ((((s).is_Check) && (((s).dtor_onTrue).is_Some)) && (((s).dtor_els).is_ElseTo))) || ((((s).is_ForEach) && ((_dafny.ZERO).isLessThan(new BigNumber(((s).dtor_body).length)))) && (SkopWellFormed.__default.Terminal(((s).dtor_body)[(new BigNumber(((s).dtor_body).length)).minus(_dafny.ONE)])));
+      return (((((((s).is_Then) || ((s).is_Page)) || ((s).is_HandOff)) || ((s).is_Stop)) || (((s).is_Ask) && (((s).dtor_form).is_Sections))) || ((((s).is_Check) && (((s).dtor_onTrue).is_Some)) && (((s).dtor_els).is_ElseTo))) || ((((s).is_ForEach) && ((_dafny.ZERO).isLessThan(new BigNumber(((s).dtor_body).length)))) && (SkopeWellFormed.__default.Terminal(((s).dtor_body)[(new BigNumber(((s).dtor_body).length)).minus(_dafny.ONE)])));
     };
     static NoDeadCode(body) {
       return _dafny.Quantifier(_dafny.IntegerRange(_dafny.ZERO, (new BigNumber((body).length)).minus(_dafny.ONE)), true, function (_forall_var_0) {
         let _0_i = _forall_var_0;
-        return !(((_dafny.ZERO).isLessThanOrEqualTo(_0_i)) && ((_0_i).isLessThan((new BigNumber((body).length)).minus(_dafny.ONE)))) || (!(SkopWellFormed.__default.Terminal((body)[_0_i])));
+        return !(((_dafny.ZERO).isLessThanOrEqualTo(_0_i)) && ((_0_i).isLessThan((new BigNumber((body).length)).minus(_dafny.ONE)))) || (!(SkopeWellFormed.__default.Terminal((body)[_0_i])));
       });
     };
     static RubricOk(low, high, rubric) {
@@ -2591,7 +2591,7 @@ let SkopWellFormed = (function() {
         });
       }))) && (_dafny.Quantifier(_dafny.IntegerRange(low, (high).plus(_dafny.ONE)), true, function (_forall_var_3) {
         let _3_level = _forall_var_3;
-        return !(((low).isLessThanOrEqualTo(_3_level)) && ((_3_level).isLessThanOrEqualTo(high))) || ((SkopWellFormed.__default.Levels(rubric)).contains(_3_level));
+        return !(((low).isLessThanOrEqualTo(_3_level)) && ((_3_level).isLessThanOrEqualTo(high))) || ((SkopeWellFormed.__default.Levels(rubric)).contains(_3_level));
       }));
     };
     static Levels(rubric) {
@@ -2634,7 +2634,7 @@ let SkopWellFormed = (function() {
         let _3_low = (_source0).low;
         let _4_high = (_source0).high;
         let _5_rubric = (_source0).rubric;
-        return (((!(((s).dtor_els).is_Skip)) && (((_dafny.ZERO).isLessThanOrEqualTo(_3_low)) && ((_3_low).isLessThan(_4_high)))) && (((_4_high).minus(_3_low)).isLessThan(new BigNumber(10)))) && (SkopWellFormed.__default.RubricOk(_3_low, _4_high, _5_rubric));
+        return (((!(((s).dtor_els).is_Skip)) && (((_dafny.ZERO).isLessThanOrEqualTo(_3_low)) && ((_3_low).isLessThan(_4_high)))) && (((_4_high).minus(_3_low)).isLessThan(new BigNumber(10)))) && (SkopeWellFormed.__default.RubricOk(_3_low, _4_high, _5_rubric));
       }
     };
     static PartVars(ps) {
@@ -2653,30 +2653,30 @@ let SkopWellFormed = (function() {
       if ((s).is_Run) {
         return (s).dtor_binding;
       } else if (((s).is_Ask) && (((s).dtor_form).is_YesNo)) {
-        return SkopAst.Option.create_Some(((s).dtor_form).dtor_binding);
+        return SkopeAst.Option.create_Some(((s).dtor_form).dtor_binding);
       } else if (((s).is_Ask) && (((s).dtor_form).is_OneOf)) {
-        return SkopAst.Option.create_Some(((s).dtor_form).dtor_binding);
+        return SkopeAst.Option.create_Some(((s).dtor_form).dtor_binding);
       } else if (((s).is_Ask) && (((s).dtor_form).is_Score)) {
-        return SkopAst.Option.create_Some(((s).dtor_form).dtor_binding);
+        return SkopeAst.Option.create_Some(((s).dtor_form).dtor_binding);
       } else {
-        return SkopAst.Option.create_None();
+        return SkopeAst.Option.create_None();
       }
     };
     static BindingSet(s) {
-      if ((SkopWellFormed.__default.Binding(s)).is_Some) {
-        return _dafny.Set.fromElements((SkopWellFormed.__default.Binding(s)).dtor_value);
+      if ((SkopeWellFormed.__default.Binding(s)).is_Some) {
+        return _dafny.Set.fromElements((SkopeWellFormed.__default.Binding(s)).dtor_value);
       } else {
         return _dafny.Set.fromElements();
       }
     };
     static Rebound(p) {
-      let _0_stmts = SkopWellFormed.__default.Stmts(p);
+      let _0_stmts = SkopeWellFormed.__default.Stmts(p);
       return (function () {
         let _coll0 = new _dafny.Set();
         for (const _compr_0 of (_0_stmts).Elements) {
           let _1_s = _compr_0;
-          if (((_0_stmts).contains(_1_s)) && ((SkopWellFormed.__default.Binding(_1_s)).is_Some)) {
-            _coll0.add((SkopWellFormed.__default.Binding(_1_s)).dtor_value);
+          if (((_0_stmts).contains(_1_s)) && ((SkopeWellFormed.__default.Binding(_1_s)).is_Some)) {
+            _coll0.add((SkopeWellFormed.__default.Binding(_1_s)).dtor_value);
           }
         }
         return _coll0;
@@ -2692,13 +2692,13 @@ let SkopWellFormed = (function() {
       }());
     };
     static AllNames(p) {
-      return ((((p).dtor_params).Keys).Union(SkopWellFormed.__default.Builtins)).Union(SkopWellFormed.__default.Rebound(p));
+      return ((((p).dtor_params).Keys).Union(SkopeWellFormed.__default.Builtins)).Union(SkopeWellFormed.__default.Rebound(p));
     };
     static TextVars(s) {
       if ((s).is_Ask) {
-        return SkopWellFormed.__default.PartVars((s).dtor_question);
+        return SkopeWellFormed.__default.PartVars((s).dtor_question);
       } else if ((s).is_Page) {
-        return SkopWellFormed.__default.PartVars((s).dtor_text);
+        return SkopeWellFormed.__default.PartVars((s).dtor_text);
       } else {
         return _dafny.Set.fromElements();
       }
@@ -2717,13 +2717,13 @@ let SkopWellFormed = (function() {
       }
     };
     static EntryEnv(p) {
-      let _0_names = (((p).dtor_params).Keys).Union(SkopWellFormed.__default.Builtins);
-      return SkopWellFormed.Env.create_Env(_0_names, function () {
+      let _0_names = (((p).dtor_params).Keys).Union(SkopeWellFormed.__default.Builtins);
+      return SkopeWellFormed.Env.create_Env(_0_names, function () {
   let _coll0 = new _dafny.Map();
   for (const _compr_0 of (_0_names).Elements) {
     let _1_x = _compr_0;
     if ((_0_names).contains(_1_x)) {
-      _coll0.push([_1_x,(((((p).dtor_params).contains(_1_x)) ? (_dafny.Set.fromElements(SkopWellFormed.Kind.create_KParam())) : (_dafny.Set.fromElements()))).Union((((SkopWellFormed.__default.Builtins).contains(_1_x)) ? (_dafny.Set.fromElements(SkopWellFormed.Kind.create_KBuiltin())) : (_dafny.Set.fromElements())))]);
+      _coll0.push([_1_x,(((((p).dtor_params).contains(_1_x)) ? (_dafny.Set.fromElements(SkopeWellFormed.Kind.create_KParam())) : (_dafny.Set.fromElements()))).Union((((SkopeWellFormed.__default.Builtins).contains(_1_x)) ? (_dafny.Set.fromElements(SkopeWellFormed.Kind.create_KBuiltin())) : (_dafny.Set.fromElements())))]);
     }
   }
   return _coll0;
@@ -2731,32 +2731,32 @@ let SkopWellFormed = (function() {
     };
     static BindKinds(s) {
       if ((s).is_Run) {
-        return _dafny.Set.fromElements(SkopWellFormed.Kind.create_KRun());
+        return _dafny.Set.fromElements(SkopeWellFormed.Kind.create_KRun());
       } else if (((s).is_Ask) && (((s).dtor_form).is_YesNo)) {
-        return _dafny.Set.fromElements(SkopWellFormed.Kind.create_KYesNo());
+        return _dafny.Set.fromElements(SkopeWellFormed.Kind.create_KYesNo());
       } else if (((s).is_Ask) && (((s).dtor_form).is_OneOf)) {
-        return _dafny.Set.fromElements(SkopWellFormed.Kind.create_KValue((((s).dtor_form).dtor_list).dtor_id));
+        return _dafny.Set.fromElements(SkopeWellFormed.Kind.create_KValue((((s).dtor_form).dtor_list).dtor_id));
       } else if (((s).is_Ask) && (((s).dtor_form).is_Score)) {
-        return _dafny.Set.fromElements(SkopWellFormed.Kind.create_KScore());
+        return _dafny.Set.fromElements(SkopeWellFormed.Kind.create_KScore());
       } else {
         return _dafny.Set.fromElements();
       }
     };
     static ItemKind(i, list) {
       if ((i).is_Action) {
-        return SkopWellFormed.Kind.create_KAction(list);
+        return SkopeWellFormed.Kind.create_KAction(list);
       } else {
-        return SkopWellFormed.Kind.create_KValue(list);
+        return SkopeWellFormed.Kind.create_KValue(list);
       }
     };
     static ItemKinds(p, r) {
-      if (SkopWellFormed.__default.IsData(p, (r).dtor_id)) {
+      if (SkopeWellFormed.__default.IsData(p, (r).dtor_id)) {
         return function () {
           let _coll0 = new _dafny.Set();
-          for (const _compr_0 of ((SkopWellFormed.__default.DataList(p, (r).dtor_id)).dtor_items).Elements) {
+          for (const _compr_0 of ((SkopeWellFormed.__default.DataList(p, (r).dtor_id)).dtor_items).Elements) {
             let _0_i = _compr_0;
-            if (_dafny.Seq.contains((SkopWellFormed.__default.DataList(p, (r).dtor_id)).dtor_items, _0_i)) {
-              _coll0.add(SkopWellFormed.__default.ItemKind(_0_i, (r).dtor_id));
+            if (_dafny.Seq.contains((SkopeWellFormed.__default.DataList(p, (r).dtor_id)).dtor_items, _0_i)) {
+              _coll0.add(SkopeWellFormed.__default.ItemKind(_0_i, (r).dtor_id));
             }
           }
           return _coll0;
@@ -2766,19 +2766,19 @@ let SkopWellFormed = (function() {
       }
     };
     static Forget(e, xs) {
-      return SkopWellFormed.Env.create_Env(((e).dtor_bound).Difference(xs), (e).dtor_kinds);
+      return SkopeWellFormed.Env.create_Env(((e).dtor_bound).Difference(xs), (e).dtor_kinds);
     };
     static After(p, s, e) {
       if ((s).is_ForEach) {
-        return SkopWellFormed.__default.LoopExit(p, s, e);
-      } else if ((SkopWellFormed.__default.Binding(s)).is_None) {
+        return SkopeWellFormed.__default.LoopExit(p, s, e);
+      } else if ((SkopeWellFormed.__default.Binding(s)).is_None) {
         return e;
       } else {
-        let _0_x = (SkopWellFormed.__default.Binding(s)).dtor_value;
+        let _0_x = (SkopeWellFormed.__default.Binding(s)).dtor_value;
         if (((s).is_Run) && (((s).dtor_els).is_Skip)) {
-          return SkopWellFormed.Env.create_Env(((e).dtor_bound).Difference(_dafny.Set.fromElements(_0_x)), ((e).dtor_kinds).update(_0_x, _dafny.Set.fromElements(SkopWellFormed.Kind.create_KRun())));
+          return SkopeWellFormed.Env.create_Env(((e).dtor_bound).Difference(_dafny.Set.fromElements(_0_x)), ((e).dtor_kinds).update(_0_x, _dafny.Set.fromElements(SkopeWellFormed.Kind.create_KRun())));
         } else {
-          return SkopWellFormed.Env.create_Env(((e).dtor_bound).Union(_dafny.Set.fromElements(_0_x)), ((e).dtor_kinds).update(_0_x, SkopWellFormed.__default.BindKinds(s)));
+          return SkopeWellFormed.Env.create_Env(((e).dtor_bound).Union(_dafny.Set.fromElements(_0_x)), ((e).dtor_kinds).update(_0_x, SkopeWellFormed.__default.BindKinds(s)));
         }
       }
     };
@@ -2786,11 +2786,11 @@ let SkopWellFormed = (function() {
       if ((new BigNumber((body).length)).isEqualTo(_dafny.ZERO)) {
         return e;
       } else {
-        return SkopWellFormed.__default.Walk(p, (body).slice(_dafny.ONE), SkopWellFormed.__default.After(p, (body)[_dafny.ZERO], e));
+        return SkopeWellFormed.__default.Walk(p, (body).slice(_dafny.ONE), SkopeWellFormed.__default.After(p, (body)[_dafny.ZERO], e));
       }
     };
     static Unbinds(body) {
-      let _0_flat = SkopWellFormed.__default.Flat(body);
+      let _0_flat = SkopeWellFormed.__default.Flat(body);
       return (function () {
         let _coll0 = new _dafny.Set();
         for (const _compr_0 of (_0_flat).Elements) {
@@ -2812,15 +2812,15 @@ let SkopWellFormed = (function() {
       }());
     };
     static BodyKinds(p, body, x) {
-      let _0_flat = SkopWellFormed.__default.Flat(body);
+      let _0_flat = SkopeWellFormed.__default.Flat(body);
       return (function () {
         let _coll0 = new _dafny.Set();
         for (const _compr_0 of (_0_flat).Elements) {
           let _1_s = _compr_0;
-          if ((_dafny.Seq.contains(_0_flat, _1_s)) && (_dafny.areEqual(SkopWellFormed.__default.Binding(_1_s), SkopAst.Option.create_Some(x)))) {
-            for (const _compr_1 of (SkopWellFormed.__default.BindKinds(_1_s)).Elements) {
+          if ((_dafny.Seq.contains(_0_flat, _1_s)) && (_dafny.areEqual(SkopeWellFormed.__default.Binding(_1_s), SkopeAst.Option.create_Some(x)))) {
+            for (const _compr_1 of (SkopeWellFormed.__default.BindKinds(_1_s)).Elements) {
               let _2_k = _compr_1;
-              if ((SkopWellFormed.__default.BindKinds(_1_s)).contains(_2_k)) {
+              if ((SkopeWellFormed.__default.BindKinds(_1_s)).contains(_2_k)) {
                 _coll0.add(_2_k);
               }
             }
@@ -2832,9 +2832,9 @@ let SkopWellFormed = (function() {
         for (const _compr_2 of (_0_flat).Elements) {
           let _3_s = _compr_2;
           if (((_dafny.Seq.contains(_0_flat, _3_s)) && ((_3_s).is_ForEach)) && (_dafny.areEqual((_3_s).dtor_loopVar, x))) {
-            for (const _compr_3 of (SkopWellFormed.__default.ItemKinds(p, (_3_s).dtor_list)).Elements) {
+            for (const _compr_3 of (SkopeWellFormed.__default.ItemKinds(p, (_3_s).dtor_list)).Elements) {
               let _4_k = _compr_3;
-              if ((SkopWellFormed.__default.ItemKinds(p, (_3_s).dtor_list)).contains(_4_k)) {
+              if ((SkopeWellFormed.__default.ItemKinds(p, (_3_s).dtor_list)).contains(_4_k)) {
                 _coll1.add(_4_k);
               }
             }
@@ -2844,13 +2844,13 @@ let SkopWellFormed = (function() {
       }());
     };
     static BodyNames(body) {
-      let _0_flat = SkopWellFormed.__default.Flat(body);
+      let _0_flat = SkopeWellFormed.__default.Flat(body);
       return (function () {
         let _coll0 = new _dafny.Set();
         for (const _compr_0 of (_0_flat).Elements) {
           let _1_s = _compr_0;
-          if ((_dafny.Seq.contains(_0_flat, _1_s)) && ((SkopWellFormed.__default.Binding(_1_s)).is_Some)) {
-            _coll0.add((SkopWellFormed.__default.Binding(_1_s)).dtor_value);
+          if ((_dafny.Seq.contains(_0_flat, _1_s)) && ((SkopeWellFormed.__default.Binding(_1_s)).is_Some)) {
+            _coll0.add((SkopeWellFormed.__default.Binding(_1_s)).dtor_value);
           }
         }
         return _coll0;
@@ -2866,21 +2866,21 @@ let SkopWellFormed = (function() {
       }());
     };
     static LoopEntry(p, s, e) {
-      let _0_names = (((e).dtor_kinds).Keys).Union(SkopWellFormed.__default.BodyNames((s).dtor_body));
-      return SkopWellFormed.Env.create_Env((((e).dtor_bound).Difference(SkopWellFormed.__default.Unbinds((s).dtor_body))).Union(_dafny.Set.fromElements((s).dtor_loopVar)), (function () {
+      let _0_names = (((e).dtor_kinds).Keys).Union(SkopeWellFormed.__default.BodyNames((s).dtor_body));
+      return SkopeWellFormed.Env.create_Env((((e).dtor_bound).Difference(SkopeWellFormed.__default.Unbinds((s).dtor_body))).Union(_dafny.Set.fromElements((s).dtor_loopVar)), (function () {
   let _coll0 = new _dafny.Map();
   for (const _compr_0 of (_0_names).Elements) {
     let _1_x = _compr_0;
     if ((_0_names).contains(_1_x)) {
-      _coll0.push([_1_x,(SkopWellFormed.__default.KindsOf(e, _1_x)).Union(SkopWellFormed.__default.BodyKinds(p, (s).dtor_body, _1_x))]);
+      _coll0.push([_1_x,(SkopeWellFormed.__default.KindsOf(e, _1_x)).Union(SkopeWellFormed.__default.BodyKinds(p, (s).dtor_body, _1_x))]);
     }
   }
   return _coll0;
-}()).update((s).dtor_loopVar, SkopWellFormed.__default.ItemKinds(p, (s).dtor_list)));
+}()).update((s).dtor_loopVar, SkopeWellFormed.__default.ItemKinds(p, (s).dtor_list)));
     };
     static LoopExit(p, s, e) {
-      let _0_w = SkopWellFormed.__default.Walk(p, (s).dtor_body, SkopWellFormed.__default.LoopEntry(p, s, e));
-      return SkopWellFormed.Env.create_Env(((_0_w).dtor_bound).Difference(_dafny.Set.fromElements((s).dtor_loopVar)), ((_0_w).dtor_kinds).Subtract(_dafny.Set.fromElements((s).dtor_loopVar)));
+      let _0_w = SkopeWellFormed.__default.Walk(p, (s).dtor_body, SkopeWellFormed.__default.LoopEntry(p, s, e));
+      return SkopeWellFormed.Env.create_Env(((_0_w).dtor_bound).Difference(_dafny.Set.fromElements((s).dtor_loopVar)), ((_0_w).dtor_kinds).Subtract(_dafny.Set.fromElements((s).dtor_loopVar)));
     };
     static SafeChar(c) {
       return (((((new _dafny.CodePoint('a'.codePointAt(0))).isLessThanOrEqual(c)) && ((c).isLessThanOrEqual(new _dafny.CodePoint('z'.codePointAt(0))))) || (((new _dafny.CodePoint('A'.codePointAt(0))).isLessThanOrEqual(c)) && ((c).isLessThanOrEqual(new _dafny.CodePoint('Z'.codePointAt(0)))))) || (((new _dafny.CodePoint('0'.codePointAt(0))).isLessThanOrEqual(c)) && ((c).isLessThanOrEqual(new _dafny.CodePoint('9'.codePointAt(0)))))) || (_dafny.Seq.contains(_dafny.Seq.UnicodeFromString("._/:@%+=,-"), c));
@@ -2888,41 +2888,41 @@ let SkopWellFormed = (function() {
     static SafeValue(v) {
       return (((_dafny.ZERO).isLessThan(new BigNumber((v).length))) && (!_dafny.areEqual((v)[_dafny.ZERO], new _dafny.CodePoint('-'.codePointAt(0))))) && (_dafny.Quantifier((v).UniqueElements, true, function (_forall_var_0) {
         let _0_c = _forall_var_0;
-        return !(_dafny.Seq.contains(v, _0_c)) || (SkopWellFormed.__default.SafeChar(_0_c));
+        return !(_dafny.Seq.contains(v, _0_c)) || (SkopeWellFormed.__default.SafeChar(_0_c));
       }));
     };
     static SafeParam(v) {
       if ((v).is_PStr) {
-        return SkopWellFormed.__default.SafeValue((v).dtor_s);
+        return SkopeWellFormed.__default.SafeValue((v).dtor_s);
       } else {
         return (_dafny.ZERO).isLessThanOrEqualTo((v).dtor_i);
       }
     };
     static ValuesSafe(p, id) {
-      return !(SkopWellFormed.__default.IsData(p, id)) || (_dafny.Quantifier(((SkopWellFormed.__default.DataList(p, id)).dtor_items).UniqueElements, true, function (_forall_var_0) {
+      return !(SkopeWellFormed.__default.IsData(p, id)) || (_dafny.Quantifier(((SkopeWellFormed.__default.DataList(p, id)).dtor_items).UniqueElements, true, function (_forall_var_0) {
         let _0_i = _forall_var_0;
-        return !((_dafny.Seq.contains((SkopWellFormed.__default.DataList(p, id)).dtor_items, _0_i)) && ((_0_i).is_Value)) || (SkopWellFormed.__default.SafeValue((_0_i).dtor_value));
+        return !((_dafny.Seq.contains((SkopeWellFormed.__default.DataList(p, id)).dtor_items, _0_i)) && ((_0_i).is_Value)) || (SkopeWellFormed.__default.SafeValue((_0_i).dtor_value));
       }));
     };
     static CmdKindOk(p, x, k) {
-      return (((!((k).is_KRun)) && (!((k).is_KAction))) && (!(_dafny.areEqual(k, SkopWellFormed.Kind.create_KParam())) || ((((p).dtor_params).contains(x)) && (SkopWellFormed.__default.SafeParam(((p).dtor_params).get(x)))))) && (!((k).is_KValue) || (SkopWellFormed.__default.ValuesSafe(p, (k).dtor_list)));
+      return (((!((k).is_KRun)) && (!((k).is_KAction))) && (!(_dafny.areEqual(k, SkopeWellFormed.Kind.create_KParam())) || ((((p).dtor_params).contains(x)) && (SkopeWellFormed.__default.SafeParam(((p).dtor_params).get(x)))))) && (!((k).is_KValue) || (SkopeWellFormed.__default.ValuesSafe(p, (k).dtor_list)));
     };
     static CmdVarOk(p, e, x) {
-      return (((e).dtor_bound).contains(x)) && (_dafny.Quantifier((SkopWellFormed.__default.KindsOf(e, x)).Elements, true, function (_forall_var_0) {
+      return (((e).dtor_bound).contains(x)) && (_dafny.Quantifier((SkopeWellFormed.__default.KindsOf(e, x)).Elements, true, function (_forall_var_0) {
         let _0_k = _forall_var_0;
-        return !((SkopWellFormed.__default.KindsOf(e, x)).contains(_0_k)) || (SkopWellFormed.__default.CmdKindOk(p, x, _0_k));
+        return !((SkopeWellFormed.__default.KindsOf(e, x)).contains(_0_k)) || (SkopeWellFormed.__default.CmdKindOk(p, x, _0_k));
       }));
     };
     static ActionVars(p, list) {
-      if (SkopWellFormed.__default.IsData(p, list)) {
+      if (SkopeWellFormed.__default.IsData(p, list)) {
         return function () {
           let _coll0 = new _dafny.Set();
-          for (const _compr_0 of ((SkopWellFormed.__default.DataList(p, list)).dtor_items).Elements) {
+          for (const _compr_0 of ((SkopeWellFormed.__default.DataList(p, list)).dtor_items).Elements) {
             let _0_i = _compr_0;
-            if ((_dafny.Seq.contains((SkopWellFormed.__default.DataList(p, list)).dtor_items, _0_i)) && ((_0_i).is_Action)) {
-              for (const _compr_1 of (SkopWellFormed.__default.PartVars((_0_i).dtor_cmd)).Elements) {
+            if ((_dafny.Seq.contains((SkopeWellFormed.__default.DataList(p, list)).dtor_items, _0_i)) && ((_0_i).is_Action)) {
+              for (const _compr_1 of (SkopeWellFormed.__default.PartVars((_0_i).dtor_cmd)).Elements) {
                 let _1_y = _compr_1;
-                if ((SkopWellFormed.__default.PartVars((_0_i).dtor_cmd)).contains(_1_y)) {
+                if ((SkopeWellFormed.__default.PartVars((_0_i).dtor_cmd)).contains(_1_y)) {
                   _coll0.add(_1_y);
                 }
               }
@@ -2939,7 +2939,7 @@ let SkopWellFormed = (function() {
       {
         if (_source0.is_Run) {
           let _0_cmd = (_source0).cmd;
-          return SkopWellFormed.__default.PartVars(_0_cmd);
+          return SkopeWellFormed.__default.PartVars(_0_cmd);
         }
       }
       {
@@ -2947,7 +2947,7 @@ let SkopWellFormed = (function() {
           let action0 = (_source0).action;
           if (action0.is_DoCmd) {
             let _1_cmd = (action0).cmd;
-            return SkopWellFormed.__default.PartVars(_1_cmd);
+            return SkopeWellFormed.__default.PartVars(_1_cmd);
           }
         }
       }
@@ -2956,14 +2956,14 @@ let SkopWellFormed = (function() {
           let cond0 = (_source0).cond;
           if (cond0.is_Succeeds) {
             let _2_cmd = (cond0).cmd;
-            return SkopWellFormed.__default.PartVars(_2_cmd);
+            return SkopeWellFormed.__default.PartVars(_2_cmd);
           }
         }
       }
       {
         if (_source0.is_IfYesRun) {
           let _3_cmd = (_source0).cmd;
-          return SkopWellFormed.__default.PartVars(_3_cmd);
+          return SkopeWellFormed.__default.PartVars(_3_cmd);
         }
       }
       {
@@ -2971,7 +2971,7 @@ let SkopWellFormed = (function() {
           let action1 = (_source0).action;
           if (action1.is_DoCmd) {
             let _4_cmd = (action1).cmd;
-            return SkopWellFormed.__default.PartVars(_4_cmd);
+            return SkopeWellFormed.__default.PartVars(_4_cmd);
           }
         }
       }
@@ -2994,13 +2994,13 @@ let SkopWellFormed = (function() {
       }
     };
     static MayBind(s, x) {
-      return ((SkopWellFormed.__default.BindingSet(s)).contains(x)) || (((s).is_ForEach) && ((_dafny.areEqual(x, (s).dtor_loopVar)) || ((SkopWellFormed.__default.BodyNames((s).dtor_body)).contains(x))));
+      return ((SkopeWellFormed.__default.BindingSet(s)).contains(x)) || (((s).is_ForEach) && ((_dafny.areEqual(x, (s).dtor_loopVar)) || ((SkopeWellFormed.__default.BodyNames((s).dtor_body)).contains(x))));
     };
     static NextGov(s, gov) {
       if (((s).is_Ask) && (((s).dtor_form).is_YesNo)) {
-        return SkopAst.Option.create_Some(((s).dtor_form).dtor_binding);
-      } else if (((gov).is_Some) && (SkopWellFormed.__default.MayBind(s, (gov).dtor_value))) {
-        return SkopAst.Option.create_None();
+        return SkopeAst.Option.create_Some(((s).dtor_form).dtor_binding);
+      } else if (((gov).is_Some) && (SkopeWellFormed.__default.MayBind(s, (gov).dtor_value))) {
+        return SkopeAst.Option.create_None();
       } else {
         return gov;
       }
@@ -3014,17 +3014,17 @@ let SkopWellFormed = (function() {
     static Initial(p) {
       return function () {
         let _coll0 = new _dafny.Map();
-        for (const _compr_0 of ((((p).dtor_params).Keys).Union(SkopWellFormed.__default.Builtins)).Elements) {
+        for (const _compr_0 of ((((p).dtor_params).Keys).Union(SkopeWellFormed.__default.Builtins)).Elements) {
           let _0_x = _compr_0;
-          if (((((p).dtor_params).Keys).Union(SkopWellFormed.__default.Builtins)).contains(_0_x)) {
-            _coll0.push([_0_x,((((p).dtor_params).contains(_0_x)) ? (SkopWellFormed.Kind.create_KParam()) : (SkopWellFormed.Kind.create_KBuiltin()))]);
+          if (((((p).dtor_params).Keys).Union(SkopeWellFormed.__default.Builtins)).contains(_0_x)) {
+            _coll0.push([_0_x,((((p).dtor_params).contains(_0_x)) ? (SkopeWellFormed.Kind.create_KParam()) : (SkopeWellFormed.Kind.create_KBuiltin()))]);
           }
         }
         return _coll0;
       }();
     };
     static TransferEnv(s, c, lv, c_k) {
-      return ((((((c).Keys).Difference(lv)).Difference(SkopWellFormed.__default.BindingSet(s))).IsSubsetOf((c_k).Keys)) && (((c_k).Keys).IsSubsetOf(((c).Keys).Difference(lv)))) && (_dafny.Quantifier((c_k).Keys.Elements, true, function (_forall_var_0) {
+      return ((((((c).Keys).Difference(lv)).Difference(SkopeWellFormed.__default.BindingSet(s))).IsSubsetOf((c_k).Keys)) && (((c_k).Keys).IsSubsetOf(((c).Keys).Difference(lv)))) && (_dafny.Quantifier((c_k).Keys.Elements, true, function (_forall_var_0) {
         let _0_x = _forall_var_0;
         return !((c_k).contains(_0_x)) || (_dafny.areEqual((c_k).get(_0_x), (c).get(_0_x)));
       }));
@@ -3049,7 +3049,7 @@ let SkopWellFormed = (function() {
     get dtor_src() { return this.src; }
     toString() {
       if (this.$tag === 0) {
-        return "SkopWellFormed.Jump.Jump" + "(" + _dafny.toString(this.ref) + ", " + _dafny.toString(this.src) + ")";
+        return "SkopeWellFormed.Jump.Jump" + "(" + _dafny.toString(this.ref) + ", " + _dafny.toString(this.src) + ")";
       } else  {
         return "<unexpected>";
       }
@@ -3064,7 +3064,7 @@ let SkopWellFormed = (function() {
       }
     }
     static Default() {
-      return SkopWellFormed.Jump.create_Jump(SkopAst.SectionRef.Default(), _dafny.ZERO);
+      return SkopeWellFormed.Jump.create_Jump(SkopeAst.SectionRef.Default(), _dafny.ZERO);
     }
     static Rtd() {
       return class {
@@ -3119,19 +3119,19 @@ let SkopWellFormed = (function() {
     get dtor_list() { return this.list; }
     toString() {
       if (this.$tag === 0) {
-        return "SkopWellFormed.Kind.KParam";
+        return "SkopeWellFormed.Kind.KParam";
       } else if (this.$tag === 1) {
-        return "SkopWellFormed.Kind.KBuiltin";
+        return "SkopeWellFormed.Kind.KBuiltin";
       } else if (this.$tag === 2) {
-        return "SkopWellFormed.Kind.KRun";
+        return "SkopeWellFormed.Kind.KRun";
       } else if (this.$tag === 3) {
-        return "SkopWellFormed.Kind.KValue" + "(" + this.list.toVerbatimString(true) + ")";
+        return "SkopeWellFormed.Kind.KValue" + "(" + this.list.toVerbatimString(true) + ")";
       } else if (this.$tag === 4) {
-        return "SkopWellFormed.Kind.KAction" + "(" + this.list.toVerbatimString(true) + ")";
+        return "SkopeWellFormed.Kind.KAction" + "(" + this.list.toVerbatimString(true) + ")";
       } else if (this.$tag === 5) {
-        return "SkopWellFormed.Kind.KYesNo";
+        return "SkopeWellFormed.Kind.KYesNo";
       } else if (this.$tag === 6) {
-        return "SkopWellFormed.Kind.KScore";
+        return "SkopeWellFormed.Kind.KScore";
       } else  {
         return "<unexpected>";
       }
@@ -3158,7 +3158,7 @@ let SkopWellFormed = (function() {
       }
     }
     static Default() {
-      return SkopWellFormed.Kind.create_KParam();
+      return SkopeWellFormed.Kind.create_KParam();
     }
     static Rtd() {
       return class {
@@ -3184,7 +3184,7 @@ let SkopWellFormed = (function() {
     get dtor_kinds() { return this.kinds; }
     toString() {
       if (this.$tag === 0) {
-        return "SkopWellFormed.Env.Env" + "(" + _dafny.toString(this.bound) + ", " + _dafny.toString(this.kinds) + ")";
+        return "SkopeWellFormed.Env.Env" + "(" + _dafny.toString(this.bound) + ", " + _dafny.toString(this.kinds) + ")";
       } else  {
         return "<unexpected>";
       }
@@ -3199,7 +3199,7 @@ let SkopWellFormed = (function() {
       }
     }
     static Default() {
-      return SkopWellFormed.Env.create_Env(_dafny.Set.Empty, _dafny.Map.Empty);
+      return SkopeWellFormed.Env.create_Env(_dafny.Set.Empty, _dafny.Map.Empty);
     }
     static Rtd() {
       return class {
@@ -3210,13 +3210,13 @@ let SkopWellFormed = (function() {
     }
   }
   return $module;
-})(); // end of module SkopWellFormed
-let SkopStep = (function() {
+})(); // end of module SkopeWellFormed
+let SkopeStep = (function() {
   let $module = {};
 
   $module.__default = class __default {
     constructor () {
-      this._tname = "SkopStep._default";
+      this._tname = "SkopeStep._default";
     }
     _parentTraits() {
       return [];
@@ -3299,17 +3299,17 @@ let SkopStep = (function() {
     }
     toString() {
       if (this.$tag === 0) {
-        return "SkopStep.Origin.FromParam";
+        return "SkopeStep.Origin.FromParam";
       } else if (this.$tag === 1) {
-        return "SkopStep.Origin.FromBuiltin";
+        return "SkopeStep.Origin.FromBuiltin";
       } else if (this.$tag === 2) {
-        return "SkopStep.Origin.FromListItem";
+        return "SkopeStep.Origin.FromListItem";
       } else if (this.$tag === 3) {
-        return "SkopStep.Origin.FromYesNo";
+        return "SkopeStep.Origin.FromYesNo";
       } else if (this.$tag === 4) {
-        return "SkopStep.Origin.FromScore";
+        return "SkopeStep.Origin.FromScore";
       } else if (this.$tag === 5) {
-        return "SkopStep.Origin.FromRunOutput";
+        return "SkopeStep.Origin.FromRunOutput";
       } else  {
         return "<unexpected>";
       }
@@ -3334,7 +3334,7 @@ let SkopStep = (function() {
       }
     }
     static Default() {
-      return SkopStep.Origin.create_FromParam();
+      return SkopeStep.Origin.create_FromParam();
     }
     static Rtd() {
       return class {
@@ -3365,9 +3365,9 @@ let SkopStep = (function() {
     get dtor_i() { return this.i; }
     toString() {
       if (this.$tag === 0) {
-        return "SkopStep.Val.Str" + "(" + this.s.toVerbatimString(true) + ")";
+        return "SkopeStep.Val.Str" + "(" + this.s.toVerbatimString(true) + ")";
       } else if (this.$tag === 1) {
-        return "SkopStep.Val.Int" + "(" + _dafny.toString(this.i) + ")";
+        return "SkopeStep.Val.Int" + "(" + _dafny.toString(this.i) + ")";
       } else  {
         return "<unexpected>";
       }
@@ -3384,7 +3384,7 @@ let SkopStep = (function() {
       }
     }
     static Default() {
-      return SkopStep.Val.create_Str(_dafny.Seq.UnicodeFromString(""));
+      return SkopeStep.Val.create_Str(_dafny.Seq.UnicodeFromString(""));
     }
     static Rtd() {
       return class {
@@ -3410,7 +3410,7 @@ let SkopStep = (function() {
     get dtor_origin() { return this.origin; }
     toString() {
       if (this.$tag === 0) {
-        return "SkopStep.Bound.Bound" + "(" + _dafny.toString(this.value) + ", " + _dafny.toString(this.origin) + ")";
+        return "SkopeStep.Bound.Bound" + "(" + _dafny.toString(this.value) + ", " + _dafny.toString(this.origin) + ")";
       } else  {
         return "<unexpected>";
       }
@@ -3425,7 +3425,7 @@ let SkopStep = (function() {
       }
     }
     static Default() {
-      return SkopStep.Bound.create_Bound(SkopStep.Val.Default(), SkopStep.Origin.Default());
+      return SkopeStep.Bound.create_Bound(SkopeStep.Val.Default(), SkopeStep.Origin.Default());
     }
     static Rtd() {
       return class {
@@ -3457,9 +3457,9 @@ let SkopStep = (function() {
     get dtor_origin() { return this.origin; }
     toString() {
       if (this.$tag === 0) {
-        return "SkopStep.Piece.AuthorLit" + "(" + this.s.toVerbatimString(true) + ")";
+        return "SkopeStep.Piece.AuthorLit" + "(" + this.s.toVerbatimString(true) + ")";
       } else if (this.$tag === 1) {
-        return "SkopStep.Piece.Trusted" + "(" + this.s.toVerbatimString(true) + ", " + _dafny.toString(this.origin) + ")";
+        return "SkopeStep.Piece.Trusted" + "(" + this.s.toVerbatimString(true) + ", " + _dafny.toString(this.origin) + ")";
       } else  {
         return "<unexpected>";
       }
@@ -3476,7 +3476,7 @@ let SkopStep = (function() {
       }
     }
     static Default() {
-      return SkopStep.Piece.create_AuthorLit(_dafny.Seq.UnicodeFromString(""));
+      return SkopeStep.Piece.create_AuthorLit(_dafny.Seq.UnicodeFromString(""));
     }
     static Rtd() {
       return class {
@@ -3516,11 +3516,11 @@ let SkopStep = (function() {
     }
     toString() {
       if (this.$tag === 0) {
-        return "SkopStep.ExecKind.RunExec";
+        return "SkopeStep.ExecKind.RunExec";
       } else if (this.$tag === 1) {
-        return "SkopStep.ExecKind.DoExec";
+        return "SkopeStep.ExecKind.DoExec";
       } else if (this.$tag === 2) {
-        return "SkopStep.ExecKind.CheckExec";
+        return "SkopeStep.ExecKind.CheckExec";
       } else  {
         return "<unexpected>";
       }
@@ -3539,7 +3539,7 @@ let SkopStep = (function() {
       }
     }
     static Default() {
-      return SkopStep.ExecKind.create_RunExec();
+      return SkopeStep.ExecKind.create_RunExec();
     }
     static Rtd() {
       return class {
@@ -3579,11 +3579,11 @@ let SkopStep = (function() {
     }
     toString() {
       if (this.$tag === 0) {
-        return "SkopStep.AskKind.Choice";
+        return "SkopeStep.AskKind.Choice";
       } else if (this.$tag === 1) {
-        return "SkopStep.AskKind.YesNoKind";
+        return "SkopeStep.AskKind.YesNoKind";
       } else if (this.$tag === 2) {
-        return "SkopStep.AskKind.ScoreKind";
+        return "SkopeStep.AskKind.ScoreKind";
       } else  {
         return "<unexpected>";
       }
@@ -3602,7 +3602,7 @@ let SkopStep = (function() {
       }
     }
     static Default() {
-      return SkopStep.AskKind.create_Choice();
+      return SkopeStep.AskKind.create_Choice();
     }
     static Rtd() {
       return class {
@@ -3630,7 +3630,7 @@ let SkopStep = (function() {
     get dtor_description() { return this.description; }
     toString() {
       if (this.$tag === 0) {
-        return "SkopStep.AskOpt.AskOpt" + "(" + this.id.toVerbatimString(true) + ", " + this.text.toVerbatimString(true) + ", " + _dafny.toString(this.description) + ")";
+        return "SkopeStep.AskOpt.AskOpt" + "(" + this.id.toVerbatimString(true) + ", " + this.text.toVerbatimString(true) + ", " + _dafny.toString(this.description) + ")";
       } else  {
         return "<unexpected>";
       }
@@ -3645,7 +3645,7 @@ let SkopStep = (function() {
       }
     }
     static Default() {
-      return SkopStep.AskOpt.create_AskOpt(_dafny.Seq.UnicodeFromString(""), _dafny.Seq.UnicodeFromString(""), SkopAst.Option.Default());
+      return SkopeStep.AskOpt.create_AskOpt(_dafny.Seq.UnicodeFromString(""), _dafny.Seq.UnicodeFromString(""), SkopeAst.Option.Default());
     }
     static Rtd() {
       return class {
@@ -3679,7 +3679,7 @@ let SkopStep = (function() {
     get dtor_timeoutMs() { return this.timeoutMs; }
     toString() {
       if (this.$tag === 0) {
-        return "SkopStep.AskRequest.AskRequest" + "(" + _dafny.toString(this.kind) + ", " + this.question.toVerbatimString(true) + ", " + _dafny.toString(this.guidance) + ", " + _dafny.toString(this.options) + ", " + _dafny.toString(this.context) + ", " + _dafny.toString(this.timeoutMs) + ")";
+        return "SkopeStep.AskRequest.AskRequest" + "(" + _dafny.toString(this.kind) + ", " + this.question.toVerbatimString(true) + ", " + _dafny.toString(this.guidance) + ", " + _dafny.toString(this.options) + ", " + _dafny.toString(this.context) + ", " + _dafny.toString(this.timeoutMs) + ")";
       } else  {
         return "<unexpected>";
       }
@@ -3694,7 +3694,7 @@ let SkopStep = (function() {
       }
     }
     static Default() {
-      return SkopStep.AskRequest.create_AskRequest(SkopStep.AskKind.Default(), _dafny.Seq.UnicodeFromString(""), SkopAst.Option.Default(), _dafny.Seq.of(), _dafny.Map.Empty, _dafny.ZERO);
+      return SkopeStep.AskRequest.create_AskRequest(SkopeStep.AskKind.Default(), _dafny.Seq.UnicodeFromString(""), SkopeAst.Option.Default(), _dafny.Seq.of(), _dafny.Map.Empty, _dafny.ZERO);
     }
     static Rtd() {
       return class {
@@ -3746,15 +3746,15 @@ let SkopStep = (function() {
     }
     toString() {
       if (this.$tag === 0) {
-        return "SkopStep.Reason.Explicit";
+        return "SkopeStep.Reason.Explicit";
       } else if (this.$tag === 1) {
-        return "SkopStep.Reason.GateFailed";
+        return "SkopeStep.Reason.GateFailed";
       } else if (this.$tag === 2) {
-        return "SkopStep.Reason.CommandFailed";
+        return "SkopeStep.Reason.CommandFailed";
       } else if (this.$tag === 3) {
-        return "SkopStep.Reason.AskUnavailable";
+        return "SkopeStep.Reason.AskUnavailable";
       } else if (this.$tag === 4) {
-        return "SkopStep.Reason.Deadline";
+        return "SkopeStep.Reason.Deadline";
       } else  {
         return "<unexpected>";
       }
@@ -3777,7 +3777,7 @@ let SkopStep = (function() {
       }
     }
     static Default() {
-      return SkopStep.Reason.create_Explicit();
+      return SkopeStep.Reason.create_Explicit();
     }
     static Rtd() {
       return class {
@@ -3813,11 +3813,11 @@ let SkopStep = (function() {
     get dtor_detail() { return this.detail; }
     toString() {
       if (this.$tag === 0) {
-        return "SkopStep.Outcome.Stopped";
+        return "SkopeStep.Outcome.Stopped";
       } else if (this.$tag === 1) {
-        return "SkopStep.Outcome.Paged";
+        return "SkopeStep.Outcome.Paged";
       } else if (this.$tag === 2) {
-        return "SkopStep.Outcome.Handoff" + "(" + _dafny.toString(this.reason) + ", " + _dafny.toString(this.detail) + ")";
+        return "SkopeStep.Outcome.Handoff" + "(" + _dafny.toString(this.reason) + ", " + _dafny.toString(this.detail) + ")";
       } else  {
         return "<unexpected>";
       }
@@ -3836,7 +3836,7 @@ let SkopStep = (function() {
       }
     }
     static Default() {
-      return SkopStep.Outcome.create_Stopped();
+      return SkopeStep.Outcome.create_Stopped();
     }
     static Rtd() {
       return class {
@@ -3896,15 +3896,15 @@ let SkopStep = (function() {
     get dtor_outcome() { return this.outcome; }
     toString() {
       if (this.$tag === 0) {
-        return "SkopStep.Next.Exec" + "(" + this.cmd.toVerbatimString(true) + ", " + _dafny.toString(this.kind) + ", " + _dafny.toString(this.timeoutMs) + ", " + _dafny.toString(this.src) + ")";
+        return "SkopeStep.Next.Exec" + "(" + this.cmd.toVerbatimString(true) + ", " + _dafny.toString(this.kind) + ", " + _dafny.toString(this.timeoutMs) + ", " + _dafny.toString(this.src) + ")";
       } else if (this.$tag === 1) {
-        return "SkopStep.Next.AskNext" + "(" + _dafny.toString(this.request) + ", " + _dafny.toString(this.src) + ")";
+        return "SkopeStep.Next.AskNext" + "(" + _dafny.toString(this.request) + ", " + _dafny.toString(this.src) + ")";
       } else if (this.$tag === 2) {
-        return "SkopStep.Next.PageNext" + "(" + this.text.toVerbatimString(true) + ", " + _dafny.toString(this.src) + ")";
+        return "SkopeStep.Next.PageNext" + "(" + this.text.toVerbatimString(true) + ", " + _dafny.toString(this.src) + ")";
       } else if (this.$tag === 3) {
-        return "SkopStep.Next.Choose" + "(" + _dafny.toString(this.n) + ")";
+        return "SkopeStep.Next.Choose" + "(" + _dafny.toString(this.n) + ")";
       } else if (this.$tag === 4) {
-        return "SkopStep.Next.Done" + "(" + _dafny.toString(this.outcome) + ")";
+        return "SkopeStep.Next.Done" + "(" + _dafny.toString(this.outcome) + ")";
       } else  {
         return "<unexpected>";
       }
@@ -3927,7 +3927,7 @@ let SkopStep = (function() {
       }
     }
     static Default() {
-      return SkopStep.Next.create_Exec(_dafny.Seq.UnicodeFromString(""), SkopStep.ExecKind.Default(), _dafny.ZERO, _dafny.ZERO);
+      return SkopeStep.Next.create_Exec(_dafny.Seq.UnicodeFromString(""), SkopeStep.ExecKind.Default(), _dafny.ZERO, _dafny.ZERO);
     }
     static Rtd() {
       return class {
@@ -3961,9 +3961,9 @@ let SkopStep = (function() {
     }
     toString() {
       if (this.$tag === 0) {
-        return "SkopStep.AskFailure.Unavailable";
+        return "SkopeStep.AskFailure.Unavailable";
       } else if (this.$tag === 1) {
-        return "SkopStep.AskFailure.RequestTooLarge";
+        return "SkopeStep.AskFailure.RequestTooLarge";
       } else  {
         return "<unexpected>";
       }
@@ -3980,7 +3980,7 @@ let SkopStep = (function() {
       }
     }
     static Default() {
-      return SkopStep.AskFailure.create_Unavailable();
+      return SkopeStep.AskFailure.create_Unavailable();
     }
     static Rtd() {
       return class {
@@ -4057,19 +4057,19 @@ let SkopStep = (function() {
     get dtor_i() { return this.i; }
     toString() {
       if (this.$tag === 0) {
-        return "SkopStep.Response.NoResponse";
+        return "SkopeStep.Response.NoResponse";
       } else if (this.$tag === 1) {
-        return "SkopStep.Response.ExecResult" + "(" + _dafny.toString(this.exit) + ", " + this.stdout.toVerbatimString(true) + ", " + this.stderrTail.toVerbatimString(true) + ", " + _dafny.toString(this.timedOut) + ")";
+        return "SkopeStep.Response.ExecResult" + "(" + _dafny.toString(this.exit) + ", " + this.stdout.toVerbatimString(true) + ", " + this.stderrTail.toVerbatimString(true) + ", " + _dafny.toString(this.timedOut) + ")";
       } else if (this.$tag === 2) {
-        return "SkopStep.Response.AskAnswer" + "(" + _dafny.toString(this.probs) + ", " + _dafny.toString(this.unassigned) + ", " + this.backend.toVerbatimString(true) + ", " + this.model.toVerbatimString(true) + ", " + _dafny.toString(this.ms) + ")";
+        return "SkopeStep.Response.AskAnswer" + "(" + _dafny.toString(this.probs) + ", " + _dafny.toString(this.unassigned) + ", " + this.backend.toVerbatimString(true) + ", " + this.model.toVerbatimString(true) + ", " + _dafny.toString(this.ms) + ")";
       } else if (this.$tag === 3) {
-        return "SkopStep.Response.AskFailed" + "(" + _dafny.toString(this.error) + ", " + this.backend.toVerbatimString(true) + ")";
+        return "SkopeStep.Response.AskFailed" + "(" + _dafny.toString(this.error) + ", " + this.backend.toVerbatimString(true) + ")";
       } else if (this.$tag === 4) {
-        return "SkopStep.Response.PageResult" + "(" + _dafny.toString(this.ok) + ")";
+        return "SkopeStep.Response.PageResult" + "(" + _dafny.toString(this.ok) + ")";
       } else if (this.$tag === 5) {
-        return "SkopStep.Response.Picked" + "(" + _dafny.toString(this.i) + ")";
+        return "SkopeStep.Response.Picked" + "(" + _dafny.toString(this.i) + ")";
       } else if (this.$tag === 6) {
-        return "SkopStep.Response.DeadlineExceeded";
+        return "SkopeStep.Response.DeadlineExceeded";
       } else  {
         return "<unexpected>";
       }
@@ -4096,7 +4096,7 @@ let SkopStep = (function() {
       }
     }
     static Default() {
-      return SkopStep.Response.create_NoResponse();
+      return SkopeStep.Response.create_NoResponse();
     }
     static Rtd() {
       return class {
@@ -4122,7 +4122,7 @@ let SkopStep = (function() {
     get dtor_line() { return this.line; }
     toString() {
       if (this.$tag === 0) {
-        return "SkopStep.Where.Where" + "(" + this.section.toVerbatimString(true) + ", " + _dafny.toString(this.line) + ")";
+        return "SkopeStep.Where.Where" + "(" + this.section.toVerbatimString(true) + ", " + _dafny.toString(this.line) + ")";
       } else  {
         return "<unexpected>";
       }
@@ -4137,7 +4137,7 @@ let SkopStep = (function() {
       }
     }
     static Default() {
-      return SkopStep.Where.create_Where(_dafny.Seq.UnicodeFromString(""), _dafny.ZERO);
+      return SkopeStep.Where.create_Where(_dafny.Seq.UnicodeFromString(""), _dafny.ZERO);
     }
     static Rtd() {
       return class {
@@ -4168,9 +4168,9 @@ let SkopStep = (function() {
     get dtor_level() { return this.level; }
     toString() {
       if (this.$tag === 0) {
-        return "SkopStep.Chosen.ChosenId" + "(" + this.id.toVerbatimString(true) + ")";
+        return "SkopeStep.Chosen.ChosenId" + "(" + this.id.toVerbatimString(true) + ")";
       } else if (this.$tag === 1) {
-        return "SkopStep.Chosen.ChosenLevel" + "(" + _dafny.toString(this.level) + ")";
+        return "SkopeStep.Chosen.ChosenLevel" + "(" + _dafny.toString(this.level) + ")";
       } else  {
         return "<unexpected>";
       }
@@ -4187,7 +4187,7 @@ let SkopStep = (function() {
       }
     }
     static Default() {
-      return SkopStep.Chosen.create_ChosenId(_dafny.Seq.UnicodeFromString(""));
+      return SkopeStep.Chosen.create_ChosenId(_dafny.Seq.UnicodeFromString(""));
     }
     static Rtd() {
       return class {
@@ -4321,27 +4321,27 @@ let SkopStep = (function() {
     get dtor_dry() { return this.dry; }
     toString() {
       if (this.$tag === 0) {
-        return "SkopStep.EventBody.RunEv" + "(" + this.cmd.toVerbatimString(true) + ", " + _dafny.toString(this.exit) + ", " + _dafny.toString(this.timedOut) + ", " + _dafny.toString(this.afterWouldDo) + ")";
+        return "SkopeStep.EventBody.RunEv" + "(" + this.cmd.toVerbatimString(true) + ", " + _dafny.toString(this.exit) + ", " + _dafny.toString(this.timedOut) + ", " + _dafny.toString(this.afterWouldDo) + ")";
       } else if (this.$tag === 1) {
-        return "SkopStep.EventBody.CheckCmdEv" + "(" + this.cmd.toVerbatimString(true) + ", " + _dafny.toString(this.exit) + ", " + _dafny.toString(this.timedOut) + ", " + _dafny.toString(this.afterWouldDo) + ")";
+        return "SkopeStep.EventBody.CheckCmdEv" + "(" + this.cmd.toVerbatimString(true) + ", " + _dafny.toString(this.exit) + ", " + _dafny.toString(this.timedOut) + ", " + _dafny.toString(this.afterWouldDo) + ")";
       } else if (this.$tag === 2) {
-        return "SkopStep.EventBody.CheckEv" + "(" + this.expr.toVerbatimString(true) + ", " + _dafny.toString(this.left) + ", " + _dafny.toString(this.right) + ", " + _dafny.toString(this.result) + ", " + _dafny.toString(this.afterWouldDo) + ")";
+        return "SkopeStep.EventBody.CheckEv" + "(" + this.expr.toVerbatimString(true) + ", " + _dafny.toString(this.left) + ", " + _dafny.toString(this.right) + ", " + _dafny.toString(this.result) + ", " + _dafny.toString(this.afterWouldDo) + ")";
       } else if (this.$tag === 3) {
-        return "SkopStep.EventBody.AskEv" + "(" + this.question.toVerbatimString(true) + ", " + _dafny.toString(this.kind) + ", " + _dafny.toString(this.probs) + ", " + _dafny.toString(this.chosen) + ", " + _dafny.toString(this.confidence) + ", " + _dafny.toString(this.sure) + ", " + _dafny.toString(this.passed) + ", " + _dafny.toString(this.range) + ", " + _dafny.toString(this.detail) + ", " + _dafny.toString(this.afterWouldDo) + ")";
+        return "SkopeStep.EventBody.AskEv" + "(" + this.question.toVerbatimString(true) + ", " + _dafny.toString(this.kind) + ", " + _dafny.toString(this.probs) + ", " + _dafny.toString(this.chosen) + ", " + _dafny.toString(this.confidence) + ", " + _dafny.toString(this.sure) + ", " + _dafny.toString(this.passed) + ", " + _dafny.toString(this.range) + ", " + _dafny.toString(this.detail) + ", " + _dafny.toString(this.afterWouldDo) + ")";
       } else if (this.$tag === 4) {
-        return "SkopStep.EventBody.EffectStartEv" + "(" + this.cmd.toVerbatimString(true) + ")";
+        return "SkopeStep.EventBody.EffectStartEv" + "(" + this.cmd.toVerbatimString(true) + ")";
       } else if (this.$tag === 5) {
-        return "SkopStep.EventBody.EffectEndEv" + "(" + this.cmd.toVerbatimString(true) + ", " + _dafny.toString(this.exit) + ", " + _dafny.toString(this.timedOut) + ")";
+        return "SkopeStep.EventBody.EffectEndEv" + "(" + this.cmd.toVerbatimString(true) + ", " + _dafny.toString(this.exit) + ", " + _dafny.toString(this.timedOut) + ")";
       } else if (this.$tag === 6) {
-        return "SkopStep.EventBody.WouldDoEv" + "(" + this.cmd.toVerbatimString(true) + ")";
+        return "SkopeStep.EventBody.WouldDoEv" + "(" + this.cmd.toVerbatimString(true) + ")";
       } else if (this.$tag === 7) {
-        return "SkopStep.EventBody.PageEv" + "(" + this.text.toVerbatimString(true) + ", " + _dafny.toString(this.ok) + ")";
+        return "SkopeStep.EventBody.PageEv" + "(" + this.text.toVerbatimString(true) + ", " + _dafny.toString(this.ok) + ")";
       } else if (this.$tag === 8) {
-        return "SkopStep.EventBody.WouldPageEv" + "(" + this.text.toVerbatimString(true) + ")";
+        return "SkopeStep.EventBody.WouldPageEv" + "(" + this.text.toVerbatimString(true) + ")";
       } else if (this.$tag === 9) {
-        return "SkopStep.EventBody.TransferEv" + "(" + this.from.toVerbatimString(true) + ", " + this.to.toVerbatimString(true) + ")";
+        return "SkopeStep.EventBody.TransferEv" + "(" + this.from.toVerbatimString(true) + ", " + this.to.toVerbatimString(true) + ")";
       } else if (this.$tag === 10) {
-        return "SkopStep.EventBody.OutcomeEv" + "(" + _dafny.toString(this.outcome) + ", " + _dafny.toString(this.askCalls) + ", " + _dafny.toString(this.effects) + ", " + _dafny.toString(this.dry) + ")";
+        return "SkopeStep.EventBody.OutcomeEv" + "(" + _dafny.toString(this.outcome) + ", " + _dafny.toString(this.askCalls) + ", " + _dafny.toString(this.effects) + ", " + _dafny.toString(this.dry) + ")";
       } else  {
         return "<unexpected>";
       }
@@ -4376,7 +4376,7 @@ let SkopStep = (function() {
       }
     }
     static Default() {
-      return SkopStep.EventBody.create_RunEv(_dafny.Seq.UnicodeFromString(""), SkopAst.Option.Default(), false, false);
+      return SkopeStep.EventBody.create_RunEv(_dafny.Seq.UnicodeFromString(""), SkopeAst.Option.Default(), false, false);
     }
     static Rtd() {
       return class {
@@ -4402,7 +4402,7 @@ let SkopStep = (function() {
     get dtor_body() { return this.body; }
     toString() {
       if (this.$tag === 0) {
-        return "SkopStep.CoreEvent.CoreEvent" + "(" + _dafny.toString(this.at) + ", " + _dafny.toString(this.body) + ")";
+        return "SkopeStep.CoreEvent.CoreEvent" + "(" + _dafny.toString(this.at) + ", " + _dafny.toString(this.body) + ")";
       } else  {
         return "<unexpected>";
       }
@@ -4417,7 +4417,7 @@ let SkopStep = (function() {
       }
     }
     static Default() {
-      return SkopStep.CoreEvent.create_CoreEvent(SkopAst.Option.Default(), SkopStep.EventBody.Default());
+      return SkopeStep.CoreEvent.create_CoreEvent(SkopeAst.Option.Default(), SkopeStep.EventBody.Default());
     }
     static Rtd() {
       return class {
@@ -4451,9 +4451,9 @@ let SkopStep = (function() {
     }
     toString() {
       if (this.$tag === 0) {
-        return "SkopStep.Mode.Concrete";
+        return "SkopeStep.Mode.Concrete";
       } else if (this.$tag === 1) {
-        return "SkopStep.Mode.Explore";
+        return "SkopeStep.Mode.Explore";
       } else  {
         return "<unexpected>";
       }
@@ -4470,7 +4470,7 @@ let SkopStep = (function() {
       }
     }
     static Default() {
-      return SkopStep.Mode.create_Concrete();
+      return SkopeStep.Mode.create_Concrete();
     }
     static Rtd() {
       return class {
@@ -4500,7 +4500,7 @@ let SkopStep = (function() {
     get dtor_mode() { return this.mode; }
     toString() {
       if (this.$tag === 0) {
-        return "SkopStep.RunConfig.RunConfig" + "(" + _dafny.toString(this.params) + ", " + _dafny.toString(this.builtins) + ", " + _dafny.toString(this.dry) + ", " + _dafny.toString(this.mode) + ")";
+        return "SkopeStep.RunConfig.RunConfig" + "(" + _dafny.toString(this.params) + ", " + _dafny.toString(this.builtins) + ", " + _dafny.toString(this.dry) + ", " + _dafny.toString(this.mode) + ")";
       } else  {
         return "<unexpected>";
       }
@@ -4515,7 +4515,7 @@ let SkopStep = (function() {
       }
     }
     static Default() {
-      return SkopStep.RunConfig.create_RunConfig(_dafny.Map.Empty, _dafny.Map.Empty, false, SkopStep.Mode.Default());
+      return SkopeStep.RunConfig.create_RunConfig(_dafny.Map.Empty, _dafny.Map.Empty, false, SkopeStep.Mode.Default());
     }
     static Rtd() {
       return class {
@@ -4541,7 +4541,7 @@ let SkopStep = (function() {
     get dtor_src() { return this.src; }
     toString() {
       if (this.$tag === 0) {
-        return "SkopStep.LintError.LintError" + "(" + this.code.toVerbatimString(true) + ", " + _dafny.toString(this.src) + ")";
+        return "SkopeStep.LintError.LintError" + "(" + this.code.toVerbatimString(true) + ", " + _dafny.toString(this.src) + ")";
       } else  {
         return "<unexpected>";
       }
@@ -4556,7 +4556,7 @@ let SkopStep = (function() {
       }
     }
     static Default() {
-      return SkopStep.LintError.create_LintError(_dafny.Seq.UnicodeFromString(""), _dafny.ZERO);
+      return SkopeStep.LintError.create_LintError(_dafny.Seq.UnicodeFromString(""), _dafny.ZERO);
     }
     static Rtd() {
       return class {
@@ -4567,19 +4567,19 @@ let SkopStep = (function() {
     }
   }
   return $module;
-})(); // end of module SkopStep
-let SkopCheck = (function() {
+})(); // end of module SkopeStep
+let SkopeCheck = (function() {
   let $module = {};
 
   $module.__default = class __default {
     constructor () {
-      this._tname = "SkopCheck._default";
+      this._tname = "SkopeCheck._default";
     }
     _parentTraits() {
       return [];
     }
     static Err(code, src) {
-      return SkopStep.LintError.create_LintError(code, src);
+      return SkopeStep.LintError.create_LintError(code, src);
     };
     static UnionSeq(xs, f) {
       let _0___accumulator = _dafny.Set.fromElements();
@@ -4597,7 +4597,7 @@ let SkopCheck = (function() {
       }
     };
     static OverSections(p, f) {
-      let _0_ids = SkopCheck.__default.Ids(p);
+      let _0_ids = SkopeCheck.__default.Ids(p);
       let _1_m = function () {
         let _coll0 = new _dafny.Map();
         for (const _compr_0 of (_0_ids).Elements) {
@@ -4626,70 +4626,70 @@ let SkopCheck = (function() {
     };
     static FlatOf(p, f) {
       return ((_0_p, _1_f) => function (_2_id) {
-        return ((SkopWellFormed.__default.IsInstr(_0_p, _2_id)) ? (SkopCheck.__default.UnionSeq(SkopWellFormed.__default.Flat(SkopWellFormed.__default.Body(_0_p, _2_id)), _1_f)) : (_dafny.Set.fromElements()));
+        return ((SkopeWellFormed.__default.IsInstr(_0_p, _2_id)) ? (SkopeCheck.__default.UnionSeq(SkopeWellFormed.__default.Flat(SkopeWellFormed.__default.Body(_0_p, _2_id)), _1_f)) : (_dafny.Set.fromElements()));
       })(p, f);
     };
     static OverStmts(p, f) {
-      return SkopCheck.__default.OverSections(p, SkopCheck.__default.FlatOf(p, f));
+      return SkopeCheck.__default.OverSections(p, SkopeCheck.__default.FlatOf(p, f));
     };
     static Lint(p) {
-      return SkopCheck.__default.Sorted(SkopCheck.__default.Errors(p, SkopCheck.__default.Analyse(p)));
+      return SkopeCheck.__default.Sorted(SkopeCheck.__default.Errors(p, SkopeCheck.__default.Analyse(p)));
     };
     static Warnings(p) {
-      return SkopCheck.__default.Sorted(SkopCheck.__default.WarningsWith(p, SkopCheck.__default.Analyse(p)));
+      return SkopeCheck.__default.Sorted(SkopeCheck.__default.WarningsWith(p, SkopeCheck.__default.Analyse(p)));
     };
     static LintAll(p) {
-      let _0_f = SkopCheck.__default.Analyse(p);
-      return _dafny.Tuple.of(SkopCheck.__default.Sorted(SkopCheck.__default.Errors(p, _0_f)), SkopCheck.__default.Sorted(SkopCheck.__default.WarningsWith(p, _0_f)));
+      let _0_f = SkopeCheck.__default.Analyse(p);
+      return _dafny.Tuple.of(SkopeCheck.__default.Sorted(SkopeCheck.__default.Errors(p, _0_f)), SkopeCheck.__default.Sorted(SkopeCheck.__default.WarningsWith(p, _0_f)));
     };
     static Analyse(p) {
-      let _0_reach = SkopCheck.__default.Reaches(p);
-      return SkopCheck.Facts.create_Facts(_0_reach, SkopCheck.__default.InEnvs(p, _0_reach));
+      let _0_reach = SkopeCheck.__default.Reaches(p);
+      return SkopeCheck.Facts.create_Facts(_0_reach, SkopeCheck.__default.InEnvs(p, _0_reach));
     };
     static Errors(p, f) {
-      let _0_cycles = SkopCheck.__default.CycleErrs(p, (f).dtor_reach);
-      let _1_actions = SkopCheck.__default.ActionErrs(p);
-      return (((((((((SkopCheck.__default.EntryErrs(p)).Union(SkopCheck.__default.RefErrs(p))).Union(SkopCheck.__default.ListErrs(p))).Union(_0_cycles)).Union(SkopCheck.__default.StructErrs(p))).Union(SkopCheck.__default.ChecksErrs(p))).Union(SkopCheck.__default.AskErrs(p))).Union(SkopCheck.__default.NameErrs(p))).Union(_1_actions)).Union((((_0_cycles).equals(_dafny.Set.fromElements())) ? (SkopCheck.__default.FlowErrs(p, (f).dtor_In, (_1_actions).equals(_dafny.Set.fromElements()))) : (_dafny.Set.fromElements())));
+      let _0_cycles = SkopeCheck.__default.CycleErrs(p, (f).dtor_reach);
+      let _1_actions = SkopeCheck.__default.ActionErrs(p);
+      return (((((((((SkopeCheck.__default.EntryErrs(p)).Union(SkopeCheck.__default.RefErrs(p))).Union(SkopeCheck.__default.ListErrs(p))).Union(_0_cycles)).Union(SkopeCheck.__default.StructErrs(p))).Union(SkopeCheck.__default.ChecksErrs(p))).Union(SkopeCheck.__default.AskErrs(p))).Union(SkopeCheck.__default.NameErrs(p))).Union(_1_actions)).Union((((_0_cycles).equals(_dafny.Set.fromElements())) ? (SkopeCheck.__default.FlowErrs(p, (f).dtor_In, (_1_actions).equals(_dafny.Set.fromElements()))) : (_dafny.Set.fromElements())));
     };
     static EntryErrs(p) {
-      if (SkopWellFormed.__default.IsInstr(p, ((p).dtor_entry).dtor_section)) {
+      if (SkopeWellFormed.__default.IsInstr(p, ((p).dtor_entry).dtor_section)) {
         return _dafny.Set.fromElements();
       } else if (((p).dtor_sections).contains(((p).dtor_entry).dtor_section)) {
-        return _dafny.Set.fromElements(SkopCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-REF-KIND"), ((p).dtor_entry).dtor_src));
+        return _dafny.Set.fromElements(SkopeCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-REF-KIND"), ((p).dtor_entry).dtor_src));
       } else {
-        return _dafny.Set.fromElements(SkopCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-UNRESOLVED"), ((p).dtor_entry).dtor_src));
+        return _dafny.Set.fromElements(SkopeCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-UNRESOLVED"), ((p).dtor_entry).dtor_src));
       }
     };
     static TargetErrs(p, r, src) {
-      if ((!(SkopWellFormed.__default.AnchorOk(r))) || (!((p).dtor_sections).contains((r).dtor_id))) {
-        return _dafny.Set.fromElements(SkopCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-UNRESOLVED"), src));
-      } else if (!(SkopWellFormed.__default.IsInstr(p, (r).dtor_id))) {
-        return _dafny.Set.fromElements(SkopCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-REF-KIND"), src));
+      if ((!(SkopeWellFormed.__default.AnchorOk(r))) || (!((p).dtor_sections).contains((r).dtor_id))) {
+        return _dafny.Set.fromElements(SkopeCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-UNRESOLVED"), src));
+      } else if (!(SkopeWellFormed.__default.IsInstr(p, (r).dtor_id))) {
+        return _dafny.Set.fromElements(SkopeCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-REF-KIND"), src));
       } else {
         return _dafny.Set.fromElements();
       }
     };
     static ListRefErrs(p, r, src) {
-      if ((!(SkopWellFormed.__default.AnchorOk(r))) || (!((p).dtor_sections).contains((r).dtor_id))) {
-        return _dafny.Set.fromElements(SkopCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-UNRESOLVED"), src));
+      if ((!(SkopeWellFormed.__default.AnchorOk(r))) || (!((p).dtor_sections).contains((r).dtor_id))) {
+        return _dafny.Set.fromElements(SkopeCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-UNRESOLVED"), src));
       } else if ((((p).dtor_sections).get((r).dtor_id)).is_Instructions) {
-        return _dafny.Set.fromElements(SkopCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-REF-KIND"), src));
-      } else if (!(SkopWellFormed.__default.IsData(p, (r).dtor_id))) {
-        return _dafny.Set.fromElements(SkopCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-SECTION-KIND"), src));
+        return _dafny.Set.fromElements(SkopeCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-REF-KIND"), src));
+      } else if (!(SkopeWellFormed.__default.IsData(p, (r).dtor_id))) {
+        return _dafny.Set.fromElements(SkopeCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-SECTION-KIND"), src));
       } else {
         return _dafny.Set.fromElements();
       }
     };
     static StmtRefErrs(p, s) {
-      let _0_jumps = SkopWellFormed.__default.Jumps(s);
+      let _0_jumps = SkopeWellFormed.__default.Jumps(s);
       return (function () {
         let _coll0 = new _dafny.Set();
         for (const _compr_0 of (_0_jumps).Elements) {
           let _1_j = _compr_0;
           if ((_0_jumps).contains(_1_j)) {
-            for (const _compr_1 of (SkopCheck.__default.TargetErrs(p, (_1_j).dtor_ref, (_1_j).dtor_src)).Elements) {
+            for (const _compr_1 of (SkopeCheck.__default.TargetErrs(p, (_1_j).dtor_ref, (_1_j).dtor_src)).Elements) {
               let _2_e = _compr_1;
-              if ((SkopCheck.__default.TargetErrs(p, (_1_j).dtor_ref, (_1_j).dtor_src)).contains(_2_e)) {
+              if ((SkopeCheck.__default.TargetErrs(p, (_1_j).dtor_ref, (_1_j).dtor_src)).contains(_2_e)) {
                 _coll0.add(_2_e);
               }
             }
@@ -4698,12 +4698,12 @@ let SkopCheck = (function() {
         return _coll0;
       }()).Union(function () {
         let _coll1 = new _dafny.Set();
-        for (const _compr_2 of (SkopWellFormed.__default.ListRefs(s)).Elements) {
+        for (const _compr_2 of (SkopeWellFormed.__default.ListRefs(s)).Elements) {
           let _3_r = _compr_2;
-          if ((SkopWellFormed.__default.ListRefs(s)).contains(_3_r)) {
-            for (const _compr_3 of (SkopCheck.__default.ListRefErrs(p, _3_r, (s).dtor_src)).Elements) {
+          if ((SkopeWellFormed.__default.ListRefs(s)).contains(_3_r)) {
+            for (const _compr_3 of (SkopeCheck.__default.ListRefErrs(p, _3_r, (s).dtor_src)).Elements) {
               let _4_e = _compr_3;
-              if ((SkopCheck.__default.ListRefErrs(p, _3_r, (s).dtor_src)).contains(_4_e)) {
+              if ((SkopeCheck.__default.ListRefErrs(p, _3_r, (s).dtor_src)).contains(_4_e)) {
                 _coll1.add(_4_e);
               }
             }
@@ -4713,11 +4713,11 @@ let SkopCheck = (function() {
       }());
     };
     static RefErrs(p) {
-      return SkopCheck.__default.OverStmts(p, SkopCheck.__default.RefsOf(p));
+      return SkopeCheck.__default.OverStmts(p, SkopeCheck.__default.RefsOf(p));
     };
     static RefsOf(p) {
       return ((_0_p) => function (_1_s) {
-        return SkopCheck.__default.StmtRefErrs(_0_p, _1_s);
+        return SkopeCheck.__default.StmtRefErrs(_0_p, _1_s);
       })(p);
     };
     static DataListErrs(l) {
@@ -4727,7 +4727,7 @@ let SkopCheck = (function() {
       let _pat_let_tv3 = l;
       let _pat_let_tv4 = l;
       if ((new BigNumber(((l).dtor_items).length)).isEqualTo(_dafny.ZERO)) {
-        return _dafny.Set.fromElements(SkopCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-LIST-EMPTY"), (l).dtor_src));
+        return _dafny.Set.fromElements(SkopeCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-LIST-EMPTY"), (l).dtor_src));
       } else {
         return (function (_pat_let0_0) {
           return function (_0_odd) {
@@ -4739,21 +4739,21 @@ let SkopCheck = (function() {
               for (const _compr_0 of ((_pat_let_tv0).dtor_items).Elements) {
                 let _1_i = _compr_0;
                 if ((_dafny.Seq.contains((_pat_let_tv1).dtor_items, _1_i)) && (((_1_i).is_Action) === (_0_odd))) {
-                  _coll0.add(SkopCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-LIST-MIXED"), (_1_i).dtor_src));
+                  _coll0.add(SkopeCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-LIST-MIXED"), (_1_i).dtor_src));
                 }
               }
               return _coll0;
             }()));
           }(_pat_let0_0);
-        }(SkopCheck.__default.MinorityIsAction((l).dtor_items))).Union(function () {
+        }(SkopeCheck.__default.MinorityIsAction((l).dtor_items))).Union(function () {
           let _coll1 = new _dafny.Set();
           for (const _compr_1 of _dafny.IntegerRange(_dafny.ZERO, new BigNumber(((l).dtor_items).length))) {
             let _3_a = _compr_1;
             if ((_dafny.ZERO).isLessThanOrEqualTo(_3_a)) {
               for (const _compr_2 of _dafny.IntegerRange((_3_a).plus(_dafny.ONE), new BigNumber(((l).dtor_items).length))) {
                 let _4_b = _compr_2;
-                if ((((_3_a).isLessThan(_4_b)) && ((_4_b).isLessThan(new BigNumber(((l).dtor_items).length)))) && (_dafny.areEqual(SkopWellFormed.__default.Lower(SkopWellFormed.__default.Label(((l).dtor_items)[_3_a])), SkopWellFormed.__default.Lower(SkopWellFormed.__default.Label(((l).dtor_items)[_4_b]))))) {
-                  _coll1.add(SkopCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-LIST-DUP"), (((l).dtor_items)[_4_b]).dtor_src));
+                if ((((_3_a).isLessThan(_4_b)) && ((_4_b).isLessThan(new BigNumber(((l).dtor_items).length)))) && (_dafny.areEqual(SkopeWellFormed.__default.Lower(SkopeWellFormed.__default.Label(((l).dtor_items)[_3_a])), SkopeWellFormed.__default.Lower(SkopeWellFormed.__default.Label(((l).dtor_items)[_4_b]))))) {
+                  _coll1.add(SkopeCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-LIST-DUP"), (((l).dtor_items)[_4_b]).dtor_src));
                 }
               }
             }
@@ -4780,17 +4780,17 @@ let SkopCheck = (function() {
       }
     };
     static StmtListErrs(p, s) {
-      return (((((s).is_ForEach) && (SkopWellFormed.__default.IsData(p, ((s).dtor_list).dtor_id))) ? (SkopCheck.__default.DataListErrs(SkopWellFormed.__default.DataList(p, ((s).dtor_list).dtor_id))) : ((((((s).is_Ask) && (((s).dtor_form).is_OneOf)) && (SkopWellFormed.__default.IsData(p, (((s).dtor_form).dtor_list).dtor_id))) ? (SkopCheck.__default.DataListErrs(SkopWellFormed.__default.DataList(p, (((s).dtor_form).dtor_list).dtor_id))) : (_dafny.Set.fromElements()))))).Union(((((((s).is_Ask) && (((s).dtor_form).is_OneOf)) && (SkopWellFormed.__default.IsData(p, (((s).dtor_form).dtor_list).dtor_id))) && (_dafny.Quantifier(((SkopWellFormed.__default.DataList(p, (((s).dtor_form).dtor_list).dtor_id)).dtor_items).UniqueElements, false, function (_exists_var_0) {
+      return (((((s).is_ForEach) && (SkopeWellFormed.__default.IsData(p, ((s).dtor_list).dtor_id))) ? (SkopeCheck.__default.DataListErrs(SkopeWellFormed.__default.DataList(p, ((s).dtor_list).dtor_id))) : ((((((s).is_Ask) && (((s).dtor_form).is_OneOf)) && (SkopeWellFormed.__default.IsData(p, (((s).dtor_form).dtor_list).dtor_id))) ? (SkopeCheck.__default.DataListErrs(SkopeWellFormed.__default.DataList(p, (((s).dtor_form).dtor_list).dtor_id))) : (_dafny.Set.fromElements()))))).Union(((((((s).is_Ask) && (((s).dtor_form).is_OneOf)) && (SkopeWellFormed.__default.IsData(p, (((s).dtor_form).dtor_list).dtor_id))) && (_dafny.Quantifier(((SkopeWellFormed.__default.DataList(p, (((s).dtor_form).dtor_list).dtor_id)).dtor_items).UniqueElements, false, function (_exists_var_0) {
         let _0_i = _exists_var_0;
-        return (_dafny.Seq.contains((SkopWellFormed.__default.DataList(p, (((s).dtor_form).dtor_list).dtor_id)).dtor_items, _0_i)) && ((_0_i).is_Action);
-      }))) ? (_dafny.Set.fromElements(SkopCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-LIST-KIND"), (s).dtor_src))) : (_dafny.Set.fromElements())));
+        return (_dafny.Seq.contains((SkopeWellFormed.__default.DataList(p, (((s).dtor_form).dtor_list).dtor_id)).dtor_items, _0_i)) && ((_0_i).is_Action);
+      }))) ? (_dafny.Set.fromElements(SkopeCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-LIST-KIND"), (s).dtor_src))) : (_dafny.Set.fromElements())));
     };
     static ListErrs(p) {
-      return SkopCheck.__default.OverStmts(p, SkopCheck.__default.ListsOf(p));
+      return SkopeCheck.__default.OverStmts(p, SkopeCheck.__default.ListsOf(p));
     };
     static ListsOf(p) {
       return ((_0_p) => function (_1_s) {
-        return SkopCheck.__default.StmtListErrs(_0_p, _1_s);
+        return SkopeCheck.__default.StmtListErrs(_0_p, _1_s);
       })(p);
     };
     static Ids(p) {
@@ -4806,12 +4806,12 @@ let SkopCheck = (function() {
       }();
     };
     static Succ(p, id) {
-      let _0_jumps = SkopCheck.__default.AllJumps(SkopWellFormed.__default.Flat(SkopWellFormed.__default.Body(p, id)));
+      let _0_jumps = SkopeCheck.__default.AllJumps(SkopeWellFormed.__default.Flat(SkopeWellFormed.__default.Body(p, id)));
       return function () {
         let _coll0 = new _dafny.Set();
         for (const _compr_0 of (_0_jumps).Elements) {
           let _1_j = _compr_0;
-          if (((_0_jumps).contains(_1_j)) && (SkopWellFormed.__default.IsInstr(p, ((_1_j).dtor_ref).dtor_id))) {
+          if (((_0_jumps).contains(_1_j)) && (SkopeWellFormed.__default.IsInstr(p, ((_1_j).dtor_ref).dtor_id))) {
             _coll0.add(((_1_j).dtor_ref).dtor_id);
           }
         }
@@ -4824,7 +4824,7 @@ let SkopCheck = (function() {
         if ((new BigNumber((flat).length)).isEqualTo(_dafny.ZERO)) {
           return (_dafny.Set.fromElements()).Union(_0___accumulator);
         } else {
-          _0___accumulator = (_0___accumulator).Union(SkopWellFormed.__default.Jumps((flat)[_dafny.ZERO]));
+          _0___accumulator = (_0___accumulator).Union(SkopeWellFormed.__default.Jumps((flat)[_dafny.ZERO]));
           let _in0 = (flat).slice(_dafny.ONE);
           flat = _in0;
           continue TAIL_CALL_START;
@@ -4832,13 +4832,13 @@ let SkopCheck = (function() {
       }
     };
     static SuccMap(p) {
-      let _0_ids = SkopCheck.__default.Ids(p);
+      let _0_ids = SkopeCheck.__default.Ids(p);
       return function () {
         let _coll0 = new _dafny.Map();
         for (const _compr_0 of (_0_ids).Elements) {
           let _1_id = _compr_0;
           if ((_0_ids).contains(_1_id)) {
-            _coll0.push([_1_id,SkopCheck.__default.Succ(p, _1_id)]);
+            _coll0.push([_1_id,SkopeCheck.__default.Succ(p, _1_id)]);
           }
         }
         return _coll0;
@@ -4877,24 +4877,24 @@ let SkopCheck = (function() {
       }
     };
     static Reach(p, succ, id) {
-      return SkopCheck.__default.Closure(p, succ, _dafny.Set.fromElements(id), _dafny.Set.fromElements(id));
+      return SkopeCheck.__default.Closure(p, succ, _dafny.Set.fromElements(id), _dafny.Set.fromElements(id));
     };
     static Reaches(p) {
-      let _0_ids = SkopCheck.__default.Ids(p);
-      let _1_succ = SkopCheck.__default.SuccMap(p);
+      let _0_ids = SkopeCheck.__default.Ids(p);
+      let _1_succ = SkopeCheck.__default.SuccMap(p);
       return function () {
         let _coll0 = new _dafny.Map();
         for (const _compr_0 of (_0_ids).Elements) {
           let _2_id = _compr_0;
           if ((_0_ids).contains(_2_id)) {
-            _coll0.push([_2_id,SkopCheck.__default.Reach(p, _1_succ, _2_id)]);
+            _coll0.push([_2_id,SkopeCheck.__default.Reach(p, _1_succ, _2_id)]);
           }
         }
         return _coll0;
       }();
     };
     static CycleErrs(p, reach) {
-      let _0_jumps = SkopCheck.__default.SectionJumps(p);
+      let _0_jumps = SkopeCheck.__default.SectionJumps(p);
       return function () {
         let _coll0 = new _dafny.Set();
         for (const _compr_0 of (_0_jumps).Keys.Elements) {
@@ -4903,7 +4903,7 @@ let SkopCheck = (function() {
             for (const _compr_1 of ((_0_jumps).get(_1_id)).Elements) {
               let _2_j = _compr_1;
               if (((((_0_jumps).get(_1_id)).contains(_2_j)) && ((reach).contains(((_2_j).dtor_ref).dtor_id))) && (((reach).get(((_2_j).dtor_ref).dtor_id)).contains(_1_id))) {
-                _coll0.add(SkopCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-CYCLE"), (_2_j).dtor_src));
+                _coll0.add(SkopeCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-CYCLE"), (_2_j).dtor_src));
               }
             }
           }
@@ -4912,13 +4912,13 @@ let SkopCheck = (function() {
       }();
     };
     static SectionJumps(p) {
-      let _0_ids = SkopCheck.__default.Ids(p);
+      let _0_ids = SkopeCheck.__default.Ids(p);
       return function () {
         let _coll0 = new _dafny.Map();
         for (const _compr_0 of (_0_ids).Elements) {
           let _1_id = _compr_0;
           if ((_0_ids).contains(_1_id)) {
-            _coll0.push([_1_id,SkopCheck.__default.AllJumps(SkopWellFormed.__default.Flat(SkopWellFormed.__default.Body(p, _1_id)))]);
+            _coll0.push([_1_id,SkopeCheck.__default.AllJumps(SkopeWellFormed.__default.Flat(SkopeWellFormed.__default.Body(p, _1_id)))]);
           }
         }
         return _coll0;
@@ -4941,40 +4941,40 @@ let SkopCheck = (function() {
         let _coll0 = new _dafny.Set();
         for (const _compr_0 of _dafny.IntegerRange(_dafny.ZERO, (new BigNumber((body).length)).minus(_dafny.ONE))) {
           let _0_i = _compr_0;
-          if ((((_dafny.ZERO).isLessThanOrEqualTo(_0_i)) && ((_0_i).isLessThan((new BigNumber((body).length)).minus(_dafny.ONE)))) && (SkopWellFormed.__default.Terminal((body)[_0_i]))) {
-            _coll0.add(SkopCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-UNREACHABLE"), ((body)[(_0_i).plus(_dafny.ONE)]).dtor_src));
+          if ((((_dafny.ZERO).isLessThanOrEqualTo(_0_i)) && ((_0_i).isLessThan((new BigNumber((body).length)).minus(_dafny.ONE)))) && (SkopeWellFormed.__default.Terminal((body)[_0_i]))) {
+            _coll0.add(SkopeCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-UNREACHABLE"), ((body)[(_0_i).plus(_dafny.ONE)]).dtor_src));
           }
         }
         return _coll0;
       }();
     };
     static SectionStructErrs(src, body) {
-      return (((((new BigNumber((body).length)).isEqualTo(_dafny.ZERO)) ? (_dafny.Set.fromElements(SkopCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-FALLS-OFF"), src))) : (((!(SkopWellFormed.__default.Terminal((body)[(new BigNumber((body).length)).minus(_dafny.ONE)]))) ? (_dafny.Set.fromElements(SkopCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-FALLS-OFF"), ((body)[(new BigNumber((body).length)).minus(_dafny.ONE)]).dtor_src))) : (_dafny.Set.fromElements()))))).Union(SkopCheck.__default.DeadErrs(body))).Union(SkopCheck.__default.UnionSeq(SkopWellFormed.__default.Flat(body), SkopCheck.__default.LoopDead));
+      return (((((new BigNumber((body).length)).isEqualTo(_dafny.ZERO)) ? (_dafny.Set.fromElements(SkopeCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-FALLS-OFF"), src))) : (((!(SkopeWellFormed.__default.Terminal((body)[(new BigNumber((body).length)).minus(_dafny.ONE)]))) ? (_dafny.Set.fromElements(SkopeCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-FALLS-OFF"), ((body)[(new BigNumber((body).length)).minus(_dafny.ONE)]).dtor_src))) : (_dafny.Set.fromElements()))))).Union(SkopeCheck.__default.DeadErrs(body))).Union(SkopeCheck.__default.UnionSeq(SkopeWellFormed.__default.Flat(body), SkopeCheck.__default.LoopDead));
     };
     static LoopDead(s) {
       if ((s).is_ForEach) {
-        return SkopCheck.__default.DeadErrs((s).dtor_body);
+        return SkopeCheck.__default.DeadErrs((s).dtor_body);
       } else {
         return _dafny.Set.fromElements();
       }
     };
     static StructErrs(p) {
-      return SkopCheck.__default.OverSections(p, SkopCheck.__default.StructOf(p));
+      return SkopeCheck.__default.OverSections(p, SkopeCheck.__default.StructOf(p));
     };
     static StructOf(p) {
       return ((_0_p) => function (_1_id) {
-        return ((SkopWellFormed.__default.IsInstr(_0_p, _1_id)) ? (SkopCheck.__default.SectionStructErrs((((_0_p).dtor_sections).get(_1_id)).dtor_src, SkopWellFormed.__default.Body(_0_p, _1_id))) : (_dafny.Set.fromElements()));
+        return ((SkopeWellFormed.__default.IsInstr(_0_p, _1_id)) ? (SkopeCheck.__default.SectionStructErrs((((_0_p).dtor_sections).get(_1_id)).dtor_src, SkopeWellFormed.__default.Body(_0_p, _1_id))) : (_dafny.Set.fromElements()));
       })(p);
     };
     static CheckFindings(s) {
       if ((((s).is_Check) && (((s).dtor_onTrue).is_None)) && (((s).dtor_els).is_NoElse)) {
-        return _dafny.Set.fromElements(SkopCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-GRAMMAR"), (s).dtor_src));
+        return _dafny.Set.fromElements(SkopeCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-GRAMMAR"), (s).dtor_src));
       } else {
         return _dafny.Set.fromElements();
       }
     };
     static ChecksErrs(p) {
-      return SkopCheck.__default.OverStmts(p, SkopCheck.__default.CheckFindings);
+      return SkopeCheck.__default.OverStmts(p, SkopeCheck.__default.CheckFindings);
     };
     static RubricErrs(src, low, high, rubric) {
       return ((function () {
@@ -4982,7 +4982,7 @@ let SkopCheck = (function() {
         for (const _compr_0 of (rubric).Elements) {
           let _0_r = _compr_0;
           if ((_dafny.Seq.contains(rubric, _0_r)) && (!(((low).isLessThanOrEqualTo((_0_r).dtor_level)) && (((_0_r).dtor_level).isLessThanOrEqualTo(high))))) {
-            _coll0.add(SkopCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-SCORE-RUBRIC"), (_0_r).dtor_src));
+            _coll0.add(SkopeCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-SCORE-RUBRIC"), (_0_r).dtor_src));
           }
         }
         return _coll0;
@@ -4994,7 +4994,7 @@ let SkopCheck = (function() {
             for (const _compr_2 of _dafny.IntegerRange((_1_a).plus(_dafny.ONE), new BigNumber((rubric).length))) {
               let _2_b = _compr_2;
               if ((((_1_a).isLessThan(_2_b)) && ((_2_b).isLessThan(new BigNumber((rubric).length)))) && ((((rubric)[_1_a]).dtor_level).isEqualTo(((rubric)[_2_b]).dtor_level))) {
-                _coll1.add(SkopCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-SCORE-RUBRIC"), ((rubric)[_2_b]).dtor_src));
+                _coll1.add(SkopeCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-SCORE-RUBRIC"), ((rubric)[_2_b]).dtor_src));
               }
             }
           }
@@ -5004,20 +5004,20 @@ let SkopCheck = (function() {
         let _coll2 = new _dafny.Set();
         for (const _compr_3 of _dafny.IntegerRange(low, (high).plus(_dafny.ONE))) {
           let _3_level = _compr_3;
-          if ((((low).isLessThanOrEqualTo(_3_level)) && ((_3_level).isLessThanOrEqualTo(high))) && (!(SkopWellFormed.__default.Levels(rubric)).contains(_3_level))) {
-            _coll2.add(SkopCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-SCORE-RUBRIC"), src));
+          if ((((low).isLessThanOrEqualTo(_3_level)) && ((_3_level).isLessThanOrEqualTo(high))) && (!(SkopeWellFormed.__default.Levels(rubric)).contains(_3_level))) {
+            _coll2.add(SkopeCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-SCORE-RUBRIC"), src));
           }
         }
         return _coll2;
       }());
     };
     static AskErrsOf(s) {
-      return ((((((s).dtor_els).is_Skip) && (!(((s).dtor_form).is_YesNo))) ? (_dafny.Set.fromElements(SkopCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-ELSE-SKIP"), (s).dtor_src))) : (_dafny.Set.fromElements()))).Union(function () {
+      return ((((((s).dtor_els).is_Skip) && (!(((s).dtor_form).is_YesNo))) ? (_dafny.Set.fromElements(SkopeCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-ELSE-SKIP"), (s).dtor_src))) : (_dafny.Set.fromElements()))).Union(function () {
         let _source0 = (s).dtor_form;
         {
           if (_source0.is_Sections) {
             let _0_opts = (_source0).options;
-            return (((((new BigNumber((_0_opts).length)).isLessThan(new BigNumber(2))) || ((new BigNumber(255)).isLessThan(new BigNumber((_0_opts).length)))) ? (_dafny.Set.fromElements(SkopCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-OPTION-COUNT"), (s).dtor_src))) : (_dafny.Set.fromElements()))).Union(function () {
+            return (((((new BigNumber((_0_opts).length)).isLessThan(new BigNumber(2))) || ((new BigNumber(255)).isLessThan(new BigNumber((_0_opts).length)))) ? (_dafny.Set.fromElements(SkopeCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-OPTION-COUNT"), (s).dtor_src))) : (_dafny.Set.fromElements()))).Union(function () {
               let _coll0 = new _dafny.Set();
               for (const _compr_0 of _dafny.IntegerRange(_dafny.ZERO, new BigNumber((_0_opts).length))) {
                 let _1_a = _compr_0;
@@ -5025,7 +5025,7 @@ let SkopCheck = (function() {
                   for (const _compr_1 of _dafny.IntegerRange((_1_a).plus(_dafny.ONE), new BigNumber((_0_opts).length))) {
                     let _2_b = _compr_1;
                     if ((((_1_a).isLessThan(_2_b)) && ((_2_b).isLessThan(new BigNumber((_0_opts).length)))) && (_dafny.areEqual((((_0_opts)[_1_a]).dtor_ref).dtor_id, (((_0_opts)[_2_b]).dtor_ref).dtor_id))) {
-                      _coll0.add(SkopCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-OPTION-COUNT"), ((_0_opts)[_2_b]).dtor_src));
+                      _coll0.add(SkopeCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-OPTION-COUNT"), ((_0_opts)[_2_b]).dtor_src));
                     }
                   }
                 }
@@ -5040,9 +5040,9 @@ let SkopCheck = (function() {
             let _4_high = (_source0).high;
             let _5_rubric = (_source0).rubric;
             if (!((((_dafny.ZERO).isLessThanOrEqualTo(_3_low)) && ((_3_low).isLessThan(_4_high))) && (((_4_high).minus(_3_low)).isLessThan(new BigNumber(10))))) {
-              return _dafny.Set.fromElements(SkopCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-SCORE-RANGE"), (s).dtor_src));
+              return _dafny.Set.fromElements(SkopeCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-SCORE-RANGE"), (s).dtor_src));
             } else {
-              return SkopCheck.__default.RubricErrs((s).dtor_src, _3_low, _4_high, _5_rubric);
+              return SkopeCheck.__default.RubricErrs((s).dtor_src, _3_low, _4_high, _5_rubric);
             }
           }
         }
@@ -5052,27 +5052,27 @@ let SkopCheck = (function() {
       }());
     };
     static AskErrs(p) {
-      return SkopCheck.__default.OverStmts(p, SkopCheck.__default.AskFindings);
+      return SkopeCheck.__default.OverStmts(p, SkopeCheck.__default.AskFindings);
     };
     static AskFindings(s) {
       if ((s).is_Ask) {
-        return SkopCheck.__default.AskErrsOf(s);
+        return SkopeCheck.__default.AskErrsOf(s);
       } else {
         return _dafny.Set.fromElements();
       }
     };
     static NameErrs(p) {
-      let _0_all = SkopWellFormed.__default.AllNames(p);
-      let _1_stmts = SkopWellFormed.__default.Stmts(p);
+      let _0_all = SkopeWellFormed.__default.AllNames(p);
+      let _1_stmts = SkopeWellFormed.__default.Stmts(p);
       return function () {
         let _coll0 = new _dafny.Set();
         for (const _compr_0 of (_1_stmts).Elements) {
           let _2_s = _compr_0;
           if ((_1_stmts).contains(_2_s)) {
-            for (const _compr_1 of (SkopWellFormed.__default.TextVars(_2_s)).Elements) {
+            for (const _compr_1 of (SkopeWellFormed.__default.TextVars(_2_s)).Elements) {
               let _3_x = _compr_1;
-              if (((SkopWellFormed.__default.TextVars(_2_s)).contains(_3_x)) && (!(_0_all).contains(_3_x))) {
-                _coll0.add(SkopCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-UNBOUND"), (_2_s).dtor_src));
+              if (((SkopeWellFormed.__default.TextVars(_2_s)).contains(_3_x)) && (!(_0_all).contains(_3_x))) {
+                _coll0.add(SkopeCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-UNBOUND"), (_2_s).dtor_src));
               }
             }
           }
@@ -5081,29 +5081,29 @@ let SkopCheck = (function() {
       }();
     };
     static ActionVarErrs(p, rebound, y, src) {
-      if (!((((p).dtor_params).Keys).Union(SkopWellFormed.__default.Builtins)).contains(y)) {
-        return _dafny.Set.fromElements(SkopCheck.__default.Err((((rebound).contains(y)) ? (_dafny.Seq.UnicodeFromString("E-TAINT")) : (_dafny.Seq.UnicodeFromString("E-UNBOUND"))), src));
+      if (!((((p).dtor_params).Keys).Union(SkopeWellFormed.__default.Builtins)).contains(y)) {
+        return _dafny.Set.fromElements(SkopeCheck.__default.Err((((rebound).contains(y)) ? (_dafny.Seq.UnicodeFromString("E-TAINT")) : (_dafny.Seq.UnicodeFromString("E-UNBOUND"))), src));
       } else if ((rebound).contains(y)) {
-        return _dafny.Set.fromElements(SkopCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-TAINT"), src));
-      } else if ((((p).dtor_params).contains(y)) && (!(SkopWellFormed.__default.SafeParam(((p).dtor_params).get(y))))) {
-        return _dafny.Set.fromElements(SkopCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-UNSAFE-VALUE"), (((p).dtor_params).get(y)).dtor_src));
+        return _dafny.Set.fromElements(SkopeCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-TAINT"), src));
+      } else if ((((p).dtor_params).contains(y)) && (!(SkopeWellFormed.__default.SafeParam(((p).dtor_params).get(y))))) {
+        return _dafny.Set.fromElements(SkopeCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-UNSAFE-VALUE"), (((p).dtor_params).get(y)).dtor_src));
       } else {
         return _dafny.Set.fromElements();
       }
     };
     static ActionFindings(p, rebound) {
       return ((_0_p, _1_rebound) => function (_2_s) {
-        return ((((_2_s).is_ForEach) && (SkopWellFormed.__default.IsData(_0_p, ((_2_s).dtor_list).dtor_id))) ? (function () {
+        return ((((_2_s).is_ForEach) && (SkopeWellFormed.__default.IsData(_0_p, ((_2_s).dtor_list).dtor_id))) ? (function () {
           let _coll0 = new _dafny.Set();
-          for (const _compr_0 of ((SkopWellFormed.__default.DataList(_0_p, ((_2_s).dtor_list).dtor_id)).dtor_items).Elements) {
+          for (const _compr_0 of ((SkopeWellFormed.__default.DataList(_0_p, ((_2_s).dtor_list).dtor_id)).dtor_items).Elements) {
             let _3_i = _compr_0;
-            if ((_dafny.Seq.contains((SkopWellFormed.__default.DataList(_0_p, ((_2_s).dtor_list).dtor_id)).dtor_items, _3_i)) && ((_3_i).is_Action)) {
-              for (const _compr_1 of (SkopWellFormed.__default.PartVars((_3_i).dtor_cmd)).Elements) {
+            if ((_dafny.Seq.contains((SkopeWellFormed.__default.DataList(_0_p, ((_2_s).dtor_list).dtor_id)).dtor_items, _3_i)) && ((_3_i).is_Action)) {
+              for (const _compr_1 of (SkopeWellFormed.__default.PartVars((_3_i).dtor_cmd)).Elements) {
                 let _4_y = _compr_1;
-                if ((SkopWellFormed.__default.PartVars((_3_i).dtor_cmd)).contains(_4_y)) {
-                  for (const _compr_2 of (SkopCheck.__default.ActionVarErrs(_0_p, _1_rebound, _4_y, (_3_i).dtor_src)).Elements) {
+                if ((SkopeWellFormed.__default.PartVars((_3_i).dtor_cmd)).contains(_4_y)) {
+                  for (const _compr_2 of (SkopeCheck.__default.ActionVarErrs(_0_p, _1_rebound, _4_y, (_3_i).dtor_src)).Elements) {
                     let _5_e = _compr_2;
-                    if ((SkopCheck.__default.ActionVarErrs(_0_p, _1_rebound, _4_y, (_3_i).dtor_src)).contains(_5_e)) {
+                    if ((SkopeCheck.__default.ActionVarErrs(_0_p, _1_rebound, _4_y, (_3_i).dtor_src)).contains(_5_e)) {
                       _coll0.add(_5_e);
                     }
                   }
@@ -5116,7 +5116,7 @@ let SkopCheck = (function() {
       })(p, rebound);
     };
     static ActionErrs(p) {
-      return SkopCheck.__default.OverStmts(p, SkopCheck.__default.ActionFindings(p, SkopWellFormed.__default.Rebound(p)));
+      return SkopeCheck.__default.OverStmts(p, SkopeCheck.__default.ActionFindings(p, SkopeWellFormed.__default.Rebound(p)));
     };
     static AddIn(a, b) {
       return function () {
@@ -5135,8 +5135,8 @@ let SkopCheck = (function() {
         return _dafny.Map.Empty.slice();
       } else {
         let _0_s = (body)[_dafny.ZERO];
-        let _1_jumps = SkopWellFormed.__default.Jumps(_0_s);
-        let _2_out = SkopWellFormed.__default.Forget(e, (lv).Union(SkopWellFormed.__default.BindingSet(_0_s)));
+        let _1_jumps = SkopeWellFormed.__default.Jumps(_0_s);
+        let _2_out = SkopeWellFormed.__default.Forget(e, (lv).Union(SkopeWellFormed.__default.BindingSet(_0_s)));
         let _3_targets = function () {
           let _coll0 = new _dafny.Set();
           for (const _compr_0 of (_1_jumps).Elements) {
@@ -5157,7 +5157,7 @@ let SkopCheck = (function() {
           }
           return _coll1;
         }();
-        return SkopCheck.__default.AddIn(SkopCheck.__default.AddIn(_5_here, (((_0_s).is_ForEach) ? (SkopCheck.__default.Outs(p, (_0_s).dtor_body, SkopWellFormed.__default.LoopEntry(p, _0_s, e), (lv).Union(_dafny.Set.fromElements((_0_s).dtor_loopVar)))) : (_dafny.Map.Empty.slice()))), SkopCheck.__default.Outs(p, (body).slice(_dafny.ONE), SkopWellFormed.__default.After(p, _0_s, e), lv));
+        return SkopeCheck.__default.AddIn(SkopeCheck.__default.AddIn(_5_here, (((_0_s).is_ForEach) ? (SkopeCheck.__default.Outs(p, (_0_s).dtor_body, SkopeWellFormed.__default.LoopEntry(p, _0_s, e), (lv).Union(_dafny.Set.fromElements((_0_s).dtor_loopVar)))) : (_dafny.Map.Empty.slice()))), SkopeCheck.__default.Outs(p, (body).slice(_dafny.ONE), SkopeWellFormed.__default.After(p, _0_s, e), lv));
       }
     };
     static Meet(es) {
@@ -5176,7 +5176,7 @@ let SkopCheck = (function() {
         }
         return _coll0;
       }();
-      return SkopWellFormed.Env.create_Env(function () {
+      return SkopeWellFormed.Env.create_Env(function () {
   let _coll1 = new _dafny.Set();
   for (const _compr_2 of (es).Elements) {
     let _3_e = _compr_2;
@@ -5223,7 +5223,7 @@ let SkopCheck = (function() {
       if ((n).isLessThan(k)) {
         return _dafny.Tuple.of(_dafny.Map.Empty.slice(), _dafny.Map.Empty.slice());
       } else {
-        let _let_tmp_rhs0 = SkopCheck.__default.InLayers(p, byRank, n, (k).plus(_dafny.ONE));
+        let _let_tmp_rhs0 = SkopeCheck.__default.InLayers(p, byRank, n, (k).plus(_dafny.ONE));
         let _0_done = (_let_tmp_rhs0)[0];
         let _1_incoming = (_let_tmp_rhs0)[1];
         if (!(byRank).contains(k)) {
@@ -5236,9 +5236,9 @@ let SkopCheck = (function() {
               if (((byRank).get(k)).contains(_3_t)) {
                 _coll0.push([_3_t,function (_pat_let1_0) {
                   return function (_4_es) {
-                    return (((_4_es).equals(_dafny.Set.fromElements())) ? (SkopWellFormed.__default.EntryEnv(_pat_let_tv0)) : (SkopCheck.__default.Meet(_4_es)));
+                    return (((_4_es).equals(_dafny.Set.fromElements())) ? (SkopeWellFormed.__default.EntryEnv(_pat_let_tv0)) : (SkopeCheck.__default.Meet(_4_es)));
                   }(_pat_let1_0);
-                }(((((_1_incoming).contains(_3_t)) ? ((_1_incoming).get(_3_t)) : (_dafny.Set.fromElements()))).Union(((_dafny.areEqual(_3_t, ((p).dtor_entry).dtor_section)) ? (_dafny.Set.fromElements(SkopWellFormed.__default.EntryEnv(p))) : (_dafny.Set.fromElements()))))]);
+                }(((((_1_incoming).contains(_3_t)) ? ((_1_incoming).get(_3_t)) : (_dafny.Set.fromElements()))).Union(((_dafny.areEqual(_3_t, ((p).dtor_entry).dtor_section)) ? (_dafny.Set.fromElements(SkopeWellFormed.__default.EntryEnv(p))) : (_dafny.Set.fromElements()))))]);
               }
             }
             return _coll0;
@@ -5247,8 +5247,8 @@ let SkopCheck = (function() {
             let _coll1 = new _dafny.Map();
             for (const _compr_1 of (_2_layer).Keys.Elements) {
               let _6_t = _compr_1;
-              if (((_2_layer).contains(_6_t)) && (SkopWellFormed.__default.IsInstr(p, _6_t))) {
-                _coll1.push([_6_t,SkopCheck.__default.Outs(p, SkopWellFormed.__default.Body(p, _6_t), (_2_layer).get(_6_t), _dafny.Set.fromElements())]);
+              if (((_2_layer).contains(_6_t)) && (SkopeWellFormed.__default.IsInstr(p, _6_t))) {
+                _coll1.push([_6_t,SkopeCheck.__default.Outs(p, SkopeWellFormed.__default.Body(p, _6_t), (_2_layer).get(_6_t), _dafny.Set.fromElements())]);
               }
             }
             return _coll1;
@@ -5292,7 +5292,7 @@ let SkopCheck = (function() {
             }
             return _coll3;
           }();
-          return _dafny.Tuple.of((_0_done).Merge(_2_layer), SkopCheck.__default.AddIn(_1_incoming, _10_more));
+          return _dafny.Tuple.of((_0_done).Merge(_2_layer), SkopeCheck.__default.AddIn(_1_incoming, _10_more));
         }
       }
     };
@@ -5339,32 +5339,32 @@ let SkopCheck = (function() {
         }
         return _coll2;
       }();
-      let _8_layers = (SkopCheck.__default.InLayers(p, _5_byRank, new BigNumber((_0_live).length), _dafny.ONE))[0];
+      let _8_layers = (SkopeCheck.__default.InLayers(p, _5_byRank, new BigNumber((_0_live).length), _dafny.ONE))[0];
       return function () {
         let _coll4 = new _dafny.Map();
         for (const _compr_4 of (_0_live).Elements) {
           let _9_id = _compr_4;
           if ((_0_live).contains(_9_id)) {
-            _coll4.push([_9_id,(((_8_layers).contains(_9_id)) ? ((_8_layers).get(_9_id)) : (SkopWellFormed.__default.EntryEnv(p)))]);
+            _coll4.push([_9_id,(((_8_layers).contains(_9_id)) ? ((_8_layers).get(_9_id)) : (SkopeWellFormed.__default.EntryEnv(p)))]);
           }
         }
         return _coll4;
       }();
     };
     static CmdVarErrs(p, e, x, src) {
-      let _0_ks = SkopWellFormed.__default.KindsOf(e, x);
-      return ((((((!((e).dtor_bound).contains(x)) ? (_dafny.Set.fromElements(SkopCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-UNBOUND"), src))) : (_dafny.Set.fromElements()))).Union((((_0_ks).contains(SkopWellFormed.Kind.create_KRun())) ? (_dafny.Set.fromElements(SkopCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-TAINT"), src))) : (_dafny.Set.fromElements())))).Union(((_dafny.Quantifier((_0_ks).Elements, false, function (_exists_var_0) {
+      let _0_ks = SkopeWellFormed.__default.KindsOf(e, x);
+      return ((((((!((e).dtor_bound).contains(x)) ? (_dafny.Set.fromElements(SkopeCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-UNBOUND"), src))) : (_dafny.Set.fromElements()))).Union((((_0_ks).contains(SkopeWellFormed.Kind.create_KRun())) ? (_dafny.Set.fromElements(SkopeCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-TAINT"), src))) : (_dafny.Set.fromElements())))).Union(((_dafny.Quantifier((_0_ks).Elements, false, function (_exists_var_0) {
         let _1_k = _exists_var_0;
         return ((_0_ks).contains(_1_k)) && ((_1_k).is_KAction);
-      })) ? (_dafny.Set.fromElements(SkopCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-ACTION-IN-CMD"), src))) : (_dafny.Set.fromElements())))).Union(((((_0_ks).contains(SkopWellFormed.Kind.create_KParam())) && (!((((p).dtor_params).contains(x)) && (SkopWellFormed.__default.SafeParam(((p).dtor_params).get(x)))))) ? (_dafny.Set.fromElements(SkopCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-UNSAFE-VALUE"), ((((p).dtor_params).contains(x)) ? ((((p).dtor_params).get(x)).dtor_src) : (src))))) : (_dafny.Set.fromElements())))).Union(function () {
+      })) ? (_dafny.Set.fromElements(SkopeCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-ACTION-IN-CMD"), src))) : (_dafny.Set.fromElements())))).Union(((((_0_ks).contains(SkopeWellFormed.Kind.create_KParam())) && (!((((p).dtor_params).contains(x)) && (SkopeWellFormed.__default.SafeParam(((p).dtor_params).get(x)))))) ? (_dafny.Set.fromElements(SkopeCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-UNSAFE-VALUE"), ((((p).dtor_params).contains(x)) ? ((((p).dtor_params).get(x)).dtor_src) : (src))))) : (_dafny.Set.fromElements())))).Union(function () {
         let _coll0 = new _dafny.Set();
         for (const _compr_0 of (_0_ks).Elements) {
           let _2_k = _compr_0;
-          if ((((_0_ks).contains(_2_k)) && ((_2_k).is_KValue)) && (SkopWellFormed.__default.IsData(p, (_2_k).dtor_list))) {
-            for (const _compr_1 of ((SkopWellFormed.__default.DataList(p, (_2_k).dtor_list)).dtor_items).Elements) {
+          if ((((_0_ks).contains(_2_k)) && ((_2_k).is_KValue)) && (SkopeWellFormed.__default.IsData(p, (_2_k).dtor_list))) {
+            for (const _compr_1 of ((SkopeWellFormed.__default.DataList(p, (_2_k).dtor_list)).dtor_items).Elements) {
               let _3_i = _compr_1;
-              if (((_dafny.Seq.contains((SkopWellFormed.__default.DataList(p, (_2_k).dtor_list)).dtor_items, _3_i)) && ((_3_i).is_Value)) && (!(SkopWellFormed.__default.SafeValue((_3_i).dtor_value)))) {
-                _coll0.add(SkopCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-UNSAFE-VALUE"), (_3_i).dtor_src));
+              if (((_dafny.Seq.contains((SkopeWellFormed.__default.DataList(p, (_2_k).dtor_list)).dtor_items, _3_i)) && ((_3_i).is_Value)) && (!(SkopeWellFormed.__default.SafeValue((_3_i).dtor_value)))) {
+                _coll0.add(SkopeCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-UNSAFE-VALUE"), (_3_i).dtor_src));
               }
             }
           }
@@ -5380,12 +5380,12 @@ let SkopCheck = (function() {
       let _pat_let_tv4 = In;
       return (((((((function () {
         let _coll0 = new _dafny.Set();
-        for (const _compr_0 of (SkopWellFormed.__default.CmdVars(s)).Elements) {
+        for (const _compr_0 of (SkopeWellFormed.__default.CmdVars(s)).Elements) {
           let _0_x = _compr_0;
-          if ((SkopWellFormed.__default.CmdVars(s)).contains(_0_x)) {
-            for (const _compr_1 of (SkopCheck.__default.CmdVarErrs(p, e, _0_x, (s).dtor_src)).Elements) {
+          if ((SkopeWellFormed.__default.CmdVars(s)).contains(_0_x)) {
+            for (const _compr_1 of (SkopeCheck.__default.CmdVarErrs(p, e, _0_x, (s).dtor_src)).Elements) {
               let _1_err = _compr_1;
-              if ((SkopCheck.__default.CmdVarErrs(p, e, _0_x, (s).dtor_src)).contains(_1_err)) {
+              if ((SkopeCheck.__default.CmdVarErrs(p, e, _0_x, (s).dtor_src)).contains(_1_err)) {
                 _coll0.add(_1_err);
               }
             }
@@ -5394,31 +5394,31 @@ let SkopCheck = (function() {
         return _coll0;
       }()).Union(function () {
         let _coll1 = new _dafny.Set();
-        for (const _compr_2 of (SkopWellFormed.__default.OperandVars(s)).Elements) {
+        for (const _compr_2 of (SkopeWellFormed.__default.OperandVars(s)).Elements) {
           let _2_x = _compr_2;
-          if (((SkopWellFormed.__default.OperandVars(s)).contains(_2_x)) && (!((e).dtor_bound).contains(_2_x))) {
-            _coll1.add(SkopCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-UNBOUND"), (s).dtor_src));
+          if (((SkopeWellFormed.__default.OperandVars(s)).contains(_2_x)) && (!((e).dtor_bound).contains(_2_x))) {
+            _coll1.add(SkopeCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-UNBOUND"), (s).dtor_src));
           }
         }
         return _coll1;
       }())).Union(function () {
         let _coll2 = new _dafny.Set();
-        for (const _compr_3 of (SkopWellFormed.__default.DoItems(s)).Elements) {
+        for (const _compr_3 of (SkopeWellFormed.__default.DoItems(s)).Elements) {
           let _3_x = _compr_3;
-          if (((SkopWellFormed.__default.DoItems(s)).contains(_3_x)) && (!((e).dtor_bound).contains(_3_x))) {
-            _coll2.add(SkopCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-UNBOUND"), (s).dtor_src));
+          if (((SkopeWellFormed.__default.DoItems(s)).contains(_3_x)) && (!((e).dtor_bound).contains(_3_x))) {
+            _coll2.add(SkopeCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-UNBOUND"), (s).dtor_src));
           }
         }
         return _coll2;
       }())).Union(function () {
         let _coll3 = new _dafny.Set();
-        for (const _compr_4 of (SkopWellFormed.__default.DoItems(s)).Elements) {
+        for (const _compr_4 of (SkopeWellFormed.__default.DoItems(s)).Elements) {
           let _4_x = _compr_4;
-          if ((SkopWellFormed.__default.DoItems(s)).contains(_4_x)) {
-            for (const _compr_5 of (SkopWellFormed.__default.KindsOf(e, _4_x)).Elements) {
+          if ((SkopeWellFormed.__default.DoItems(s)).contains(_4_x)) {
+            for (const _compr_5 of (SkopeWellFormed.__default.KindsOf(e, _4_x)).Elements) {
               let _5_k = _compr_5;
-              if (((SkopWellFormed.__default.KindsOf(e, _4_x)).contains(_5_k)) && (!((_5_k).is_KAction))) {
-                _coll3.add(SkopCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-LIST-KIND"), (s).dtor_src));
+              if (((SkopeWellFormed.__default.KindsOf(e, _4_x)).contains(_5_k)) && (!((_5_k).is_KAction))) {
+                _coll3.add(SkopeCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-LIST-KIND"), (s).dtor_src));
               }
             }
           }
@@ -5427,15 +5427,15 @@ let SkopCheck = (function() {
       }())).Union(function () {
         let _coll4 = new _dafny.Set();
         if (act) {
-          for (const _compr_6 of (SkopWellFormed.__default.DoItems(s)).Elements) {
+          for (const _compr_6 of (SkopeWellFormed.__default.DoItems(s)).Elements) {
             let _6_x = _compr_6;
-            if ((SkopWellFormed.__default.DoItems(s)).contains(_6_x)) {
-              for (const _compr_7 of (SkopWellFormed.__default.KindsOf(e, _6_x)).Elements) {
+            if ((SkopeWellFormed.__default.DoItems(s)).contains(_6_x)) {
+              for (const _compr_7 of (SkopeWellFormed.__default.KindsOf(e, _6_x)).Elements) {
                 let _7_k = _compr_7;
-                if (((SkopWellFormed.__default.KindsOf(e, _6_x)).contains(_7_k)) && ((_7_k).is_KAction)) {
-                  for (const _compr_8 of (SkopCheck.__default.DoneCmdErrs(p, e, (_7_k).dtor_list)).Elements) {
+                if (((SkopeWellFormed.__default.KindsOf(e, _6_x)).contains(_7_k)) && ((_7_k).is_KAction)) {
+                  for (const _compr_8 of (SkopeCheck.__default.DoneCmdErrs(p, e, (_7_k).dtor_list)).Elements) {
                     let _8_err = _compr_8;
-                    if ((SkopCheck.__default.DoneCmdErrs(p, e, (_7_k).dtor_list)).contains(_8_err)) {
+                    if ((SkopeCheck.__default.DoneCmdErrs(p, e, (_7_k).dtor_list)).contains(_8_err)) {
                       _coll4.add(_8_err);
                     }
                   }
@@ -5445,7 +5445,7 @@ let SkopCheck = (function() {
           }
         }
         return _coll4;
-      }())).Union((((((s).is_IfYesRun) || ((s).is_IfYesDo)) && (!((((gov).is_Some) && (((e).dtor_bound).contains((gov).dtor_value))) && ((SkopWellFormed.__default.KindsOf(e, (gov).dtor_value)).equals(_dafny.Set.fromElements(SkopWellFormed.Kind.create_KYesNo())))))) ? (_dafny.Set.fromElements(SkopCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-IF-YES"), (s).dtor_src))) : (_dafny.Set.fromElements())))).Union(function (_pat_let2_0) {
+      }())).Union((((((s).is_IfYesRun) || ((s).is_IfYesDo)) && (!((((gov).is_Some) && (((e).dtor_bound).contains((gov).dtor_value))) && ((SkopeWellFormed.__default.KindsOf(e, (gov).dtor_value)).equals(_dafny.Set.fromElements(SkopeWellFormed.Kind.create_KYesNo())))))) ? (_dafny.Set.fromElements(SkopeCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-IF-YES"), (s).dtor_src))) : (_dafny.Set.fromElements())))).Union(function (_pat_let2_0) {
         return function (_9_jumps) {
           return function (_pat_let3_0) {
             return function (_10_out) {
@@ -5453,30 +5453,30 @@ let SkopCheck = (function() {
                 let _coll5 = new _dafny.Set();
                 for (const _compr_9 of (_9_jumps).Elements) {
                   let _11_j = _compr_9;
-                  if ((((_9_jumps).contains(_11_j)) && ((_pat_let_tv3).contains(((_11_j).dtor_ref).dtor_id))) && (!(SkopWellFormed.__default.Approx((_pat_let_tv4).get(((_11_j).dtor_ref).dtor_id), _10_out)))) {
-                    _coll5.add(SkopCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-UNBOUND"), (_11_j).dtor_src));
+                  if ((((_9_jumps).contains(_11_j)) && ((_pat_let_tv3).contains(((_11_j).dtor_ref).dtor_id))) && (!(SkopeWellFormed.__default.Approx((_pat_let_tv4).get(((_11_j).dtor_ref).dtor_id), _10_out)))) {
+                    _coll5.add(SkopeCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-UNBOUND"), (_11_j).dtor_src));
                   }
                 }
                 return _coll5;
               }();
             }(_pat_let3_0);
-          }(SkopWellFormed.__default.Forget(_pat_let_tv0, (_pat_let_tv1).Union(SkopWellFormed.__default.BindingSet(_pat_let_tv2))));
+          }(SkopeWellFormed.__default.Forget(_pat_let_tv0, (_pat_let_tv1).Union(SkopeWellFormed.__default.BindingSet(_pat_let_tv2))));
         }(_pat_let2_0);
-      }(SkopWellFormed.__default.Jumps(s)))).Union(((!((s).is_ForEach)) ? (_dafny.Set.fromElements()) : (((!(SkopWellFormed.__default.IsData(p, ((s).dtor_list).dtor_id))) ? (SkopCheck.__default.ListRefErrs(p, (s).dtor_list, (s).dtor_src)) : ((((new BigNumber(((SkopWellFormed.__default.DataList(p, ((s).dtor_list).dtor_id)).dtor_items).length)).isEqualTo(_dafny.ZERO)) ? (SkopCheck.__default.DataListErrs(SkopWellFormed.__default.DataList(p, ((s).dtor_list).dtor_id))) : (SkopCheck.__default.SeqErrs(p, act, In, (s).dtor_body, SkopWellFormed.__default.LoopEntry(p, s, e), (lv).Union(_dafny.Set.fromElements((s).dtor_loopVar)), SkopAst.Option.create_None()))))))));
+      }(SkopeWellFormed.__default.Jumps(s)))).Union(((!((s).is_ForEach)) ? (_dafny.Set.fromElements()) : (((!(SkopeWellFormed.__default.IsData(p, ((s).dtor_list).dtor_id))) ? (SkopeCheck.__default.ListRefErrs(p, (s).dtor_list, (s).dtor_src)) : ((((new BigNumber(((SkopeWellFormed.__default.DataList(p, ((s).dtor_list).dtor_id)).dtor_items).length)).isEqualTo(_dafny.ZERO)) ? (SkopeCheck.__default.DataListErrs(SkopeWellFormed.__default.DataList(p, ((s).dtor_list).dtor_id))) : (SkopeCheck.__default.SeqErrs(p, act, In, (s).dtor_body, SkopeWellFormed.__default.LoopEntry(p, s, e), (lv).Union(_dafny.Set.fromElements((s).dtor_loopVar)), SkopeAst.Option.create_None()))))))));
     };
     static DoneCmdErrs(p, e, list) {
-      if (SkopWellFormed.__default.IsData(p, list)) {
+      if (SkopeWellFormed.__default.IsData(p, list)) {
         return function () {
           let _coll0 = new _dafny.Set();
-          for (const _compr_0 of ((SkopWellFormed.__default.DataList(p, list)).dtor_items).Elements) {
+          for (const _compr_0 of ((SkopeWellFormed.__default.DataList(p, list)).dtor_items).Elements) {
             let _0_i = _compr_0;
-            if ((_dafny.Seq.contains((SkopWellFormed.__default.DataList(p, list)).dtor_items, _0_i)) && ((_0_i).is_Action)) {
-              for (const _compr_1 of (SkopWellFormed.__default.PartVars((_0_i).dtor_cmd)).Elements) {
+            if ((_dafny.Seq.contains((SkopeWellFormed.__default.DataList(p, list)).dtor_items, _0_i)) && ((_0_i).is_Action)) {
+              for (const _compr_1 of (SkopeWellFormed.__default.PartVars((_0_i).dtor_cmd)).Elements) {
                 let _1_y = _compr_1;
-                if ((SkopWellFormed.__default.PartVars((_0_i).dtor_cmd)).contains(_1_y)) {
-                  for (const _compr_2 of (SkopCheck.__default.CmdVarErrs(p, e, _1_y, (_0_i).dtor_src)).Elements) {
+                if ((SkopeWellFormed.__default.PartVars((_0_i).dtor_cmd)).contains(_1_y)) {
+                  for (const _compr_2 of (SkopeCheck.__default.CmdVarErrs(p, e, _1_y, (_0_i).dtor_src)).Elements) {
                     let _2_err = _compr_2;
-                    if ((SkopCheck.__default.CmdVarErrs(p, e, _1_y, (_0_i).dtor_src)).contains(_2_err)) {
+                    if ((SkopeCheck.__default.CmdVarErrs(p, e, _1_y, (_0_i).dtor_src)).contains(_2_err)) {
                       _coll0.add(_2_err);
                     }
                   }
@@ -5494,19 +5494,19 @@ let SkopCheck = (function() {
       if ((new BigNumber((body).length)).isEqualTo(_dafny.ZERO)) {
         return _dafny.Set.fromElements();
       } else {
-        return (SkopCheck.__default.StmtErrs(p, act, In, (body)[_dafny.ZERO], e, lv, gov)).Union(SkopCheck.__default.SeqErrs(p, act, In, (body).slice(_dafny.ONE), SkopWellFormed.__default.After(p, (body)[_dafny.ZERO], e), lv, SkopWellFormed.__default.NextGov((body)[_dafny.ZERO], gov)));
+        return (SkopeCheck.__default.StmtErrs(p, act, In, (body)[_dafny.ZERO], e, lv, gov)).Union(SkopeCheck.__default.SeqErrs(p, act, In, (body).slice(_dafny.ONE), SkopeWellFormed.__default.After(p, (body)[_dafny.ZERO], e), lv, SkopeWellFormed.__default.NextGov((body)[_dafny.ZERO], gov)));
       }
     };
     static FlowErrs(p, In, act) {
-      return (SkopCheck.__default.OverSections(p, SkopCheck.__default.FlowOf(p, In, act))).Union(((((In).contains(((p).dtor_entry).dtor_section)) && (!(SkopWellFormed.__default.Approx((In).get(((p).dtor_entry).dtor_section), SkopWellFormed.__default.EntryEnv(p))))) ? (_dafny.Set.fromElements(SkopCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-UNBOUND"), ((p).dtor_entry).dtor_src))) : (_dafny.Set.fromElements())));
+      return (SkopeCheck.__default.OverSections(p, SkopeCheck.__default.FlowOf(p, In, act))).Union(((((In).contains(((p).dtor_entry).dtor_section)) && (!(SkopeWellFormed.__default.Approx((In).get(((p).dtor_entry).dtor_section), SkopeWellFormed.__default.EntryEnv(p))))) ? (_dafny.Set.fromElements(SkopeCheck.__default.Err(_dafny.Seq.UnicodeFromString("E-UNBOUND"), ((p).dtor_entry).dtor_src))) : (_dafny.Set.fromElements())));
     };
     static FlowOf(p, In, act) {
       return ((_0_p, _1_In, _2_act) => function (_3_id) {
-        return (((SkopWellFormed.__default.IsInstr(_0_p, _3_id)) && ((_1_In).contains(_3_id))) ? (SkopCheck.__default.SeqErrs(_0_p, _2_act, _1_In, SkopWellFormed.__default.Body(_0_p, _3_id), (_1_In).get(_3_id), _dafny.Set.fromElements(), SkopAst.Option.create_None())) : (_dafny.Set.fromElements()));
+        return (((SkopeWellFormed.__default.IsInstr(_0_p, _3_id)) && ((_1_In).contains(_3_id))) ? (SkopeCheck.__default.SeqErrs(_0_p, _2_act, _1_In, SkopeWellFormed.__default.Body(_0_p, _3_id), (_1_In).get(_3_id), _dafny.Set.fromElements(), SkopeAst.Option.create_None())) : (_dafny.Set.fromElements()));
       })(p, In, act);
     };
     static WarningsWith(p, f) {
-      return (((SkopCheck.__default.UnreachedWarns(p, (f).dtor_reach)).Union(SkopCheck.__default.NoGuidanceWarns(p))).Union(SkopCheck.__default.ScoreWarns(p, (f).dtor_reach))).Union((((SkopCheck.__default.CycleErrs(p, (f).dtor_reach)).equals(_dafny.Set.fromElements())) ? (SkopCheck.__default.NoContextWarns(p, (f).dtor_In)) : (_dafny.Set.fromElements())));
+      return (((SkopeCheck.__default.UnreachedWarns(p, (f).dtor_reach)).Union(SkopeCheck.__default.NoGuidanceWarns(p))).Union(SkopeCheck.__default.ScoreWarns(p, (f).dtor_reach))).Union((((SkopeCheck.__default.CycleErrs(p, (f).dtor_reach)).equals(_dafny.Set.fromElements())) ? (SkopeCheck.__default.NoContextWarns(p, (f).dtor_In)) : (_dafny.Set.fromElements())));
     };
     static UnreachedWarns(p, reach) {
       if (!(reach).contains(((p).dtor_entry).dtor_section)) {
@@ -5518,7 +5518,7 @@ let SkopCheck = (function() {
           for (const _compr_0 of (reach).Keys.Elements) {
             let _1_id = _compr_0;
             if ((((reach).contains(_1_id)) && (((p).dtor_sections).contains(_1_id))) && (!(_0_reached).contains(_1_id))) {
-              _coll0.add(SkopCheck.__default.Err(_dafny.Seq.UnicodeFromString("W-SECTION-UNREACHED"), (((p).dtor_sections).get(_1_id)).dtor_src));
+              _coll0.add(SkopeCheck.__default.Err(_dafny.Seq.UnicodeFromString("W-SECTION-UNREACHED"), (((p).dtor_sections).get(_1_id)).dtor_src));
             }
           }
           return _coll0;
@@ -5526,7 +5526,7 @@ let SkopCheck = (function() {
       }
     };
     static NoGuidanceWarns(p) {
-      let _0_stmts = SkopWellFormed.__default.Stmts(p);
+      let _0_stmts = SkopeWellFormed.__default.Stmts(p);
       return function () {
         let _coll0 = new _dafny.Set();
         for (const _compr_0 of (_0_stmts).Elements) {
@@ -5534,8 +5534,8 @@ let SkopCheck = (function() {
           if ((((_0_stmts).contains(_1_s)) && ((_1_s).is_Ask)) && (((_1_s).dtor_form).is_Sections)) {
             for (const _compr_1 of (((_1_s).dtor_form).dtor_options).Elements) {
               let _2_o = _compr_1;
-              if (((_dafny.Seq.contains(((_1_s).dtor_form).dtor_options, _2_o)) && (SkopWellFormed.__default.IsInstr(p, ((_2_o).dtor_ref).dtor_id))) && (((((p).dtor_sections).get(((_2_o).dtor_ref).dtor_id)).dtor_guidance).is_None)) {
-                _coll0.add(SkopCheck.__default.Err(_dafny.Seq.UnicodeFromString("W-NO-GUIDANCE"), (((p).dtor_sections).get(((_2_o).dtor_ref).dtor_id)).dtor_src));
+              if (((_dafny.Seq.contains(((_1_s).dtor_form).dtor_options, _2_o)) && (SkopeWellFormed.__default.IsInstr(p, ((_2_o).dtor_ref).dtor_id))) && (((((p).dtor_sections).get(((_2_o).dtor_ref).dtor_id)).dtor_guidance).is_None)) {
+                _coll0.add(SkopeCheck.__default.Err(_dafny.Seq.UnicodeFromString("W-NO-GUIDANCE"), (((p).dtor_sections).get(((_2_o).dtor_ref).dtor_id)).dtor_src));
               }
             }
           }
@@ -5548,15 +5548,15 @@ let SkopCheck = (function() {
         return _dafny.Set.fromElements();
       } else {
         let _0_s = (body)[_dafny.ZERO];
-        return ((((((_0_s).is_Ask) && (_dafny.Quantifier((SkopWellFormed.__default.PartVars((_0_s).dtor_question)).Elements, true, function (_forall_var_0) {
+        return ((((((_0_s).is_Ask) && (_dafny.Quantifier((SkopeWellFormed.__default.PartVars((_0_s).dtor_question)).Elements, true, function (_forall_var_0) {
           let _1_x = _forall_var_0;
-          return !((SkopWellFormed.__default.PartVars((_0_s).dtor_question)).contains(_1_x)) || (!(SkopWellFormed.__default.KindsOf(e, _1_x)).contains(SkopWellFormed.Kind.create_KRun()));
-        }))) ? (_dafny.Set.fromElements(SkopCheck.__default.Err(_dafny.Seq.UnicodeFromString("W-ASK-NO-CONTEXT"), (_0_s).dtor_src))) : (_dafny.Set.fromElements()))).Union((((_0_s).is_ForEach) ? (SkopCheck.__default.NoContext(p, (_0_s).dtor_body, SkopWellFormed.__default.LoopEntry(p, _0_s, e))) : (_dafny.Set.fromElements())))).Union(SkopCheck.__default.NoContext(p, (body).slice(_dafny.ONE), SkopWellFormed.__default.After(p, _0_s, e)));
+          return !((SkopeWellFormed.__default.PartVars((_0_s).dtor_question)).contains(_1_x)) || (!(SkopeWellFormed.__default.KindsOf(e, _1_x)).contains(SkopeWellFormed.Kind.create_KRun()));
+        }))) ? (_dafny.Set.fromElements(SkopeCheck.__default.Err(_dafny.Seq.UnicodeFromString("W-ASK-NO-CONTEXT"), (_0_s).dtor_src))) : (_dafny.Set.fromElements()))).Union((((_0_s).is_ForEach) ? (SkopeCheck.__default.NoContext(p, (_0_s).dtor_body, SkopeWellFormed.__default.LoopEntry(p, _0_s, e))) : (_dafny.Set.fromElements())))).Union(SkopeCheck.__default.NoContext(p, (body).slice(_dafny.ONE), SkopeWellFormed.__default.After(p, _0_s, e)));
       }
     };
     static NoContextWarns(p, In) {
-      return SkopCheck.__default.OverSections(p, ((_0_p, _1_In) => function (_2_id) {
-        return (((SkopWellFormed.__default.IsInstr(_0_p, _2_id)) && ((_1_In).contains(_2_id))) ? (SkopCheck.__default.NoContext(_0_p, SkopWellFormed.__default.Body(_0_p, _2_id), (_1_In).get(_2_id))) : (_dafny.Set.fromElements()));
+      return SkopeCheck.__default.OverSections(p, ((_0_p, _1_In) => function (_2_id) {
+        return (((SkopeWellFormed.__default.IsInstr(_0_p, _2_id)) && ((_1_In).contains(_2_id))) ? (SkopeCheck.__default.NoContext(_0_p, SkopeWellFormed.__default.Body(_0_p, _2_id), (_1_In).get(_2_id))) : (_dafny.Set.fromElements()));
       })(p, In));
     };
     static Uses(s, x) {
@@ -5617,14 +5617,14 @@ let SkopCheck = (function() {
           return _dafny.Seq.of();
         }
       }();
-      return ((((_dafny.MultiSet.FromArray(_0_parts)).get(SkopAst.Part.create_Var(x))).plus((((((s).is_Check) && (((s).dtor_cond).is_Cmp)) && (_dafny.areEqual(((s).dtor_cond).dtor_l, SkopAst.Operand.create_VarOp(x)))) ? (_dafny.ONE) : (_dafny.ZERO)))).plus((((((s).is_Check) && (((s).dtor_cond).is_Cmp)) && (_dafny.areEqual(((s).dtor_cond).dtor_r, SkopAst.Operand.create_VarOp(x)))) ? (_dafny.ONE) : (_dafny.ZERO)))).plus((((SkopWellFormed.__default.DoItems(s)).contains(x)) ? (_dafny.ONE) : (_dafny.ZERO)));
+      return ((((_dafny.MultiSet.FromArray(_0_parts)).get(SkopeAst.Part.create_Var(x))).plus((((((s).is_Check) && (((s).dtor_cond).is_Cmp)) && (_dafny.areEqual(((s).dtor_cond).dtor_l, SkopeAst.Operand.create_VarOp(x)))) ? (_dafny.ONE) : (_dafny.ZERO)))).plus((((((s).is_Check) && (((s).dtor_cond).is_Cmp)) && (_dafny.areEqual(((s).dtor_cond).dtor_r, SkopeAst.Operand.create_VarOp(x)))) ? (_dafny.ONE) : (_dafny.ZERO)))).plus((((SkopeWellFormed.__default.DoItems(s)).contains(x)) ? (_dafny.ONE) : (_dafny.ZERO)));
     };
     static Threshold(s, x) {
-      return (((s).is_Check) && (((s).dtor_cond).is_Cmp)) && (((_dafny.areEqual(((s).dtor_cond).dtor_l, SkopAst.Operand.create_VarOp(x))) && ((((s).dtor_cond).dtor_r).is_Num)) || ((_dafny.areEqual(((s).dtor_cond).dtor_r, SkopAst.Operand.create_VarOp(x))) && ((((s).dtor_cond).dtor_l).is_Num)));
+      return (((s).is_Check) && (((s).dtor_cond).is_Cmp)) && (((_dafny.areEqual(((s).dtor_cond).dtor_l, SkopeAst.Operand.create_VarOp(x))) && ((((s).dtor_cond).dtor_r).is_Num)) || ((_dafny.areEqual(((s).dtor_cond).dtor_r, SkopeAst.Operand.create_VarOp(x))) && ((((s).dtor_cond).dtor_l).is_Num)));
     };
     static ScoreWarns(p, reach) {
-      return SkopCheck.__default.OverSections(p, ((_0_p, _1_reach) => function (_2_id) {
-        return (((SkopWellFormed.__default.IsInstr(_0_p, _2_id)) && ((_1_reach).contains(_2_id))) ? (SkopCheck.__default.ScoreWarnsIn(_0_p, _1_reach, _2_id, SkopWellFormed.__default.Flat(SkopWellFormed.__default.Body(_0_p, _2_id)), _dafny.ZERO)) : (_dafny.Set.fromElements()));
+      return SkopeCheck.__default.OverSections(p, ((_0_p, _1_reach) => function (_2_id) {
+        return (((SkopeWellFormed.__default.IsInstr(_0_p, _2_id)) && ((_1_reach).contains(_2_id))) ? (SkopeCheck.__default.ScoreWarnsIn(_0_p, _1_reach, _2_id, SkopeWellFormed.__default.Flat(SkopeWellFormed.__default.Body(_0_p, _2_id)), _dafny.ZERO)) : (_dafny.Set.fromElements()));
       })(p, reach));
     };
     static ScoreWarnsIn(p, reach, id, flat, i) {
@@ -5633,7 +5633,7 @@ let SkopCheck = (function() {
         if ((new BigNumber((flat).length)).isLessThanOrEqualTo(i)) {
           return (_dafny.Set.fromElements()).Union(_0___accumulator);
         } else {
-          _0___accumulator = (_0___accumulator).Union(SkopCheck.__default.ScoreWarn(p, reach, id, flat, i));
+          _0___accumulator = (_0___accumulator).Union(SkopeCheck.__default.ScoreWarn(p, reach, id, flat, i));
           let _in0 = p;
           let _in1 = reach;
           let _in2 = id;
@@ -5667,10 +5667,10 @@ let SkopCheck = (function() {
           let _coll1 = new _dafny.Set();
           for (const _compr_1 of ((reach).get(id)).Elements) {
             let _4_t = _compr_1;
-            if (((((reach).get(id)).contains(_4_t)) && (!_dafny.areEqual(_4_t, id))) && (SkopWellFormed.__default.IsInstr(p, _4_t))) {
-              for (const _compr_2 of (SkopWellFormed.__default.Flat(SkopWellFormed.__default.Body(p, _4_t))).Elements) {
+            if (((((reach).get(id)).contains(_4_t)) && (!_dafny.areEqual(_4_t, id))) && (SkopeWellFormed.__default.IsInstr(p, _4_t))) {
+              for (const _compr_2 of (SkopeWellFormed.__default.Flat(SkopeWellFormed.__default.Body(p, _4_t))).Elements) {
                 let _5_u = _compr_2;
-                if (_dafny.Seq.contains(SkopWellFormed.__default.Flat(SkopWellFormed.__default.Body(p, _4_t)), _5_u)) {
+                if (_dafny.Seq.contains(SkopeWellFormed.__default.Flat(SkopeWellFormed.__default.Body(p, _4_t)), _5_u)) {
                   _coll1.add(_5_u);
                 }
               }
@@ -5682,29 +5682,29 @@ let SkopCheck = (function() {
           let _coll2 = new _dafny.Set();
           for (const _compr_3 of (_2_later).Elements) {
             let _7_u = _compr_3;
-            if (((_2_later).contains(_7_u)) && ((_dafny.ZERO).isLessThan(SkopCheck.__default.Uses(_7_u, _1_x)))) {
+            if (((_2_later).contains(_7_u)) && ((_dafny.ZERO).isLessThan(SkopeCheck.__default.Uses(_7_u, _1_x)))) {
               _coll2.add(_7_u);
             }
           }
           return _coll2;
         }();
         if ((_6_users).equals(_dafny.Set.fromElements())) {
-          return _dafny.Set.fromElements(SkopCheck.__default.Err(_dafny.Seq.UnicodeFromString("W-SCORE-UNUSED"), (_0_s).dtor_src));
+          return _dafny.Set.fromElements(SkopeCheck.__default.Err(_dafny.Seq.UnicodeFromString("W-SCORE-UNUSED"), (_0_s).dtor_src));
         } else if (_dafny.Quantifier((_6_users).Elements, false, function (_exists_var_0) {
           let _8_u = _exists_var_0;
-          return ((_6_users).contains(_8_u)) && ((((_6_users).equals(_dafny.Set.fromElements(_8_u))) && ((SkopCheck.__default.Uses(_8_u, _1_x)).isEqualTo(_dafny.ONE))) && (SkopCheck.__default.Threshold(_8_u, _1_x)));
+          return ((_6_users).contains(_8_u)) && ((((_6_users).equals(_dafny.Set.fromElements(_8_u))) && ((SkopeCheck.__default.Uses(_8_u, _1_x)).isEqualTo(_dafny.ONE))) && (SkopeCheck.__default.Threshold(_8_u, _1_x)));
         })) {
-          return _dafny.Set.fromElements(SkopCheck.__default.Err(_dafny.Seq.UnicodeFromString("W-SCORE-THRESHOLD"), (_0_s).dtor_src));
+          return _dafny.Set.fromElements(SkopeCheck.__default.Err(_dafny.Seq.UnicodeFromString("W-SCORE-THRESHOLD"), (_0_s).dtor_src));
         } else {
           return _dafny.Set.fromElements();
         }
       }
     };
     static StrLe(a, b) {
-      return ((new BigNumber((a).length)).isEqualTo(_dafny.ZERO)) || (((_dafny.ZERO).isLessThan(new BigNumber((b).length))) && ((((a)[_dafny.ZERO]).isLessThan((b)[_dafny.ZERO])) || ((_dafny.areEqual((a)[_dafny.ZERO], (b)[_dafny.ZERO])) && (SkopCheck.__default.StrLe((a).slice(_dafny.ONE), (b).slice(_dafny.ONE))))));
+      return ((new BigNumber((a).length)).isEqualTo(_dafny.ZERO)) || (((_dafny.ZERO).isLessThan(new BigNumber((b).length))) && ((((a)[_dafny.ZERO]).isLessThan((b)[_dafny.ZERO])) || ((_dafny.areEqual((a)[_dafny.ZERO], (b)[_dafny.ZERO])) && (SkopeCheck.__default.StrLe((a).slice(_dafny.ONE), (b).slice(_dafny.ONE))))));
     };
     static ErrLe(a, b) {
-      return (((a).dtor_src).isLessThan((b).dtor_src)) || ((((a).dtor_src).isEqualTo((b).dtor_src)) && (SkopCheck.__default.StrLe((a).dtor_code, (b).dtor_code)));
+      return (((a).dtor_src).isLessThan((b).dtor_src)) || ((((a).dtor_src).isEqualTo((b).dtor_src)) && (SkopeCheck.__default.StrLe((a).dtor_code, (b).dtor_code)));
     };
     static Sorted(s) {
       let _0___accumulator = _dafny.Seq.of();
@@ -5720,14 +5720,14 @@ let SkopCheck = (function() {
                 _1_m = _assign_such_that_0;
                 if (((s).contains(_1_m)) && (_dafny.Quantifier((s).Elements, true, function (_forall_var_0) {
                   let _2_x = _forall_var_0;
-                  return !((s).contains(_2_x)) || (SkopCheck.__default.ErrLe(_1_m, _2_x));
+                  return !((s).contains(_2_x)) || (SkopeCheck.__default.ErrLe(_1_m, _2_x));
                 }))) {
                   break L_ASSIGN_SUCH_THAT_0;
                 }
               }
               throw new Error("assign-such-that search produced no value");
             }
-            return _dafny.Seq.Concat(_dafny.Seq.of(_1_m), SkopCheck.__default.Sorted((_pat_let_tv0).Difference(_dafny.Set.fromElements(_1_m))));
+            return _dafny.Seq.Concat(_dafny.Seq.of(_1_m), SkopeCheck.__default.Sorted((_pat_let_tv0).Difference(_dafny.Set.fromElements(_1_m))));
           }(0);
         }
       }
@@ -5749,7 +5749,7 @@ let SkopCheck = (function() {
     get dtor_In() { return this.In; }
     toString() {
       if (this.$tag === 0) {
-        return "SkopCheck.Facts.Facts" + "(" + _dafny.toString(this.reach) + ", " + _dafny.toString(this.In) + ")";
+        return "SkopeCheck.Facts.Facts" + "(" + _dafny.toString(this.reach) + ", " + _dafny.toString(this.In) + ")";
       } else  {
         return "<unexpected>";
       }
@@ -5764,7 +5764,7 @@ let SkopCheck = (function() {
       }
     }
     static Default() {
-      return SkopCheck.Facts.create_Facts(_dafny.Map.Empty, _dafny.Map.Empty);
+      return SkopeCheck.Facts.create_Facts(_dafny.Map.Empty, _dafny.Map.Empty);
     }
     static Rtd() {
       return class {
@@ -5775,13 +5775,13 @@ let SkopCheck = (function() {
     }
   }
   return $module;
-})(); // end of module SkopCheck
-let SkopValues = (function() {
+})(); // end of module SkopeCheck
+let SkopeValues = (function() {
   let $module = {};
 
   $module.__default = class __default {
     constructor () {
-      this._tname = "SkopValues._default";
+      this._tname = "SkopeValues._default";
     }
     _parentTraits() {
       return [];
@@ -5793,9 +5793,9 @@ let SkopValues = (function() {
       let _0___accumulator = _dafny.Seq.of();
       TAIL_CALL_START: while (true) {
         if ((n).isLessThan(new BigNumber(10))) {
-          return _dafny.Seq.Concat(_dafny.Seq.of(SkopValues.__default.Digit(n)), _0___accumulator);
+          return _dafny.Seq.Concat(_dafny.Seq.of(SkopeValues.__default.Digit(n)), _0___accumulator);
         } else {
-          _0___accumulator = _dafny.Seq.Concat(_dafny.Seq.of(SkopValues.__default.Digit((n).mod(new BigNumber(10)))), _0___accumulator);
+          _0___accumulator = _dafny.Seq.Concat(_dafny.Seq.of(SkopeValues.__default.Digit((n).mod(new BigNumber(10)))), _0___accumulator);
           let _in0 = _dafny.EuclideanDivision(n, new BigNumber(10));
           n = _in0;
           continue TAIL_CALL_START;
@@ -5804,9 +5804,9 @@ let SkopValues = (function() {
     };
     static IntToString(i) {
       if ((i).isLessThan(_dafny.ZERO)) {
-        return _dafny.Seq.Concat(_dafny.Seq.UnicodeFromString("-"), SkopValues.__default.NatToString((_dafny.ZERO).minus(i)));
+        return _dafny.Seq.Concat(_dafny.Seq.UnicodeFromString("-"), SkopeValues.__default.NatToString((_dafny.ZERO).minus(i)));
       } else {
-        return SkopValues.__default.NatToString(i);
+        return SkopeValues.__default.NatToString(i);
       }
     };
     static Show(v) {
@@ -5819,7 +5819,7 @@ let SkopValues = (function() {
       }
       {
         let _1_i = (_source0).i;
-        return SkopValues.__default.IntToString(_1_i);
+        return SkopeValues.__default.IntToString(_1_i);
       }
     };
     static IsDigit(c) {
@@ -5828,11 +5828,11 @@ let SkopValues = (function() {
     static AllDigits(s) {
       return ((_dafny.ZERO).isLessThan(new BigNumber((s).length))) && (_dafny.Quantifier((s).UniqueElements, true, function (_forall_var_0) {
         let _0_c = _forall_var_0;
-        return !(_dafny.Seq.contains(s, _0_c)) || (SkopValues.__default.IsDigit(_0_c));
+        return !(_dafny.Seq.contains(s, _0_c)) || (SkopeValues.__default.IsDigit(_0_c));
       }));
     };
     static Json(s) {
-      return _dafny.Seq.Concat(_dafny.Seq.Concat(_dafny.Seq.UnicodeFromString("\""), SkopValues.__default.JsonEsc(s)), _dafny.Seq.UnicodeFromString("\""));
+      return _dafny.Seq.Concat(_dafny.Seq.Concat(_dafny.Seq.UnicodeFromString("\""), SkopeValues.__default.JsonEsc(s)), _dafny.Seq.UnicodeFromString("\""));
     };
     static JsonEsc(s) {
       let _0___accumulator = _dafny.Seq.of();
@@ -5840,7 +5840,7 @@ let SkopValues = (function() {
         if ((new BigNumber((s).length)).isEqualTo(_dafny.ZERO)) {
           return _dafny.Seq.Concat(_0___accumulator, _dafny.Seq.UnicodeFromString(""));
         } else {
-          _0___accumulator = _dafny.Seq.Concat(_0___accumulator, ((_dafny.areEqual((s)[_dafny.ZERO], new _dafny.CodePoint('"'.codePointAt(0)))) ? (_dafny.Seq.UnicodeFromString("\\\"")) : (((_dafny.areEqual((s)[_dafny.ZERO], new _dafny.CodePoint('\\'.codePointAt(0)))) ? (_dafny.Seq.UnicodeFromString("\\\\")) : ((((new BigNumber(((s)[_dafny.ZERO]).value)).isLessThan(new BigNumber(32))) ? (_dafny.Seq.Concat(_dafny.Seq.UnicodeFromString("\\u00"), _dafny.Seq.of(SkopValues.__default.HexDigit(_dafny.EuclideanDivision(new BigNumber(((s)[_dafny.ZERO]).value), new BigNumber(16))), SkopValues.__default.HexDigit((new BigNumber(((s)[_dafny.ZERO]).value)).mod(new BigNumber(16)))))) : (_dafny.Seq.of((s)[_dafny.ZERO]))))))));
+          _0___accumulator = _dafny.Seq.Concat(_0___accumulator, ((_dafny.areEqual((s)[_dafny.ZERO], new _dafny.CodePoint('"'.codePointAt(0)))) ? (_dafny.Seq.UnicodeFromString("\\\"")) : (((_dafny.areEqual((s)[_dafny.ZERO], new _dafny.CodePoint('\\'.codePointAt(0)))) ? (_dafny.Seq.UnicodeFromString("\\\\")) : ((((new BigNumber(((s)[_dafny.ZERO]).value)).isLessThan(new BigNumber(32))) ? (_dafny.Seq.Concat(_dafny.Seq.UnicodeFromString("\\u00"), _dafny.Seq.of(SkopeValues.__default.HexDigit(_dafny.EuclideanDivision(new BigNumber(((s)[_dafny.ZERO]).value), new BigNumber(16))), SkopeValues.__default.HexDigit((new BigNumber(((s)[_dafny.ZERO]).value)).mod(new BigNumber(16)))))) : (_dafny.Seq.of((s)[_dafny.ZERO]))))))));
           let _in0 = (s).slice(_dafny.ONE);
           s = _in0;
           continue TAIL_CALL_START;
@@ -5855,7 +5855,7 @@ let SkopValues = (function() {
     };
     static TrimStart(s) {
       TAIL_CALL_START: while (true) {
-        if (((_dafny.ZERO).isLessThan(new BigNumber((s).length))) && (SkopValues.__default.Space((s)[_dafny.ZERO]))) {
+        if (((_dafny.ZERO).isLessThan(new BigNumber((s).length))) && (SkopeValues.__default.Space((s)[_dafny.ZERO]))) {
           let _in0 = (s).slice(_dafny.ONE);
           s = _in0;
           continue TAIL_CALL_START;
@@ -5866,7 +5866,7 @@ let SkopValues = (function() {
     };
     static TrimEnd(s) {
       TAIL_CALL_START: while (true) {
-        if (((_dafny.ZERO).isLessThan(new BigNumber((s).length))) && (SkopValues.__default.Space((s)[(new BigNumber((s).length)).minus(_dafny.ONE)]))) {
+        if (((_dafny.ZERO).isLessThan(new BigNumber((s).length))) && (SkopeValues.__default.Space((s)[(new BigNumber((s).length)).minus(_dafny.ONE)]))) {
           let _in0 = (s).slice(0, (new BigNumber((s).length)).minus(_dafny.ONE));
           s = _in0;
           continue TAIL_CALL_START;
@@ -5876,7 +5876,7 @@ let SkopValues = (function() {
       }
     };
     static Trim(s) {
-      return SkopValues.__default.TrimEnd(SkopValues.__default.TrimStart(s));
+      return SkopeValues.__default.TrimEnd(SkopeValues.__default.TrimStart(s));
     };
     static StripPct(s) {
       if (((_dafny.ZERO).isLessThan(new BigNumber((s).length))) && (_dafny.areEqual((s)[(new BigNumber((s).length)).minus(_dafny.ONE)], new _dafny.CodePoint('%'.codePointAt(0))))) {
@@ -5889,7 +5889,7 @@ let SkopValues = (function() {
       if ((new BigNumber((s).length)).isEqualTo(_dafny.ZERO)) {
         return _dafny.ZERO;
       } else {
-        return ((SkopValues.__default.DigitsVal((s).slice(0, (new BigNumber((s).length)).minus(_dafny.ONE)))).multipliedBy(new BigNumber(10))).plus((new BigNumber(((s)[(new BigNumber((s).length)).minus(_dafny.ONE)]).value)).minus(new BigNumber((new _dafny.CodePoint('0'.codePointAt(0))).value)));
+        return ((SkopeValues.__default.DigitsVal((s).slice(0, (new BigNumber((s).length)).minus(_dafny.ONE)))).multipliedBy(new BigNumber(10))).plus((new BigNumber(((s)[(new BigNumber((s).length)).minus(_dafny.ONE)]).value)).minus(new BigNumber((new _dafny.CodePoint('0'.codePointAt(0))).value)));
       }
     };
     static Pow10(n) {
@@ -5923,14 +5923,14 @@ let SkopValues = (function() {
     static ParseNum(s) {
       let _0_neg = ((_dafny.ZERO).isLessThan(new BigNumber((s).length))) && (_dafny.areEqual((s)[_dafny.ZERO], new _dafny.CodePoint('-'.codePointAt(0))));
       let _1_t = ((_0_neg) ? ((s).slice(_dafny.ONE)) : (s));
-      let _2_i = SkopValues.__default.IndexOf(_1_t, new _dafny.CodePoint('.'.codePointAt(0)));
+      let _2_i = SkopeValues.__default.IndexOf(_1_t, new _dafny.CodePoint('.'.codePointAt(0)));
       let _3_a = (_1_t).slice(0, _2_i);
       let _4_b = (((_2_i).isLessThan(new BigNumber((_1_t).length))) ? ((_1_t).slice((_2_i).plus(_dafny.ONE))) : (_dafny.Seq.UnicodeFromString("")));
-      if ((!(SkopValues.__default.AllDigits(_3_a))) || (((_2_i).isLessThan(new BigNumber((_1_t).length))) && (!(SkopValues.__default.AllDigits(_4_b))))) {
-        return SkopAst.Option.create_None();
+      if ((!(SkopeValues.__default.AllDigits(_3_a))) || (((_2_i).isLessThan(new BigNumber((_1_t).length))) && (!(SkopeValues.__default.AllDigits(_4_b))))) {
+        return SkopeAst.Option.create_None();
       } else {
-        let _5_v = (new _dafny.BigRational((SkopValues.__default.DigitsVal(_3_a)), new BigNumber(1))).plus((new _dafny.BigRational((SkopValues.__default.DigitsVal(_4_b)), new BigNumber(1))).dividedBy(new _dafny.BigRational((SkopValues.__default.Pow10(new BigNumber((_4_b).length))), new BigNumber(1))));
-        return SkopAst.Option.create_Some(((_0_neg) ? ((new _dafny.BigRational(new BigNumber("0"))).minus(_5_v)) : (_5_v)));
+        let _5_v = (new _dafny.BigRational((SkopeValues.__default.DigitsVal(_3_a)), new BigNumber(1))).plus((new _dafny.BigRational((SkopeValues.__default.DigitsVal(_4_b)), new BigNumber(1))).dividedBy(new _dafny.BigRational((SkopeValues.__default.Pow10(new BigNumber((_4_b).length))), new BigNumber(1))));
+        return SkopeAst.Option.create_Some(((_0_neg) ? ((new _dafny.BigRational(new BigNumber("0"))).minus(_5_v)) : (_5_v)));
       }
     };
     static NumText(v) {
@@ -5938,16 +5938,16 @@ let SkopValues = (function() {
       {
         if (_source0.is_Int) {
           let _0_i = (_source0).i;
-          return SkopAst.Option.create_Some(SkopValues.__default.IntToString(_0_i));
+          return SkopeAst.Option.create_Some(SkopeValues.__default.IntToString(_0_i));
         }
       }
       {
         let _1_s = (_source0).s;
-        let _2_t = SkopValues.__default.StripPct(SkopValues.__default.Trim(_1_s));
-        if ((SkopValues.__default.ParseNum(_2_t)).is_Some) {
-          return SkopAst.Option.create_Some(_2_t);
+        let _2_t = SkopeValues.__default.StripPct(SkopeValues.__default.Trim(_1_s));
+        if ((SkopeValues.__default.ParseNum(_2_t)).is_Some) {
+          return SkopeAst.Option.create_Some(_2_t);
         } else {
-          return SkopAst.Option.create_None();
+          return SkopeAst.Option.create_None();
         }
       }
     };
@@ -5956,12 +5956,12 @@ let SkopValues = (function() {
       {
         if (_source0.is_Int) {
           let _0_i = (_source0).i;
-          return SkopAst.Option.create_Some(new _dafny.BigRational((_0_i), new BigNumber(1)));
+          return SkopeAst.Option.create_Some(new _dafny.BigRational((_0_i), new BigNumber(1)));
         }
       }
       {
         let _1_s = (_source0).s;
-        return SkopValues.__default.ParseNum(SkopValues.__default.StripPct(SkopValues.__default.Trim(_1_s)));
+        return SkopeValues.__default.ParseNum(SkopeValues.__default.StripPct(SkopeValues.__default.Trim(_1_s)));
       }
     };
     static Compare(op, a, b) {
@@ -6030,13 +6030,13 @@ let SkopValues = (function() {
           }
         }
         return _coll0;
-      }()))) && (SkopValues.__default.InUnit(u))) && (_dafny.Quantifier((ids).UniqueElements, true, function (_forall_var_0) {
+      }()))) && (SkopeValues.__default.InUnit(u))) && (_dafny.Quantifier((ids).UniqueElements, true, function (_forall_var_0) {
         let _1_id = _forall_var_0;
-        return !(_dafny.Seq.contains(ids, _1_id)) || (SkopValues.__default.InUnit((probs).get(_1_id)));
-      }))) && (((new _dafny.BigRational(new BigNumber(-1), new BigNumber("1000"))).isAtMost(((SkopValues.__default.SumFirst(ids, probs, _dafny.ZERO)).plus(u)).minus(new _dafny.BigRational(new BigNumber("1"))))) && ((((SkopValues.__default.SumFirst(ids, probs, _dafny.ZERO)).plus(u)).minus(new _dafny.BigRational(new BigNumber("1")))).isAtMost(new _dafny.BigRational(_dafny.ONE, new BigNumber("1000")))));
+        return !(_dafny.Seq.contains(ids, _1_id)) || (SkopeValues.__default.InUnit((probs).get(_1_id)));
+      }))) && (((new _dafny.BigRational(new BigNumber(-1), new BigNumber("1000"))).isAtMost(((SkopeValues.__default.SumFirst(ids, probs, _dafny.ZERO)).plus(u)).minus(new _dafny.BigRational(new BigNumber("1"))))) && ((((SkopeValues.__default.SumFirst(ids, probs, _dafny.ZERO)).plus(u)).minus(new _dafny.BigRational(new BigNumber("1")))).isAtMost(new _dafny.BigRational(_dafny.ONE, new BigNumber("1000")))));
     };
     static Total(ids, probs, u) {
-      return (SkopValues.__default.SumFirst(ids, probs, _dafny.ZERO)).plus(u);
+      return (SkopeValues.__default.SumFirst(ids, probs, _dafny.ZERO)).plus(u);
     };
     static ArgMaxFrom(ids, probs, i, best) {
       TAIL_CALL_START: while (true) {
@@ -6056,19 +6056,19 @@ let SkopValues = (function() {
       }
     };
     static Gate(ids, probs, u, sure) {
-      if (!(SkopValues.__default.ValidAnswer(ids, probs, u))) {
-        return SkopValues.Verdict.create_Invalid();
+      if (!(SkopeValues.__default.ValidAnswer(ids, probs, u))) {
+        return SkopeValues.Verdict.create_Invalid();
       } else {
-        let _0_t = SkopValues.__default.Total(ids, probs, u);
-        let _1_c = SkopValues.__default.ArgMaxFrom(ids, probs, _dafny.ONE, _dafny.ZERO);
+        let _0_t = SkopeValues.__default.Total(ids, probs, u);
+        let _1_c = SkopeValues.__default.ArgMaxFrom(ids, probs, _dafny.ONE, _dafny.ZERO);
         let _2_conf = ((probs).get((ids)[_1_c])).dividedBy(_0_t);
         if ((((new _dafny.BigRational((sure), new BigNumber(1))).dividedBy(new _dafny.BigRational(new BigNumber("100")))).isAtMost(_2_conf)) && (_dafny.Quantifier(_dafny.IntegerRange(_dafny.ZERO, new BigNumber((ids).length)), true, function (_forall_var_0) {
           let _3_j = _forall_var_0;
           return !((((_dafny.ZERO).isLessThanOrEqualTo(_3_j)) && ((_3_j).isLessThan(new BigNumber((ids).length)))) && (!(_3_j).isEqualTo(_1_c))) || (((((probs).get((ids)[_3_j])).dividedBy(_0_t)).plus((u).dividedBy(_0_t))).isLessThan(_2_conf));
         }))) {
-          return SkopValues.Verdict.create_Sure(_1_c, _2_conf);
+          return SkopeValues.Verdict.create_Sure(_1_c, _2_conf);
         } else {
-          return SkopValues.Verdict.create_Unsure(_1_c, _2_conf);
+          return SkopeValues.Verdict.create_Unsure(_1_c, _2_conf);
         }
       }
     };
@@ -6101,11 +6101,11 @@ let SkopValues = (function() {
     get dtor_conf() { return this.conf; }
     toString() {
       if (this.$tag === 0) {
-        return "SkopValues.Verdict.Invalid";
+        return "SkopeValues.Verdict.Invalid";
       } else if (this.$tag === 1) {
-        return "SkopValues.Verdict.Unsure" + "(" + _dafny.toString(this.chosen) + ", " + _dafny.toString(this.conf) + ")";
+        return "SkopeValues.Verdict.Unsure" + "(" + _dafny.toString(this.chosen) + ", " + _dafny.toString(this.conf) + ")";
       } else if (this.$tag === 2) {
-        return "SkopValues.Verdict.Sure" + "(" + _dafny.toString(this.chosen) + ", " + _dafny.toString(this.conf) + ")";
+        return "SkopeValues.Verdict.Sure" + "(" + _dafny.toString(this.chosen) + ", " + _dafny.toString(this.conf) + ")";
       } else  {
         return "<unexpected>";
       }
@@ -6124,7 +6124,7 @@ let SkopValues = (function() {
       }
     }
     static Default() {
-      return SkopValues.Verdict.create_Invalid();
+      return SkopeValues.Verdict.create_Invalid();
     }
     static Rtd() {
       return class {
@@ -6135,19 +6135,19 @@ let SkopValues = (function() {
     }
   }
   return $module;
-})(); // end of module SkopValues
-let SkopState = (function() {
+})(); // end of module SkopeValues
+let SkopeState = (function() {
   let $module = {};
 
   $module.__default = class __default {
     constructor () {
-      this._tname = "SkopState._default";
+      this._tname = "SkopeState._default";
     }
     _parentTraits() {
       return [];
     }
     static ItemSlot(it) {
-      return SkopState.Slot.create_Slot(SkopStep.Bound.create_Bound(SkopStep.Val.create_Str(SkopWellFormed.__default.Label(it)), SkopStep.Origin.create_FromListItem()), SkopAst.Option.create_Some(it));
+      return SkopeState.Slot.create_Slot(SkopeStep.Bound.create_Bound(SkopeStep.Val.create_Str(SkopeWellFormed.__default.Label(it)), SkopeStep.Origin.create_FromListItem()), SkopeAst.Option.create_Some(it));
     };
     static OpSrc(op) {
       let _source0 = op;
@@ -6174,10 +6174,10 @@ let SkopState = (function() {
         if ((new BigNumber((b).length)).isEqualTo(_dafny.ZERO)) {
           return _dafny.Seq.Concat(_0___accumulator, _dafny.Seq.of());
         } else {
-          _0___accumulator = _dafny.Seq.Concat(_0___accumulator, _dafny.Seq.of(SkopState.Task.create_Task(SkopState.Op.create_S((b)[_dafny.ZERO]), gov)));
+          _0___accumulator = _dafny.Seq.Concat(_0___accumulator, _dafny.Seq.of(SkopeState.Task.create_Task(SkopeState.Op.create_S((b)[_dafny.ZERO]), gov)));
           let _in0 = p;
           let _in1 = (b).slice(_dafny.ONE);
-          let _in2 = SkopWellFormed.__default.NextGov((b)[_dafny.ZERO], gov);
+          let _in2 = SkopeWellFormed.__default.NextGov((b)[_dafny.ZERO], gov);
           p = _in0;
           b = _in1;
           gov = _in2;
@@ -6191,7 +6191,7 @@ let SkopState = (function() {
         if ((new BigNumber((items).length)).isEqualTo(_dafny.ZERO)) {
           return _dafny.Seq.Concat(_0___accumulator, _dafny.Seq.of());
         } else {
-          _0___accumulator = _dafny.Seq.Concat(_0___accumulator, _dafny.Seq.Concat(_dafny.Seq.of(SkopState.Task.create_Task(SkopState.Op.create_Bind((fe).dtor_loopVar, (items)[_dafny.ZERO], (fe).dtor_src), SkopAst.Option.create_None())), SkopState.__default.Tasks(p, (fe).dtor_body, SkopAst.Option.create_None())));
+          _0___accumulator = _dafny.Seq.Concat(_0___accumulator, _dafny.Seq.Concat(_dafny.Seq.of(SkopeState.Task.create_Task(SkopeState.Op.create_Bind((fe).dtor_loopVar, (items)[_dafny.ZERO], (fe).dtor_src), SkopeAst.Option.create_None())), SkopeState.__default.Tasks(p, (fe).dtor_body, SkopeAst.Option.create_None())));
           let _in0 = p;
           let _in1 = fe;
           let _in2 = (items).slice(_dafny.ONE);
@@ -6204,7 +6204,7 @@ let SkopState = (function() {
     };
     static Expand(p, t) {
       let _0_fe = ((t).dtor_op).dtor_stmt;
-      return _dafny.Seq.Concat(SkopState.__default.Iters(p, _0_fe, (SkopWellFormed.__default.DataList(p, ((_0_fe).dtor_list).dtor_id)).dtor_items), _dafny.Seq.of(SkopState.Task.create_Task(SkopState.Op.create_Unbind((_0_fe).dtor_loopVar, (_0_fe).dtor_src), SkopAst.Option.create_None())));
+      return _dafny.Seq.Concat(SkopeState.__default.Iters(p, _0_fe, (SkopeWellFormed.__default.DataList(p, ((_0_fe).dtor_list).dtor_id)).dtor_items), _dafny.Seq.of(SkopeState.Task.create_Task(SkopeState.Op.create_Unbind((_0_fe).dtor_loopVar, (_0_fe).dtor_src), SkopeAst.Option.create_None())));
     };
     static LoopVars(ts) {
       return function () {
@@ -6225,17 +6225,17 @@ let SkopState = (function() {
       return (((s).dtor_last).is_Some) && (!((((s).dtor_last).dtor_value).is_Done));
     };
     static Accepts(s, r) {
-      return ((r).is_DeadlineExceeded) || (((((s).dtor_last).is_None) ? ((r).is_NoResponse) : (SkopStep.__default.Answers(((s).dtor_last).dtor_value, r))));
+      return ((r).is_DeadlineExceeded) || (((((s).dtor_last).is_None) ? ((r).is_NoResponse) : (SkopeStep.__default.Answers(((s).dtor_last).dtor_value, r))));
     };
     static CmdNames(p) {
       return (function () {
         let _coll0 = new _dafny.Set();
-        for (const _compr_0 of (SkopWellFormed.__default.Stmts(p)).Elements) {
+        for (const _compr_0 of (SkopeWellFormed.__default.Stmts(p)).Elements) {
           let _0_s = _compr_0;
-          if ((SkopWellFormed.__default.Stmts(p)).contains(_0_s)) {
-            for (const _compr_1 of (SkopWellFormed.__default.CmdVars(_0_s)).Elements) {
+          if ((SkopeWellFormed.__default.Stmts(p)).contains(_0_s)) {
+            for (const _compr_1 of (SkopeWellFormed.__default.CmdVars(_0_s)).Elements) {
               let _1_x = _compr_1;
-              if ((SkopWellFormed.__default.CmdVars(_0_s)).contains(_1_x)) {
+              if ((SkopeWellFormed.__default.CmdVars(_0_s)).contains(_1_x)) {
                 _coll0.add(_1_x);
               }
             }
@@ -6247,9 +6247,9 @@ let SkopState = (function() {
         for (const _compr_2 of ((p).dtor_sections).Keys.Elements) {
           let _2_id = _compr_2;
           if (((p).dtor_sections).contains(_2_id)) {
-            for (const _compr_3 of (SkopWellFormed.__default.ActionVars(p, _2_id)).Elements) {
+            for (const _compr_3 of (SkopeWellFormed.__default.ActionVars(p, _2_id)).Elements) {
               let _3_y = _compr_3;
-              if ((SkopWellFormed.__default.ActionVars(p, _2_id)).contains(_3_y)) {
+              if ((SkopeWellFormed.__default.ActionVars(p, _2_id)).contains(_3_y)) {
                 _coll1.add(_3_y);
               }
             }
@@ -6261,9 +6261,9 @@ let SkopState = (function() {
     static RunNames(p) {
       return function () {
         let _coll0 = new _dafny.Set();
-        for (const _compr_0 of (SkopWellFormed.__default.Stmts(p)).Elements) {
+        for (const _compr_0 of (SkopeWellFormed.__default.Stmts(p)).Elements) {
           let _0_s = _compr_0;
-          if ((((SkopWellFormed.__default.Stmts(p)).contains(_0_s)) && ((_0_s).is_Run)) && (((_0_s).dtor_binding).is_Some)) {
+          if ((((SkopeWellFormed.__default.Stmts(p)).contains(_0_s)) && ((_0_s).is_Run)) && (((_0_s).dtor_binding).is_Some)) {
             _coll0.add(((_0_s).dtor_binding).dtor_value);
           }
         }
@@ -6271,13 +6271,13 @@ let SkopState = (function() {
       }();
     };
     static InputsOk(p, cfg) {
-      let _0_cn = SkopState.__default.CmdNames(p);
-      return ((((((cfg).dtor_params).Keys).equals(((p).dtor_params).Keys)) && ((((cfg).dtor_builtins).Keys).equals(SkopWellFormed.__default.Builtins))) && (_dafny.Quantifier(((cfg).dtor_params).Keys.Elements, true, function (_forall_var_0) {
+      let _0_cn = SkopeState.__default.CmdNames(p);
+      return ((((((cfg).dtor_params).Keys).equals(((p).dtor_params).Keys)) && ((((cfg).dtor_builtins).Keys).equals(SkopeWellFormed.__default.Builtins))) && (_dafny.Quantifier(((cfg).dtor_params).Keys.Elements, true, function (_forall_var_0) {
         let _1_x = _forall_var_0;
-        return !((((cfg).dtor_params).contains(_1_x)) && ((_0_cn).contains(_1_x))) || (SkopWellFormed.__default.SafeValue(SkopValues.__default.Show(((cfg).dtor_params).get(_1_x))));
+        return !((((cfg).dtor_params).contains(_1_x)) && ((_0_cn).contains(_1_x))) || (SkopeWellFormed.__default.SafeValue(SkopeValues.__default.Show(((cfg).dtor_params).get(_1_x))));
       }))) && (_dafny.Quantifier(((cfg).dtor_builtins).Keys.Elements, true, function (_forall_var_1) {
         let _2_x = _forall_var_1;
-        return !((((cfg).dtor_builtins).contains(_2_x)) && ((_0_cn).contains(_2_x))) || (SkopWellFormed.__default.SafeValue(SkopValues.__default.Show(((cfg).dtor_builtins).get(_2_x))));
+        return !((((cfg).dtor_builtins).contains(_2_x)) && ((_0_cn).contains(_2_x))) || (SkopeWellFormed.__default.SafeValue(SkopeValues.__default.Show(((cfg).dtor_builtins).get(_2_x))));
       }));
     };
     static IsRead(e) {
@@ -6295,7 +6295,7 @@ let SkopState = (function() {
         if ((new BigNumber((c).length)).isEqualTo(_dafny.ZERO)) {
           return _dafny.Seq.Concat(_0___accumulator, _dafny.Seq.UnicodeFromString(""));
         } else {
-          _0___accumulator = _dafny.Seq.Concat(_0___accumulator, ((((c)[_dafny.ZERO]).is_Lit) ? (((c)[_dafny.ZERO]).dtor_s) : (SkopValues.__default.Show((((vars).get(((c)[_dafny.ZERO]).dtor_name)).dtor_b).dtor_value))));
+          _0___accumulator = _dafny.Seq.Concat(_0___accumulator, ((((c)[_dafny.ZERO]).is_Lit) ? (((c)[_dafny.ZERO]).dtor_s) : (SkopeValues.__default.Show((((vars).get(((c)[_dafny.ZERO]).dtor_name)).dtor_b).dtor_value))));
           let _in0 = vars;
           let _in1 = (c).slice(_dafny.ONE);
           vars = _in0;
@@ -6321,9 +6321,9 @@ let SkopState = (function() {
             {
               let _2_x = (_source0).name;
               if ((vars).contains(_2_x)) {
-                return SkopValues.__default.Show((((vars).get(_2_x)).dtor_b).dtor_value);
+                return SkopeValues.__default.Show((((vars).get(_2_x)).dtor_b).dtor_value);
               } else {
-                return SkopState.__default.Unavailable;
+                return SkopeState.__default.Unavailable;
               }
             }
           }());
@@ -6337,15 +6337,15 @@ let SkopState = (function() {
     };
     static QPart(rn, vars, x) {
       if ((vars).contains(x)) {
-        if (_dafny.areEqual((((vars).get(x)).dtor_b).dtor_origin, SkopStep.Origin.create_FromRunOutput())) {
+        if (_dafny.areEqual((((vars).get(x)).dtor_b).dtor_origin, SkopeStep.Origin.create_FromRunOutput())) {
           return _dafny.Seq.Concat(_dafny.Seq.Concat(_dafny.Seq.UnicodeFromString("`"), x), _dafny.Seq.UnicodeFromString("`"));
         } else {
-          return SkopValues.__default.Show((((vars).get(x)).dtor_b).dtor_value);
+          return SkopeValues.__default.Show((((vars).get(x)).dtor_b).dtor_value);
         }
       } else if ((rn).contains(x)) {
         return _dafny.Seq.Concat(_dafny.Seq.Concat(_dafny.Seq.UnicodeFromString("`"), x), _dafny.Seq.UnicodeFromString("`"));
       } else {
-        return SkopState.__default.Unavailable;
+        return SkopeState.__default.Unavailable;
       }
     };
     static RenderQ(rn, vars, q) {
@@ -6364,7 +6364,7 @@ let SkopState = (function() {
             }
             {
               let _2_x = (_source0).name;
-              return SkopState.__default.QPart(rn, vars, _2_x);
+              return SkopeState.__default.QPart(rn, vars, _2_x);
             }
           }());
           let _in0 = rn;
@@ -6379,7 +6379,7 @@ let SkopState = (function() {
     };
     static InContext(rn, vars, x) {
       if ((vars).contains(x)) {
-        return _dafny.areEqual((((vars).get(x)).dtor_b).dtor_origin, SkopStep.Origin.create_FromRunOutput());
+        return _dafny.areEqual((((vars).get(x)).dtor_b).dtor_origin, SkopeStep.Origin.create_FromRunOutput());
       } else {
         return (rn).contains(x);
       }
@@ -6387,10 +6387,10 @@ let SkopState = (function() {
     static Context(rn, vars, q) {
       return function () {
         let _coll0 = new _dafny.Map();
-        for (const _compr_0 of (SkopWellFormed.__default.PartVars(q)).Elements) {
+        for (const _compr_0 of (SkopeWellFormed.__default.PartVars(q)).Elements) {
           let _0_x = _compr_0;
-          if (((SkopWellFormed.__default.PartVars(q)).contains(_0_x)) && (SkopState.__default.InContext(rn, vars, _0_x))) {
-            _coll0.push([_0_x,(((vars).contains(_0_x)) ? (SkopValues.__default.Show((((vars).get(_0_x)).dtor_b).dtor_value)) : (SkopState.__default.Unavailable))]);
+          if (((SkopeWellFormed.__default.PartVars(q)).contains(_0_x)) && (SkopeState.__default.InContext(rn, vars, _0_x))) {
+            _coll0.push([_0_x,(((vars).contains(_0_x)) ? (SkopeValues.__default.Show((((vars).get(_0_x)).dtor_b).dtor_value)) : (SkopeState.__default.Unavailable))]);
           }
         }
         return _coll0;
@@ -6399,9 +6399,9 @@ let SkopState = (function() {
     static RubricText(rubric, n) {
       TAIL_CALL_START: while (true) {
         if ((new BigNumber((rubric).length)).isEqualTo(_dafny.ZERO)) {
-          return SkopAst.Option.create_None();
+          return SkopeAst.Option.create_None();
         } else if ((((rubric)[_dafny.ZERO]).dtor_level).isEqualTo(n)) {
-          return SkopAst.Option.create_Some(((rubric)[_dafny.ZERO]).dtor_text);
+          return SkopeAst.Option.create_Some(((rubric)[_dafny.ZERO]).dtor_text);
         } else {
           let _in0 = (rubric).slice(_dafny.ONE);
           let _in1 = n;
@@ -6418,7 +6418,7 @@ let SkopState = (function() {
           return _dafny.Seq.Concat(_0___accumulator, _dafny.Seq.of());
         } else {
           let _1_sec = ((p).dtor_sections).get((((opts)[_dafny.ZERO]).dtor_ref).dtor_id);
-          _0___accumulator = _dafny.Seq.Concat(_0___accumulator, _dafny.Seq.of(SkopStep.AskOpt.create_AskOpt((((opts)[_dafny.ZERO]).dtor_ref).dtor_id, (_1_sec).dtor_name, (_1_sec).dtor_guidance)));
+          _0___accumulator = _dafny.Seq.Concat(_0___accumulator, _dafny.Seq.of(SkopeStep.AskOpt.create_AskOpt((((opts)[_dafny.ZERO]).dtor_ref).dtor_id, (_1_sec).dtor_name, (_1_sec).dtor_guidance)));
           let _in0 = p;
           let _in1 = (opts).slice(_dafny.ONE);
           p = _in0;
@@ -6433,7 +6433,7 @@ let SkopState = (function() {
         if ((new BigNumber((items).length)).isEqualTo(_dafny.ZERO)) {
           return _dafny.Seq.Concat(_0___accumulator, _dafny.Seq.of());
         } else {
-          _0___accumulator = _dafny.Seq.Concat(_0___accumulator, _dafny.Seq.of(SkopStep.AskOpt.create_AskOpt(((items)[_dafny.ZERO]).dtor_value, ((items)[_dafny.ZERO]).dtor_value, SkopAst.Option.create_None())));
+          _0___accumulator = _dafny.Seq.Concat(_0___accumulator, _dafny.Seq.of(SkopeStep.AskOpt.create_AskOpt(((items)[_dafny.ZERO]).dtor_value, ((items)[_dafny.ZERO]).dtor_value, SkopeAst.Option.create_None())));
           let _in0 = (items).slice(_dafny.ONE);
           items = _in0;
           continue TAIL_CALL_START;
@@ -6446,7 +6446,7 @@ let SkopState = (function() {
         if ((n).isEqualTo(_dafny.ZERO)) {
           return _dafny.Seq.Concat(_0___accumulator, _dafny.Seq.of());
         } else {
-          _0___accumulator = _dafny.Seq.Concat(_0___accumulator, _dafny.Seq.of(SkopStep.AskOpt.create_AskOpt(SkopValues.__default.IntToString(lo), SkopValues.__default.IntToString(lo), SkopState.__default.RubricText(rubric, lo))));
+          _0___accumulator = _dafny.Seq.Concat(_0___accumulator, _dafny.Seq.of(SkopeStep.AskOpt.create_AskOpt(SkopeValues.__default.IntToString(lo), SkopeValues.__default.IntToString(lo), SkopeState.__default.RubricText(rubric, lo))));
           let _in0 = rubric;
           let _in1 = (lo).plus(_dafny.ONE);
           let _in2 = (n).minus(_dafny.ONE);
@@ -6462,56 +6462,56 @@ let SkopState = (function() {
       {
         if (_source0.is_Sections) {
           let _0_opts = (_source0).options;
-          return SkopState.__default.SectionOpts(p, _0_opts);
+          return SkopeState.__default.SectionOpts(p, _0_opts);
         }
       }
       {
         if (_source0.is_YesNo) {
-          return _dafny.Seq.of(SkopStep.AskOpt.create_AskOpt(_dafny.Seq.UnicodeFromString("yes"), _dafny.Seq.UnicodeFromString("yes"), SkopAst.Option.create_None()), SkopStep.AskOpt.create_AskOpt(_dafny.Seq.UnicodeFromString("no"), _dafny.Seq.UnicodeFromString("no"), SkopAst.Option.create_None()));
+          return _dafny.Seq.of(SkopeStep.AskOpt.create_AskOpt(_dafny.Seq.UnicodeFromString("yes"), _dafny.Seq.UnicodeFromString("yes"), SkopeAst.Option.create_None()), SkopeStep.AskOpt.create_AskOpt(_dafny.Seq.UnicodeFromString("no"), _dafny.Seq.UnicodeFromString("no"), SkopeAst.Option.create_None()));
         }
       }
       {
         if (_source0.is_OneOf) {
           let _1_l = (_source0).list;
-          return SkopState.__default.ValueOpts((SkopWellFormed.__default.DataList(p, (_1_l).dtor_id)).dtor_items);
+          return SkopeState.__default.ValueOpts((SkopeWellFormed.__default.DataList(p, (_1_l).dtor_id)).dtor_items);
         }
       }
       {
         let _2_lo = (_source0).low;
         let _3_hi = (_source0).high;
         let _4_rubric = (_source0).rubric;
-        return SkopState.__default.LevelOpts(_4_rubric, _2_lo, ((_3_hi).minus(_2_lo)).plus(_dafny.ONE));
+        return SkopeState.__default.LevelOpts(_4_rubric, _2_lo, ((_3_hi).minus(_2_lo)).plus(_dafny.ONE));
       }
     };
     static KindOf(form) {
       let _source0 = form;
       {
         if (_source0.is_Sections) {
-          return SkopStep.AskKind.create_Choice();
+          return SkopeStep.AskKind.create_Choice();
         }
       }
       {
         if (_source0.is_YesNo) {
-          return SkopStep.AskKind.create_YesNoKind();
+          return SkopeStep.AskKind.create_YesNoKind();
         }
       }
       {
         if (_source0.is_OneOf) {
-          return SkopStep.AskKind.create_Choice();
+          return SkopeStep.AskKind.create_Choice();
         }
       }
       {
-        return SkopStep.AskKind.create_ScoreKind();
+        return SkopeStep.AskKind.create_ScoreKind();
       }
     };
     static AskReq(p, sec, vars, rn, q, form) {
-      return SkopStep.AskRequest.create_AskRequest(SkopState.__default.KindOf(form), SkopState.__default.RenderQ(rn, vars, q), (((p).dtor_sections).get(sec)).dtor_guidance, SkopState.__default.Options(p, form), SkopState.__default.Context(rn, vars, q), _dafny.ZERO);
+      return SkopeStep.AskRequest.create_AskRequest(SkopeState.__default.KindOf(form), SkopeState.__default.RenderQ(rn, vars, q), (((p).dtor_sections).get(sec)).dtor_guidance, SkopeState.__default.Options(p, form), SkopeState.__default.Context(rn, vars, q), _dafny.ZERO);
     };
     static Yes(vars, gov) {
-      return (((gov).is_Some) && ((vars).contains((gov).dtor_value))) && (_dafny.areEqual((((vars).get((gov).dtor_value)).dtor_b).dtor_value, SkopStep.Val.create_Str(_dafny.Seq.UnicodeFromString("yes"))));
+      return (((gov).is_Some) && ((vars).contains((gov).dtor_value))) && (_dafny.areEqual((((vars).get((gov).dtor_value)).dtor_b).dtor_value, SkopeStep.Val.create_Str(_dafny.Seq.UnicodeFromString("yes"))));
     };
     static Unknown(vars, o) {
-      return (((o).is_VarOp) && ((vars).contains((o).dtor_name))) && (_dafny.areEqual((((vars).get((o).dtor_name)).dtor_b).dtor_origin, SkopStep.Origin.create_FromRunOutput()));
+      return (((o).is_VarOp) && ((vars).contains((o).dtor_name))) && (_dafny.areEqual((((vars).get((o).dtor_name)).dtor_b).dtor_origin, SkopeStep.Origin.create_FromRunOutput()));
     };
     static Issues(s) {
       let _0_t = ((s).dtor_tasks)[_dafny.ZERO];
@@ -6530,7 +6530,7 @@ let SkopState = (function() {
         {
           if (_source0.is_Check) {
             let _1_cond = (_source0).cond;
-            return ((_1_cond).is_Succeeds) || ((_dafny.areEqual(((s).dtor_cfg).dtor_mode, SkopStep.Mode.create_Explore())) && ((SkopState.__default.Unknown((s).dtor_vars, (_1_cond).dtor_l)) || (SkopState.__default.Unknown((s).dtor_vars, (_1_cond).dtor_r))));
+            return ((_1_cond).is_Succeeds) || ((_dafny.areEqual(((s).dtor_cfg).dtor_mode, SkopeStep.Mode.create_Explore())) && ((SkopeState.__default.Unknown((s).dtor_vars, (_1_cond).dtor_l)) || (SkopeState.__default.Unknown((s).dtor_vars, (_1_cond).dtor_r))));
           }
         }
         {
@@ -6540,12 +6540,12 @@ let SkopState = (function() {
         }
         {
           if (_source0.is_IfYesRun) {
-            return SkopState.__default.Yes((s).dtor_vars, (_0_t).dtor_gov);
+            return SkopeState.__default.Yes((s).dtor_vars, (_0_t).dtor_gov);
           }
         }
         {
           if (_source0.is_IfYesDo) {
-            return (SkopState.__default.Yes((s).dtor_vars, (_0_t).dtor_gov)) && (!(((s).dtor_cfg).dtor_dry));
+            return (SkopeState.__default.Yes((s).dtor_vars, (_0_t).dtor_gov)) && (!(((s).dtor_cfg).dtor_dry));
           }
         }
         {
@@ -6559,7 +6559,7 @@ let SkopState = (function() {
       }());
     };
     static DoReady(vars, a) {
-      return !((a).is_DoItem) || (((((vars).contains((a).dtor_item)) && ((((vars).get((a).dtor_item)).dtor_item).is_Some)) && (((((vars).get((a).dtor_item)).dtor_item).dtor_value).is_Action)) && (SkopState.__default.CmdBound(vars, ((((vars).get((a).dtor_item)).dtor_item).dtor_value).dtor_cmd)));
+      return !((a).is_DoItem) || (((((vars).contains((a).dtor_item)) && ((((vars).get((a).dtor_item)).dtor_item).is_Some)) && (((((vars).get((a).dtor_item)).dtor_item).dtor_value).is_Action)) && (SkopeState.__default.CmdBound(vars, ((((vars).get((a).dtor_item)).dtor_item).dtor_value).dtor_cmd)));
     };
     static DoParts(vars, a) {
       let _source0 = a;
@@ -6575,7 +6575,7 @@ let SkopState = (function() {
       }
     };
     static ExecOf(vars, c, kind, timeoutMs, src) {
-      return SkopStep.Next.create_Exec(SkopState.__default.RenderCmd(vars, c), kind, timeoutMs, src);
+      return SkopeStep.Next.create_Exec(SkopeState.__default.RenderCmd(vars, c), kind, timeoutMs, src);
     };
     static IssueNext(s) {
       let _0_p = (s).dtor_prog;
@@ -6585,14 +6585,14 @@ let SkopState = (function() {
         if (_source0.is_Run) {
           let _2_src = (_source0).src;
           let _3_c = (_source0).cmd;
-          return SkopState.__default.ExecOf((s).dtor_vars, _3_c, SkopStep.ExecKind.create_RunExec(), ((_0_p).dtor_limits).dtor_runTimeoutMs, _2_src);
+          return SkopeState.__default.ExecOf((s).dtor_vars, _3_c, SkopeStep.ExecKind.create_RunExec(), ((_0_p).dtor_limits).dtor_runTimeoutMs, _2_src);
         }
       }
       {
         if (_source0.is_Do) {
           let _4_src = (_source0).src;
           let _5_a = (_source0).action;
-          return SkopState.__default.ExecOf((s).dtor_vars, SkopState.__default.DoParts((s).dtor_vars, _5_a), SkopStep.ExecKind.create_DoExec(), ((_0_p).dtor_limits).dtor_doTimeoutMs, _4_src);
+          return SkopeState.__default.ExecOf((s).dtor_vars, SkopeState.__default.DoParts((s).dtor_vars, _5_a), SkopeStep.ExecKind.create_DoExec(), ((_0_p).dtor_limits).dtor_doTimeoutMs, _4_src);
         }
       }
       {
@@ -6600,9 +6600,9 @@ let SkopState = (function() {
           let _6_src = (_source0).src;
           let _7_cond = (_source0).cond;
           if ((_7_cond).is_Succeeds) {
-            return SkopState.__default.ExecOf((s).dtor_vars, (_7_cond).dtor_cmd, SkopStep.ExecKind.create_CheckExec(), ((_0_p).dtor_limits).dtor_runTimeoutMs, _6_src);
+            return SkopeState.__default.ExecOf((s).dtor_vars, (_7_cond).dtor_cmd, SkopeStep.ExecKind.create_CheckExec(), ((_0_p).dtor_limits).dtor_runTimeoutMs, _6_src);
           } else {
-            return SkopStep.Next.create_Choose(new BigNumber(3));
+            return SkopeStep.Next.create_Choose(new BigNumber(3));
           }
         }
       }
@@ -6611,32 +6611,32 @@ let SkopState = (function() {
           let _8_src = (_source0).src;
           let _9_q = (_source0).question;
           let _10_form = (_source0).form;
-          return SkopStep.Next.create_AskNext(SkopState.__default.AskReq(_0_p, (s).dtor_sec, (s).dtor_vars, (s).dtor_runNames, _9_q, _10_form), _8_src);
+          return SkopeStep.Next.create_AskNext(SkopeState.__default.AskReq(_0_p, (s).dtor_sec, (s).dtor_vars, (s).dtor_runNames, _9_q, _10_form), _8_src);
         }
       }
       {
         if (_source0.is_IfYesRun) {
           let _11_src = (_source0).src;
           let _12_c = (_source0).cmd;
-          return SkopState.__default.ExecOf((s).dtor_vars, _12_c, SkopStep.ExecKind.create_RunExec(), ((_0_p).dtor_limits).dtor_runTimeoutMs, _11_src);
+          return SkopeState.__default.ExecOf((s).dtor_vars, _12_c, SkopeStep.ExecKind.create_RunExec(), ((_0_p).dtor_limits).dtor_runTimeoutMs, _11_src);
         }
       }
       {
         if (_source0.is_IfYesDo) {
           let _13_src = (_source0).src;
           let _14_a = (_source0).action;
-          return SkopState.__default.ExecOf((s).dtor_vars, SkopState.__default.DoParts((s).dtor_vars, _14_a), SkopStep.ExecKind.create_DoExec(), ((_0_p).dtor_limits).dtor_doTimeoutMs, _13_src);
+          return SkopeState.__default.ExecOf((s).dtor_vars, SkopeState.__default.DoParts((s).dtor_vars, _14_a), SkopeStep.ExecKind.create_DoExec(), ((_0_p).dtor_limits).dtor_doTimeoutMs, _13_src);
         }
       }
       {
         if (_source0.is_Page) {
           let _15_src = (_source0).src;
           let _16_text = (_source0).text;
-          return SkopStep.Next.create_PageNext(SkopState.__default.RenderText((s).dtor_vars, _16_text), _15_src);
+          return SkopeStep.Next.create_PageNext(SkopeState.__default.RenderText((s).dtor_vars, _16_text), _15_src);
         }
       }
       {
-        return SkopStep.Next.create_Choose(_dafny.ZERO);
+        return SkopeStep.Next.create_Choose(_dafny.ZERO);
       }
     };
     static TemplateOf(st, kind) {
@@ -6644,20 +6644,20 @@ let SkopState = (function() {
       {
         if (_source0.is_Run) {
           let _0_c = (_source0).cmd;
-          if (_dafny.areEqual(kind, SkopStep.ExecKind.create_RunExec())) {
-            return SkopAst.Option.create_Some(_0_c);
+          if (_dafny.areEqual(kind, SkopeStep.ExecKind.create_RunExec())) {
+            return SkopeAst.Option.create_Some(_0_c);
           } else {
-            return SkopAst.Option.create_None();
+            return SkopeAst.Option.create_None();
           }
         }
       }
       {
         if (_source0.is_IfYesRun) {
           let _1_c = (_source0).cmd;
-          if (_dafny.areEqual(kind, SkopStep.ExecKind.create_RunExec())) {
-            return SkopAst.Option.create_Some(_1_c);
+          if (_dafny.areEqual(kind, SkopeStep.ExecKind.create_RunExec())) {
+            return SkopeAst.Option.create_Some(_1_c);
           } else {
-            return SkopAst.Option.create_None();
+            return SkopeAst.Option.create_None();
           }
         }
       }
@@ -6666,10 +6666,10 @@ let SkopState = (function() {
           let cond0 = (_source0).cond;
           if (cond0.is_Succeeds) {
             let _2_c = (cond0).cmd;
-            if (_dafny.areEqual(kind, SkopStep.ExecKind.create_CheckExec())) {
-              return SkopAst.Option.create_Some(_2_c);
+            if (_dafny.areEqual(kind, SkopeStep.ExecKind.create_CheckExec())) {
+              return SkopeAst.Option.create_Some(_2_c);
             } else {
-              return SkopAst.Option.create_None();
+              return SkopeAst.Option.create_None();
             }
           }
         }
@@ -6679,10 +6679,10 @@ let SkopState = (function() {
           let action0 = (_source0).action;
           if (action0.is_DoCmd) {
             let _3_c = (action0).cmd;
-            if (_dafny.areEqual(kind, SkopStep.ExecKind.create_DoExec())) {
-              return SkopAst.Option.create_Some(_3_c);
+            if (_dafny.areEqual(kind, SkopeStep.ExecKind.create_DoExec())) {
+              return SkopeAst.Option.create_Some(_3_c);
             } else {
-              return SkopAst.Option.create_None();
+              return SkopeAst.Option.create_None();
             }
           }
         }
@@ -6692,16 +6692,16 @@ let SkopState = (function() {
           let action1 = (_source0).action;
           if (action1.is_DoCmd) {
             let _4_c = (action1).cmd;
-            if (_dafny.areEqual(kind, SkopStep.ExecKind.create_DoExec())) {
-              return SkopAst.Option.create_Some(_4_c);
+            if (_dafny.areEqual(kind, SkopeStep.ExecKind.create_DoExec())) {
+              return SkopeAst.Option.create_Some(_4_c);
             } else {
-              return SkopAst.Option.create_None();
+              return SkopeAst.Option.create_None();
             }
           }
         }
       }
       {
-        return SkopAst.Option.create_None();
+        return SkopeAst.Option.create_None();
       }
     };
     static InitVars(cfg) {
@@ -6710,7 +6710,7 @@ let SkopState = (function() {
         for (const _compr_0 of ((cfg).dtor_builtins).Keys.Elements) {
           let _0_x = _compr_0;
           if (((cfg).dtor_builtins).contains(_0_x)) {
-            _coll0.push([_0_x,SkopState.Slot.create_Slot(SkopStep.Bound.create_Bound(((cfg).dtor_builtins).get(_0_x), SkopStep.Origin.create_FromBuiltin()), SkopAst.Option.create_None())]);
+            _coll0.push([_0_x,SkopeState.Slot.create_Slot(SkopeStep.Bound.create_Bound(((cfg).dtor_builtins).get(_0_x), SkopeStep.Origin.create_FromBuiltin()), SkopeAst.Option.create_None())]);
           }
         }
         return _coll0;
@@ -6719,21 +6719,21 @@ let SkopState = (function() {
         for (const _compr_1 of ((cfg).dtor_params).Keys.Elements) {
           let _1_x = _compr_1;
           if (((cfg).dtor_params).contains(_1_x)) {
-            _coll1.push([_1_x,SkopState.Slot.create_Slot(SkopStep.Bound.create_Bound(((cfg).dtor_params).get(_1_x), SkopStep.Origin.create_FromParam()), SkopAst.Option.create_None())]);
+            _coll1.push([_1_x,SkopeState.Slot.create_Slot(SkopeStep.Bound.create_Bound(((cfg).dtor_params).get(_1_x), SkopeStep.Origin.create_FromParam()), SkopeAst.Option.create_None())]);
           }
         }
         return _coll1;
       }());
     };
     static StartState(p, cfg) {
-      return SkopState.State.create_State(p, cfg, ((p).dtor_entry).dtor_section, SkopState.__default.Tasks(p, SkopWellFormed.__default.Body(p, ((p).dtor_entry).dtor_section), SkopAst.Option.create_None()), SkopState.__default.InitVars(cfg), SkopState.__default.RunNames(p), SkopAst.Option.create_None(), false, _dafny.ZERO, _dafny.ZERO);
+      return SkopeState.State.create_State(p, cfg, ((p).dtor_entry).dtor_section, SkopeState.__default.Tasks(p, SkopeWellFormed.__default.Body(p, ((p).dtor_entry).dtor_section), SkopeAst.Option.create_None()), SkopeState.__default.InitVars(cfg), SkopeState.__default.RunNames(p), SkopeAst.Option.create_None(), false, _dafny.ZERO, _dafny.ZERO);
     };
     static Enter(s, id, e) {
       let _0_dt__update__tmp_h0 = s;
-      let _1_dt__update_hvars_h0 = ((s).dtor_vars).Subtract(SkopState.__default.LoopVars((s).dtor_tasks));
-      let _2_dt__update_htasks_h0 = SkopState.__default.Tasks((s).dtor_prog, SkopWellFormed.__default.Body((s).dtor_prog, id), SkopAst.Option.create_None());
+      let _1_dt__update_hvars_h0 = ((s).dtor_vars).Subtract(SkopeState.__default.LoopVars((s).dtor_tasks));
+      let _2_dt__update_htasks_h0 = SkopeState.__default.Tasks((s).dtor_prog, SkopeWellFormed.__default.Body((s).dtor_prog, id), SkopeAst.Option.create_None());
       let _3_dt__update_hsec_h0 = id;
-      return SkopState.State.create_State((_0_dt__update__tmp_h0).dtor_prog, (_0_dt__update__tmp_h0).dtor_cfg, _3_dt__update_hsec_h0, _2_dt__update_htasks_h0, _1_dt__update_hvars_h0, (_0_dt__update__tmp_h0).dtor_runNames, (_0_dt__update__tmp_h0).dtor_last, (_0_dt__update__tmp_h0).dtor_afterWouldDo, (_0_dt__update__tmp_h0).dtor_askCalls, (_0_dt__update__tmp_h0).dtor_effects);
+      return SkopeState.State.create_State((_0_dt__update__tmp_h0).dtor_prog, (_0_dt__update__tmp_h0).dtor_cfg, _3_dt__update_hsec_h0, _2_dt__update_htasks_h0, _1_dt__update_hvars_h0, (_0_dt__update__tmp_h0).dtor_runNames, (_0_dt__update__tmp_h0).dtor_last, (_0_dt__update__tmp_h0).dtor_afterWouldDo, (_0_dt__update__tmp_h0).dtor_askCalls, (_0_dt__update__tmp_h0).dtor_effects);
     };
     static Stmt0(s) {
       return ((((s).dtor_tasks)[_dafny.ZERO]).dtor_op).dtor_stmt;
@@ -6758,7 +6758,7 @@ let SkopState = (function() {
     get dtor_item() { return this.item; }
     toString() {
       if (this.$tag === 0) {
-        return "SkopState.Slot.Slot" + "(" + _dafny.toString(this.b) + ", " + _dafny.toString(this.item) + ")";
+        return "SkopeState.Slot.Slot" + "(" + _dafny.toString(this.b) + ", " + _dafny.toString(this.item) + ")";
       } else  {
         return "<unexpected>";
       }
@@ -6773,7 +6773,7 @@ let SkopState = (function() {
       }
     }
     static Default() {
-      return SkopState.Slot.create_Slot(SkopStep.Bound.Default(), SkopAst.Option.Default());
+      return SkopeState.Slot.create_Slot(SkopeStep.Bound.Default(), SkopeAst.Option.Default());
     }
     static Rtd() {
       return class {
@@ -6815,11 +6815,11 @@ let SkopState = (function() {
     get dtor_src() { return this.src; }
     toString() {
       if (this.$tag === 0) {
-        return "SkopState.Op.S" + "(" + _dafny.toString(this.stmt) + ")";
+        return "SkopeState.Op.S" + "(" + _dafny.toString(this.stmt) + ")";
       } else if (this.$tag === 1) {
-        return "SkopState.Op.Bind" + "(" + this.v.toVerbatimString(true) + ", " + _dafny.toString(this.item) + ", " + _dafny.toString(this.src) + ")";
+        return "SkopeState.Op.Bind" + "(" + this.v.toVerbatimString(true) + ", " + _dafny.toString(this.item) + ", " + _dafny.toString(this.src) + ")";
       } else if (this.$tag === 2) {
-        return "SkopState.Op.Unbind" + "(" + this.v.toVerbatimString(true) + ", " + _dafny.toString(this.src) + ")";
+        return "SkopeState.Op.Unbind" + "(" + this.v.toVerbatimString(true) + ", " + _dafny.toString(this.src) + ")";
       } else  {
         return "<unexpected>";
       }
@@ -6838,7 +6838,7 @@ let SkopState = (function() {
       }
     }
     static Default() {
-      return SkopState.Op.create_S(SkopAst.Stmt.Default());
+      return SkopeState.Op.create_S(SkopeAst.Stmt.Default());
     }
     static Rtd() {
       return class {
@@ -6864,7 +6864,7 @@ let SkopState = (function() {
     get dtor_gov() { return this.gov; }
     toString() {
       if (this.$tag === 0) {
-        return "SkopState.Task.Task" + "(" + _dafny.toString(this.op) + ", " + _dafny.toString(this.gov) + ")";
+        return "SkopeState.Task.Task" + "(" + _dafny.toString(this.op) + ", " + _dafny.toString(this.gov) + ")";
       } else  {
         return "<unexpected>";
       }
@@ -6879,7 +6879,7 @@ let SkopState = (function() {
       }
     }
     static Default() {
-      return SkopState.Task.create_Task(SkopState.Op.Default(), SkopAst.Option.Default());
+      return SkopeState.Task.create_Task(SkopeState.Op.Default(), SkopeAst.Option.Default());
     }
     static Rtd() {
       return class {
@@ -6921,7 +6921,7 @@ let SkopState = (function() {
     get dtor_effects() { return this.effects; }
     toString() {
       if (this.$tag === 0) {
-        return "SkopState.State.State" + "(" + _dafny.toString(this.prog) + ", " + _dafny.toString(this.cfg) + ", " + this.sec.toVerbatimString(true) + ", " + _dafny.toString(this.tasks) + ", " + _dafny.toString(this.vars) + ", " + _dafny.toString(this.runNames) + ", " + _dafny.toString(this.last) + ", " + _dafny.toString(this.afterWouldDo) + ", " + _dafny.toString(this.askCalls) + ", " + _dafny.toString(this.effects) + ")";
+        return "SkopeState.State.State" + "(" + _dafny.toString(this.prog) + ", " + _dafny.toString(this.cfg) + ", " + this.sec.toVerbatimString(true) + ", " + _dafny.toString(this.tasks) + ", " + _dafny.toString(this.vars) + ", " + _dafny.toString(this.runNames) + ", " + _dafny.toString(this.last) + ", " + _dafny.toString(this.afterWouldDo) + ", " + _dafny.toString(this.askCalls) + ", " + _dafny.toString(this.effects) + ")";
       } else  {
         return "<unexpected>";
       }
@@ -6936,7 +6936,7 @@ let SkopState = (function() {
       }
     }
     static Default() {
-      return SkopState.State.create_State(SkopAst.Program.Default(), SkopStep.RunConfig.Default(), _dafny.Seq.UnicodeFromString(""), _dafny.Seq.of(), _dafny.Map.Empty, _dafny.Set.Empty, SkopAst.Option.Default(), false, _dafny.ZERO, _dafny.ZERO);
+      return SkopeState.State.create_State(SkopeAst.Program.Default(), SkopeStep.RunConfig.Default(), _dafny.Seq.UnicodeFromString(""), _dafny.Seq.of(), _dafny.Map.Empty, _dafny.Set.Empty, SkopeAst.Option.Default(), false, _dafny.ZERO, _dafny.ZERO);
     }
     static Rtd() {
       return class {
@@ -6947,58 +6947,58 @@ let SkopState = (function() {
     }
   }
   return $module;
-})(); // end of module SkopState
-let SkopLemmas = (function() {
+})(); // end of module SkopeState
+let SkopeLemmas = (function() {
   let $module = {};
 
   return $module;
-})(); // end of module SkopLemmas
-let SkopRun = (function() {
+})(); // end of module SkopeLemmas
+let SkopeRun = (function() {
   let $module = {};
 
   $module.__default = class __default {
     constructor () {
-      this._tname = "SkopRun._default";
+      this._tname = "SkopeRun._default";
     }
     _parentTraits() {
       return [];
     }
     static Start(p, cfg) {
-      return SkopState.__default.StartState(p, cfg);
+      return SkopeState.__default.StartState(p, cfg);
     };
     static Ev(s, body) {
-      return SkopStep.CoreEvent.create_CoreEvent(SkopAst.Option.create_Some(SkopStep.Where.create_Where(((((s).dtor_prog).dtor_sections).get((s).dtor_sec)).dtor_name, SkopState.__default.OpSrc((((s).dtor_tasks)[_dafny.ZERO]).dtor_op))), body);
+      return SkopeStep.CoreEvent.create_CoreEvent(SkopeAst.Option.create_Some(SkopeStep.Where.create_Where(((((s).dtor_prog).dtor_sections).get((s).dtor_sec)).dtor_name, SkopeState.__default.OpSrc((((s).dtor_tasks)[_dafny.ZERO]).dtor_op))), body);
     };
     static Log(s, e) {
       let _0_dt__update__tmp_h2 = s;
-      return SkopState.State.create_State((_0_dt__update__tmp_h2).dtor_prog, (_0_dt__update__tmp_h2).dtor_cfg, (_0_dt__update__tmp_h2).dtor_sec, (_0_dt__update__tmp_h2).dtor_tasks, (_0_dt__update__tmp_h2).dtor_vars, (_0_dt__update__tmp_h2).dtor_runNames, (_0_dt__update__tmp_h2).dtor_last, (_0_dt__update__tmp_h2).dtor_afterWouldDo, (_0_dt__update__tmp_h2).dtor_askCalls, (_0_dt__update__tmp_h2).dtor_effects);
+      return SkopeState.State.create_State((_0_dt__update__tmp_h2).dtor_prog, (_0_dt__update__tmp_h2).dtor_cfg, (_0_dt__update__tmp_h2).dtor_sec, (_0_dt__update__tmp_h2).dtor_tasks, (_0_dt__update__tmp_h2).dtor_vars, (_0_dt__update__tmp_h2).dtor_runNames, (_0_dt__update__tmp_h2).dtor_last, (_0_dt__update__tmp_h2).dtor_afterWouldDo, (_0_dt__update__tmp_h2).dtor_askCalls, (_0_dt__update__tmp_h2).dtor_effects);
     };
     static Then(e, r) {
       return _dafny.Tuple.of((r)[0], _dafny.Seq.Concat(_dafny.Seq.of(e), (r)[1]), (r)[2]);
     };
     static Finish(s, o) {
       let _pat_let_tv0 = o;
-      let _0_e = SkopRun.__default.Ev(s, SkopStep.EventBody.create_OutcomeEv(o, (s).dtor_askCalls, (s).dtor_effects, ((s).dtor_cfg).dtor_dry));
+      let _0_e = SkopeRun.__default.Ev(s, SkopeStep.EventBody.create_OutcomeEv(o, (s).dtor_askCalls, (s).dtor_effects, ((s).dtor_cfg).dtor_dry));
       return _dafny.Tuple.of(function (_pat_let5_0) {
   return function (_1_dt__update__tmp_h1) {
     return function (_pat_let6_0) {
       return function (_2_dt__update_hlast_h1) {
-        return SkopState.State.create_State((_1_dt__update__tmp_h1).dtor_prog, (_1_dt__update__tmp_h1).dtor_cfg, (_1_dt__update__tmp_h1).dtor_sec, (_1_dt__update__tmp_h1).dtor_tasks, (_1_dt__update__tmp_h1).dtor_vars, (_1_dt__update__tmp_h1).dtor_runNames, _2_dt__update_hlast_h1, (_1_dt__update__tmp_h1).dtor_afterWouldDo, (_1_dt__update__tmp_h1).dtor_askCalls, (_1_dt__update__tmp_h1).dtor_effects);
+        return SkopeState.State.create_State((_1_dt__update__tmp_h1).dtor_prog, (_1_dt__update__tmp_h1).dtor_cfg, (_1_dt__update__tmp_h1).dtor_sec, (_1_dt__update__tmp_h1).dtor_tasks, (_1_dt__update__tmp_h1).dtor_vars, (_1_dt__update__tmp_h1).dtor_runNames, _2_dt__update_hlast_h1, (_1_dt__update__tmp_h1).dtor_afterWouldDo, (_1_dt__update__tmp_h1).dtor_askCalls, (_1_dt__update__tmp_h1).dtor_effects);
       }(_pat_let6_0);
-    }(SkopAst.Option.create_Some(SkopStep.Next.create_Done(_pat_let_tv0)));
+    }(SkopeAst.Option.create_Some(SkopeStep.Next.create_Done(_pat_let_tv0)));
   }(_pat_let5_0);
-}(s), _dafny.Seq.of(_0_e), SkopStep.Next.create_Done(o));
+}(s), _dafny.Seq.of(_0_e), SkopeStep.Next.create_Done(o));
     };
     static Continue(s, vars2) {
       let _pat_let_tv0 = vars2;
       let _pat_let_tv1 = s;
-      return SkopRun.__default.Advance(function (_pat_let7_0) {
+      return SkopeRun.__default.Advance(function (_pat_let7_0) {
         return function (_0_dt__update__tmp_h0) {
           return function (_pat_let8_0) {
             return function (_1_dt__update_hvars_h0) {
               return function (_pat_let9_0) {
                 return function (_2_dt__update_htasks_h0) {
-                  return SkopState.State.create_State((_0_dt__update__tmp_h0).dtor_prog, (_0_dt__update__tmp_h0).dtor_cfg, (_0_dt__update__tmp_h0).dtor_sec, _2_dt__update_htasks_h0, _1_dt__update_hvars_h0, (_0_dt__update__tmp_h0).dtor_runNames, (_0_dt__update__tmp_h0).dtor_last, (_0_dt__update__tmp_h0).dtor_afterWouldDo, (_0_dt__update__tmp_h0).dtor_askCalls, (_0_dt__update__tmp_h0).dtor_effects);
+                  return SkopeState.State.create_State((_0_dt__update__tmp_h0).dtor_prog, (_0_dt__update__tmp_h0).dtor_cfg, (_0_dt__update__tmp_h0).dtor_sec, _2_dt__update_htasks_h0, _1_dt__update_hvars_h0, (_0_dt__update__tmp_h0).dtor_runNames, (_0_dt__update__tmp_h0).dtor_last, (_0_dt__update__tmp_h0).dtor_afterWouldDo, (_0_dt__update__tmp_h0).dtor_askCalls, (_0_dt__update__tmp_h0).dtor_effects);
                 }(_pat_let9_0);
               }(((_pat_let_tv1).dtor_tasks).slice(_dafny.ONE));
             }(_pat_let8_0);
@@ -7009,8 +7009,8 @@ let SkopRun = (function() {
     static Goto(s, j) {
       let _0_p = (s).dtor_prog;
       let _1_id = ((j).dtor_ref).dtor_id;
-      let _2_e = SkopRun.__default.Ev(s, SkopStep.EventBody.create_TransferEv((((_0_p).dtor_sections).get((s).dtor_sec)).dtor_name, (((_0_p).dtor_sections).get(_1_id)).dtor_name));
-      return SkopRun.__default.Then(_2_e, SkopRun.__default.Advance(SkopState.__default.Enter(s, _1_id, _2_e)));
+      let _2_e = SkopeRun.__default.Ev(s, SkopeStep.EventBody.create_TransferEv((((_0_p).dtor_sections).get((s).dtor_sec)).dtor_name, (((_0_p).dtor_sections).get(_1_id)).dtor_name));
+      return SkopeRun.__default.Then(_2_e, SkopeRun.__default.Advance(SkopeState.__default.Enter(s, _1_id, _2_e)));
     };
     static Advance(s) {
       let _pat_let_tv0 = s;
@@ -7021,47 +7021,47 @@ let SkopRun = (function() {
         if (_source0.is_Bind) {
           let _2_v = (_source0).v;
           let _3_it = (_source0).item;
-          return SkopRun.__default.Continue(s, ((s).dtor_vars).update(_2_v, SkopState.__default.ItemSlot(_3_it)));
+          return SkopeRun.__default.Continue(s, ((s).dtor_vars).update(_2_v, SkopeState.__default.ItemSlot(_3_it)));
         }
       }
       {
         if (_source0.is_Unbind) {
           let _4_v = (_source0).v;
-          return SkopRun.__default.Continue(s, ((s).dtor_vars).Subtract(_dafny.Set.fromElements(_4_v)));
+          return SkopeRun.__default.Continue(s, ((s).dtor_vars).Subtract(_dafny.Set.fromElements(_4_v)));
         }
       }
       {
         let _5_st = (_source0).stmt;
-        if (SkopState.__default.Issues(s)) {
-          return SkopRun.__default.Issue(s);
+        if (SkopeState.__default.Issues(s)) {
+          return SkopeRun.__default.Issue(s);
         } else {
           let _source1 = _5_st;
           {
             if (_source1.is_Stop) {
-              return SkopRun.__default.Finish(s, SkopStep.Outcome.create_Stopped());
+              return SkopeRun.__default.Finish(s, SkopeStep.Outcome.create_Stopped());
             }
           }
           {
             if (_source1.is_HandOff) {
-              return SkopRun.__default.Finish(s, SkopStep.Outcome.create_Handoff(SkopStep.Reason.create_Explicit(), SkopAst.Option.create_None()));
+              return SkopeRun.__default.Finish(s, SkopeStep.Outcome.create_Handoff(SkopeStep.Reason.create_Explicit(), SkopeAst.Option.create_None()));
             }
           }
           {
             if (_source1.is_Then) {
               let _6_src = (_source1).src;
               let _7_r = (_source1).ref;
-              return SkopRun.__default.Goto(s, SkopWellFormed.Jump.create_Jump(_7_r, _6_src));
+              return SkopeRun.__default.Goto(s, SkopeWellFormed.Jump.create_Jump(_7_r, _6_src));
             }
           }
           {
             if (_source1.is_ForEach) {
-              return SkopRun.__default.Advance(function (_pat_let10_0) {
+              return SkopeRun.__default.Advance(function (_pat_let10_0) {
                 return function (_8_dt__update__tmp_h0) {
                   return function (_pat_let11_0) {
                     return function (_9_dt__update_htasks_h0) {
-                      return SkopState.State.create_State((_8_dt__update__tmp_h0).dtor_prog, (_8_dt__update__tmp_h0).dtor_cfg, (_8_dt__update__tmp_h0).dtor_sec, _9_dt__update_htasks_h0, (_8_dt__update__tmp_h0).dtor_vars, (_8_dt__update__tmp_h0).dtor_runNames, (_8_dt__update__tmp_h0).dtor_last, (_8_dt__update__tmp_h0).dtor_afterWouldDo, (_8_dt__update__tmp_h0).dtor_askCalls, (_8_dt__update__tmp_h0).dtor_effects);
+                      return SkopeState.State.create_State((_8_dt__update__tmp_h0).dtor_prog, (_8_dt__update__tmp_h0).dtor_cfg, (_8_dt__update__tmp_h0).dtor_sec, _9_dt__update_htasks_h0, (_8_dt__update__tmp_h0).dtor_vars, (_8_dt__update__tmp_h0).dtor_runNames, (_8_dt__update__tmp_h0).dtor_last, (_8_dt__update__tmp_h0).dtor_afterWouldDo, (_8_dt__update__tmp_h0).dtor_askCalls, (_8_dt__update__tmp_h0).dtor_effects);
                     }(_pat_let11_0);
-                  }(_dafny.Seq.Concat(SkopState.__default.Expand(_0_p, _1_t), ((_pat_let_tv0).dtor_tasks).slice(_dafny.ONE)));
+                  }(_dafny.Seq.Concat(SkopeState.__default.Expand(_0_p, _1_t), ((_pat_let_tv0).dtor_tasks).slice(_dafny.ONE)));
                 }(_pat_let10_0);
               }(s));
             }
@@ -7069,59 +7069,59 @@ let SkopRun = (function() {
           {
             if (_source1.is_Page) {
               let _10_text = (_source1).text;
-              let _11_e = SkopRun.__default.Ev(s, SkopStep.EventBody.create_WouldPageEv(SkopState.__default.RenderText((s).dtor_vars, _10_text)));
-              return SkopRun.__default.Then(_11_e, SkopRun.__default.Finish(SkopRun.__default.Log(s, _11_e), SkopStep.Outcome.create_Paged()));
+              let _11_e = SkopeRun.__default.Ev(s, SkopeStep.EventBody.create_WouldPageEv(SkopeState.__default.RenderText((s).dtor_vars, _10_text)));
+              return SkopeRun.__default.Then(_11_e, SkopeRun.__default.Finish(SkopeRun.__default.Log(s, _11_e), SkopeStep.Outcome.create_Paged()));
             }
           }
           {
             if (_source1.is_Do) {
               let _12_a = (_source1).action;
-              return SkopRun.__default.WouldDo(s, _12_a);
+              return SkopeRun.__default.WouldDo(s, _12_a);
             }
           }
           {
             if (_source1.is_IfYesDo) {
               let _13_a = (_source1).action;
-              if (SkopState.__default.Yes((s).dtor_vars, (_1_t).dtor_gov)) {
-                return SkopRun.__default.WouldDo(s, _13_a);
+              if (SkopeState.__default.Yes((s).dtor_vars, (_1_t).dtor_gov)) {
+                return SkopeRun.__default.WouldDo(s, _13_a);
               } else {
-                return SkopRun.__default.Continue(s, (s).dtor_vars);
+                return SkopeRun.__default.Continue(s, (s).dtor_vars);
               }
             }
           }
           {
             if (_source1.is_IfYesRun) {
-              return SkopRun.__default.Continue(s, (s).dtor_vars);
+              return SkopeRun.__default.Continue(s, (s).dtor_vars);
             }
           }
           {
             if (_source1.is_Check) {
               let _14_cond = (_source1).cond;
-              return SkopRun.__default.Compare(s, _14_cond);
+              return SkopeRun.__default.Compare(s, _14_cond);
             }
           }
           {
-            return SkopRun.__default.Finish(s, SkopStep.Outcome.create_Stopped());
+            return SkopeRun.__default.Finish(s, SkopeStep.Outcome.create_Stopped());
           }
         }
       }
     };
     static Issue(s) {
       let _pat_let_tv0 = s;
-      let _0_n = SkopState.__default.IssueNext(s);
-      if (((SkopState.__default.Stmt0(s)).is_Do) || ((SkopState.__default.Stmt0(s)).is_IfYesDo)) {
-        let _1_e = SkopRun.__default.Ev(s, SkopStep.EventBody.create_EffectStartEv((_0_n).dtor_cmd));
+      let _0_n = SkopeState.__default.IssueNext(s);
+      if (((SkopeState.__default.Stmt0(s)).is_Do) || ((SkopeState.__default.Stmt0(s)).is_IfYesDo)) {
+        let _1_e = SkopeRun.__default.Ev(s, SkopeStep.EventBody.create_EffectStartEv((_0_n).dtor_cmd));
         return _dafny.Tuple.of(function (_pat_let12_0) {
   return function (_2_dt__update__tmp_h1) {
     return function (_pat_let13_0) {
       return function (_3_dt__update_hlast_h1) {
         return function (_pat_let14_0) {
           return function (_4_dt__update_heffects_h1) {
-            return SkopState.State.create_State((_2_dt__update__tmp_h1).dtor_prog, (_2_dt__update__tmp_h1).dtor_cfg, (_2_dt__update__tmp_h1).dtor_sec, (_2_dt__update__tmp_h1).dtor_tasks, (_2_dt__update__tmp_h1).dtor_vars, (_2_dt__update__tmp_h1).dtor_runNames, _3_dt__update_hlast_h1, (_2_dt__update__tmp_h1).dtor_afterWouldDo, (_2_dt__update__tmp_h1).dtor_askCalls, _4_dt__update_heffects_h1);
+            return SkopeState.State.create_State((_2_dt__update__tmp_h1).dtor_prog, (_2_dt__update__tmp_h1).dtor_cfg, (_2_dt__update__tmp_h1).dtor_sec, (_2_dt__update__tmp_h1).dtor_tasks, (_2_dt__update__tmp_h1).dtor_vars, (_2_dt__update__tmp_h1).dtor_runNames, _3_dt__update_hlast_h1, (_2_dt__update__tmp_h1).dtor_afterWouldDo, (_2_dt__update__tmp_h1).dtor_askCalls, _4_dt__update_heffects_h1);
           }(_pat_let14_0);
         }(((_pat_let_tv0).dtor_effects).plus(_dafny.ONE));
       }(_pat_let13_0);
-    }(SkopAst.Option.create_Some(_0_n));
+    }(SkopeAst.Option.create_Some(_0_n));
   }(_pat_let12_0);
 }(s), _dafny.Seq.of(_1_e), _0_n);
       } else {
@@ -7129,25 +7129,25 @@ let SkopRun = (function() {
   return function (_5_dt__update__tmp_h3) {
     return function (_pat_let16_0) {
       return function (_6_dt__update_hlast_h3) {
-        return SkopState.State.create_State((_5_dt__update__tmp_h3).dtor_prog, (_5_dt__update__tmp_h3).dtor_cfg, (_5_dt__update__tmp_h3).dtor_sec, (_5_dt__update__tmp_h3).dtor_tasks, (_5_dt__update__tmp_h3).dtor_vars, (_5_dt__update__tmp_h3).dtor_runNames, _6_dt__update_hlast_h3, (_5_dt__update__tmp_h3).dtor_afterWouldDo, (_5_dt__update__tmp_h3).dtor_askCalls, (_5_dt__update__tmp_h3).dtor_effects);
+        return SkopeState.State.create_State((_5_dt__update__tmp_h3).dtor_prog, (_5_dt__update__tmp_h3).dtor_cfg, (_5_dt__update__tmp_h3).dtor_sec, (_5_dt__update__tmp_h3).dtor_tasks, (_5_dt__update__tmp_h3).dtor_vars, (_5_dt__update__tmp_h3).dtor_runNames, _6_dt__update_hlast_h3, (_5_dt__update__tmp_h3).dtor_afterWouldDo, (_5_dt__update__tmp_h3).dtor_askCalls, (_5_dt__update__tmp_h3).dtor_effects);
       }(_pat_let16_0);
-    }(SkopAst.Option.create_Some(_0_n));
+    }(SkopeAst.Option.create_Some(_0_n));
   }(_pat_let15_0);
 }(s), _dafny.Seq.of(), _0_n);
       }
     };
     static WouldDo(s, a) {
-      let _0_e = SkopRun.__default.Ev(s, SkopStep.EventBody.create_WouldDoEv(SkopState.__default.RenderCmd((s).dtor_vars, SkopState.__default.DoParts((s).dtor_vars, a))));
+      let _0_e = SkopeRun.__default.Ev(s, SkopeStep.EventBody.create_WouldDoEv(SkopeState.__default.RenderCmd((s).dtor_vars, SkopeState.__default.DoParts((s).dtor_vars, a))));
       let _1_s1 = function (_pat_let17_0) {
         return function (_2_dt__update__tmp_h0) {
           return function (_pat_let18_0) {
             return function (_3_dt__update_hafterWouldDo_h0) {
-              return SkopState.State.create_State((_2_dt__update__tmp_h0).dtor_prog, (_2_dt__update__tmp_h0).dtor_cfg, (_2_dt__update__tmp_h0).dtor_sec, (_2_dt__update__tmp_h0).dtor_tasks, (_2_dt__update__tmp_h0).dtor_vars, (_2_dt__update__tmp_h0).dtor_runNames, (_2_dt__update__tmp_h0).dtor_last, _3_dt__update_hafterWouldDo_h0, (_2_dt__update__tmp_h0).dtor_askCalls, (_2_dt__update__tmp_h0).dtor_effects);
+              return SkopeState.State.create_State((_2_dt__update__tmp_h0).dtor_prog, (_2_dt__update__tmp_h0).dtor_cfg, (_2_dt__update__tmp_h0).dtor_sec, (_2_dt__update__tmp_h0).dtor_tasks, (_2_dt__update__tmp_h0).dtor_vars, (_2_dt__update__tmp_h0).dtor_runNames, (_2_dt__update__tmp_h0).dtor_last, _3_dt__update_hafterWouldDo_h0, (_2_dt__update__tmp_h0).dtor_askCalls, (_2_dt__update__tmp_h0).dtor_effects);
             }(_pat_let18_0);
           }(true);
         }(_pat_let17_0);
       }(s);
-      return SkopRun.__default.Then(_0_e, SkopRun.__default.Continue(_1_s1, (s).dtor_vars));
+      return SkopeRun.__default.Then(_0_e, SkopeRun.__default.Continue(_1_s1, (s).dtor_vars));
     };
     static OperandVal(vars, o) {
       let _source0 = o;
@@ -7159,7 +7159,7 @@ let SkopRun = (function() {
       }
       {
         let _1_t = (_source0).text;
-        return SkopStep.Val.create_Str(_1_t);
+        return SkopeStep.Val.create_Str(_1_t);
       }
     };
     static OperandText(o) {
@@ -7207,90 +7207,90 @@ let SkopRun = (function() {
       }
     };
     static Expr(c) {
-      return _dafny.Seq.Concat(_dafny.Seq.Concat(_dafny.Seq.Concat(_dafny.Seq.Concat(SkopRun.__default.OperandText((c).dtor_l), _dafny.Seq.UnicodeFromString(" ")), SkopRun.__default.OpText((c).dtor_op)), _dafny.Seq.UnicodeFromString(" ")), SkopRun.__default.OperandText((c).dtor_r));
+      return _dafny.Seq.Concat(_dafny.Seq.Concat(_dafny.Seq.Concat(_dafny.Seq.Concat(SkopeRun.__default.OperandText((c).dtor_l), _dafny.Seq.UnicodeFromString(" ")), SkopeRun.__default.OpText((c).dtor_op)), _dafny.Seq.UnicodeFromString(" ")), SkopeRun.__default.OperandText((c).dtor_r));
     };
     static Compare(s, c) {
-      let _0_l = SkopRun.__default.OperandVal((s).dtor_vars, (c).dtor_l);
-      let _1_r = SkopRun.__default.OperandVal((s).dtor_vars, (c).dtor_r);
-      let _2_a = SkopValues.__default.Coerce(_0_l);
-      let _3_b = SkopValues.__default.Coerce(_1_r);
-      let _4_result = ((((_2_a).is_Some) && ((_3_b).is_Some)) ? (SkopAst.Option.create_Some(SkopValues.__default.Compare((c).dtor_op, (_2_a).dtor_value, (_3_b).dtor_value))) : (SkopAst.Option.create_None()));
-      return SkopRun.__default.AfterCheck(s, SkopRun.__default.Ev(s, SkopStep.EventBody.create_CheckEv(SkopRun.__default.Expr(c), SkopValues.__default.NumText(_0_l), SkopValues.__default.NumText(_1_r), _4_result, (s).dtor_afterWouldDo)), _4_result, SkopAst.Option.create_Some(SkopRun.__default.CmpDetail(c, _0_l, _1_r)));
+      let _0_l = SkopeRun.__default.OperandVal((s).dtor_vars, (c).dtor_l);
+      let _1_r = SkopeRun.__default.OperandVal((s).dtor_vars, (c).dtor_r);
+      let _2_a = SkopeValues.__default.Coerce(_0_l);
+      let _3_b = SkopeValues.__default.Coerce(_1_r);
+      let _4_result = ((((_2_a).is_Some) && ((_3_b).is_Some)) ? (SkopeAst.Option.create_Some(SkopeValues.__default.Compare((c).dtor_op, (_2_a).dtor_value, (_3_b).dtor_value))) : (SkopeAst.Option.create_None()));
+      return SkopeRun.__default.AfterCheck(s, SkopeRun.__default.Ev(s, SkopeStep.EventBody.create_CheckEv(SkopeRun.__default.Expr(c), SkopeValues.__default.NumText(_0_l), SkopeValues.__default.NumText(_1_r), _4_result, (s).dtor_afterWouldDo)), _4_result, SkopeAst.Option.create_Some(SkopeRun.__default.CmpDetail(c, _0_l, _1_r)));
     };
     static AfterCheck(s, e, result, detail) {
-      return SkopRun.__default.Then(e, (((result).is_None) ? (SkopRun.__default.Failed(SkopRun.__default.Log(s, e), detail)) : (SkopRun.__default.CheckDone(SkopRun.__default.Log(s, e), (result).dtor_value))));
+      return SkopeRun.__default.Then(e, (((result).is_None) ? (SkopeRun.__default.Failed(SkopeRun.__default.Log(s, e), detail)) : (SkopeRun.__default.CheckDone(SkopeRun.__default.Log(s, e), (result).dtor_value))));
     };
     static CmpDetail(c, l, r) {
-      return _dafny.Seq.Concat(_dafny.Seq.Concat(_dafny.Seq.Concat(_dafny.Seq.Concat(_dafny.Seq.Concat(_dafny.Seq.Concat(_dafny.Seq.UnicodeFromString("{\"expr\":"), SkopValues.__default.Json(SkopRun.__default.Expr(c))), _dafny.Seq.UnicodeFromString(",\"left\":")), SkopValues.__default.Json(SkopValues.__default.Show(l))), _dafny.Seq.UnicodeFromString(",\"right\":")), SkopValues.__default.Json(SkopValues.__default.Show(r))), _dafny.Seq.UnicodeFromString("}"));
+      return _dafny.Seq.Concat(_dafny.Seq.Concat(_dafny.Seq.Concat(_dafny.Seq.Concat(_dafny.Seq.Concat(_dafny.Seq.Concat(_dafny.Seq.UnicodeFromString("{\"expr\":"), SkopeValues.__default.Json(SkopeRun.__default.Expr(c))), _dafny.Seq.UnicodeFromString(",\"left\":")), SkopeValues.__default.Json(SkopeValues.__default.Show(l))), _dafny.Seq.UnicodeFromString(",\"right\":")), SkopeValues.__default.Json(SkopeValues.__default.Show(r))), _dafny.Seq.UnicodeFromString("}"));
     };
     static Failed(s, detail) {
-      let _0_st = SkopState.__default.Stmt0(s);
+      let _0_st = SkopeState.__default.Stmt0(s);
       let _source0 = (_0_st).dtor_els;
       {
         if (_source0.is_NoElse) {
-          return SkopRun.__default.Finish(s, SkopStep.Outcome.create_Handoff(SkopStep.Reason.create_CommandFailed(), detail));
+          return SkopeRun.__default.Finish(s, SkopeStep.Outcome.create_Handoff(SkopeStep.Reason.create_CommandFailed(), detail));
         }
       }
       {
         if (_source0.is_Skip) {
           if (((_0_st).is_Run) && (((_0_st).dtor_binding).is_Some)) {
-            return SkopRun.__default.Continue(s, ((s).dtor_vars).Subtract(_dafny.Set.fromElements(((_0_st).dtor_binding).dtor_value)));
+            return SkopeRun.__default.Continue(s, ((s).dtor_vars).Subtract(_dafny.Set.fromElements(((_0_st).dtor_binding).dtor_value)));
           } else {
-            return SkopRun.__default.Continue(s, (s).dtor_vars);
+            return SkopeRun.__default.Continue(s, (s).dtor_vars);
           }
         }
       }
       {
         let _1_r = (_source0).ref;
-        return SkopRun.__default.Goto(s, SkopWellFormed.Jump.create_Jump(_1_r, (_0_st).dtor_src));
+        return SkopeRun.__default.Goto(s, SkopeWellFormed.Jump.create_Jump(_1_r, (_0_st).dtor_src));
       }
     };
     static CheckDone(s, b) {
-      let _0_st = SkopState.__default.Stmt0(s);
+      let _0_st = SkopeState.__default.Stmt0(s);
       if (b) {
         let _source0 = (_0_st).dtor_onTrue;
         {
           if (_source0.is_None) {
-            return SkopRun.__default.Continue(s, (s).dtor_vars);
+            return SkopeRun.__default.Continue(s, (s).dtor_vars);
           }
         }
         {
           if (_source0.is_Some) {
             let value0 = (_source0).value;
             if (value0.is_StopTarget) {
-              return SkopRun.__default.Finish(s, SkopStep.Outcome.create_Stopped());
+              return SkopeRun.__default.Finish(s, SkopeStep.Outcome.create_Stopped());
             }
           }
         }
         {
           let value1 = (_source0).value;
           let _1_r = (value1).ref;
-          return SkopRun.__default.Goto(s, SkopWellFormed.Jump.create_Jump(_1_r, (_0_st).dtor_src));
+          return SkopeRun.__default.Goto(s, SkopeWellFormed.Jump.create_Jump(_1_r, (_0_st).dtor_src));
         }
       } else if (((_0_st).dtor_els).is_ElseTo) {
-        return SkopRun.__default.Goto(s, SkopWellFormed.Jump.create_Jump(((_0_st).dtor_els).dtor_ref, (_0_st).dtor_src));
+        return SkopeRun.__default.Goto(s, SkopeWellFormed.Jump.create_Jump(((_0_st).dtor_els).dtor_ref, (_0_st).dtor_src));
       } else {
-        return SkopRun.__default.Continue(s, (s).dtor_vars);
+        return SkopeRun.__default.Continue(s, (s).dtor_vars);
       }
     };
     static Ok(r) {
-      return (_dafny.areEqual((r).dtor_exit, SkopAst.Option.create_Some(_dafny.ZERO))) && (!((r).dtor_timedOut));
+      return (_dafny.areEqual((r).dtor_exit, SkopeAst.Option.create_Some(_dafny.ZERO))) && (!((r).dtor_timedOut));
     };
     static RunSlot(stdout) {
-      return SkopState.Slot.create_Slot(SkopStep.Bound.create_Bound(SkopStep.Val.create_Str(SkopValues.__default.Trim(stdout)), SkopStep.Origin.create_FromRunOutput()), SkopAst.Option.create_None());
+      return SkopeState.Slot.create_Slot(SkopeStep.Bound.create_Bound(SkopeStep.Val.create_Str(SkopeValues.__default.Trim(stdout)), SkopeStep.Origin.create_FromRunOutput()), SkopeAst.Option.create_None());
     };
     static Range(form) {
       if ((form).is_Score) {
-        return SkopAst.Option.create_Some(_dafny.Tuple.of((form).dtor_low, (form).dtor_high));
+        return SkopeAst.Option.create_Some(_dafny.Tuple.of((form).dtor_low, (form).dtor_high));
       } else {
-        return SkopAst.Option.create_None();
+        return SkopeAst.Option.create_None();
       }
     };
     static ChosenOf(form, ids, c) {
       if ((form).is_Score) {
-        return SkopStep.Chosen.create_ChosenLevel(((form).dtor_low).plus(c));
+        return SkopeStep.Chosen.create_ChosenLevel(((form).dtor_low).plus(c));
       } else {
-        return SkopStep.Chosen.create_ChosenId((ids)[c]);
+        return SkopeStep.Chosen.create_ChosenId((ids)[c]);
       }
     };
     static FailureText(f) {
@@ -7305,157 +7305,157 @@ let SkopRun = (function() {
       }
     };
     static GateMiss(s) {
-      let _0_st = SkopState.__default.Stmt0(s);
+      let _0_st = SkopeState.__default.Stmt0(s);
       let _source0 = (_0_st).dtor_els;
       {
         if (_source0.is_NoElse) {
-          return SkopRun.__default.Finish(s, SkopStep.Outcome.create_Handoff(SkopStep.Reason.create_GateFailed(), SkopAst.Option.create_None()));
+          return SkopeRun.__default.Finish(s, SkopeStep.Outcome.create_Handoff(SkopeStep.Reason.create_GateFailed(), SkopeAst.Option.create_None()));
         }
       }
       {
         if (_source0.is_Skip) {
-          let _1_sl = SkopState.Slot.create_Slot(SkopStep.Bound.create_Bound(SkopStep.Val.create_Str(_dafny.Seq.UnicodeFromString("no")), SkopStep.Origin.create_FromYesNo()), SkopAst.Option.create_None());
-          return SkopRun.__default.Continue(s, ((s).dtor_vars).update(((_0_st).dtor_form).dtor_binding, _1_sl));
+          let _1_sl = SkopeState.Slot.create_Slot(SkopeStep.Bound.create_Bound(SkopeStep.Val.create_Str(_dafny.Seq.UnicodeFromString("no")), SkopeStep.Origin.create_FromYesNo()), SkopeAst.Option.create_None());
+          return SkopeRun.__default.Continue(s, ((s).dtor_vars).update(((_0_st).dtor_form).dtor_binding, _1_sl));
         }
       }
       {
         let _2_r = (_source0).ref;
-        return SkopRun.__default.Goto(s, SkopWellFormed.Jump.create_Jump(_2_r, (_0_st).dtor_src));
+        return SkopeRun.__default.Goto(s, SkopeWellFormed.Jump.create_Jump(_2_r, (_0_st).dtor_src));
       }
     };
     static Accept(s, c) {
-      let _0_st = SkopState.__default.Stmt0(s);
+      let _0_st = SkopeState.__default.Stmt0(s);
       let _1_p = (s).dtor_prog;
       let _source0 = (_0_st).dtor_form;
       {
         if (_source0.is_Sections) {
           let _2_opts = (_source0).options;
-          return SkopRun.__default.Goto(s, SkopWellFormed.Jump.create_Jump(((_2_opts)[c]).dtor_ref, ((_2_opts)[c]).dtor_src));
+          return SkopeRun.__default.Goto(s, SkopeWellFormed.Jump.create_Jump(((_2_opts)[c]).dtor_ref, ((_2_opts)[c]).dtor_src));
         }
       }
       {
         if (_source0.is_YesNo) {
           let _3_x = (_source0).binding;
-          let _4_sl = SkopState.Slot.create_Slot(SkopStep.Bound.create_Bound(SkopStep.Val.create_Str((((c).isEqualTo(_dafny.ZERO)) ? (_dafny.Seq.UnicodeFromString("yes")) : (_dafny.Seq.UnicodeFromString("no")))), SkopStep.Origin.create_FromYesNo()), SkopAst.Option.create_None());
-          return SkopRun.__default.Continue(s, ((s).dtor_vars).update(_3_x, _4_sl));
+          let _4_sl = SkopeState.Slot.create_Slot(SkopeStep.Bound.create_Bound(SkopeStep.Val.create_Str((((c).isEqualTo(_dafny.ZERO)) ? (_dafny.Seq.UnicodeFromString("yes")) : (_dafny.Seq.UnicodeFromString("no")))), SkopeStep.Origin.create_FromYesNo()), SkopeAst.Option.create_None());
+          return SkopeRun.__default.Continue(s, ((s).dtor_vars).update(_3_x, _4_sl));
         }
       }
       {
         if (_source0.is_OneOf) {
           let _5_l = (_source0).list;
           let _6_x = (_source0).binding;
-          let _7_it = ((SkopWellFormed.__default.DataList(_1_p, (_5_l).dtor_id)).dtor_items)[c];
-          let _8_sl = SkopState.Slot.create_Slot(SkopStep.Bound.create_Bound(SkopStep.Val.create_Str((_7_it).dtor_value), SkopStep.Origin.create_FromListItem()), SkopAst.Option.create_None());
-          return SkopRun.__default.Continue(s, ((s).dtor_vars).update(_6_x, _8_sl));
+          let _7_it = ((SkopeWellFormed.__default.DataList(_1_p, (_5_l).dtor_id)).dtor_items)[c];
+          let _8_sl = SkopeState.Slot.create_Slot(SkopeStep.Bound.create_Bound(SkopeStep.Val.create_Str((_7_it).dtor_value), SkopeStep.Origin.create_FromListItem()), SkopeAst.Option.create_None());
+          return SkopeRun.__default.Continue(s, ((s).dtor_vars).update(_6_x, _8_sl));
         }
       }
       {
         let _9_lo = (_source0).low;
         let _10_x = (_source0).binding;
-        let _11_sl = SkopState.Slot.create_Slot(SkopStep.Bound.create_Bound(SkopStep.Val.create_Int((_9_lo).plus(c)), SkopStep.Origin.create_FromScore()), SkopAst.Option.create_None());
-        return SkopRun.__default.Continue(s, ((s).dtor_vars).update(_10_x, _11_sl));
+        let _11_sl = SkopeState.Slot.create_Slot(SkopeStep.Bound.create_Bound(SkopeStep.Val.create_Int((_9_lo).plus(c)), SkopeStep.Origin.create_FromScore()), SkopeAst.Option.create_None());
+        return SkopeRun.__default.Continue(s, ((s).dtor_vars).update(_10_x, _11_sl));
       }
     };
     static Answered(s, st, req, r) {
-      let _0_ids = SkopValues.__default.Ids((req).dtor_options);
-      let _1_v = SkopValues.__default.Gate(_0_ids, (r).dtor_probs, (r).dtor_unassigned, (st).dtor_sure);
+      let _0_ids = SkopeValues.__default.Ids((req).dtor_options);
+      let _1_v = SkopeValues.__default.Gate(_0_ids, (r).dtor_probs, (r).dtor_unassigned, (st).dtor_sure);
       let _source0 = _1_v;
       {
         if (_source0.is_Invalid) {
-          let _2_e = SkopRun.__default.Ev(s, SkopStep.EventBody.create_AskEv((req).dtor_question, (req).dtor_kind, SkopAst.Option.create_None(), SkopAst.Option.create_None(), SkopAst.Option.create_None(), (st).dtor_sure, false, SkopRun.__default.Range((st).dtor_form), SkopAst.Option.create_Some(SkopStep.AskFailure.create_Unavailable()), (s).dtor_afterWouldDo));
-          return SkopRun.__default.Then(_2_e, SkopRun.__default.Finish(SkopRun.__default.Log(s, _2_e), SkopStep.Outcome.create_Handoff(SkopStep.Reason.create_AskUnavailable(), SkopAst.Option.create_Some(SkopRun.__default.FailureText(SkopStep.AskFailure.create_Unavailable())))));
+          let _2_e = SkopeRun.__default.Ev(s, SkopeStep.EventBody.create_AskEv((req).dtor_question, (req).dtor_kind, SkopeAst.Option.create_None(), SkopeAst.Option.create_None(), SkopeAst.Option.create_None(), (st).dtor_sure, false, SkopeRun.__default.Range((st).dtor_form), SkopeAst.Option.create_Some(SkopeStep.AskFailure.create_Unavailable()), (s).dtor_afterWouldDo));
+          return SkopeRun.__default.Then(_2_e, SkopeRun.__default.Finish(SkopeRun.__default.Log(s, _2_e), SkopeStep.Outcome.create_Handoff(SkopeStep.Reason.create_AskUnavailable(), SkopeAst.Option.create_Some(SkopeRun.__default.FailureText(SkopeStep.AskFailure.create_Unavailable())))));
         }
       }
       {
         if (_source0.is_Unsure) {
           let _3_c = (_source0).chosen;
           let _4_conf = (_source0).conf;
-          return SkopRun.__default.GateMissed(s, st, req, r, _3_c, _4_conf);
+          return SkopeRun.__default.GateMissed(s, st, req, r, _3_c, _4_conf);
         }
       }
       {
         let _5_c = (_source0).chosen;
         let _6_conf = (_source0).conf;
-        return SkopRun.__default.GatePassed(s, st, req, r, _5_c, _6_conf);
+        return SkopeRun.__default.GatePassed(s, st, req, r, _5_c, _6_conf);
       }
     };
     static GateMissed(s, st, req, r, c, conf) {
-      let _0_e = SkopRun.__default.Ev(s, SkopStep.EventBody.create_AskEv((req).dtor_question, (req).dtor_kind, SkopAst.Option.create_Some((r).dtor_probs), SkopAst.Option.create_Some(SkopRun.__default.ChosenOf((st).dtor_form, SkopValues.__default.Ids((req).dtor_options), c)), SkopAst.Option.create_Some(conf), (st).dtor_sure, false, SkopRun.__default.Range((st).dtor_form), SkopAst.Option.create_None(), (s).dtor_afterWouldDo));
-      return SkopRun.__default.Then(_0_e, SkopRun.__default.GateMiss(SkopRun.__default.Log(s, _0_e)));
+      let _0_e = SkopeRun.__default.Ev(s, SkopeStep.EventBody.create_AskEv((req).dtor_question, (req).dtor_kind, SkopeAst.Option.create_Some((r).dtor_probs), SkopeAst.Option.create_Some(SkopeRun.__default.ChosenOf((st).dtor_form, SkopeValues.__default.Ids((req).dtor_options), c)), SkopeAst.Option.create_Some(conf), (st).dtor_sure, false, SkopeRun.__default.Range((st).dtor_form), SkopeAst.Option.create_None(), (s).dtor_afterWouldDo));
+      return SkopeRun.__default.Then(_0_e, SkopeRun.__default.GateMiss(SkopeRun.__default.Log(s, _0_e)));
     };
     static GatePassed(s, st, req, r, c, conf) {
-      let _0_e = SkopRun.__default.Ev(s, SkopStep.EventBody.create_AskEv((req).dtor_question, (req).dtor_kind, SkopAst.Option.create_Some((r).dtor_probs), SkopAst.Option.create_Some(SkopRun.__default.ChosenOf((st).dtor_form, SkopValues.__default.Ids((req).dtor_options), c)), SkopAst.Option.create_Some(conf), (st).dtor_sure, true, SkopRun.__default.Range((st).dtor_form), SkopAst.Option.create_None(), (s).dtor_afterWouldDo));
-      return SkopRun.__default.Then(_0_e, SkopRun.__default.Accept(SkopRun.__default.Log(s, _0_e), c));
+      let _0_e = SkopeRun.__default.Ev(s, SkopeStep.EventBody.create_AskEv((req).dtor_question, (req).dtor_kind, SkopeAst.Option.create_Some((r).dtor_probs), SkopeAst.Option.create_Some(SkopeRun.__default.ChosenOf((st).dtor_form, SkopeValues.__default.Ids((req).dtor_options), c)), SkopeAst.Option.create_Some(conf), (st).dtor_sure, true, SkopeRun.__default.Range((st).dtor_form), SkopeAst.Option.create_None(), (s).dtor_afterWouldDo));
+      return SkopeRun.__default.Then(_0_e, SkopeRun.__default.Accept(SkopeRun.__default.Log(s, _0_e), c));
     };
     static Resume(s, r) {
       let _0_n = ((s).dtor_last).dtor_value;
-      let _1_st = SkopState.__default.Stmt0(s);
+      let _1_st = SkopeState.__default.Stmt0(s);
       let _2_s0 = function (_pat_let19_0) {
         return function (_3_dt__update__tmp_h0) {
           return function (_pat_let20_0) {
             return function (_4_dt__update_hlast_h0) {
-              return SkopState.State.create_State((_3_dt__update__tmp_h0).dtor_prog, (_3_dt__update__tmp_h0).dtor_cfg, (_3_dt__update__tmp_h0).dtor_sec, (_3_dt__update__tmp_h0).dtor_tasks, (_3_dt__update__tmp_h0).dtor_vars, (_3_dt__update__tmp_h0).dtor_runNames, _4_dt__update_hlast_h0, (_3_dt__update__tmp_h0).dtor_afterWouldDo, (_3_dt__update__tmp_h0).dtor_askCalls, (_3_dt__update__tmp_h0).dtor_effects);
+              return SkopeState.State.create_State((_3_dt__update__tmp_h0).dtor_prog, (_3_dt__update__tmp_h0).dtor_cfg, (_3_dt__update__tmp_h0).dtor_sec, (_3_dt__update__tmp_h0).dtor_tasks, (_3_dt__update__tmp_h0).dtor_vars, (_3_dt__update__tmp_h0).dtor_runNames, _4_dt__update_hlast_h0, (_3_dt__update__tmp_h0).dtor_afterWouldDo, (_3_dt__update__tmp_h0).dtor_askCalls, (_3_dt__update__tmp_h0).dtor_effects);
             }(_pat_let20_0);
-          }(SkopAst.Option.create_None());
+          }(SkopeAst.Option.create_None());
         }(_pat_let19_0);
       }(s);
       let _source0 = _1_st;
       {
         if (_source0.is_Run) {
-          return SkopRun.__default.AfterRun(_2_s0, SkopRun.__default.Ev(_2_s0, SkopStep.EventBody.create_RunEv((_0_n).dtor_cmd, (r).dtor_exit, (r).dtor_timedOut, (s).dtor_afterWouldDo)), r);
+          return SkopeRun.__default.AfterRun(_2_s0, SkopeRun.__default.Ev(_2_s0, SkopeStep.EventBody.create_RunEv((_0_n).dtor_cmd, (r).dtor_exit, (r).dtor_timedOut, (s).dtor_afterWouldDo)), r);
         }
       }
       {
         if (_source0.is_IfYesRun) {
-          return SkopRun.__default.AfterExec(_2_s0, SkopRun.__default.Ev(_2_s0, SkopStep.EventBody.create_RunEv((_0_n).dtor_cmd, (r).dtor_exit, (r).dtor_timedOut, (s).dtor_afterWouldDo)), r);
+          return SkopeRun.__default.AfterExec(_2_s0, SkopeRun.__default.Ev(_2_s0, SkopeStep.EventBody.create_RunEv((_0_n).dtor_cmd, (r).dtor_exit, (r).dtor_timedOut, (s).dtor_afterWouldDo)), r);
         }
       }
       {
         if (_source0.is_Do) {
-          return SkopRun.__default.AfterExec(_2_s0, SkopRun.__default.Ev(_2_s0, SkopStep.EventBody.create_EffectEndEv((_0_n).dtor_cmd, (r).dtor_exit, (r).dtor_timedOut)), r);
+          return SkopeRun.__default.AfterExec(_2_s0, SkopeRun.__default.Ev(_2_s0, SkopeStep.EventBody.create_EffectEndEv((_0_n).dtor_cmd, (r).dtor_exit, (r).dtor_timedOut)), r);
         }
       }
       {
         if (_source0.is_IfYesDo) {
-          return SkopRun.__default.AfterExec(_2_s0, SkopRun.__default.Ev(_2_s0, SkopStep.EventBody.create_EffectEndEv((_0_n).dtor_cmd, (r).dtor_exit, (r).dtor_timedOut)), r);
+          return SkopeRun.__default.AfterExec(_2_s0, SkopeRun.__default.Ev(_2_s0, SkopeStep.EventBody.create_EffectEndEv((_0_n).dtor_cmd, (r).dtor_exit, (r).dtor_timedOut)), r);
         }
       }
       {
         if (_source0.is_Check) {
           let _5_cond = (_source0).cond;
           if ((_5_cond).is_Succeeds) {
-            let _6_result = ((((r).dtor_timedOut) || (((r).dtor_exit).is_None)) ? (SkopAst.Option.create_None()) : (SkopAst.Option.create_Some(_dafny.areEqual((r).dtor_exit, SkopAst.Option.create_Some(_dafny.ZERO)))));
-            return SkopRun.__default.AfterCheck(_2_s0, SkopRun.__default.Ev(_2_s0, SkopStep.EventBody.create_CheckCmdEv((_0_n).dtor_cmd, (r).dtor_exit, (r).dtor_timedOut, (s).dtor_afterWouldDo)), _6_result, SkopAst.Option.create_None());
+            let _6_result = ((((r).dtor_timedOut) || (((r).dtor_exit).is_None)) ? (SkopeAst.Option.create_None()) : (SkopeAst.Option.create_Some(_dafny.areEqual((r).dtor_exit, SkopeAst.Option.create_Some(_dafny.ZERO)))));
+            return SkopeRun.__default.AfterCheck(_2_s0, SkopeRun.__default.Ev(_2_s0, SkopeStep.EventBody.create_CheckCmdEv((_0_n).dtor_cmd, (r).dtor_exit, (r).dtor_timedOut, (s).dtor_afterWouldDo)), _6_result, SkopeAst.Option.create_None());
           } else {
-            let _7_l = SkopRun.__default.OperandVal((_2_s0).dtor_vars, (_5_cond).dtor_l);
-            let _8_rt = SkopRun.__default.OperandVal((_2_s0).dtor_vars, (_5_cond).dtor_r);
-            let _9_result = ((((r).dtor_i).isEqualTo(_dafny.ZERO)) ? (SkopAst.Option.create_Some(true)) : (((((r).dtor_i).isEqualTo(_dafny.ONE)) ? (SkopAst.Option.create_Some(false)) : (SkopAst.Option.create_None()))));
-            return SkopRun.__default.AfterCheck(_2_s0, SkopRun.__default.Ev(_2_s0, SkopStep.EventBody.create_CheckEv(SkopRun.__default.Expr(_5_cond), SkopValues.__default.NumText(_7_l), SkopValues.__default.NumText(_8_rt), _9_result, (s).dtor_afterWouldDo)), _9_result, SkopAst.Option.create_Some(SkopRun.__default.CmpDetail(_5_cond, _7_l, _8_rt)));
+            let _7_l = SkopeRun.__default.OperandVal((_2_s0).dtor_vars, (_5_cond).dtor_l);
+            let _8_rt = SkopeRun.__default.OperandVal((_2_s0).dtor_vars, (_5_cond).dtor_r);
+            let _9_result = ((((r).dtor_i).isEqualTo(_dafny.ZERO)) ? (SkopeAst.Option.create_Some(true)) : (((((r).dtor_i).isEqualTo(_dafny.ONE)) ? (SkopeAst.Option.create_Some(false)) : (SkopeAst.Option.create_None()))));
+            return SkopeRun.__default.AfterCheck(_2_s0, SkopeRun.__default.Ev(_2_s0, SkopeStep.EventBody.create_CheckEv(SkopeRun.__default.Expr(_5_cond), SkopeValues.__default.NumText(_7_l), SkopeValues.__default.NumText(_8_rt), _9_result, (s).dtor_afterWouldDo)), _9_result, SkopeAst.Option.create_Some(SkopeRun.__default.CmpDetail(_5_cond, _7_l, _8_rt)));
           }
         }
       }
       {
         if (_source0.is_Ask) {
-          return SkopRun.__default.ResumeAsk(_2_s0, _1_st, (_0_n).dtor_request, r);
+          return SkopeRun.__default.ResumeAsk(_2_s0, _1_st, (_0_n).dtor_request, r);
         }
       }
       {
         if (_source0.is_Page) {
-          let _10_e = SkopRun.__default.Ev(_2_s0, SkopStep.EventBody.create_PageEv((_0_n).dtor_text, (r).dtor_ok));
-          return SkopRun.__default.Then(_10_e, SkopRun.__default.Finish(SkopRun.__default.Log(_2_s0, _10_e), SkopStep.Outcome.create_Paged()));
+          let _10_e = SkopeRun.__default.Ev(_2_s0, SkopeStep.EventBody.create_PageEv((_0_n).dtor_text, (r).dtor_ok));
+          return SkopeRun.__default.Then(_10_e, SkopeRun.__default.Finish(SkopeRun.__default.Log(_2_s0, _10_e), SkopeStep.Outcome.create_Paged()));
         }
       }
       {
-        return SkopRun.__default.Finish(_2_s0, SkopStep.Outcome.create_Stopped());
+        return SkopeRun.__default.Finish(_2_s0, SkopeStep.Outcome.create_Stopped());
       }
     };
     static AfterRun(s, e, r) {
-      let _0_s1 = SkopRun.__default.Log(s, e);
-      let _1_b = (SkopState.__default.Stmt0(s)).dtor_binding;
-      return SkopRun.__default.Then(e, ((!(SkopRun.__default.Ok(r))) ? (SkopRun.__default.Failed(_0_s1, SkopAst.Option.create_None())) : ((((_1_b).is_Some) ? (SkopRun.__default.Continue(_0_s1, ((_0_s1).dtor_vars).update((_1_b).dtor_value, SkopRun.__default.RunSlot((r).dtor_stdout)))) : (SkopRun.__default.Continue(_0_s1, (_0_s1).dtor_vars))))));
+      let _0_s1 = SkopeRun.__default.Log(s, e);
+      let _1_b = (SkopeState.__default.Stmt0(s)).dtor_binding;
+      return SkopeRun.__default.Then(e, ((!(SkopeRun.__default.Ok(r))) ? (SkopeRun.__default.Failed(_0_s1, SkopeAst.Option.create_None())) : ((((_1_b).is_Some) ? (SkopeRun.__default.Continue(_0_s1, ((_0_s1).dtor_vars).update((_1_b).dtor_value, SkopeRun.__default.RunSlot((r).dtor_stdout)))) : (SkopeRun.__default.Continue(_0_s1, (_0_s1).dtor_vars))))));
     };
     static AfterExec(s, e, r) {
-      return SkopRun.__default.Then(e, ((SkopRun.__default.Ok(r)) ? (SkopRun.__default.Continue(SkopRun.__default.Log(s, e), (s).dtor_vars)) : (SkopRun.__default.Failed(SkopRun.__default.Log(s, e), SkopAst.Option.create_None()))));
+      return SkopeRun.__default.Then(e, ((SkopeRun.__default.Ok(r)) ? (SkopeRun.__default.Continue(SkopeRun.__default.Log(s, e), (s).dtor_vars)) : (SkopeRun.__default.Failed(SkopeRun.__default.Log(s, e), SkopeAst.Option.create_None()))));
     };
     static ResumeAsk(s0, st, req, r) {
       let _pat_let_tv0 = s0;
@@ -7463,39 +7463,39 @@ let SkopRun = (function() {
         return function (_1_dt__update__tmp_h0) {
           return function (_pat_let22_0) {
             return function (_2_dt__update_haskCalls_h0) {
-              return SkopState.State.create_State((_1_dt__update__tmp_h0).dtor_prog, (_1_dt__update__tmp_h0).dtor_cfg, (_1_dt__update__tmp_h0).dtor_sec, (_1_dt__update__tmp_h0).dtor_tasks, (_1_dt__update__tmp_h0).dtor_vars, (_1_dt__update__tmp_h0).dtor_runNames, (_1_dt__update__tmp_h0).dtor_last, (_1_dt__update__tmp_h0).dtor_afterWouldDo, _2_dt__update_haskCalls_h0, (_1_dt__update__tmp_h0).dtor_effects);
+              return SkopeState.State.create_State((_1_dt__update__tmp_h0).dtor_prog, (_1_dt__update__tmp_h0).dtor_cfg, (_1_dt__update__tmp_h0).dtor_sec, (_1_dt__update__tmp_h0).dtor_tasks, (_1_dt__update__tmp_h0).dtor_vars, (_1_dt__update__tmp_h0).dtor_runNames, (_1_dt__update__tmp_h0).dtor_last, (_1_dt__update__tmp_h0).dtor_afterWouldDo, _2_dt__update_haskCalls_h0, (_1_dt__update__tmp_h0).dtor_effects);
             }(_pat_let22_0);
           }(((_pat_let_tv0).dtor_askCalls).plus(_dafny.ONE));
         }(_pat_let21_0);
       }(s0);
       if ((r).is_AskFailed) {
-        let _3_e = SkopRun.__default.Ev(_0_s1, SkopStep.EventBody.create_AskEv((req).dtor_question, (req).dtor_kind, SkopAst.Option.create_None(), SkopAst.Option.create_None(), SkopAst.Option.create_None(), (st).dtor_sure, false, SkopRun.__default.Range((st).dtor_form), SkopAst.Option.create_Some((r).dtor_error), (s0).dtor_afterWouldDo));
-        return SkopRun.__default.Then(_3_e, SkopRun.__default.Finish(SkopRun.__default.Log(_0_s1, _3_e), SkopStep.Outcome.create_Handoff(SkopStep.Reason.create_AskUnavailable(), SkopAst.Option.create_Some(SkopRun.__default.FailureText((r).dtor_error)))));
+        let _3_e = SkopeRun.__default.Ev(_0_s1, SkopeStep.EventBody.create_AskEv((req).dtor_question, (req).dtor_kind, SkopeAst.Option.create_None(), SkopeAst.Option.create_None(), SkopeAst.Option.create_None(), (st).dtor_sure, false, SkopeRun.__default.Range((st).dtor_form), SkopeAst.Option.create_Some((r).dtor_error), (s0).dtor_afterWouldDo));
+        return SkopeRun.__default.Then(_3_e, SkopeRun.__default.Finish(SkopeRun.__default.Log(_0_s1, _3_e), SkopeStep.Outcome.create_Handoff(SkopeStep.Reason.create_AskUnavailable(), SkopeAst.Option.create_Some(SkopeRun.__default.FailureText((r).dtor_error)))));
       } else {
-        return SkopRun.__default.Answered(_0_s1, st, req, r);
+        return SkopeRun.__default.Answered(_0_s1, st, req, r);
       }
     };
     static Step(s, r) {
       if ((r).is_DeadlineExceeded) {
-        return SkopRun.__default.Finish(function (_pat_let23_0) {
+        return SkopeRun.__default.Finish(function (_pat_let23_0) {
           return function (_0_dt__update__tmp_h0) {
             return function (_pat_let24_0) {
               return function (_1_dt__update_hlast_h0) {
-                return SkopState.State.create_State((_0_dt__update__tmp_h0).dtor_prog, (_0_dt__update__tmp_h0).dtor_cfg, (_0_dt__update__tmp_h0).dtor_sec, (_0_dt__update__tmp_h0).dtor_tasks, (_0_dt__update__tmp_h0).dtor_vars, (_0_dt__update__tmp_h0).dtor_runNames, _1_dt__update_hlast_h0, (_0_dt__update__tmp_h0).dtor_afterWouldDo, (_0_dt__update__tmp_h0).dtor_askCalls, (_0_dt__update__tmp_h0).dtor_effects);
+                return SkopeState.State.create_State((_0_dt__update__tmp_h0).dtor_prog, (_0_dt__update__tmp_h0).dtor_cfg, (_0_dt__update__tmp_h0).dtor_sec, (_0_dt__update__tmp_h0).dtor_tasks, (_0_dt__update__tmp_h0).dtor_vars, (_0_dt__update__tmp_h0).dtor_runNames, _1_dt__update_hlast_h0, (_0_dt__update__tmp_h0).dtor_afterWouldDo, (_0_dt__update__tmp_h0).dtor_askCalls, (_0_dt__update__tmp_h0).dtor_effects);
               }(_pat_let24_0);
-            }(SkopAst.Option.create_None());
+            }(SkopeAst.Option.create_None());
           }(_pat_let23_0);
-        }(s), SkopStep.Outcome.create_Handoff(SkopStep.Reason.create_Deadline(), SkopAst.Option.create_None()));
+        }(s), SkopeStep.Outcome.create_Handoff(SkopeStep.Reason.create_Deadline(), SkopeAst.Option.create_None()));
       } else if (((s).dtor_last).is_None) {
-        return SkopRun.__default.Advance(s);
+        return SkopeRun.__default.Advance(s);
       } else {
-        return SkopRun.__default.Resume(s, r);
+        return SkopeRun.__default.Resume(s, r);
       }
     };
   };
   return $module;
-})(); // end of module SkopRun
-let SkopProofs = (function() {
+})(); // end of module SkopeRun
+let SkopeProofs = (function() {
   let $module = {};
 
 
@@ -7518,7 +7518,7 @@ let SkopProofs = (function() {
     get dtor_final() { return this._$$_final; }
     toString() {
       if (this.$tag === 0) {
-        return "SkopProofs.Trace.Trace" + "(" + _dafny.toString(this.states) + ", " + _dafny.toString(this.nexts) + ", " + _dafny.toString(this.events) + ", " + _dafny.toString(this._$$_final) + ")";
+        return "SkopeProofs.Trace.Trace" + "(" + _dafny.toString(this.states) + ", " + _dafny.toString(this.nexts) + ", " + _dafny.toString(this.events) + ", " + _dafny.toString(this._$$_final) + ")";
       } else  {
         return "<unexpected>";
       }
@@ -7533,7 +7533,7 @@ let SkopProofs = (function() {
       }
     }
     static Default() {
-      return SkopProofs.Trace.create_Trace(_dafny.Seq.of(), _dafny.Seq.of(), _dafny.Seq.of(), SkopState.State.Default());
+      return SkopeProofs.Trace.create_Trace(_dafny.Seq.of(), _dafny.Seq.of(), _dafny.Seq.of(), SkopeState.State.Default());
     }
     static Rtd() {
       return class {
@@ -7544,11 +7544,11 @@ let SkopProofs = (function() {
     }
   }
   return $module;
-})(); // end of module SkopProofs
+})(); // end of module SkopeProofs
 let _module = (function() {
   let $module = {};
 
   return $module;
 })(); // end of module _module
 
-module.exports = { _dafny, SkopAst, SkopStep, SkopWellFormed, SkopCheck, SkopValues, SkopState, SkopRun };
+module.exports = { _dafny, SkopeAst, SkopeStep, SkopeWellFormed, SkopeCheck, SkopeValues, SkopeState, SkopeRun };

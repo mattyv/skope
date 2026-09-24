@@ -5,13 +5,13 @@
 // exactly the events returned, the measure fell below the given bound
 // unless the run ended (P1), and the request is one the program allows
 // (P3, P4). Proofs.dfy lifts these to whole runs.
-module SkopRun {
-  import opened SkopAst
-  import opened SkopStep
-  import opened SkopWellFormed
-  import opened SkopValues
-  import opened SkopState
-  import opened SkopLemmas
+module SkopeRun {
+  import opened SkopeAst
+  import opened SkopeStep
+  import opened SkopeWellFormed
+  import opened SkopeValues
+  import opened SkopeState
+  import opened SkopeLemmas
 
   // Start requires what lint guarantees (WellFormed, P6) plus the host's checks.
   function Start(p: Program, cfg: RunConfig): (s: State)
@@ -160,7 +160,7 @@ module SkopRun {
     Ready(s);
     var l, r := OperandVal(s.vars, c.l), OperandVal(s.vars, c.r);
     var a, b := Coerce(l), Coerce(r);
-    var result := if a.Some? && b.Some? then Some(SkopValues.Compare(c.op, a.value, b.value)) else None;
+    var result := if a.Some? && b.Some? then Some(SkopeValues.Compare(c.op, a.value, b.value)) else None;
     AfterCheck(s, Ev(s, CheckEv(Expr(c), NumText(l), NumText(r), result, s.afterWouldDo)), result, Some(CmpDetail(c, l, r)))
   }
 

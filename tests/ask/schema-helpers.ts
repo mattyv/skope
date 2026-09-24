@@ -13,7 +13,7 @@ const read = (p: string) => JSON.parse(readFileSync(new URL(`../../contracts/${p
 
 const ajv = new Ajv2020({ allErrors: true, strict: true, allowUnionTypes: true });
 ajv.addSchema(read("ask.schema.json"));
-const validateOutput = ajv.getSchema("https://github.com/mattyv/skop/contracts/ask.schema.json#/$defs/output");
+const validateOutput = ajv.getSchema("https://github.com/mattyv/skope/contracts/ask.schema.json#/$defs/output");
 if (!validateOutput) throw new Error("no ask.schema.json#/$defs/output schema");
 
 /** Asserts `out` validates against the ask output contract, then returns

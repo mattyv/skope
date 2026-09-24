@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// The `skop-ask` entry point (SPEC §6.1): `skop-ask --request /path/req.json`
+// The `skope-ask` entry point (SPEC §6.1): `skope-ask --request /path/req.json`
 // reads the request from that file, asks the configured backend, and
 // prints one JSON object (an answer or a failure) to stdout. Exit 0 on
 // success, non-zero on failure. Stdin is also accepted, for callers that
@@ -8,7 +8,7 @@
 // an implementation convenience on top of it.
 //
 // ponytail: `--fake` is handled by the host in-process (SPEC §5.4 lists it
-// as a handler alongside "real", not as a `skop-ask` backend), so this CLI
+// as a handler alongside "real", not as a `skope-ask` backend), so this CLI
 // only wires up jev and openrouter. Backend selection and credentials come
 // from environment variables here rather than re-reading config.yaml,
 // since parsing and validating that file (E-CONFIG) is the runner
@@ -34,18 +34,18 @@ function checkMinMass(minMass: number): void {
 
 export async function runAsk(requestJson: string, env: NodeJS.ProcessEnv): Promise<AskOutput> {
   const request = JSON.parse(requestJson) as AskRequest;
-  const backend = env.SKOP_ASK_BACKEND ?? "jev";
-  const retries = env.SKOP_ASK_RETRIES !== undefined ? Number(env.SKOP_ASK_RETRIES) : 1;
+  const backend = env.SKOPE_ASK_BACKEND ?? "jev";
+  const retries = env.SKOPE_ASK_RETRIES !== undefined ? Number(env.SKOPE_ASK_RETRIES) : 1;
   checkRetries(retries);
   const retryCfg: RetryConfig = { timeoutMs: request.timeout_ms, retries };
 
   if (backend === "fake") {
     // SPEC §5.4: `--fake` is handled by the host in-process, before
-    // skop-ask is ever invoked. Seeing it here means something upstream
-    // is misconfigured (e.g. ask.backend: fake reaching skop-ask instead
+    // skope-ask is ever invoked. Seeing it here means something upstream
+    // is misconfigured (e.g. ask.backend: fake reaching skope-ask instead
     // of being intercepted).
     throw new ConfigError(
-      "ask.backend 'fake' is handled by the host via --fake (SPEC §5.4), not by skop-ask; skop-ask should never be invoked for it",
+      "ask.backend 'fake' is handled by the host via --fake (SPEC §5.4), not by skope-ask; skope-ask should never be invoked for it",
     );
   }
   if (backend === "jev") {
@@ -88,7 +88,7 @@ async function main() {
     process.stdout.write(`${JSON.stringify(out)}\n`);
     process.exit(isFailure(out) ? 1 : 0);
   } catch (err) {
-    process.stderr.write(`skop-ask: ${err instanceof Error ? err.message : String(err)}\n`);
+    process.stderr.write(`skope-ask: ${err instanceof Error ? err.message : String(err)}\n`);
     process.exit(1);
   }
 }

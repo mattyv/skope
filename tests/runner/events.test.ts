@@ -60,13 +60,13 @@ describe("error and warning events (SPEC §7.1, §10)", () => {
     expect(validate(locked), JSON.stringify(validate.errors)).toBe(true);
     expect(locked).toMatchObject({ event: "locked", holder_pid: 4242 });
 
-    const stale = staleLockEvent(ctxNoRun, "/run/skop/disk-full.lock", 4242);
+    const stale = staleLockEvent(ctxNoRun, "/run/skope/disk-full.lock", 4242);
     expect(validate(stale), JSON.stringify(validate.errors)).toBe(true);
-    expect(stale).toMatchObject({ event: "stale_lock", path: "/run/skop/disk-full.lock", holder_pid: 4242 });
+    expect(stale).toMatchObject({ event: "stale_lock", path: "/run/skope/disk-full.lock", holder_pid: 4242 });
   });
 
   test("staleLockEvent with an unreadable lock has holder_pid null and validates", () => {
-    const stale = staleLockEvent(ctxNoRun, "/run/skop/disk-full.lock", null);
+    const stale = staleLockEvent(ctxNoRun, "/run/skope/disk-full.lock", null);
     expect(validate(stale), JSON.stringify(validate.errors)).toBe(true);
     expect(stale.holder_pid).toBeNull();
   });

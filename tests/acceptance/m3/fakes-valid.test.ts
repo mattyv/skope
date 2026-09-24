@@ -39,7 +39,7 @@ describe("fake scenario files validate against contracts/fakes.schema.json (SPEC
         expect(validateCommands(commands), JSON.stringify(validateCommands.errors)).toBe(true);
       });
 
-      test("expected-exit is one of skop's outcome codes (SPEC §4.1)", () => {
+      test("expected-exit is one of skope's outcome codes (SPEC §4.1)", () => {
         expect(EXIT_CODES.has(readExpectedExit(s.expectedExitPath))).toBe(true);
       });
 

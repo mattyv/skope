@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/mattyv/skop/contracts/event.schema.json",
+  "$id": "https://github.com/mattyv/skope/contracts/event.schema.json",
   "title": "Event",
-  "description": "One line of skop's JSON Lines output on stdout (SPEC §10). Exactly one event shape matches, chosen by `event`. Every shape has the common fields ts, run_id, skill, skill_hash, host, and optionally section and line; run_id, skill and skill_hash are null before a run exists. Nothing else is allowed.",
+  "description": "One line of skope's JSON Lines output on stdout (SPEC §10). Exactly one event shape matches, chosen by `event`. Every shape has the common fields ts, run_id, skill, skill_hash, host, and optionally section and line; run_id, skill and skill_hash are null before a run exists. Nothing else is allowed.",
   "oneOf": [
     {
       "$ref": "#/$defs/run_start"
@@ -112,11 +112,11 @@
         "run_dir": {
           "type": "string"
         },
-        "skop_version": {
+        "skope_version": {
           "type": "string",
           "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z.-]+)?$"
         },
-        "skop_build": {
+        "skope_build": {
           "type": "string",
           "pattern": "^[0-9a-f]{64}$",
           "description": "Build identity, bare hex (SPEC §7.2)."
@@ -133,8 +133,8 @@
         "dry_run",
         "caller",
         "run_dir",
-        "skop_version",
-        "skop_build"
+        "skope_version",
+        "skope_build"
       ],
       "additionalProperties": false
     },

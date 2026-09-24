@@ -1,10 +1,10 @@
 // Values the core computes with (SPEC §3.5, §4.2, §6.1): rendering, the
 // safe-value check, number coercion for `check`, and the ask gate. Pure
 // functions; P5 is proven here about Gate.
-module SkopValues {
-  import opened SkopAst
-  import opened SkopStep
-  import opened SkopWellFormed
+module SkopeValues {
+  import opened SkopeAst
+  import opened SkopeStep
+  import opened SkopeWellFormed
 
   // ---- rendering ----
 

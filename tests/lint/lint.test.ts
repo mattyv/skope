@@ -712,14 +712,14 @@ describe("if yes (SPEC §4.2)", () => {
 describe("checks (SPEC §3.4)", () => {
   // src/ast.ts refuses this JSON, so the statement is built directly.
   test("E-GRAMMAR: a check with neither target nor else, at lint time", () => {
-    const { SkopAst } = gen;
-    const stmt = SkopAst.Stmt.create_Check(
+    const { SkopeAst } = gen;
+    const stmt = SkopeAst.Stmt.create_Check(
       new BigNumber(11),
-      SkopAst.Cond.create_Succeeds(_dafny.Seq.of()),
-      SkopAst.Option.create_None(),
-      SkopAst.Else.create_NoElse(),
+      SkopeAst.Cond.create_Succeeds(_dafny.Seq.of()),
+      SkopeAst.Option.create_None(),
+      SkopeAst.Else.create_NoElse(),
     );
-    const found = [...gen.SkopCheck.__default.CheckFindings(stmt)].map((e: any) =>
+    const found = [...gen.SkopeCheck.__default.CheckFindings(stmt)].map((e: any) =>
       E(e.dtor_code.toVerbatimString(false), e.dtor_src.toNumber()),
     );
     expect(found).toEqual([E("E-GRAMMAR", 11)]);

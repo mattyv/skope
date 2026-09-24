@@ -7,7 +7,7 @@
 
 import { describe, expect, test } from "vitest";
 import { normalise } from "../../helpers/golden.js";
-import { runSkop } from "../lib/cli.js";
+import { runSkope } from "../lib/cli.js";
 import { allScenarios, readExpectedExit, readGolden } from "../lib/scenarios.js";
 
 describe("M3: exec with fakes matches the golden event stream (SPEC §12.3)", () => {
@@ -21,7 +21,7 @@ describe("M3: exec with fakes matches the golden event stream (SPEC §12.3)", ()
 
     test(title, async () => {
       const mode = isDryRun ? "--dry-run" : "--apply";
-      const result = await runSkop([s.skillPath, mode, "--fake", s.answersPath, "--fake-exec", s.commandsPath]);
+      const result = await runSkope([s.skillPath, mode, "--fake", s.answersPath, "--fake-exec", s.commandsPath]);
       const expected = readGolden(s.goldenPath);
       expect(normalise(result.events)).toEqual(normalise(expected));
       expect(result.code).toBe(readExpectedExit(s.expectedExitPath));

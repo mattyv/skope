@@ -18,7 +18,7 @@ export type Lead =
  * markers just inside the bold (`***run***`, `**_run_**`) don't hide a
  * keyword. */
 export function classifyLead(text: string): Lead | null {
-  // HTML bold renders like **bold** but isn't skop's bold: an error, not a
+  // HTML bold renders like **bold** but isn't skope's bold: an error, not a
   // silent prose item (SPEC §3.3 rule 3).
   const html = /^<(b|strong)>(.*?)<\/\1>/i.exec(text);
   if (html) return { kind: "unknown", content: html[2] ?? "", html: true };

@@ -10,7 +10,7 @@
 // Every golden this script writes is listed in tests/acceptance/REVIEW.md
 // for human review, per PLAN.md §4 F. In particular: `request_sha256` on
 // `ask` events is a well-formed placeholder, not a real hash of a request
-// payload, because the exact bytes skop-ask writes to `ask-<n>.json` aren't
+// payload, because the exact bytes skope-ask writes to `ask-<n>.json` aren't
 // pinned by SPEC.md or contracts/ (see the note in the final report on
 // SPEC §7.1/§10). `stdout_hash` values ARE real: sha256 of the fake
 // command's stdout, computed below, since that's fully determined by
@@ -34,8 +34,8 @@ const redact = (s) => s.replace(SECRET_PATTERN, "[REDACTED]");
 // --- envelope -----------------------------------------------------------
 
 const ENV = { ts: "2026-09-23T00:00:00Z", run_id: "r-test", host: "test-host", skill_hash: `sha256:${"a".repeat(64)}` };
-const RUN_DIR = "/tmp/skop/runs/r-test";
-const SKOP_IDENTITY = { version: "0.1.0", build: "0".repeat(64) };
+const RUN_DIR = "/tmp/skope/runs/r-test";
+const SKOPE_IDENTITY = { version: "0.1.0", build: "0".repeat(64) };
 
 // SPEC §8.2, verbatim.
 const PREAMBLE =
@@ -50,7 +50,7 @@ const PREAMBLE =
   "skill could have handled this automatically, propose a change to it as a " +
   "unified diff. Never edit the skill file yourself.";
 
-// SPEC §8.1: the full handoff record shape (minus run_id/host/skill_hash/skop, which the
+// SPEC §8.1: the full handoff record shape (minus run_id/host/skill_hash/skope, which the
 // golden helper ignores). `detail` carries the ask that triggered a gate_failed or
 // ask_unavailable handoff; other reasons omit it.
 function buildRecord({ skill, section, line, reason, detail, variables = {}, effects = [], dry_run }) {
@@ -63,7 +63,7 @@ function buildRecord({ skill, section, line, reason, detail, variables = {}, eff
     variables,
     effects,
     dry_run,
-    skop: SKOP_IDENTITY,
+    skope: SKOPE_IDENTITY,
     preamble: PREAMBLE,
   };
 }
@@ -82,9 +82,9 @@ const mk = {
       params,
       dry_run,
       caller,
-      run_dir: "/tmp/skop/runs/r-test",
-      skop_version: "0.1.0",
-      skop_build: "0".repeat(64),
+      run_dir: "/tmp/skope/runs/r-test",
+      skope_version: "0.1.0",
+      skope_build: "0".repeat(64),
     }),
   run: (skill, { section, line, cmd, exit, stdout, timed_out = false, after_would_do = false }) =>
     wrap(skill, {
@@ -131,7 +131,7 @@ const mk = {
       backend: "fake",
       model: "fake",
       ms: 1,
-      request_path: "/tmp/skop/runs/r-test/ask-1.json",
+      request_path: "/tmp/skope/runs/r-test/ask-1.json",
       request_sha256: PLACEHOLDER_HASH,
       after_would_do,
       ...(range ? { range } : {}),
@@ -167,10 +167,10 @@ const mk = {
     wrap(skill, { event: "handoff_record", section, line, path: `${RUN_DIR}/handoff.json`, record }),
 };
 
-// Page text as skop escapes the skill's page text for the pager (SPEC §3.5: no mentions, no
+// Page text as skope escapes the skill's page text for the pager (SPEC §3.5: no mentions, no
 // links): entities for & < >, backslashes on a markdown link's brackets, and a zero-width space
 // after @, inside ://, and after a dot between a word and a letter, so `example.com` can't become
-// a link. skop's own handoff page (host, section, record path) isn't escaped, so the path copies.
+// a link. skope's own handoff page (host, section, record path) isn't escaped, so the path copies.
 function escapePage(t) {
   return t
     .replace(/&/g, "&amp;")
@@ -421,7 +421,7 @@ function dfRunStart(dry_run) {
     mk.handoffPage(DF, {
       section: "Investigate",
       line: 58,
-      text: "test-host: skop disk-full handed off (explicit) in Investigate. Record: /tmp/skop/runs/r-test/handoff.json",
+      text: "test-host: skope disk-full handed off (explicit) in Investigate. Record: /tmp/skope/runs/r-test/handoff.json",
       ok: true,
     }),
     mk.outcome(DF, { outcome: "handoff", reason: "explicit", ask_calls: 1, effects: 0, dry_run: false }),
@@ -480,7 +480,7 @@ function dfRunStart(dry_run) {
     mk.handoffPage(DF, {
       section: "Triage",
       line: 27,
-      text: "test-host: skop disk-full handed off (gate_failed) in Triage. Record: /tmp/skop/runs/r-test/handoff.json",
+      text: "test-host: skope disk-full handed off (gate_failed) in Triage. Record: /tmp/skope/runs/r-test/handoff.json",
       ok: true,
     }),
     mk.outcome(DF, { outcome: "handoff", reason: "gate_failed", ask_calls: 1, effects: 0, dry_run: false }),
@@ -655,7 +655,7 @@ function dfRunStart(dry_run) {
     mk.handoffPage(DF, {
       section: "Triage",
       line: 27,
-      text: "test-host: skop disk-full handed off (ask_unavailable) in Triage. Record: /tmp/skop/runs/r-test/handoff.json",
+      text: "test-host: skope disk-full handed off (ask_unavailable) in Triage. Record: /tmp/skope/runs/r-test/handoff.json",
       ok: true,
     }),
     mk.outcome(DF, { outcome: "handoff", reason: "ask_unavailable", ask_calls: 1, effects: 0, dry_run: false }),
@@ -715,7 +715,7 @@ function dfRunStart(dry_run) {
     mk.handoffPage(DF, {
       section: "Triage",
       line: 27,
-      text: "test-host: skop disk-full handed off (ask_unavailable) in Triage. Record: /tmp/skop/runs/r-test/handoff.json",
+      text: "test-host: skope disk-full handed off (ask_unavailable) in Triage. Record: /tmp/skope/runs/r-test/handoff.json",
       ok: true,
     }),
     mk.outcome(DF, { outcome: "handoff", reason: "ask_unavailable", ask_calls: 1, effects: 0, dry_run: false }),
@@ -785,7 +785,7 @@ function dfRunStart(dry_run) {
     mk.handoffPage(DF, {
       section: "Restart",
       line: 47,
-      text: "test-host: skop disk-full handed off (command_failed) in Restart. Record: /tmp/skop/runs/r-test/handoff.json",
+      text: "test-host: skope disk-full handed off (command_failed) in Restart. Record: /tmp/skope/runs/r-test/handoff.json",
       ok: true,
     }),
     mk.outcome(DF, { outcome: "handoff", reason: "command_failed", ask_calls: 2, effects: 1, dry_run: false }),
@@ -837,7 +837,7 @@ function dfRunStart(dry_run) {
     mk.handoffPage(DF, {
       section: "Triage",
       line: 25,
-      text: "test-host: skop disk-full handed off (command_failed) in Triage. Record: /tmp/skop/runs/r-test/handoff.json",
+      text: "test-host: skope disk-full handed off (command_failed) in Triage. Record: /tmp/skope/runs/r-test/handoff.json",
       ok: true,
     }),
     mk.outcome(DF, { outcome: "handoff", reason: "command_failed", ask_calls: 0, effects: 0, dry_run: false }),
@@ -880,7 +880,7 @@ function dfRunStart(dry_run) {
     mk.handoffPage(DF, {
       section: "Triage",
       line: 25,
-      text: "test-host: skop disk-full handed off (deadline) in Triage. Record: /tmp/skop/runs/r-test/handoff.json",
+      text: "test-host: skope disk-full handed off (deadline) in Triage. Record: /tmp/skope/runs/r-test/handoff.json",
       ok: true,
     }),
     mk.outcome(DF, { outcome: "handoff", reason: "deadline", ask_calls: 0, effects: 0, dry_run: false }),
@@ -931,7 +931,7 @@ function dfRunStart(dry_run) {
     mk.handoffPage(DF, {
       section: "Triage",
       line: 27,
-      text: "test-host: skop disk-full handed off (gate_failed) in Triage. Record: /tmp/skop/runs/r-test/handoff.json",
+      text: "test-host: skope disk-full handed off (gate_failed) in Triage. Record: /tmp/skope/runs/r-test/handoff.json",
       ok: true,
     }),
     mk.outcome(DF, { outcome: "handoff", reason: "gate_failed", ask_calls: 1, effects: 0, dry_run: false }),
@@ -1051,7 +1051,7 @@ function dfRunStart(dry_run) {
     mk.handoffPage(DF, {
       section: "Triage",
       line: 27,
-      text: "test-host: skop disk-full handed off (gate_failed) in Triage. Record: /tmp/skop/runs/r-test/handoff.json",
+      text: "test-host: skope disk-full handed off (gate_failed) in Triage. Record: /tmp/skope/runs/r-test/handoff.json",
       ok: true,
     }),
     mk.outcome(DF, { outcome: "handoff", reason: "gate_failed", ask_calls: 1, effects: 0, dry_run: false }),
@@ -1210,7 +1210,7 @@ function ceRunStart(dry_run) {
     mk.handoffPage(CE, {
       section: "Triage",
       line: 28,
-      text: "test-host: skop cert-expiry handed off (gate_failed) in Triage. Record: /tmp/skop/runs/r-test/handoff.json",
+      text: "test-host: skope cert-expiry handed off (gate_failed) in Triage. Record: /tmp/skope/runs/r-test/handoff.json",
       ok: true,
     }),
     mk.outcome(CE, { outcome: "handoff", reason: "gate_failed", ask_calls: 1, effects: 0, dry_run: false }),
@@ -1363,7 +1363,7 @@ function ceRunStart(dry_run) {
     mk.handoffPage(CE, {
       section: "Triage",
       line: 28,
-      text: "test-host: skop cert-expiry handed off (ask_unavailable) in Triage. Record: /tmp/skop/runs/r-test/handoff.json",
+      text: "test-host: skope cert-expiry handed off (ask_unavailable) in Triage. Record: /tmp/skope/runs/r-test/handoff.json",
       ok: true,
     }),
     mk.outcome(CE, { outcome: "handoff", reason: "ask_unavailable", ask_calls: 1, effects: 0, dry_run: false }),
@@ -1426,7 +1426,7 @@ function ceRunStart(dry_run) {
     mk.handoffPage(CE, {
       section: "Triage",
       line: 28,
-      text: "test-host: skop cert-expiry handed off (ask_unavailable) in Triage. Record: /tmp/skop/runs/r-test/handoff.json",
+      text: "test-host: skope cert-expiry handed off (ask_unavailable) in Triage. Record: /tmp/skope/runs/r-test/handoff.json",
       ok: true,
     }),
     mk.outcome(CE, { outcome: "handoff", reason: "ask_unavailable", ask_calls: 1, effects: 0, dry_run: false }),
@@ -1497,7 +1497,7 @@ function ceRunStart(dry_run) {
     mk.handoffPage(CE, {
       section: "Renew",
       line: 38,
-      text: "test-host: skop cert-expiry handed off (command_failed) in Renew. Record: /tmp/skop/runs/r-test/handoff.json",
+      text: "test-host: skope cert-expiry handed off (command_failed) in Renew. Record: /tmp/skope/runs/r-test/handoff.json",
       ok: true,
     }),
     mk.outcome(CE, { outcome: "handoff", reason: "command_failed", ask_calls: 1, effects: 2, dry_run: false }),
@@ -1548,7 +1548,7 @@ function ceRunStart(dry_run) {
     mk.handoffPage(CE, {
       section: "Triage",
       line: 25,
-      text: "test-host: skop cert-expiry handed off (command_failed) in Triage. Record: /tmp/skop/runs/r-test/handoff.json",
+      text: "test-host: skope cert-expiry handed off (command_failed) in Triage. Record: /tmp/skope/runs/r-test/handoff.json",
       ok: true,
     }),
     mk.outcome(CE, { outcome: "handoff", reason: "command_failed", ask_calls: 0, effects: 0, dry_run: false }),
@@ -1589,7 +1589,7 @@ function ceRunStart(dry_run) {
     mk.handoffPage(CE, {
       section: "Triage",
       line: 24,
-      text: "test-host: skop cert-expiry handed off (deadline) in Triage. Record: /tmp/skop/runs/r-test/handoff.json",
+      text: "test-host: skope cert-expiry handed off (deadline) in Triage. Record: /tmp/skope/runs/r-test/handoff.json",
       ok: true,
     }),
     mk.outcome(CE, { outcome: "handoff", reason: "deadline", ask_calls: 0, effects: 0, dry_run: false }),
@@ -1650,7 +1650,7 @@ function ceRunStart(dry_run) {
     mk.handoffPage(CE, {
       section: "Renew",
       line: 38,
-      text: "test-host: skop cert-expiry handed off (deadline) in Renew. Record: /tmp/skop/runs/r-test/handoff.json",
+      text: "test-host: skope cert-expiry handed off (deadline) in Renew. Record: /tmp/skope/runs/r-test/handoff.json",
       ok: true,
     }),
     mk.outcome(CE, { outcome: "handoff", reason: "deadline", ask_calls: 1, effects: 1, dry_run: false }),
@@ -1711,7 +1711,7 @@ function ceRunStart(dry_run) {
     mk.handoffPage(CE, {
       section: "Triage",
       line: 28,
-      text: "test-host: skop cert-expiry handed off (gate_failed) in Triage. Record: /tmp/skop/runs/r-test/handoff.json",
+      text: "test-host: skope cert-expiry handed off (gate_failed) in Triage. Record: /tmp/skope/runs/r-test/handoff.json",
       ok: true,
     }),
     mk.outcome(CE, { outcome: "handoff", reason: "gate_failed", ask_calls: 1, effects: 0, dry_run: false }),
@@ -1816,7 +1816,7 @@ function ceRunStart(dry_run) {
     mk.handoffPage(CE, {
       section: "Investigate",
       line: 56,
-      text: "test-host: skop cert-expiry handed off (explicit) in Investigate. Record: /tmp/skop/runs/r-test/handoff.json",
+      text: "test-host: skope cert-expiry handed off (explicit) in Investigate. Record: /tmp/skope/runs/r-test/handoff.json",
       ok: true,
     }),
     mk.outcome(CE, { outcome: "handoff", reason: "explicit", ask_calls: 1, effects: 0, dry_run: false }),
@@ -1911,7 +1911,7 @@ function etAsk({ probs, chosen, confidence, passed }) {
     mk.handoffPage(ET, {
       section: "Investigate",
       line: 38,
-      text: "test-host: skop error-triage handed off (explicit) in Investigate. Record: /tmp/skop/runs/r-test/handoff.json",
+      text: "test-host: skope error-triage handed off (explicit) in Investigate. Record: /tmp/skope/runs/r-test/handoff.json",
       ok: true,
     }),
     mk.outcome(ET, { outcome: "handoff", reason: "explicit", ask_calls: 1, effects: 0, dry_run: false }),
@@ -2049,7 +2049,7 @@ function etAsk({ probs, chosen, confidence, passed }) {
     mk.handoffPage(ET, {
       section: "Triage",
       line: 19,
-      text: "test-host: skop error-triage handed off (ask_unavailable) in Triage. Record: /tmp/skop/runs/r-test/handoff.json",
+      text: "test-host: skope error-triage handed off (ask_unavailable) in Triage. Record: /tmp/skope/runs/r-test/handoff.json",
       ok: true,
     }),
     mk.outcome(ET, { outcome: "handoff", reason: "ask_unavailable", ask_calls: 1, effects: 0, dry_run: false }),

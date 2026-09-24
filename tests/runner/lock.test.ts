@@ -45,7 +45,7 @@ let dir: string;
 const children: ChildProcess[] = [];
 const savedEnv = { ...process.env };
 beforeEach(() => {
-  dir = mkdtempSync(join(tmpdir(), "skop-lock-test-"));
+  dir = mkdtempSync(join(tmpdir(), "skope-lock-test-"));
 });
 afterEach(() => {
   hooks.beforeRead = undefined;
@@ -229,17 +229,17 @@ describe("process start identity (SPEC §7 step 3, P2-6)", () => {
 describe("lockDir (SPEC §7 step 3, P1-4)", () => {
   const uid = process.getuid?.() as number;
 
-  test("uses $XDG_RUNTIME_DIR/skop when XDG_RUNTIME_DIR is set", () => {
+  test("uses $XDG_RUNTIME_DIR/skope when XDG_RUNTIME_DIR is set", () => {
     process.env.XDG_RUNTIME_DIR = dir;
-    expect(lockDir()).toBe(join(dir, "skop"));
-    expect(statSync(join(dir, "skop")).isDirectory()).toBe(true);
+    expect(lockDir()).toBe(join(dir, "skope"));
+    expect(statSync(join(dir, "skope")).isDirectory()).toBe(true);
   });
 
-  test("without XDG_RUNTIME_DIR, or with a relative one, uses <tmpdir>/skop-<uid>, created with mode 0700", () => {
+  test("without XDG_RUNTIME_DIR, or with a relative one, uses <tmpdir>/skope-<uid>, created with mode 0700", () => {
     delete process.env.XDG_RUNTIME_DIR;
     process.env.TMPDIR = dir;
     const d = lockDir();
-    expect(d).toBe(join(dir, `skop-${uid}`));
+    expect(d).toBe(join(dir, `skope-${uid}`));
     expect(statSync(d).mode & 0o777).toBe(0o700);
     expect(lockDir()).toBe(d); // an existing, valid directory is reused
     process.env.XDG_RUNTIME_DIR = "relative/run";
@@ -250,14 +250,14 @@ describe("lockDir (SPEC §7 step 3, P1-4)", () => {
     delete process.env.XDG_RUNTIME_DIR;
     process.env.TMPDIR = dir;
     mkdirSync(join(dir, "elsewhere"), { mode: 0o700 });
-    symlinkSync(join(dir, "elsewhere"), join(dir, `skop-${uid}`));
+    symlinkSync(join(dir, "elsewhere"), join(dir, `skope-${uid}`));
     expect(() => lockDir()).toThrow(LockError);
   });
 
   test("the fallback directory is refused (E-IO) when it isn't a directory", () => {
     delete process.env.XDG_RUNTIME_DIR;
     process.env.TMPDIR = dir;
-    writeFileSync(join(dir, `skop-${uid}`), "");
+    writeFileSync(join(dir, `skope-${uid}`), "");
     expect(() => lockDir()).toThrow(LockError);
   });
 
@@ -265,8 +265,8 @@ describe("lockDir (SPEC §7 step 3, P1-4)", () => {
     const mode = Number.parseInt(octal, 8);
     delete process.env.XDG_RUNTIME_DIR;
     process.env.TMPDIR = dir;
-    mkdirSync(join(dir, `skop-${uid}`));
-    chmodSync(join(dir, `skop-${uid}`), mode);
+    mkdirSync(join(dir, `skope-${uid}`));
+    chmodSync(join(dir, `skope-${uid}`), mode);
     try {
       lockDir();
       expect.unreachable();
@@ -279,8 +279,8 @@ describe("lockDir (SPEC §7 step 3, P1-4)", () => {
   test.skipIf(uid !== 0)("the fallback directory is refused (E-IO) when another user owns it (needs root to set up)", () => {
     delete process.env.XDG_RUNTIME_DIR;
     process.env.TMPDIR = dir;
-    mkdirSync(join(dir, `skop-${uid}`), { mode: 0o700 });
-    chownSync(join(dir, `skop-${uid}`), 12345, 12345);
+    mkdirSync(join(dir, `skope-${uid}`), { mode: 0o700 });
+    chownSync(join(dir, `skope-${uid}`), 12345, 12345);
     expect(() => lockDir()).toThrow(LockError);
   });
 });
@@ -298,7 +298,7 @@ interface RaceResult {
  */
 async function race(lockDirPath: string, n: number): Promise<RaceResult[]> {
   const src = readFileSync(fileURLToPath(new URL("../../src/runner/lock.ts", import.meta.url)), "utf8");
-  const modDir = mkdtempSync(join(tmpdir(), "skop-lockmod-"));
+  const modDir = mkdtempSync(join(tmpdir(), "skope-lockmod-"));
   const mod = join(modDir, "lock.mjs");
   writeFileSync(
     mod,

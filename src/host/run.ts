@@ -26,7 +26,7 @@ import { createFakeClock, fakeExec } from "../runner/fakeExec.js";
 import { fakesError } from "../runner/fakes.js";
 import { acquireLock, LockError } from "../runner/lock.js";
 import { sendPage } from "../runner/pager.js";
-import { buildRedactor } from "../runner/redact.js";
+import { buildRedactor, type Redactor, redactDeep } from "../runner/redact.js";
 import type { AskRequest, Response, RunConfig, Val } from "../step.js";
 import { escapePage, type Handlers, type LoopResult, runLoop } from "./loop.js";
 import { readOnly } from "./verify.js";
@@ -63,8 +63,6 @@ class End extends Error {
 
 const sha256hex = (s: string | Buffer) => createHash("sha256").update(s).digest("hex");
 const meaning = (code: string) => CODE_MEANINGS[code] ?? code;
-/** Everything skop writes to stderr is plain text: no control characters from command output (SPEC §10). */
-const say = (s: string) => process.stderr.write(plainText(s));
 
 export async function runSkill(o: RunOptions): Promise<number> {
   const host = hostname();
@@ -75,6 +73,11 @@ export async function runSkill(o: RunOptions): Promise<number> {
   let effects = 0;
   // Whether the last ask's backend call failed, which the handler already said on stderr.
   let askFailed = false;
+  // Everything that leaves skope is redacted (SPEC §9): events, stderr, pages, the handoff record, and
+  // what the backend is sent. Until the config is read, only the built-in patterns apply.
+  let redactor: Redactor = buildRedactor();
+  /** Everything skope writes to stderr is plain text: no control characters from command output (SPEC §10). */
+  const say = (s: string) => process.stderr.write(plainText(redactor.redact(s)));
 
   const emit = (e: Record<string, unknown>) => {
     // Counted here, not taken from the core's outcome, so a run that ends in error still reports them.
@@ -82,8 +85,8 @@ export async function runSkill(o: RunOptions): Promise<number> {
     if (e.event === "effect_start") effects++;
     // The core found the answer invalid, which counts as unavailable (SPEC §4.2): say so, as for a failed call.
     if (e.event === "ask" && e.detail !== undefined && !askFailed)
-      say("skop: the backend's answer was invalid, so it counts as the backend being unavailable\n");
-    process.stdout.write(`${JSON.stringify({ ts: new Date().toISOString(), ...run, host, ...e })}\n`);
+      say("skope: the backend's answer was invalid, so it counts as the backend being unavailable\n");
+    process.stdout.write(`${JSON.stringify(redactDeep(redactor, { ts: new Date().toISOString(), ...run, host, ...e }))}\n`);
   };
   // Warnings about a run that goes ahead are emitted after run_start, so they carry its run_id (SPEC §10).
   const held: Diagnostic[] = [];
@@ -122,6 +125,12 @@ export async function runSkill(o: RunOptions): Promise<number> {
     } catch (err) {
       return fail("E-CONFIG", "args", (err as Error).message);
     }
+    const keyVars = [config.jev?.key_env ?? "TYPESAFE_API_KEY", config.openrouter?.key_env ?? "OPENROUTER_API_KEY"];
+    redactor = buildRedactor({
+      defaults: config.redact.defaults,
+      patterns: config.redact.patterns,
+      literals: keyVars.map((k) => process.env[k] ?? ""),
+    });
 
     // Step 1: parse and lint, reporting every error (SPEC §7.1).
     let text: Buffer;
@@ -149,7 +158,7 @@ export async function runSkill(o: RunOptions): Promise<number> {
       throw new End("invalid");
     }
     if (o.mode === "lint") {
-      say(`skop: ${o.file}: ok\n`);
+      say(`skope: ${o.file}: ok\n`);
       return 0;
     }
     if (o.mode === "verify" || o.mode === "explain") {
@@ -159,7 +168,7 @@ export async function runSkill(o: RunOptions): Promise<number> {
         config,
         params: params(program, o.params, fail),
         start: (c) => new Interp(program, c),
-        emit: (e) => process.stdout.write(`${JSON.stringify(e)}\n`),
+        emit: (e) => process.stdout.write(`${JSON.stringify(redactDeep(redactor, e))}\n`),
         say: (line) => say(`${line}\n`),
       });
     }
@@ -184,13 +193,7 @@ export async function runSkill(o: RunOptions): Promise<number> {
     const answers = o.fake ? (readFakes(o.fake, "answers", fail) as FakesAnswers) : undefined;
     const commands = o.fakeExec ? (readFakes(o.fakeExec, "commands", fail) as FakesCommands) : undefined;
 
-    const keyVars = [config.jev?.key_env ?? "TYPESAFE_API_KEY", config.openrouter?.key_env ?? "OPENROUTER_API_KEY"];
     const env = commandEnv(process.env, keyVars);
-    const redactor = buildRedactor({
-      defaults: config.redact.defaults,
-      patterns: config.redact.patterns,
-      literals: keyVars.map((k) => process.env[k] ?? ""),
-    });
     if (!redactor.usingDefaults)
       diag("warning", {
         code: "W-REDACT-OFF",
@@ -201,9 +204,18 @@ export async function runSkill(o: RunOptions): Promise<number> {
     // Once interrupted (SIGINT, SIGTERM), nothing more runs: a request that comes back waits forever while the signal handler exits.
     let interrupted = false;
     const halt = <T>(r: T): Promise<T> => (interrupted ? new Promise<T>(() => {}) : Promise.resolve(r));
+    const clock = createFakeClock();
+    const fakeRun = commands ? fakeExec(commands, clock) : undefined;
+    // With --fake-exec no real command runs, the pager included (SPEC §5.4): commands.yaml can
+    // answer the pager command like any other, and without an answer the page succeeds.
+    const fakePage = async (fake: NonNullable<typeof fakeRun>, cmd: string) =>
+      Object.hasOwn(commands ?? {}, cmd) ? (await fake({ cmd, src: 0 })).exit === 0 : true;
     const page = async (message: string): Promise<boolean> => {
-      const ok = await halt(config.pager ? (await sendPage(config.pager, message, env)).ok : false);
-      if (!ok) say(`skop: the pager ${config.pager ? "failed" : "isn't configured"}; the page was: ${message}\n`);
+      const text = redactor.redact(message);
+      const ok = await halt(
+        !config.pager ? false : fakeRun ? await fakePage(fakeRun, config.pager.command) : (await sendPage(config.pager, text, env)).ok,
+      );
+      if (!ok) say(`skope: the pager ${config.pager ? "failed" : "isn't configured"}; the page was: ${text}\n`);
       return ok;
     };
 
@@ -217,14 +229,16 @@ export async function runSkill(o: RunOptions): Promise<number> {
     }
     if (lock.status === "locked") {
       emit({ event: "locked", holder_pid: lock.holderPid });
-      say(`skop: another run (pid ${lock.holderPid}) holds the lock at ${lock.path}\n`);
+      say(`skope: another run (pid ${lock.holderPid}) holds the lock at ${lock.path}\n`);
       return end("locked");
     }
     if (lock.status === "stale") {
       emit({ event: "stale_lock", path: lock.path, holder_pid: lock.holderPid });
-      say(`skop: stale lock at ${lock.path}, left by a run that died. Check nothing is running, then remove it: rm ${lock.path}\n`);
-      // All skop's own words, so nothing is escaped: the path must stay copyable.
-      const message = plainText(`${host}: skop ${program.skill} found a stale lock at ${lock.path}. Check no run is live, then remove it.`);
+      say(`skope: stale lock at ${lock.path}, left by a run that died. Check nothing is running, then remove it: rm ${lock.path}\n`);
+      // All skope's own words, so nothing is escaped: the path must stay copyable.
+      const message = plainText(
+        `${host}: skope ${program.skill} found a stale lock at ${lock.path}. Check no run is live, then remove it.`,
+      );
       if (dryRun) emit({ event: "would_page", text: message });
       else emit({ event: "page", text: message, ok: await page(message) });
       return end("stale_lock");
@@ -247,10 +261,10 @@ export async function runSkill(o: RunOptions): Promise<number> {
       event: "run_start",
       params: Object.fromEntries(Object.entries(cfg.params).map(([k, v]) => [k, String(v)])),
       dry_run: dryRun,
-      caller: process.env.SKOP_CALLER === "agent" ? "agent" : "person",
+      caller: process.env.SKOPE_CALLER === "agent" ? "agent" : "person",
       run_dir: runDir,
-      skop_version: version,
-      skop_build: build,
+      skope_version: version,
+      skope_build: build,
     });
     flush();
 
@@ -264,16 +278,26 @@ export async function runSkill(o: RunOptions): Promise<number> {
     };
     process.on("SIGINT", onSignal).on("SIGTERM", onSignal);
 
-    const clock = createFakeClock();
     const started = Date.now();
-    const fakeRun = commands ? fakeExec(commands, clock) : undefined;
     let asks = 0;
     const handlers: Handlers = {
       exec: async (next) => halt(await (fakeRun ? fakeRun(next) : execCommand(next.cmd, { timeoutMs: next.timeoutMs, env }))),
       async ask(request, src) {
+        // Redacted before it's saved or sent. Option ids are left alone: the answer is keyed by them.
+        const r = (s: string) => redactor.redact(s);
         const req: AskRequest = {
           ...request,
-          context: fitContext(request.context, program.limits.ask_context_tokens * 4),
+          question: r(request.question),
+          guidance: request.guidance === null ? null : r(request.guidance),
+          options: request.options.map((opt) => ({
+            ...opt,
+            label: r(opt.label),
+            description: opt.description === null ? null : r(opt.description),
+          })) as AskRequest["options"],
+          context: fitContext(
+            Object.fromEntries(Object.entries(request.context).map(([k, v]) => [k, r(v)])),
+            program.limits.ask_context_tokens * 4,
+          ),
           timeout_ms: config.ask.timeout_ms,
         };
         const body = JSON.stringify(req);
@@ -286,7 +310,7 @@ export async function runSkill(o: RunOptions): Promise<number> {
         const t = Date.now();
         const out: AskOutput = answers ? askFake(answers, req, src) : await backend.ask(req);
         askFailed = isFailure(out);
-        if (isFailure(out)) say(`skop: the backend was unavailable: ${out.detail}\n`);
+        if (isFailure(out)) say(`skope: the backend was unavailable: ${out.detail}\n`);
         if (!answers && !isFailure(out) && config.jev && backend.name === "jev" && out.model !== config.jev.model)
           diag("warning", {
             code: "W-MODEL-ALIAS",
@@ -319,7 +343,7 @@ export async function runSkill(o: RunOptions): Promise<number> {
       const at = result.at;
       if (!at) throw new Error("the core ended a handoff without saying where");
       const path = join(runDir, "handoff.json");
-      const record = {
+      const record = redactDeep(redactor, {
         ...run,
         host,
         section: at.section,
@@ -329,20 +353,20 @@ export async function runSkill(o: RunOptions): Promise<number> {
         variables: result.variables,
         effects: result.effects,
         dry_run: dryRun,
-        skop: { version, build },
+        skope: { version, build },
         preamble: PREAMBLE,
-      };
+      });
       try {
         writeFileSync(path, `${JSON.stringify(record, null, 2)}\n`, { flag: "wx", mode: 0o600 });
       } catch (err) {
         fail("E-IO", "runtime", `can't write ${path}: ${(err as Error).message}`);
       }
       emit({ event: "handoff_record", ...at, path, record });
-      const optedOut = o.noPage || process.env.SKOP_CALLER === "agent" || config.on_handoff === "none";
+      const optedOut = o.noPage || process.env.SKOPE_CALLER === "agent" || config.on_handoff === "none";
       if (!optedOut) {
         // Only the section name is the author's; the host and record path stay copyable.
         const message = plainText(
-          `${host}: skop ${program.skill} handed off (${result.outcome.reason}) in ${escapePage(at.section)}. Record: ${path}`,
+          `${host}: skope ${program.skill} handed off (${result.outcome.reason}) in ${escapePage(at.section)}. Record: ${path}`,
         );
         if (dryRun) emit({ event: "would_page", ...at, text: message });
         else emit({ event: "handoff_page", ...at, text: message, ok: await page(message) });

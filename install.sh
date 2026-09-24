@@ -1,23 +1,23 @@
 #!/bin/sh
-# Installs a skop standalone binary (SPEC §5.5):
+# Installs a skope standalone binary (SPEC §5.5):
 #
-#   curl -fsSL https://github.com/mattyv/skop/releases/latest/download/install.sh | sh
+#   curl -fsSL https://github.com/mattyv/skope/releases/latest/download/install.sh | sh
 #
 # POSIX sh, checked with shellcheck. Supported platforms: linux x64/arm64,
 # darwin arm64 (SPEC §5.5) — anything else exits non-zero, naming itself.
 #
 # Env vars:
-#   SKOP_VERSION       Version to install, e.g. 1.2.3 (without the "v").
+#   SKOPE_VERSION       Version to install, e.g. 1.2.3 (without the "v").
 #                       Defaults to the latest GitHub release.
-#   SKOP_DOWNLOAD_URL  Base URL to download the binary and SHA256SUMS from,
+#   SKOPE_DOWNLOAD_URL  Base URL to download the binary and SHA256SUMS from,
 #                      for mirrors and tests. Defaults to the matching
 #                      GitHub release's download URL.
-#   SKOP_INSTALL_DIR   Where to install. Defaults to ~/.local/bin. Never
+#   SKOPE_INSTALL_DIR   Where to install. Defaults to ~/.local/bin. Never
 #                      uses sudo.
 set -eu
 
-repo="mattyv/skop"
-install_dir="${SKOP_INSTALL_DIR:-"$HOME/.local/bin"}"
+repo="mattyv/skope"
+install_dir="${SKOPE_INSTALL_DIR:-"$HOME/.local/bin"}"
 
 say() { printf '%s\n' "$*" >&2; }
 die() {
@@ -33,18 +33,18 @@ uname_m=$(uname -m)
 case "$uname_s" in
   Linux) os=linux ;;
   Darwin) os=darwin ;;
-  *) die "no skop binary for platform $uname_s/$uname_m" ;;
+  *) die "no skope binary for platform $uname_s/$uname_m" ;;
 esac
 
 case "$uname_m" in
   x86_64 | amd64) arch=x64 ;;
   aarch64 | arm64) arch=arm64 ;;
-  *) die "no skop binary for platform $uname_s/$uname_m" ;;
+  *) die "no skope binary for platform $uname_s/$uname_m" ;;
 esac
 
 # Only linux/x64, linux/arm64 and darwin/arm64 ship a binary (SPEC §5.5).
 if [ "$os" = "darwin" ] && [ "$arch" = "x64" ]; then
-  die "no skop binary for platform $uname_s/$uname_m"
+  die "no skope binary for platform $uname_s/$uname_m"
 fi
 
 # --- pick a downloader ----------------------------------------------------
@@ -53,16 +53,16 @@ if command -v curl >/dev/null 2>&1; then
 elif command -v wget >/dev/null 2>&1; then
   fetch() { wget -q "$1" -O "$2"; }
 else
-  die "need curl or wget to download skop"
+  die "need curl or wget to download skope"
 fi
 
 # --- resolve the download URL ------------------------------------------
-# SKOP_DOWNLOAD_URL substitutes for "https://github.com/$repo/releases" (for
-# mirrors and tests); SKOP_VERSION then picks a release under it the same
+# SKOPE_DOWNLOAD_URL substitutes for "https://github.com/$repo/releases" (for
+# mirrors and tests); SKOPE_VERSION then picks a release under it the same
 # way whether it's the default GitHub host or a mirror.
-releases_base="${SKOP_DOWNLOAD_URL:-"https://github.com/$repo/releases"}"
-if [ -n "${SKOP_VERSION:-}" ]; then
-  base_url="$releases_base/download/v$SKOP_VERSION"
+releases_base="${SKOPE_DOWNLOAD_URL:-"https://github.com/$repo/releases"}"
+if [ -n "${SKOPE_VERSION:-}" ]; then
+  base_url="$releases_base/download/v$SKOPE_VERSION"
 else
   base_url="$releases_base/latest/download"
 fi
@@ -72,9 +72,9 @@ trap 'rm -rf "$tmp_dir"' EXIT
 
 fetch "$base_url/SHA256SUMS" "$tmp_dir/SHA256SUMS" || die "couldn't download SHA256SUMS from $base_url (installing nothing)"
 
-# The binary's exact name embeds the release version (skop-<version>-<os>-
+# The binary's exact name embeds the release version (skope-<version>-<os>-
 # <arch>), which this script may not know in advance (the default and
-# SKOP_DOWNLOAD_URL cases resolve "latest" server-side). Read it out of
+# SKOPE_DOWNLOAD_URL cases resolve "latest" server-side). Read it out of
 # SHA256SUMS instead of guessing it, by matching the one entry for this
 # platform. sha256sum writes "<hash>  <name>" or "<hash> *<name>" in binary
 # mode; strip a leading "*" either way.
@@ -106,7 +106,7 @@ got=$(checksum "$tmp_dir/$binary_name")
 # --- install ----------------------------------------------------------------
 mkdir -p "$install_dir"
 chmod +x "$tmp_dir/$binary_name"
-mv "$tmp_dir/$binary_name" "$install_dir/skop"
+mv "$tmp_dir/$binary_name" "$install_dir/skope"
 
 case ":$PATH:" in
   *":$install_dir:"*) ;;
@@ -116,4 +116,4 @@ case ":$PATH:" in
     ;;
 esac
 
-"$install_dir/skop" --version
+"$install_dir/skope" --version

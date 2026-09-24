@@ -1,8 +1,8 @@
 // Golden files for event streams (SPEC §12.3). Comparisons ignore the
 // fields that differ between runs or builds, and only where SPEC §10 puts
 // them: an event's own `ts`, `ms`, `run_id`, `host`, `skill_hash`, paths,
-// request hash and skop version and build; and inside a handoff record,
-// `run_id`, `host`, `skill_hash` and `skop`. Anything else is compared,
+// request hash and skope version and build; and inside a handoff record,
+// `run_id`, `host`, `skill_hash` and `skope`. Anything else is compared,
 // including a skill variable that happens to be called `path` or `host`.
 // Keys are sorted at every depth, so emit order doesn't matter.
 //
@@ -27,11 +27,11 @@ const VARYING = new Set([
   "request_sha256",
   "path",
   "file",
-  "skop_version",
-  "skop_build",
+  "skope_version",
+  "skope_build",
 ]);
 // The same, inside a handoff record (SPEC §8.1).
-const RECORD_VARYING = new Set(["run_id", "host", "skill_hash", "skop"]);
+const RECORD_VARYING = new Set(["run_id", "host", "skill_hash", "skope"]);
 
 const byKey = ([a]: [string, unknown], [b]: [string, unknown]) => (a < b ? -1 : a > b ? 1 : 0);
 

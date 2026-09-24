@@ -1,16 +1,16 @@
 {
-  "name": "skop",
+  "name": "skope",
   "version": "0.1.0",
   "description": "Run dual-use skills: Markdown an agent can read and a small, proven runtime can execute.",
   "license": "MIT OR Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/mattyv/skop.git"
+    "url": "git+https://github.com/mattyv/skope.git"
   },
   "type": "module",
   "bin": {
-    "skop": "dist/cli.js",
-    "skop-ask": "dist/ask/cli.js"
+    "skope": "dist/cli.js",
+    "skope-ask": "dist/ask/cli.js"
   },
   "files": [
     "dist",

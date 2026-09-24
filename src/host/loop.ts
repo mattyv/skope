@@ -66,7 +66,7 @@ const TAIL_BYTES = 2048;
  * entities stop `<…>` links and `<!here>`; a zero-width space after `@`
  * stops mentions, and one inside `://` or after a dot between a word and a
  * letter stops URLs, `www.` and bare domains (`evil.example`); a markdown
- * link `[x](…)` gets its brackets backslash-escaped. skop's own parts of a
+ * link `[x](…)` gets its brackets backslash-escaped. skope's own parts of a
  * page (host, run dir, record path) are never passed through this.
  * Control characters are removed first (plainText).
  */
@@ -110,7 +110,8 @@ export async function runLoop(interp: Interp, ctx: LoopContext): Promise<LoopRes
       const hostFields = EVENT_FIELDS[body.event]?.host ?? [];
       for (const k of hostFields) if (k in pending) out[k] = pending[k];
       if (hostFields.length > 0) pending = {};
-      if (body.event === "page" || body.event === "would_page") out.text = escapePage(body.text);
+      // Redacted before escaping, which breaks up the text a pattern would match.
+      if (body.event === "page" || body.event === "would_page") out.text = escapePage(redactor.redact(body.text));
       if (body.event === "effect_start") effects.push({ cmd: body.cmd, status: "unknown" });
       if (body.event === "effect_end") {
         const last = effects.findLast((x) => x.cmd === body.cmd && x.status === "unknown");
@@ -154,7 +155,7 @@ export async function runLoop(interp: Interp, ctx: LoopContext): Promise<LoopRes
         return r;
       }
       case "page":
-        return { kind: "page", ok: await handlers.page(escapePage(next.text)) };
+        return { kind: "page", ok: await handlers.page(escapePage(redactor.redact(next.text))) };
       case "choose":
         throw new Error("the core asked to choose in a concrete run");
     }

@@ -17,19 +17,19 @@ test fails if it's stale.
 | `error-codes.json` | Error and warning codes, generated from SPEC §7.1 by `scripts/check_spec.py codes` | everyone who reports errors |
 | `ask.schema.json` | Backend request, answer and failure (SPEC §6.1). The answer schema checks shape only; the core rejects bad numbers (P5). | host (G) and backends (D) |
 | `fakes.schema.json` | `answers.yaml` and `commands.yaml` for the fake handlers (SPEC §5.4, §6.2) | fakes (D, E) and tests (F) |
-| `event.schema.json` | One line of skop's JSON Lines output (SPEC §10): one shape per event | everyone who emits events |
+| `event.schema.json` | One line of skope's JSON Lines output (SPEC §10): one shape per event | everyone who emits events |
 | `examples/events.jsonl` | One example of every event kind; a test checks they cover the schema | G, F |
 
-**`skop-ask` environment variables.** Run by hand, `skop-ask` takes its
+**`skope-ask` environment variables.** Run by hand, `skope-ask` takes its
 backend settings from these instead of reading `config.yaml`, and
 validates the numeric ones itself, failing fast as `E-CONFIG` before
-calling out to a backend. skop doesn't use them: it calls the backends'
+calling out to a backend. skope doesn't use them: it calls the backends'
 code in-process with the config it has already checked (SPEC §6.1):
 
 | Variable | Meaning | Validation |
 |---|---|---|
-| `SKOP_ASK_BACKEND` | `ask.backend`: `jev`, `openrouter` or `fake`. Default `jev`. | `fake` is rejected — the host handles `--fake` itself (SPEC §5.4) and must never invoke `skop-ask` for it. Anything else unknown is `E-CONFIG`. |
-| `SKOP_ASK_RETRIES` | `ask.retries` (SPEC §6.2). Default `1`. | integer, 0–3, else `E-CONFIG`. |
+| `SKOPE_ASK_BACKEND` | `ask.backend`: `jev`, `openrouter` or `fake`. Default `jev`. | `fake` is rejected — the host handles `--fake` itself (SPEC §5.4) and must never invoke `skope-ask` for it. Anything else unknown is `E-CONFIG`. |
+| `SKOPE_ASK_RETRIES` | `ask.retries` (SPEC §6.2). Default `1`. | integer, 0–3, else `E-CONFIG`. |
 | `JEV_KEY_ENV` | Name of the env var holding the Jev API key. Default `TYPESAFE_API_KEY`. | — |
 | `TYPESAFE_API_KEY` (or whatever `JEV_KEY_ENV` names) | Jev's bearer key. | required when `ask.backend: jev`, else `E-CONFIG`. |
 | `JEV_MODEL` | `jev.model`, a versioned id (SPEC §6.2). | required when `ask.backend: jev`, else `E-CONFIG`. |
@@ -76,10 +76,11 @@ Decisions the spec left open, made here:
   names run outputs in backticks), or by `line:N`, which wins. A list of
   command results is used in order and the last repeats. `unsure` is a
   uniform answer, so the gate always fails; `unavailable` is a backend
-  failure. `ms` advances the host's clock, so deadline scenarios can be
+  failure. Under `--fake-exec` the pager is answered by its
+  `pager.command` text too, and succeeds when there's no answer (SPEC §5.4). `ms` advances the host's clock, so deadline scenarios can be
   written.
 - **Events:** `run_id`, `skill` and `skill_hash` are `null` before a run
-  exists. `caller` is `person` or `agent`. `skop_build` is bare hex. A
+  exists. `caller` is `person` or `agent`. `skope_build` is bare hex. A
   failed `ask` has `null` answer fields and a `detail`. A warning's `stage`
   is the stage that found it.
 - **Dafny names** differ where Dafny reserves a word: `as` is `binding`,

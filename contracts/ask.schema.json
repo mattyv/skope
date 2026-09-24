@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/mattyv/skop/contracts/ask.schema.json",
+  "$id": "https://github.com/mattyv/skope/contracts/ask.schema.json",
   "title": "Ask",
-  "description": "What the host sends skop-ask, and what skop-ask prints back (SPEC §6.1): an answer, or a failure. The answer schema checks shape only. Whether the numbers are valid (range, sum, exact option ids) is the core's check, so P5 covers it; the contract must be able to carry an invalid answer to it.",
+  "description": "What the host sends skope-ask, and what skope-ask prints back (SPEC §6.1): an answer, or a failure. The answer schema checks shape only. Whether the numbers are valid (range, sum, exact option ids) is the core's check, so P5 covers it; the contract must be able to carry an invalid answer to it.",
   "$defs": {
     "request": {
       "type": "object",
@@ -99,7 +99,7 @@
       }
     },
     "output": {
-      "description": "What skop-ask prints: exactly one of an answer or a failure.",
+      "description": "What skope-ask prints: exactly one of an answer or a failure.",
       "oneOf": [
         {
           "$ref": "#/$defs/answer"

@@ -1,4 +1,4 @@
-// Config loading (SPEC §9): `$XDG_CONFIG_HOME/skop/config.yaml`. A missing
+// Config loading (SPEC §9): `$XDG_CONFIG_HOME/skope/config.yaml`. A missing
 // file at the default path means all defaults. Anything else wrong is
 // E-CONFIG, never a silent default: an unreadable file, a --config path
 // that doesn't exist, invalid YAML, an unknown key at any level, or a wrong
@@ -35,7 +35,7 @@ function xdgBase(name: string, fallback: string): string {
 }
 
 export function defaultConfigPath(): string {
-  return join(xdgBase("XDG_CONFIG_HOME", ".config"), "skop", "config.yaml");
+  return join(xdgBase("XDG_CONFIG_HOME", ".config"), "skope", "config.yaml");
 }
 
 function fail(message: string): never {
@@ -82,7 +82,7 @@ function readConfigFile(path: string, missingOk: boolean, warn: (message: string
   }
   try {
     // pager.command runs through sh, so whoever can write this file can
-    // run commands as skop. World-writable is refused; a looser group or
+    // run commands as skope. World-writable is refused; a looser group or
     // another owner is warned about (SSH-style, root counts as trusted).
     const st = fstatSync(fd);
     if (!st.isFile()) fail(`config path isn't a file: ${path}`);
@@ -110,7 +110,7 @@ export function loadConfig(path?: string, warn: (message: string) => void = () =
     ask: { backend: "jev", timeout_ms: 2000, retries: 1 },
     redact: { defaults: true, patterns: [] },
     on_handoff: "page",
-    state_dir: join(xdgBase("XDG_STATE_HOME", ".local/state"), "skop"),
+    state_dir: join(xdgBase("XDG_STATE_HOME", ".local/state"), "skope"),
   };
   const file = path ?? defaultConfigPath();
   const text = readConfigFile(file, path === undefined, warn);

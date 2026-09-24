@@ -52,7 +52,7 @@ export function readOnly(mode: ReadOnly, v: VerifyInput): number {
     const { fits, at } = traceFits(v.start(cfg(start?.dry_run ?? false, params)), core.map(signature), c);
     const { version, build } = IDENTITY;
     if (fits) {
-      v.emit({ skop_version: version, skop_build: build, trace_fits: true });
+      v.emit({ skope_version: version, skope_build: build, trace_fits: true });
       return 0;
     }
     // The first trace event no explored path takes (SPEC §12.4), or none: the trace ends early.
@@ -60,11 +60,11 @@ export function readOnly(mode: ReadOnly, v: VerifyInput): number {
     const mismatch = e
       ? { index: at, event: e.event, section: e.section ?? null, line: e.line ?? null, class: responseClass(e) }
       : { index: at, event: null, section: null, line: null, class: null };
-    v.emit({ skop_version: version, skop_build: build, trace_fits: false, mismatch });
+    v.emit({ skope_version: version, skope_build: build, trace_fits: false, mismatch });
     v.say(
       e
-        ? `skop: the trace doesn't fit: no explored path has ${e.event}${e.event === "outcome" ? "" : ` at ${e.section}:${e.line}`} (${mismatch.class}), core event ${at + 1} of ${core.length}`
-        : `skop: the trace doesn't fit: it ends after ${core.length} core events, where every explored path goes on`,
+        ? `skope: the trace doesn't fit: no explored path has ${e.event}${e.event === "outcome" ? "" : ` at ${e.section}:${e.line}`} (${mismatch.class}), core event ${at + 1} of ${core.length}`
+        : `skope: the trace doesn't fit: it ends after ${core.length} core events, where every explored path goes on`,
     );
     return 40;
   }
@@ -79,11 +79,11 @@ export function readOnly(mode: ReadOnly, v: VerifyInput): number {
     const n = (k: number, word: string) => `${k} ${word}${k === 1 ? "" : "s"}`;
     const entry = (v.program.sections[v.program.entry.section] as Section).name;
     v.say(
-      `skop: ${n(sections.length, "section")}, entry ${entry}; at most ${n(s.maxAsks, "ask")} and ${n(s.maxEffects, "effect")}; worst case ${s.maxMs / 1000}s`,
+      `skope: ${n(sections.length, "section")}, entry ${entry}; at most ${n(s.maxAsks, "ask")} and ${n(s.maxEffects, "effect")}; worst case ${s.maxMs / 1000}s`,
     );
     v.emit({
-      skop_version: version,
-      skop_build: build,
+      skope_version: version,
+      skope_build: build,
       entry: (v.program.sections[v.program.entry.section] as Section).name,
       sections: sections.map(([, x]) => ({
         name: x.name,
@@ -97,8 +97,8 @@ export function readOnly(mode: ReadOnly, v: VerifyInput): number {
   }
   // A path that ends without an outcome, or in error, can't get here: the loop would have thrown (P6).
   v.emit({
-    skop_version: version,
-    skop_build: build,
+    skope_version: version,
+    skope_build: build,
     paths: s.paths <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(s.paths) : String(s.paths),
     outcomes: [...s.outcomes].sort(),
     ...maxima,

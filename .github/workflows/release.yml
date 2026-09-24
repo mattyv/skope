@@ -111,9 +111,9 @@ jobs:
           mkdir "$RUNNER_TEMP/clean" && cd "$RUNNER_TEMP/clean"
           npm init -y > /dev/null
           npm install "$GITHUB_WORKSPACE/dist-pkg/$TARBALL"
-          out=$(npx skop --version)
+          out=$(npx skope --version)
           echo "$out"
-          case "$out" in "skop $VERSION (build identity "*) ;; *) echo "expected skop $VERSION"; exit 1 ;; esac
+          case "$out" in "skope $VERSION (build identity "*) ;; *) echo "expected skope $VERSION"; exit 1 ;; esac
       # Every fixture in fixtures/ ships with this release. Each scenario directory
       # holds answers.yaml, commands.yaml and expected-exit, because paged
       # (10) and handoff (20) are correct results, not failures.
@@ -124,13 +124,13 @@ jobs:
           status=0
           for skill in "$GITHUB_WORKSPACE"/fixtures/*/SKILL.md; do
             dir=$(dirname "$skill")
-            npx skop "$skill" --lint || { echo "lint failed: $skill"; status=1; }
+            npx skope "$skill" --lint || { echo "lint failed: $skill"; status=1; }
             scenarios=("$dir"/fakes/*/)
             if [ ${#scenarios[@]} -eq 0 ]; then echo "$(basename "$dir") has no fake scenarios"; status=1; fi
             for scenario in "${scenarios[@]}"; do
               want=$(cat "$scenario/expected-exit")
               set +e
-              npx skop "$skill" --dry-run --fake "$scenario/answers.yaml" --fake-exec "$scenario/commands.yaml" > /dev/null
+              npx skope "$skill" --dry-run --fake "$scenario/answers.yaml" --fake-exec "$scenario/commands.yaml" > /dev/null
               got=$?
               set -e
               if [ "$got" != "$want" ]; then
@@ -157,6 +157,11 @@ jobs:
             platform: darwin
             arch: arm64
     runs-on: ${{ matrix.os }}
+    # attest-build-provenance signs with an OIDC token and stores the attestation.
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -178,7 +183,7 @@ jobs:
         run: |
           node scripts/package/sea.mjs \
             --node "${{ steps.pinned.outputs.node }}" \
-            --outfile "dist-bin/skop-${{ needs.resolve.outputs.version }}-${{ matrix.platform }}-${{ matrix.arch }}"
+            --outfile "dist-bin/skope-${{ needs.resolve.outputs.version }}-${{ matrix.platform }}-${{ matrix.arch }}"
       - uses: actions/attest-build-provenance@v2
         with:
           subject-path: dist-bin/*
@@ -197,7 +202,7 @@ jobs:
           pattern: binary-*
           path: dist-bin
           merge-multiple: true
-      - run: cd dist-bin && sha256sum skop-* > SHA256SUMS && cat SHA256SUMS
+      - run: cd dist-bin && sha256sum skope-* > SHA256SUMS && cat SHA256SUMS
       - uses: actions/upload-artifact@v4
         with:
           name: checksums
@@ -233,10 +238,10 @@ jobs:
           name: checksums
           path: release/download/v${{ needs.resolve.outputs.version }}
       # A local file server standing in for the GitHub release, laid out the
-      # way install.sh expects under SKOP_DOWNLOAD_URL: <version>/<file>.
+      # way install.sh expects under SKOPE_DOWNLOAD_URL: <version>/<file>.
       - name: Serve the release directory
         run: |
-          chmod +x "release/download/v${{ needs.resolve.outputs.version }}"/skop-*
+          chmod +x "release/download/v${{ needs.resolve.outputs.version }}"/skope-*
           python3 -m http.server 8099 --directory release &
           for _ in $(seq 1 20); do curl -fsS -o /dev/null http://127.0.0.1:8099/ && break; sleep 0.5; done
       - name: Install with no Node on PATH, on a clean debian:stable-slim (Linux)
@@ -244,9 +249,9 @@ jobs:
         run: |
           docker run --rm --network host \
             -v "$PWD:/work" -w /work \
-            -e SKOP_DOWNLOAD_URL=http://127.0.0.1:8099 \
-            -e SKOP_VERSION=${{ needs.resolve.outputs.version }} \
-            -e SKOP_INSTALL_DIR=/work/installed \
+            -e SKOPE_DOWNLOAD_URL=http://127.0.0.1:8099 \
+            -e SKOPE_VERSION=${{ needs.resolve.outputs.version }} \
+            -e SKOPE_INSTALL_DIR=/work/installed \
             debian:stable-slim \
             sh -c 'apt-get update -qq && apt-get install -y -qq curl ca-certificates >/dev/null && sh install.sh'
           echo "$PWD/installed" >> "$GITHUB_PATH"
@@ -254,31 +259,31 @@ jobs:
         if: matrix.platform == 'darwin'
         env:
           PATH: /usr/bin:/bin
-          SKOP_DOWNLOAD_URL: http://127.0.0.1:8099
-          SKOP_VERSION: ${{ needs.resolve.outputs.version }}
-          SKOP_INSTALL_DIR: installed
+          SKOPE_DOWNLOAD_URL: http://127.0.0.1:8099
+          SKOPE_VERSION: ${{ needs.resolve.outputs.version }}
+          SKOPE_INSTALL_DIR: installed
         run: |
           sh install.sh
           echo "$PWD/installed" >> "$GITHUB_PATH"
       # Same checks as the npm package's clean install (install-check above):
       # --version, then every released fixture's fake scenarios.
-      - name: skop --version and every fixture's fake scenarios
+      - name: skope --version and every fixture's fake scenarios
         env:
           VERSION: ${{ needs.resolve.outputs.version }}
         run: |
-          out=$(skop --version)
+          out=$(skope --version)
           echo "$out"
-          case "$out" in "skop $VERSION (build identity "*) ;; *) echo "expected skop $VERSION"; exit 1 ;; esac
+          case "$out" in "skope $VERSION (build identity "*) ;; *) echo "expected skope $VERSION"; exit 1 ;; esac
           shopt -s nullglob
           status=0
           for skill in fixtures/*/SKILL.md; do
             dir=$(dirname "$skill")
-            skop "$skill" --lint || { echo "lint failed: $skill"; status=1; }
+            skope "$skill" --lint || { echo "lint failed: $skill"; status=1; }
             scenarios=("$dir"/fakes/*/)
             for scenario in "${scenarios[@]}"; do
               want=$(cat "$scenario/expected-exit")
               set +e
-              skop "$skill" --dry-run --fake "$scenario/answers.yaml" --fake-exec "$scenario/commands.yaml" > /dev/null
+              skope "$skill" --dry-run --fake "$scenario/answers.yaml" --fake-exec "$scenario/commands.yaml" > /dev/null
               got=$?
               set -e
               if [ "$got" != "$want" ]; then

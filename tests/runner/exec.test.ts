@@ -1,9 +1,10 @@
 // Process rules (SPEC §4.4): /bin/sh -c, /dev/null stdin (except the
 // pager), the command environment, its own process group,
 // SIGTERM+grace+SIGKILL on timeout, bounded timeouts, output capped at
-// capture time, and stopping every live command when skop is interrupted.
+// capture time, and stopping every live command when skope is interrupted.
 
-import { existsSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, test, vi } from "vitest";
@@ -19,9 +20,20 @@ afterEach(async () => {
   dir = undefined;
 });
 
+/** Whether a process is running: not gone, and not a zombie waiting to be reaped (PID 1 may never reap it). */
+function running(pid: number): boolean {
+  try {
+    return !execFileSync("ps", ["-o", "stat=", "-p", String(pid)], { encoding: "utf8" })
+      .trim()
+      .startsWith("Z");
+  } catch {
+    return false;
+  }
+}
+
 /** A path the command touches once its traps are set, so a test can wait for it. */
 function marker(name: string): string {
-  dir ??= mkdtempSync(join(tmpdir(), "skop-exec-test-"));
+  dir ??= mkdtempSync(join(tmpdir(), "skope-exec-test-"));
   return join(dir, name);
 }
 
@@ -50,10 +62,10 @@ describe("execCommand (SPEC §4.4)", () => {
     expect(r.stdout).toBe("page me\n");
   });
 
-  test("the environment is exactly the one given, not merged onto skop's own (P2-9)", async () => {
-    const r = await execCommand('echo "[$SKOP_EXEC_TEST_ONLY_GIVEN][$HOME]"', {
+  test("the environment is exactly the one given, not merged onto skope's own (P2-9)", async () => {
+    const r = await execCommand('echo "[$SKOPE_EXEC_TEST_ONLY_GIVEN][$HOME]"', {
       timeoutMs: 2000,
-      env: { SKOP_EXEC_TEST_ONLY_GIVEN: "yes" },
+      env: { SKOPE_EXEC_TEST_ONLY_GIVEN: "yes" },
     });
     expect(r.stdout).toBe("[yes][]\n");
   });
@@ -93,6 +105,27 @@ describe("execCommand (SPEC §4.4)", () => {
     expect(r.signal).toBe("SIGKILL");
     expect(elapsed).toBeGreaterThanOrEqual(700);
     expect(elapsed).toBeLessThan(10_000);
+  });
+
+  test("a timed-out command stays live until its whole group is gone, even after the shell exits", async () => {
+    // The shell dies on SIGTERM; its background child ignores SIGTERM and holds no pipe, so
+    // `close` fires while the child still runs. It must still get SIGKILL before the result.
+    const pidFile = marker("survivor");
+    const start = Date.now();
+    const p = execCommand(`(trap "" TERM; exec sleep 30) >/dev/null 2>&1 & echo $! > '${pidFile}'; sleep 30`, {
+      timeoutMs: 200,
+      graceMs: 600,
+      env,
+    });
+    await vi.waitFor(() => expect(existsSync(pidFile)).toBe(true));
+    const survivor = Number(readFileSync(pidFile, "utf8"));
+    await new Promise((res) => setTimeout(res, 400));
+    expect(liveCommands()).toBe(1); // the shell is gone, the survivor isn't
+    const r = await p;
+    expect(r.timedOut).toBe(true);
+    expect(Date.now() - start).toBeGreaterThanOrEqual(800);
+    expect(liveCommands()).toBe(0);
+    expect(running(survivor)).toBe(false);
   });
 
   test("the default grace period is 5s: a SIGTERM-ignoring command is still alive well after its timeout", async () => {
@@ -151,7 +184,7 @@ describe("execCommand (SPEC §4.4)", () => {
     expect(r.truncated).toBe(false);
   });
 
-  test("a pager that exits without reading a large message doesn't crash skop with EPIPE (P1-1)", async () => {
+  test("a pager that exits without reading a large message doesn't crash skope with EPIPE (P1-1)", async () => {
     const errors: unknown[] = [];
     const onError = (e: unknown) => errors.push(e);
     process.on("uncaughtException", onError);
@@ -170,7 +203,7 @@ describe("execCommand (SPEC §4.4)", () => {
 });
 
 describe("commandEnv (SPEC §4.4)", () => {
-  test("is skop's environment minus the backend key variables, plus LC_ALL=C", () => {
+  test("is skope's environment minus the backend key variables, plus LC_ALL=C", () => {
     const e = commandEnv({ PATH: "/bin", TYPESAFE_API_KEY: "k1", OPENROUTER_API_KEY: "k2", KEEP: "1" }, [
       "TYPESAFE_API_KEY",
       "OPENROUTER_API_KEY",
@@ -186,8 +219,8 @@ describe("commandEnv (SPEC §4.4)", () => {
   });
 
   test("a skill command never sees the backend key", async () => {
-    const e = commandEnv({ ...process.env, SKOP_TEST_KEY: "sekrit" }, ["SKOP_TEST_KEY"]);
-    const r = await execCommand('echo "[$SKOP_TEST_KEY]"; env | grep -c SKOP_TEST_KEY', { timeoutMs: 2000, env: e });
+    const e = commandEnv({ ...process.env, SKOPE_TEST_KEY: "sekrit" }, ["SKOPE_TEST_KEY"]);
+    const r = await execCommand('echo "[$SKOPE_TEST_KEY]"; env | grep -c SKOPE_TEST_KEY', { timeoutMs: 2000, env: e });
     expect(r.stdout).toBe("[]\n0\n");
   });
 
@@ -198,7 +231,7 @@ describe("commandEnv (SPEC §4.4)", () => {
   });
 });
 
-describe("stopAll (SPEC §4.4: skop interrupted, P2-13)", () => {
+describe("stopAll (SPEC §4.4: skope interrupted, P2-13)", () => {
   test("tracks live commands and stops them all: SIGTERM, then SIGKILL after the grace period", async () => {
     const [m1, m2] = [marker("polite"), marker("stubborn")];
     const polite = execCommand(`trap 'exit 7' TERM; touch '${m1}'; sleep 30 & wait`, { timeoutMs: 60_000, env });
@@ -222,6 +255,22 @@ describe("stopAll (SPEC §4.4: skop interrupted, P2-13)", () => {
     await stopAll(20_000);
     expect((await c).signal).toBe("SIGTERM");
     expect(Date.now() - start).toBeLessThan(5000);
+  });
+
+  test("waits for every process in a stopped group, not just the shell", async () => {
+    const pidFile = marker("survivor");
+    const p = execCommand(`(trap "" TERM; exec sleep 30) >/dev/null 2>&1 & echo $! > '${pidFile}'; sleep 30`, {
+      timeoutMs: 60_000,
+      env,
+    });
+    await vi.waitFor(() => expect(existsSync(pidFile)).toBe(true));
+    const survivor = Number(readFileSync(pidFile, "utf8"));
+    const start = Date.now();
+    await stopAll(300);
+    expect(Date.now() - start).toBeGreaterThanOrEqual(300);
+    expect(liveCommands()).toBe(0);
+    expect(running(survivor)).toBe(false);
+    await p;
   });
 
   test("with nothing running, it returns at once", async () => {

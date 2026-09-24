@@ -35,14 +35,14 @@ describe("golden helper (SPEC §12.3)", () => {
     expect(normalise([a])).toEqual([{ event: "handoff_record", record: { reason: "gate_failed", skill: "disk-full" } }]);
   });
 
-  test("skop's version and build identity don't break goldens", () => {
-    const a = { event: "run_start", skop_version: "0.1.0", skop_build: "aaa", dry_run: true };
-    const b = { event: "run_start", skop_version: "0.2.0", skop_build: "bbb", dry_run: true };
+  test("skope's version and build identity don't break goldens", () => {
+    const a = { event: "run_start", skope_version: "0.1.0", skope_build: "aaa", dry_run: true };
+    const b = { event: "run_start", skope_version: "0.2.0", skope_build: "bbb", dry_run: true };
     expect(toJsonl([a])).toBe(toJsonl([b]));
   });
 
   test("a handoff record's build identity doesn't break goldens", () => {
-    const rec = (build: string) => ({ event: "handoff_record", record: { reason: "deadline", skop: { version: "0.1.0", build } } });
+    const rec = (build: string) => ({ event: "handoff_record", record: { reason: "deadline", skope: { version: "0.1.0", build } } });
     expect(toJsonl([rec("aaa")])).toBe(toJsonl([rec("bbb")]));
   });
 
@@ -59,16 +59,16 @@ describe("golden helper (SPEC §12.3)", () => {
   describe("G3: host/run_id/run_dir substitution from run_start", () => {
     test("a substring of the run's host, run_id and run_dir is replaced with placeholders", () => {
       const events = [
-        { event: "run_start", host: "hk-app-03", run_id: "r-8f2c", run_dir: "/tmp/skop/runs/r-8f2c" },
-        { event: "page", text: "hk-app-03: skop disk-full handed off. Record: /tmp/skop/runs/r-8f2c/handoff.json" },
+        { event: "run_start", host: "hk-app-03", run_id: "r-8f2c", run_dir: "/tmp/skope/runs/r-8f2c" },
+        { event: "page", text: "hk-app-03: skope disk-full handed off. Record: /tmp/skope/runs/r-8f2c/handoff.json" },
       ];
       const [, page] = normalise(events) as [object, { text: string }];
-      expect(page.text).toBe("<host>: skop disk-full handed off. Record: <run_dir>/handoff.json");
+      expect(page.text).toBe("<host>: skope disk-full handed off. Record: <run_dir>/handoff.json");
     });
 
     test("unrelated text is left untouched", () => {
       const events = [
-        { event: "run_start", host: "hk-app-03", run_id: "r-8f2c", run_dir: "/tmp/skop/runs/r-8f2c" },
+        { event: "run_start", host: "hk-app-03", run_id: "r-8f2c", run_dir: "/tmp/skope/runs/r-8f2c" },
         { event: "run", stdout_tail: "91% used on /var, no relation to the run's own host or id" },
       ];
       const [, run] = normalise(events) as [object, { stdout_tail: string }];
@@ -76,9 +76,9 @@ describe("golden helper (SPEC §12.3)", () => {
     });
 
     test("with no run_start event, nothing is replaced", () => {
-      const events = [{ event: "page", text: "hk-app-03: some text with r-8f2c and /tmp/skop/runs/r-8f2c in it" }];
+      const events = [{ event: "page", text: "hk-app-03: some text with r-8f2c and /tmp/skope/runs/r-8f2c in it" }];
       const [page] = normalise(events) as [{ text: string }];
-      expect(page.text).toBe("hk-app-03: some text with r-8f2c and /tmp/skop/runs/r-8f2c in it");
+      expect(page.text).toBe("hk-app-03: some text with r-8f2c and /tmp/skope/runs/r-8f2c in it");
     });
   });
 });

@@ -2,7 +2,7 @@
 // Verifies the Dafny core and translates it to JavaScript (SPEC §5.5).
 //
 // The output, core/generated/core.cjs, is committed, so installing, testing
-// and releasing skop never needs Dafny. CI reruns this script and fails if
+// and releasing skope never needs Dafny. CI reruns this script and fails if
 // the committed file differs from a fresh build.
 //
 // Needs the Dafny version pinned in .dafny-version, found as $DAFNY or
@@ -17,7 +17,7 @@ import { fileURLToPath } from "node:url";
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const DAFNY = process.env.DAFNY ?? "dafny";
 // The Dafny modules the TypeScript adapter uses (src/core.ts).
-const MODULES = ["SkopAst", "SkopStep", "SkopWellFormed", "SkopCheck", "SkopValues", "SkopState", "SkopRun"];
+const MODULES = ["SkopeAst", "SkopeStep", "SkopeWellFormed", "SkopeCheck", "SkopeValues", "SkopeState", "SkopeRun"];
 
 // Dafny prints verification errors on stdout, so pass it straight through.
 function dafny(args) {
@@ -42,7 +42,7 @@ const files = readdirSync(join(ROOT, "core"))
   .sort()
   .map((f) => join("core", f));
 
-const tmp = mkdtempSync(join(tmpdir(), "skop-core-"));
+const tmp = mkdtempSync(join(tmpdir(), "skope-core-"));
 try {
   // translate verifies first, and fails on any unproven obligation.
   // Keep one-field datatypes (like Program) as real objects. Dafny otherwise

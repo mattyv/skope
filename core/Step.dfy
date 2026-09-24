@@ -4,8 +4,8 @@
 // C implements Start and Step against them and proves P1-P6 (SPEC §5.3).
 //
 // Phase 0 contract, mirrored by the TypeScript types in src/step.ts.
-module SkopStep {
-  import opened SkopAst
+module SkopeStep {
+  import opened SkopeAst
 
   // Where a bound value came from (SPEC §3.5). Decides at run time how a
   // name is shown in a question: trusted values are pasted in, run output

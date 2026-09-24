@@ -1,6 +1,6 @@
 // The fake ask backend (SPEC §6.2, contracts/fakes.schema.json): answers
 // questions from answers.yaml instead of a real backend. Used by tests and
-// `skop --fake`.
+// `skope --fake`.
 //
 // A key is the question text exactly as sent, or `line:N` (the statement's
 // source-map id), which wins when both match. `unsure` is a uniform
