@@ -1,6 +1,6 @@
 # Design: skill tests (`skope --test`)
 
-Status: draft, revised after review (rev 2). Nothing here is built yet.
+Status: approved. Phase 1 (stable keys) is built; phases 2–4 are not.
 
 ## Problem
 

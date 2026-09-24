@@ -759,6 +759,15 @@ Shipped Dafny code MUST NOT contain `assume`, `{:axiom}` or
   runs, the pager included: a page is answered from the file by the
   `pager.command` text like any command (exit 0 means it succeeded), and
   succeeds when the file has no answer for it.
+- **Fake keys.** Both fake files also take two keys that survive edits:
+  `Section.var` names the statement in that section that binds `var` (a
+  `run … as var` in `--fake-exec`, an ask that binds it in `--fake`), and
+  `Section.ask` names the section's only ask. The section part resolves by
+  slug (§3.4); a key whose section part names no section is an exact-text
+  key. When several keys match one statement, a stable key wins, then
+  `line:N`, then the text. A stable key that names more than one statement
+  is `E-FAKE-AMBIGUOUS`; a stable or `line:N` key that names none is
+  `W-FAKE-UNUSED`. Statements inside a `for each` are matched once per item.
 - **explore**: used by `--verify` and `--explain`. It must reach every path
   a real run could take.
   - Values from `run` are unknown. A comparison on an unknown value has three
@@ -1208,6 +1217,7 @@ and have no codes.
 | `E-BACKEND-MODEL` | args | the `openrouter` model doesn't support logprobs, or its reasoning can't be turned off (§6.2) | |
 | `E-BACKEND-LIMIT` | args | the skill exceeds the configured backend's limits: options, Score levels or context (§6.2) | 21 options on `openrouter`; `ask_context: 40k tokens` on `jev` |
 | `E-FAKE-UNMATCHED` | runtime | `--fake-exec` has no answer for a command, or `--fake` has none for a question (§5.4) | |
+| `E-FAKE-AMBIGUOUS` | args | a `Section.var` or `Section.ask` fake key names more than one statement (§5.4) | `Counters.used` when Counters binds `used` twice |
 | `E-IO` | runtime | skope can't write its run directory or lock file | |
 | `E-INTERRUPTED` | runtime | skope was interrupted (SIGINT or SIGTERM); it stopped the running command and released the lock (§4.4) | Ctrl-C during a `do` |
 | `E-INTERNAL` | runtime | a runner bug. Unreachable by P6, so always a bug report | |
@@ -1224,6 +1234,7 @@ Warnings don't stop a run:
 | `W-NO-GUIDANCE` | a section offered as an `ask` option has no guidance paragraph (§3.2) |
 | `W-CONFIG-PERMS` | the config file is group-writable or owned by someone other than this user or root; `pager.command` runs through `sh`, so whoever can write the file can run commands (§9). A world-writable config is `E-CONFIG`. |
 | `W-REDACT-OFF` | built-in redaction patterns are turned off (§9) |
+| `W-FAKE-UNUSED` | a fake key names no statement: a `line:N` with nothing on that line, or a `Section.var` / `Section.ask` the section doesn't have (§5.4) |
 
 Parse codes come from the preprocessor. Lint codes come from the Dafny core,
 so `LintError` carries the code. The rest come from the TypeScript host.

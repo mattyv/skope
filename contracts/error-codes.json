@@ -195,6 +195,11 @@
     "meaning": "`--fake-exec` has no answer for a command, or `--fake` has none for a question (§5.4)"
   },
   {
+    "code": "E-FAKE-AMBIGUOUS",
+    "stage": "args",
+    "meaning": "a `Section.var` or `Section.ask` fake key names more than one statement (§5.4)"
+  },
+  {
     "code": "E-IO",
     "stage": "runtime",
     "meaning": "skope can't write its run directory or lock file"
@@ -248,5 +253,10 @@
     "code": "W-REDACT-OFF",
     "stage": "warning",
     "meaning": "built-in redaction patterns are turned off (§9)"
+  },
+  {
+    "code": "W-FAKE-UNUSED",
+    "stage": "warning",
+    "meaning": "a fake key names no statement: a `line:N` with nothing on that line, or a `Section.var` / `Section.ask` the section doesn't have (§5.4)"
   }
 ]

@@ -1024,6 +1024,7 @@ export const CODE_MEANINGS: Record<string, string> = {
   "E-BACKEND-MODEL": "the `openrouter` model doesn't support logprobs, or its reasoning can't be turned off (§6.2)",
   "E-BACKEND-LIMIT": "the skill exceeds the configured backend's limits: options, Score levels or context (§6.2)",
   "E-FAKE-UNMATCHED": "`--fake-exec` has no answer for a command, or `--fake` has none for a question (§5.4)",
+  "E-FAKE-AMBIGUOUS": "a `Section.var` or `Section.ask` fake key names more than one statement (§5.4)",
   "E-IO": "skope can't write its run directory or lock file",
   "E-INTERRUPTED": "skope was interrupted (SIGINT or SIGTERM); it stopped the running command and released the lock (§4.4)",
   "E-INTERNAL": "a runner bug. Unreachable by P6, so always a bug report",
@@ -1034,5 +1035,6 @@ export const CODE_MEANINGS: Record<string, string> = {
   "W-MODEL-ALIAS": "`jev.model` is an alias, or a response came from a different model than configured (§6.2)",
   "W-NO-GUIDANCE": "a section offered as an `ask` option has no guidance paragraph (§3.2)",
   "W-CONFIG-PERMS": "the config file is group-writable or owned by someone other than this user or root; `pager.command` runs through `sh`, so whoever can write the file can run commands (§9). A world-writable config is `E-CONFIG`.",
-  "W-REDACT-OFF": "built-in redaction patterns are turned off (§9)"
+  "W-REDACT-OFF": "built-in redaction patterns are turned off (§9)",
+  "W-FAKE-UNUSED": "a fake key names no statement: a `line:N` with nothing on that line, or a `Section.var` / `Section.ask` the section doesn't have (§5.4)"
 };
