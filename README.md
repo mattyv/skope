@@ -276,8 +276,8 @@ sets `SKOPE_CALLER=agent` and takes the record itself.
 
 skope's questions are answered by **[Jev](https://docs.typesafe.ai)**,
 TypeSafe's System One model. Jev isn't a chatbot: it's trained to make fast,
-narrow decisions and to return a calibrated probability for every possible
-answer, which is exactly what skope's confidence thresholds need. It answers
+narrow decisions and to return a probability for every possible answer,
+which is exactly what skope's confidence thresholds need. It answers
 in about a tenth of a second.
 
 Each of skope's question forms maps onto one of Jev's three question types:
@@ -330,6 +330,27 @@ isn't trained for these decisions the way Jev is, so re-tune your
 thresholds before trusting a skill on it.
 
 Secrets are redacted before anything leaves the machine or reaches a log.
+
+### Choosing `sure`
+
+A confidence gate is only as good as the question behind it. An
+[independent calibration study](https://github.com/scienthoon/jev-ood-calibration)
+of 4,621 Jev calls found:
+
+- **When the answer isn't in the evidence, Jev is confidently wrong, not
+  unsure.** On labels it couldn't work out from the text, it averaged 0.74
+  confidence while being right 45% of the time. No `sure` catches that.
+  Put the deciding fact in the question's evidence, and use
+  `--test --live` to check.
+- **Calibration depends on the question type.** Yes/no answers were
+  under-confident, Choice answers slightly over-confident, and Score
+  answers badly over-confident. A yes/no gate errs towards handing off;
+  don't gate on a Score level alone (skope warns, `W-SCORE-THRESHOLD`).
+- **Use the probability, not the model's own confidence field.** skope
+  already gates on the chosen option's probability.
+
+So set `sure` from the margins `--test --live` reports on your own
+questions, and re-check them when you change the model version.
 
 ## What skope guarantees
 
