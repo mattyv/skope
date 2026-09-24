@@ -427,7 +427,7 @@ function detail(r: LoopResult): Record<string, unknown> | null {
 type Fail = (code: string, stage: Stage, message: string, line?: number) => never;
 
 /** Frontmatter params with --param overrides, typed like their defaults (SPEC §7 step 2). */
-function params(program: CoreProgram, overrides: string[], fail: Fail): Record<string, Val> {
+export function params(program: CoreProgram, overrides: string[], fail: Fail): Record<string, Val> {
   const out: Record<string, Val> = {};
   for (const [k, v] of Object.entries(program.params)) out[k] = "int" in v ? v.int : v.str;
   for (const kv of overrides) {

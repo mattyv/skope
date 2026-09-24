@@ -166,6 +166,23 @@ so you can test what happens when one fails. It exits 0 when every scenario
 passes, 60 when one fails, and 40 when a scenario itself is broken, so it
 fits in CI. `--scenario tests/restart` runs just one.
 
+Scripted tests check the skill's logic, not its questions. `--live` checks
+the questions: every ask goes to the real backend, and each scenario runs
+10 times (or `--runs N`, or `live.runs` in its `expect.yaml`):
+
+```console
+$ skope disk-full/SKILL.md --test --live --runs 5
+skope: live: at most 30 backend calls to jev (jev-1.13.0)
+PASS    restart
+        hits 5/5 (min 1)
+        Triage  Restart 5/5  conf min 97% med 98%  sure 85  margin +12
+        Restart.service  myapp-worker 5/5  conf min 91% med 93%  sure 90  margin +1  WARN near gate
+```
+
+A run is a hit when it does everything `expect.yaml` says. A thin margin
+over `sure` warns; set `live.min_margin` to make it fail, and
+`live.min_hit_rate` to allow some misses.
+
 Then run it for real. A dry run runs the read-only `run` and `check`
 commands, but never a `do` and never a page. It does ask the backend, so a
 skill with an `ask` needs one configured (see below) even to dry-run. Every

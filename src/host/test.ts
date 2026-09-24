@@ -1,7 +1,10 @@
 // `skope SKILL.md --test` (docs/design/skill-tests.md, SPEC §7.3): run each
-// scenario under the skill's tests/ directory with its fake commands and
-// answers, as an --apply run that runs nothing real, and check what happened
-// against its expect.yaml (or the older expected-exit).
+// scenario under the skill's tests/ directory with its fake commands, as an
+// --apply run that runs nothing real, and check what happened against its
+// expect.yaml (or the older expected-exit). Scripted, answers come from the
+// scenario's answers.yaml. With --live, every ask goes to the configured
+// backend, and each scenario runs several times: the report gives its hit
+// rate and, per ask, the answers chosen and how far confidence cleared sure.
 //
 // Output: one JSON line per scenario, then a summary line, on stdout; a
 // readable line for each on stderr. Exit 0 when every scenario passes, 60
@@ -13,12 +16,16 @@ import { basename, dirname, join, resolve } from "node:path";
 import { load as loadYaml } from "js-yaml";
 import IDENTITY from "../build-identity.js";
 import type { CoreProgram, Section } from "../contracts.gen.js";
+import { Interp } from "../interp.js";
 import { preprocess } from "../preprocess/index.js";
 import { sectionId } from "../preprocess/slug.js";
+import { type Config, loadConfig } from "../runner/config.js";
 import { plainText } from "../runner/events.js";
 import { type Expect, expectError } from "../runner/expect.js";
 import { resolveFakeKeys } from "../runner/fakeKeys.js";
-import { EXIT, runSkill } from "./run.js";
+import { explore } from "./explore.js";
+import { EXIT, params, runSkill } from "./run.js";
+import { costs } from "./verify.js";
 
 export interface TestOptions {
   file: string;
@@ -26,11 +33,21 @@ export interface TestOptions {
   scenario?: string;
   params: string[];
   config?: string;
+  /** Ask the configured backend instead of answers.yaml, and repeat each scenario. */
+  live?: boolean;
+  /** --runs: how many times each live scenario runs, over its live.runs. */
+  runs?: number;
 }
 
-type Event = { event: string } & Record<string, unknown>;
+/** Runs per live scenario when neither --runs nor live.runs says (docs/design/skill-tests.md). */
+export const DEFAULT_RUNS = 10;
+/** Without live.min_margin, a margin under this many points is a warning. */
+export const WARN_MARGIN = 5;
 
+type Event = { event: string } & Record<string, unknown>;
+type Scenario = { name: string; dir: string; expect: Expect; commands: string; answers?: string };
 type Result = { pass: true } | { pass: false; mismatch: string } | { invalid: string };
+type Run = { code: number; events: Event[] } | { invalid: string };
 
 export async function runTests(o: TestOptions): Promise<number> {
   const out = (e: Record<string, unknown>) => process.stdout.write(`${JSON.stringify(e)}\n`);
@@ -44,27 +61,50 @@ export async function runTests(o: TestOptions): Promise<number> {
     tally.invalid++;
   }
   const program = parse(o.file);
+  const scenarios = dirs.map(readScenario);
+  const summary: Record<string, unknown> = {};
 
-  for (const dir of dirs) {
-    const name = basename(dir);
-    const events = join(stateDir, name, "events.jsonl");
-    const result = await runScenario(o, program, dir, join(stateDir, name));
-    if ("invalid" in result) {
+  if (o.live) {
+    // The exact count can't be known in advance: a wrong answer can lead down a path with more asks.
+    const config = readConfig(o.config);
+    const perRun = program ? maxAsks(program, o.params, config) : 0;
+    const total = scenarios.reduce((n, s) => n + ("invalid" in s ? 0 : perRun * runsFor(o, s.expect)), 0);
+    const backend = config?.ask.backend ?? "jev";
+    const model = backend === "openrouter" ? config?.openrouter?.model : config?.jev?.model;
+    Object.assign(summary, { live: true, backend, model: model ?? null, max_backend_calls: total });
+    say(`skope: live: at most ${total} backend calls to ${backend}${model ? ` (${model})` : ""}`);
+  }
+
+  for (const s of scenarios) {
+    const name = "invalid" in s ? basename(s.dir) : s.name;
+    const dir = join(stateDir, name);
+    const report = "invalid" in s ? s : program === null ? { invalid: "the skill doesn't parse" } : undefined;
+    const r: Result & { live?: Record<string, unknown>; lines?: string[] } =
+      report ??
+      (o.live
+        ? await liveScenario(o, program as CoreProgram, s as Scenario, dir)
+        : await scripted(o, program as CoreProgram, s as Scenario, dir));
+    const events = o.live ? dir : join(dir, "events.jsonl");
+    if ("invalid" in r) {
       tally.invalid++;
-      out({ scenario: name, pass: false, invalid: result.invalid, events });
-      say(`INVALID ${name}: ${result.invalid}`);
-    } else if (result.pass) {
+      out({ scenario: name, pass: false, invalid: r.invalid, events, ...r.live });
+      say(`INVALID ${name}: ${r.invalid}`);
+      continue;
+    }
+    const extra = r.live ?? {};
+    if (r.pass) {
       tally.passed++;
-      out({ scenario: name, pass: true, mismatch: null, events });
+      out({ scenario: name, pass: true, mismatch: null, events, ...extra });
       say(`PASS    ${name}`);
     } else {
       tally.failed++;
-      out({ scenario: name, pass: false, mismatch: result.mismatch, events });
-      say(`FAIL    ${name}: ${result.mismatch} (events: ${events})`);
+      out({ scenario: name, pass: false, mismatch: r.mismatch, events, ...extra });
+      say(`FAIL    ${name}: ${r.mismatch} (events: ${events})`);
     }
+    for (const l of r.lines ?? []) say(`        ${l}`);
   }
   const { version, build } = IDENTITY;
-  out({ skope_version: version, skope_build: build, scenarios: dirs.length, ...tally });
+  out({ skope_version: version, skope_build: build, scenarios: dirs.length, ...tally, ...summary });
   say(`${tally.passed} passed, ${tally.failed} failed, ${tally.invalid} invalid`);
   return tally.invalid > 0 ? EXIT.invalid : tally.failed > 0 ? 60 : 0;
 }
@@ -87,35 +127,64 @@ function parse(file: string): CoreProgram | null {
   }
 }
 
-async function runScenario(o: TestOptions, program: CoreProgram | null, dir: string, stateDir: string): Promise<Result> {
+function readConfig(path: string | undefined): Config | null {
+  try {
+    return loadConfig(path, () => {});
+  } catch {
+    return null; // The runs report the E-CONFIG.
+  }
+}
+
+/** A scenario's files, or why they can't be used. */
+function readScenario(dir: string): Scenario | { invalid: string; dir: string } {
+  const bad = (invalid: string) => ({ invalid, dir });
   const commands = join(dir, "commands.yaml");
-  if (!existsSync(commands)) return { invalid: `${dir} has no commands.yaml` };
-  let expect: Expect | { exit: number };
+  if (!existsSync(commands)) return bad(`${dir} has no commands.yaml`);
+  const answers = join(dir, "answers.yaml");
+  const base = { name: basename(dir), dir, commands, answers: existsSync(answers) ? answers : undefined };
   const expectFile = join(dir, "expect.yaml");
   const exitFile = join(dir, "expected-exit");
   try {
     if (existsSync(expectFile)) {
       const doc = loadYaml(readFileSync(expectFile, "utf8"));
       const why = expectError(doc);
-      if (why !== null) return { invalid: `expect.yaml: ${why}` };
-      expect = doc as Expect;
-    } else if (existsSync(exitFile)) {
+      return why !== null ? bad(`expect.yaml: ${why}`) : { ...base, expect: doc as Expect };
+    }
+    if (existsSync(exitFile)) {
       const text = readFileSync(exitFile, "utf8").trim();
-      if (!/^\d+$/.test(text)) return { invalid: `expected-exit must be a number, got ${text}` };
-      expect = { exit: Number(text) };
-    } else return { invalid: `${dir} has neither expect.yaml nor expected-exit` };
+      return /^\d+$/.test(text) ? { ...base, expect: { exit: Number(text) } } : bad(`expected-exit must be a number, got ${text}`);
+    }
+    return bad(`${dir} has neither expect.yaml nor expected-exit`);
   } catch (err) {
-    return { invalid: `can't read the expectations: ${(err as Error).message}` };
+    return bad(`can't read the expectations: ${(err as Error).message}`);
   }
+}
 
+const runsFor = (o: TestOptions, expect: Expect) => o.runs ?? expect.live?.runs ?? DEFAULT_RUNS;
+
+/** The most asks any path through the skill can reach, from the explorer (as --explain counts them). */
+function maxAsks(program: CoreProgram, overrides: string[], config: Config | null): number {
+  try {
+    const p = params(program, overrides, () => {
+      throw new Error("bad param");
+    });
+    const cfg = { params: p, builtins: { host: "host", run_id: "r-explore", skill: program.skill }, dry: false, mode: "explore" as const };
+    return explore(new Interp(program, cfg), costs(config ?? readConfig(undefined) ?? DEFAULT_COSTS_CONFIG)).maxAsks;
+  } catch {
+    return 0; // The runs report the bad param.
+  }
+}
+const DEFAULT_COSTS_CONFIG = { ask: { timeout_ms: 2000, retries: 1 } } as Config;
+
+/** One run of a scenario: scripted with its answers.yaml, or live against the configured backend. */
+async function runOnce(o: TestOptions, s: Scenario, stateDir: string, live: boolean): Promise<Run> {
   mkdirSync(stateDir, { recursive: true });
   // Every ask needs an answer: with no answers.yaml, any ask the run reaches is unmatched.
-  let answers = join(dir, "answers.yaml");
-  if (!existsSync(answers)) {
+  let answers = s.answers;
+  if (!live && answers === undefined) {
     answers = join(stateDir, "answers.yaml");
     writeFileSync(answers, "{}");
   }
-
   const lines: string[] = [];
   const code = await runSkill({
     file: o.file,
@@ -124,8 +193,8 @@ async function runScenario(o: TestOptions, program: CoreProgram | null, dir: str
     dryRun: false,
     noPage: false,
     params: o.params,
-    fake: answers,
-    fakeExec: commands,
+    fake: live ? undefined : answers,
+    fakeExec: s.commands,
     config: o.config,
     test: { out: (l) => lines.push(l), err: () => {}, stateDir },
   });
@@ -135,7 +204,6 @@ async function runScenario(o: TestOptions, program: CoreProgram | null, dir: str
     .split("\n")
     .filter(Boolean)
     .map((l) => JSON.parse(l) as Event);
-
   // A run that ended invalid never started: the skill, a param, the config or the scenario's own
   // files can't be used. That's the scenario being broken, whatever it expects.
   if (code === EXIT.invalid) {
@@ -145,10 +213,124 @@ async function runScenario(o: TestOptions, program: CoreProgram | null, dir: str
   // Two keys for one statement can only be seen as the run reaches it; it's still the fake file that's broken.
   const ambiguous = events.find((e) => e.event === "error" && e.code === "E-FAKE-AMBIGUOUS");
   if (ambiguous) return { invalid: `${ambiguous.code}: ${ambiguous.message}` };
-  if (!program) return { invalid: "the skill doesn't parse" };
-  const mismatch = check(expect, code, events, program);
+  return { code, events };
+}
+
+async function scripted(o: TestOptions, program: CoreProgram, s: Scenario, stateDir: string): Promise<Result> {
+  const run = await runOnce(o, s, stateDir, false);
+  if ("invalid" in run) return run;
+  const mismatch = check(s.expect, run.code, run.events, program);
   if (mismatch !== null && typeof mismatch === "object") return mismatch;
   return mismatch === null ? { pass: true } : { pass: false, mismatch };
+}
+
+interface AskStats {
+  line: number;
+  section: string;
+  /** The expect.yaml key, when the scenario names this ask. */
+  key?: string;
+  sure: number;
+  reached: number;
+  chosen: Record<string, number>;
+  confidences: number[];
+  gateFailures: number;
+}
+
+type LiveResult = (Result & { live: Record<string, unknown>; lines: string[] }) | { invalid: string; live?: Record<string, unknown> };
+
+/**
+ * Runs a scenario `runs` times against the real backend (docs/design/skill-tests.md). A run is a
+ * hit when it satisfies the whole expect.yaml; an expected ask it never reached is a miss. The
+ * scenario fails when its hit rate is under live.min_hit_rate (default 1), or when it sets
+ * live.min_margin and the lowest confidence of an expected ask clears sure by less.
+ */
+async function liveScenario(o: TestOptions, program: CoreProgram, s: Scenario, stateDir: string): Promise<LiveResult> {
+  const runs = runsFor(o, s.expect);
+  const keys = new Map<number, string>();
+  for (const key of Object.keys(s.expect.asks ?? {})) {
+    const line = askLine(program, key);
+    if (line === null) return { invalid: `asks.${key} doesn't name exactly one ask` };
+    keys.set(line, key);
+  }
+  const stats = new Map<number, AskStats>();
+  let hits = 0;
+  let firstMiss: string | undefined;
+  for (let i = 1; i <= runs; i++) {
+    const run = await runOnce(o, s, join(stateDir, `run-${i}`), true);
+    if ("invalid" in run) return run;
+    const mismatch = check(s.expect, run.code, run.events, program);
+    if (mismatch !== null && typeof mismatch === "object") return mismatch;
+    if (mismatch === null) hits++;
+    else firstMiss ??= `run ${i}: ${mismatch}`;
+    for (const e of run.events) {
+      if (e.event !== "ask") continue;
+      const line = e.line as number;
+      const a = stats.get(line) ?? {
+        line,
+        section: e.section as string,
+        key: keys.get(line),
+        sure: e.sure as number,
+        reached: 0,
+        chosen: {},
+        confidences: [],
+        gateFailures: 0,
+      };
+      stats.set(line, a);
+      a.reached++;
+      const label = labelOf(program, line, e.chosen as string | number | null) ?? `(${e.detail ?? "no answer"})`;
+      a.chosen[label] = (a.chosen[label] ?? 0) + 1;
+      if (typeof e.confidence === "number") a.confidences.push(e.confidence);
+      if (!e.passed) a.gateFailures++;
+    }
+  }
+
+  const minHit = s.expect.live?.min_hit_rate ?? 1;
+  const minMargin = s.expect.live?.min_margin;
+  const warnings: string[] = [];
+  let failure = hits / runs < minHit ? `hit rate ${hits}/${runs} is under ${minHit}; first miss: ${firstMiss}` : undefined;
+  const asks = [...stats.values()]
+    .sort((a, b) => a.line - b.line)
+    .map((a) => {
+      const sorted = [...a.confidences].sort((x, y) => x - y);
+      const min = sorted[0];
+      const median = sorted.length ? (sorted[Math.floor((sorted.length - 1) / 2)] as number) : undefined;
+      // Points, like sure: 81% against sure 80 is +1.
+      const margin = min === undefined ? undefined : Math.round(min * 100 - a.sure);
+      const name = a.key ?? `${a.section}:${a.line}`;
+      if (a.key !== undefined && margin !== undefined) {
+        if (minMargin !== undefined && margin < minMargin) failure ??= `${name}: margin ${sign(margin)} is under min_margin ${minMargin}`;
+        else if (minMargin === undefined && margin < WARN_MARGIN) warnings.push(`${name}: margin ${sign(margin)} is near the gate`);
+      }
+      return {
+        ask: name,
+        line: a.line,
+        reached: a.reached,
+        chosen: a.chosen,
+        confidence_min: min ?? null,
+        confidence_median: median ?? null,
+        sure: a.sure,
+        margin: margin ?? null,
+        gate_failures: a.gateFailures,
+      };
+    });
+  const live = { runs, hits, hit_rate: hits / runs, min_hit_rate: minHit, asks, warnings };
+  const lines = asks.map((a) => {
+    const top = Object.entries(a.chosen).sort((x, y) => y[1] - x[1])[0];
+    const conf = a.confidence_min === null ? "conf -" : `conf min ${pct(a.confidence_min)} med ${pct(a.confidence_median as number)}`;
+    const warn = warnings.find((w) => w.startsWith(`${a.ask}:`)) ? "  WARN near gate" : "";
+    return `${a.ask}  ${top ? `${top[0]} ${top[1]}/${a.reached}` : "-"}  ${conf}  sure ${a.sure}  margin ${a.margin === null ? "-" : sign(a.margin)}${warn}`;
+  });
+  lines.unshift(`hits ${hits}/${runs} (min ${minHit})`);
+  return failure === undefined ? { pass: true, live, lines } : { pass: false, mismatch: failure, live, lines };
+}
+
+const pct = (x: number) => `${Math.round(x * 100)}%`;
+const sign = (n: number) => (n >= 0 ? `+${n}` : `${n}`);
+
+/** What an ask event's chosen value is called in expect.yaml: a section's name, or the value itself. */
+function labelOf(program: CoreProgram, line: number, chosen: string | number | null): string | null {
+  if (chosen === null) return null;
+  return sectionOptions(program, line) && typeof chosen === "string" ? (program.sections[chosen]?.name ?? chosen) : String(chosen);
 }
 
 const same = (a: string, b: string) => sectionId(a) === sectionId(b);
