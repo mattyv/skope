@@ -25,7 +25,8 @@ import sys
 import textwrap
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-DOCS = [ROOT / "SPEC.md", ROOT / "PLAN.md", ROOT / "README.md"]
+SPEC = ROOT / "docs" / "SPEC.md"
+DOCS = [SPEC, ROOT / "docs" / "PLAN.md", ROOT / "README.md"]
 CODE = re.compile(r"`([EW]-[A-Z]+(?:-[A-Z]+)*)`")
 UNTESTABLE = {"E-INTERNAL", "E-IO"}  # SPEC §12.2: can't be triggered on purpose
 TEST_FILE = re.compile(r"\.(test|spec)\.(ts|mts|js|mjs)$|\.dfy$")
@@ -40,7 +41,7 @@ CODES_FILE = ROOT / "contracts" / "error-codes.json"
 
 def spec_code_table() -> list[dict]:
     """Rows of the error and warning tables in SPEC §7.1, in order."""
-    spec = (ROOT / "SPEC.md").read_text()
+    spec = SPEC.read_text()
     rows = []
     for line in spec.splitlines():
         m = re.match(r"^\| `([EW]-[A-Z-]+)` \|(.*)\|\s*$", line)
@@ -62,7 +63,7 @@ def codes_json() -> str:
 def check_fixtures() -> list[str]:
     """Each example skill in the spec's appendices matches its fixture file."""
     errors = []
-    spec = (ROOT / "SPEC.md").read_text()
+    spec = SPEC.read_text()
     for block in re.findall(r"````markdown\n(.*?)````", spec, re.S):
         m = re.search(r"^name: ([a-z0-9-]+)", block, re.M)
         if not m or m.group(1) not in FIXTURE_DIRS:
@@ -92,7 +93,7 @@ def check_docs() -> list[str]:
     errors = []
     defined = defined_codes()
     if not defined:
-        errors.append("SPEC.md: no error code table found (§7.1)")
+        errors.append("docs/SPEC.md: no error code table found (§7.1)")
     for doc in DOCS:
         text = doc.read_text()
         for code in sorted(set(CODE.findall(text)) - defined):

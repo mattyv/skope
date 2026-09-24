@@ -180,7 +180,7 @@ PASS    restart
 | `max_ask_calls` | the run asked no more than this many questions |
 
 A scenario must set `outcome`, `exit`, `path` or `path_prefix`. The full
-rules are in [`SPEC.md`](SPEC.md) §7.3 and
+rules are in [`docs/SPEC.md`](docs/SPEC.md) §7.3 and
 [`contracts/expect.schema.json`](contracts/expect.schema.json).
 
 Nothing real runs, not even the pager, and `do` steps go through the fakes,
@@ -253,7 +253,7 @@ is a section, and a run moves from section to section until it ends.
 
 A bold word that looks like a keyword but isn't one is an error, never
 prose, so a typo can't silently skip a step. The full grammar is in
-[`SPEC.md`](SPEC.md).
+[`docs/SPEC.md`](docs/SPEC.md).
 
 ## How a run ends
 
@@ -380,10 +380,12 @@ $ DAFNY=/path/to/dafny npm run core   # verify the proofs and rebuild core/gener
 
 ## Read more
 
-- [`SPEC.md`](SPEC.md) is the language: syntax, semantics, proofs, backends
+- [`docs/SPEC.md`](docs/SPEC.md) is the language: syntax, semantics, proofs, backends
   and the CLI.
-- [`PLAN.md`](PLAN.md) is how it's built: phases, parallel agents,
+- [`docs/PLAN.md`](docs/PLAN.md) is how it's built: phases, parallel agents,
   test-first streams, reviews and releases.
+- [`docs/design/`](docs/design/) holds designs for work in progress, such
+  as [skill tests](docs/design/skill-tests.md).
 - [`contracts/`](contracts/) holds the shapes the parts of skope agree on,
   with worked examples.
 
