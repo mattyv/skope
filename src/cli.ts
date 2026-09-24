@@ -4,6 +4,7 @@
 import { parseArgs } from "node:util";
 import IDENTITY from "./build-identity.js";
 import { runSkill } from "./host/run.js";
+import { plainText } from "./runner/events.js";
 
 const USAGE = `usage: skop <SKILL.md> (--apply | --dry-run) [--no-page] [--param k=v]... [--fake answers.yaml] [--fake-exec cmds.yaml] [--config path]
        skop <SKILL.md> --lint | --explain | --verify [--trace events.jsonl]
@@ -74,7 +75,7 @@ main(process.argv.slice(2)).then(
     process.exitCode = code;
   },
   (err) => {
-    process.stderr.write(`skop: internal error: ${err instanceof Error ? err.stack : String(err)}\n`);
+    process.stderr.write(plainText(`skop: internal error: ${err instanceof Error ? err.stack : String(err)}\n`));
     process.exitCode = 50;
   },
 );

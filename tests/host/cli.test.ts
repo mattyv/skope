@@ -115,6 +115,30 @@ describe("run flow", () => {
     expect(r.stderr).toContain("disk is full");
   });
 
+  // C0 and C1 controls except \n and \t: OSC title, clear screen, BEL, CR, NUL, CSI (U+009B), DEL.
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: finding them is the point.
+  const CONTROLS = /[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/;
+
+  test("S5: control characters from command output never reach the pager, the page event or stderr", async () => {
+    const sent = join(mkdtempSync(join(tmpdir(), "skop-pager-")), "page.txt");
+    const config = file("config.yaml", `ask:\n  backend: fake\npager:\n  command: 'cat > ${sent}; exit 1'\n`);
+    const cmd = "printf 'a\\033]0;x\\007b\\033[2Jc\\rd\\000e\\302\\233f\\177g'";
+    const r = await runSkop([skill(`- **run** \`${cmd}\` as out\n- **page** "got {out}"`), "--apply", "--config", config]);
+    expect(r.code).toBe(10);
+    const text = find(r.events, "page")?.text as string;
+    expect(text).toBe("got a]0;xb[2Jcdefg");
+    expect(readFileSync(sent, "utf8")).toBe(text);
+    expect(r.stderr).toContain(text);
+    expect(r.stderr).not.toMatch(CONTROLS);
+  });
+
+  test("S5: a diagnostic can't carry control characters to stderr either", async () => {
+    const r = await runSkop([join(tmpdir(), "no-such-\u001b]0;x\u0007-\r-\u009b.md"), "--apply"]);
+    expect(r.code).toBe(40);
+    expect(r.stderr).toContain("E-USAGE");
+    expect(r.stderr).not.toMatch(CONTROLS);
+  });
+
   test("a skill with no asks needs no backend key", async () => {
     const config = file("config.yaml", "jev:\n  model: jev-1.13.0\n  key_env: NO_SUCH_KEY_VAR\n");
     const r = await runSkop([skill("- **stop**"), "--apply", "--config", config]);

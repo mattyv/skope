@@ -21,7 +21,7 @@ import { Interp, unsafeInputs } from "../interp.js";
 import { lint } from "../lint.js";
 import { preprocess } from "../preprocess/index.js";
 import { type Config, loadConfig } from "../runner/config.js";
-import { type Diagnostic, diagnosticLine, type Stage } from "../runner/events.js";
+import { type Diagnostic, diagnosticLine, plainText, type Stage } from "../runner/events.js";
 import { commandEnv, execCommand, stopAll } from "../runner/exec.js";
 import { createFakeClock, fakeExec } from "../runner/fakeExec.js";
 import { acquireLock, LockError } from "../runner/lock.js";
@@ -63,6 +63,8 @@ class End extends Error {
 
 const sha256hex = (s: string | Buffer) => createHash("sha256").update(s).digest("hex");
 const meaning = (code: string) => CODE_MEANINGS[code] ?? code;
+/** Everything skop writes to stderr is plain text: no control characters from command output (SPEC §10). */
+const say = (s: string) => process.stderr.write(plainText(s));
 
 export async function runSkill(o: RunOptions): Promise<number> {
   const host = hostname();
@@ -89,7 +91,7 @@ export async function runSkill(o: RunOptions): Promise<number> {
       return;
     }
     emit({ event: kind, ...Object.fromEntries(Object.entries(d).filter(([, v]) => v !== undefined)) });
-    process.stderr.write(`${diagnosticLine(d)}\n`);
+    say(`${diagnosticLine(d)}\n`);
   };
   const end = (ending: Ending, reason: string | null = null) => {
     flush();
@@ -181,7 +183,7 @@ export async function runSkill(o: RunOptions): Promise<number> {
     const halt = <T>(r: T): Promise<T> => (interrupted ? new Promise<T>(() => {}) : Promise.resolve(r));
     const page = async (message: string): Promise<boolean> => {
       const ok = await halt(config.pager ? (await sendPage(config.pager, message, env)).ok : false);
-      if (!ok) process.stderr.write(`skop: the pager ${config.pager ? "failed" : "isn't configured"}; the page was: ${message}\n`);
+      if (!ok) say(`skop: the pager ${config.pager ? "failed" : "isn't configured"}; the page was: ${message}\n`);
       return ok;
     };
 
@@ -199,11 +201,9 @@ export async function runSkill(o: RunOptions): Promise<number> {
     }
     if (lock.status === "stale") {
       emit({ event: "stale_lock", path: lock.path, holder_pid: lock.holderPid });
-      process.stderr.write(
-        `skop: stale lock at ${lock.path}, left by a run that died. Check nothing is running, then remove it: rm ${lock.path}\n`,
-      );
+      say(`skop: stale lock at ${lock.path}, left by a run that died. Check nothing is running, then remove it: rm ${lock.path}\n`);
       // All skop's own words, so nothing is escaped: the path must stay copyable.
-      const message = `${host}: skop ${program.skill} found a stale lock at ${lock.path}. Check no run is live, then remove it.`;
+      const message = plainText(`${host}: skop ${program.skill} found a stale lock at ${lock.path}. Check no run is live, then remove it.`);
       if (dryRun) emit({ event: "would_page", text: message });
       else emit({ event: "page", text: message, ok: await page(message) });
       return end("stale_lock");
@@ -264,7 +264,7 @@ export async function runSkill(o: RunOptions): Promise<number> {
         }
         const t = Date.now();
         const out: AskOutput = answers ? askFake(answers, req, src) : await askBackend(body, backend);
-        if (isFailure(out)) process.stderr.write(`skop: the backend was unavailable: ${out.detail}\n`);
+        if (isFailure(out)) say(`skop: the backend was unavailable: ${out.detail}\n`);
         if (!answers && !isFailure(out) && config.jev && backend.SKOP_ASK_BACKEND === "jev" && out.model !== config.jev.model)
           diag("warning", {
             code: "W-MODEL-ALIAS",
@@ -319,7 +319,9 @@ export async function runSkill(o: RunOptions): Promise<number> {
       const optedOut = o.noPage || process.env.SKOP_CALLER === "agent" || config.on_handoff === "none";
       if (!optedOut) {
         // Only the section name is the author's; the host and record path stay copyable.
-        const message = `${host}: skop ${program.skill} handed off (${result.outcome.reason}) in ${escapePage(at.section)}. Record: ${path}`;
+        const message = plainText(
+          `${host}: skop ${program.skill} handed off (${result.outcome.reason}) in ${escapePage(at.section)}. Record: ${path}`,
+        );
         if (dryRun) emit({ event: "would_page", ...at, text: message });
         else emit({ event: "handoff_page", ...at, text: message, ok: await page(message) });
       }

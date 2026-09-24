@@ -4,6 +4,7 @@
 // steps, never during a command (SPEC §7 step 5).
 
 import { createHash } from "node:crypto";
+import { plainText } from "../runner/events.js";
 import type { ExecResult } from "../runner/exec.js";
 import { type Redactor, tailBytes } from "../runner/redact.js";
 import { type AskRequest, type CoreEvent, EVENT_FIELDS, type Next, type Outcome, type Response, type Val, type Where } from "../step.js";
@@ -69,9 +70,10 @@ const TAIL_BYTES = 2048;
  * letter stops URLs, `www.` and bare domains (`evil.example`); a markdown
  * link `[x](…)` gets its brackets backslash-escaped. skop's own parts of a
  * page (host, run dir, record path) are never passed through this.
+ * Control characters are removed first (plainText).
  */
 export function escapePage(text: string): string {
-  return text
+  return plainText(text)
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")

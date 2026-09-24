@@ -1437,6 +1437,9 @@ backend with no config block. `state_dir` expands a leading
 7. Redact before sending anything to the backend, and before logging. Built-in patterns are on by
    default.
 8. Page text is escaped. A pager failure never blocks the outcome.
+   C0 and C1 control characters other than newline and tab are removed
+   from page text and from everything skop writes to stderr, so command
+   output can't drive a terminal.
 9. Backend probabilities are measured, never self-reported: Jev's own
    distribution, or token logprobs from OpenRouter.
 10. If the backend is down or answers badly, the result is a handoff, never "act

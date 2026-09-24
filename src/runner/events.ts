@@ -43,14 +43,30 @@ export function staleLockEvent(ctx: EventContext, path: string, holderPid: numbe
   return withoutUndefined({ ts: nowIso(), event: "stale_lock" as const, ...ctx, path, holder_pid: holderPid });
 }
 
+// biome-ignore lint/suspicious/noControlCharactersInRegex: removing them is the point.
+const CONTROLS = /[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/g;
+
+/**
+ * Text with every C0 and C1 control character removed except `\n` and `\t`,
+ * so nothing skop writes to a terminal or a pager (ESC sequences, BEL, CR,
+ * NUL, CSI) can drive it. Page text and everything on stderr go through this.
+ */
+export function plainText(s: string): string {
+  return s.replace(CONTROLS, "");
+}
+
 /**
  * The readable stderr line for an error or warning (SPEC §7.1). Control
- * characters are escaped, so a message is always exactly one line.
+ * characters, C1 included, are escaped, so a message is always exactly one
+ * line and can't drive the terminal.
  */
 export function diagnosticLine(d: Pick<Diagnostic, "code" | "message" | "file" | "line">): string {
   const line = d.file !== undefined && d.line !== undefined ? `${d.file}:${d.line}: ${d.code}: ${d.message}` : `${d.code}: ${d.message}`;
   // biome-ignore lint/suspicious/noControlCharactersInRegex: escaping them is the point.
-  return line.replace(/[\u0000-\u0008\u000a-\u001f\u007f]/g, (c) => JSON.stringify(c).slice(1, -1));
+  return line.replace(/[\u0000-\u0008\u000a-\u001f\u007f-\u009f]/g, (c) => {
+    const j = JSON.stringify(c).slice(1, -1);
+    return j.length > 1 ? j : `\\u${c.charCodeAt(0).toString(16).padStart(4, "0")}`;
+  });
 }
 
 export interface EventSink {
