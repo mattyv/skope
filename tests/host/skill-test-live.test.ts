@@ -35,7 +35,7 @@ function setup(expectDoc: unknown, answers?: unknown): { skill: string; config: 
   mkdirSync(s, { recursive: true });
   writeFileSync(join(s, "commands.yaml"), JSON.stringify(COMMANDS));
   writeFileSync(join(s, "expect.yaml"), JSON.stringify(expectDoc));
-  if (answers !== undefined) writeFileSync(join(s, "answers.yaml"), JSON.stringify(answers));
+  if (answers !== undefined) writeFileSync(join(s, "answers.yaml"), typeof answers === "string" ? answers : JSON.stringify(answers));
   const config = join(dir, "config.yaml");
   writeFileSync(config, `ask:\n  backend: jev\n  retries: 0\njev:\n  model: jev-1.13.0\n  key_env: ${KEY_ENV}\n`, { mode: 0o600 });
   return { skill: join(dir, "SKILL.md"), config };
@@ -60,13 +60,20 @@ function backend(
   return seen;
 }
 const RESTART: Probs = { "Clean up": 0.03125, Restart: 0.875, Page: 0.0625, Investigate: 0.03125 };
+const RESTART_HIGH: Probs = { "Clean up": 0.03125, Restart: 0.96875, Page: 0, Investigate: 0 };
 const PAGE: Probs = { "Clean up": 0.03125, Restart: 0.0625, Page: 0.875, Investigate: 0.03125 };
 
 async function live(paths: { skill: string; config: string }, runs?: number) {
   const out: string[] = [];
   const err: string[] = [];
-  const o = vi.spyOn(process.stdout, "write").mockImplementation((s) => (out.push(String(s)), true));
-  const e = vi.spyOn(process.stderr, "write").mockImplementation((s) => (err.push(String(s)), true));
+  const o = vi.spyOn(process.stdout, "write").mockImplementation((s) => {
+    out.push(String(s));
+    return true;
+  });
+  const e = vi.spyOn(process.stderr, "write").mockImplementation((s) => {
+    err.push(String(s));
+    return true;
+  });
   let code: number;
   try {
     code = await runTests({ file: paths.skill, params: [], config: paths.config, live: true, runs });
@@ -105,14 +112,14 @@ describe("skope --test --live", () => {
         confidence_min: 0.875,
         confidence_median: 0.875,
         sure: 85,
-        margin: 3,
+        margin: 2.5,
         gate_failures: 0,
       },
-      expect.objectContaining({ ask: "Restart.service", chosen: { "myapp-worker": 3 }, sure: 90, margin: 1 }),
+      expect.objectContaining({ ask: "Restart.service", chosen: { "myapp-worker": 3 }, sure: 90, margin: 0.6 }),
     ]);
     // No min_margin: a margin under 5 points warns but doesn't fail.
-    expect(r.scenario.warnings).toEqual(["Triage: margin +3 is near the gate", "Restart.service: margin +1 is near the gate"]);
-    expect(r.stderr).toContain("Triage  Restart 3/3  conf min 88% med 88%  sure 85  margin +3  WARN near gate");
+    expect(r.scenario.warnings).toEqual(["Triage: margin +2.5 is near the gate", "Restart.service: margin +0.6 is near the gate"]);
+    expect(r.stderr).toContain("Triage  Restart 3/3  conf min 88% med 88%  sure 85  margin +2.5  WARN near gate");
     expect(seen.calls).toBe(6);
   });
 
@@ -129,7 +136,44 @@ describe("skope --test --live", () => {
     backend([RESTART]);
     const r = await live(setup({ ...EXPECT, live: { runs: 2, min_margin: 5 } }));
     expect(r.code).toBe(60);
-    expect(r.scenario.mismatch).toBe("Triage: margin +3 is under min_margin 5");
+    expect(r.scenario.mismatch).toBe("Triage: margin +2.5 is under min_margin 5");
+  });
+
+  test("min_margin is checked on the exact margin: 84.6% against sure 80 is +4.6, under 5, not a rounded +5", async () => {
+    const service = [{ nginx: 0.054, rsyslog: 0, "myapp-worker": 0.946, "myapp-api": 0 }]; // 94.6% against sure 90
+    backend([RESTART_HIGH], service);
+    const r = await live(setup({ ...EXPECT, live: { runs: 1, min_margin: 5 } }));
+    expect(r.code).toBe(60);
+    expect(r.scenario.mismatch).toBe("Restart.service: margin +4.6 is under min_margin 5");
+  });
+
+  test("the median of an even number of runs is the mean of the middle two", async () => {
+    backend([RESTART, RESTART_HIGH]);
+    const r = await live(setup({ ...EXPECT, live: { runs: 2 } }));
+    expect(r.scenario.asks[0]).toMatchObject({ confidence_min: 0.875, confidence_median: (0.875 + 0.96875) / 2 });
+  });
+
+  test("a malformed answers.yaml doesn't stop a live run: live never reads it", async () => {
+    const seen = backend([RESTART]);
+    const r = await live(setup({ ...EXPECT, live: { runs: 1 } }, "::: [not yaml"));
+    expect(r.code).toBe(0);
+    expect(seen.calls).toBe(2);
+  });
+
+  test("nor does a malformed answers entry in tests.yaml", async () => {
+    const seen = backend([RESTART]);
+    const paths = setup({ ...EXPECT, live: { runs: 1 } });
+    writeFileSync(
+      join(paths.skill, "..", "tests.yaml"),
+      JSON.stringify({
+        defaults: { answers: 5 },
+        scenarios: { again: { ...EXPECT, live: { runs: 1 }, commands: COMMANDS, answers: "nope" } },
+      }),
+    );
+    const r = await live(paths);
+    expect(r.code).toBe(0);
+    expect(r.summary).toMatchObject({ scenarios: 2, passed: 2 });
+    expect(seen.calls).toBe(4);
   });
 
   test("a miss is a run that doesn't satisfy the whole expect.yaml; min_hit_rate decides", async () => {

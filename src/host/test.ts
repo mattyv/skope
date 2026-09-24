@@ -64,12 +64,15 @@ export async function runTests(o: TestOptions): Promise<number> {
   const folderDirs = scenarioDirs(testsDir);
   const folderNames = new Set(folderDirs.map((d) => basename(d)));
   const yamlPath = join(dirname(resolve(o.file)), "tests.yaml");
-  const yamlRows = readTestsYamlFile(yamlPath, folderNames);
+  const live = o.live === true;
+  const yamlRows = readTestsYamlFile(yamlPath, folderNames, live);
 
-  let scenarios: ScenarioRow[] = [...folderDirs.map(readFolderScenario), ...yamlRows].sort((a, b) => a.name.localeCompare(b.name));
+  let scenarios: ScenarioRow[] = [...folderDirs.map((d) => readFolderScenario(d, live)), ...yamlRows].sort((a, b) =>
+    a.name.localeCompare(b.name),
+  );
   if (o.scenario !== undefined) {
     const p = resolve(o.scenario);
-    if (existsSync(p) && statSync(p).isDirectory()) scenarios = [readFolderScenario(p)];
+    if (existsSync(p) && statSync(p).isDirectory()) scenarios = [readFolderScenario(p, live)];
     else {
       const found = yamlRows.find((r) => r.name === o.scenario);
       scenarios = [found ?? { name: o.scenario, invalid: `no scenario named ${o.scenario}` }];
@@ -142,7 +145,7 @@ function scenarioDirs(root: string): string[] {
 
 /** tests.yaml's scenarios, or why each one (or, if it can't be read at all, a single entry named
  * tests.yaml) can't be used. No file at all contributes nothing. */
-function readTestsYamlFile(path: string, folderNames: ReadonlySet<string>): ScenarioRow[] {
+function readTestsYamlFile(path: string, folderNames: ReadonlySet<string>, live: boolean): ScenarioRow[] {
   if (!existsSync(path)) return [];
   let doc: unknown;
   try {
@@ -150,7 +153,7 @@ function readTestsYamlFile(path: string, folderNames: ReadonlySet<string>): Scen
   } catch (err) {
     return [{ name: "tests.yaml", invalid: `can't read tests.yaml: ${(err as Error).message}` }];
   }
-  return readTestsYaml(doc, folderNames).map((r) => ("scenario" in r ? r.scenario : r));
+  return readTestsYaml(doc, folderNames, { ignoreAnswers: live }).map((r) => ("scenario" in r ? r.scenario : r));
 }
 
 function parse(file: string): CoreProgram | null {
@@ -170,8 +173,8 @@ function readConfig(path: string | undefined): Config | null {
   }
 }
 
-/** A folder scenario's files, or why they can't be used. */
-function readFolderScenario(dir: string): ScenarioRow {
+/** A folder scenario's files, or why they can't be used. Live mode never reads answers.yaml. */
+function readFolderScenario(dir: string, live: boolean): ScenarioRow {
   const name = basename(dir);
   const bad = (invalid: string) => ({ name, invalid });
   const commandsPath = join(dir, "commands.yaml");
@@ -181,7 +184,7 @@ function readFolderScenario(dir: string): ScenarioRow {
   try {
     commands = loadYaml(readFileSync(commandsPath, "utf8"));
     const answersPath = join(dir, "answers.yaml");
-    if (existsSync(answersPath)) answers = loadYaml(readFileSync(answersPath, "utf8"));
+    if (!live && existsSync(answersPath)) answers = loadYaml(readFileSync(answersPath, "utf8"));
   } catch (err) {
     return bad(`can't read the fakes: ${(err as Error).message}`);
   }
@@ -351,13 +354,16 @@ async function liveScenario(o: TestOptions, program: CoreProgram, s: Scenario, s
     .map((a) => {
       const sorted = [...a.confidences].sort((x, y) => x - y);
       const min = sorted[0];
-      const median = sorted.length ? (sorted[Math.floor((sorted.length - 1) / 2)] as number) : undefined;
-      // Points, like sure: 81% against sure 80 is +1.
-      const margin = min === undefined ? undefined : Math.round(min * 100 - a.sure);
+      const median = medianOf(sorted);
+      // Points, like sure: 81% against sure 80 is +1. Checked unrounded; rounded only to show.
+      const exact = min === undefined ? undefined : min * 100 - a.sure;
+      const margin = exact === undefined ? undefined : Math.round(exact * 10) / 10;
       const name = a.key ?? `${a.section}:${a.line}`;
       if (a.key !== undefined && margin !== undefined) {
-        if (minMargin !== undefined && margin < minMargin) failure ??= `${name}: margin ${sign(margin)} is under min_margin ${minMargin}`;
-        else if (minMargin === undefined && margin < WARN_MARGIN) warnings.push(`${name}: margin ${sign(margin)} is near the gate`);
+        if (minMargin !== undefined && (exact as number) < minMargin)
+          failure ??= `${name}: margin ${sign(margin)} is under min_margin ${minMargin}`;
+        else if (minMargin === undefined && (exact as number) < WARN_MARGIN)
+          warnings.push(`${name}: margin ${sign(margin)} is near the gate`);
       }
       return {
         ask: name,
@@ -380,6 +386,13 @@ async function liveScenario(o: TestOptions, program: CoreProgram, s: Scenario, s
   });
   lines.unshift(`hits ${hits}/${runs} (min ${minHit})`);
   return failure === undefined ? { pass: true, live, lines } : { pass: false, mismatch: failure, live, lines };
+}
+
+/** The median of sorted values: the middle one, or the mean of the two middle ones. */
+export function medianOf(sorted: number[]): number | undefined {
+  if (sorted.length === 0) return undefined;
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 1 ? sorted[mid] : ((sorted[mid - 1] as number) + (sorted[mid] as number)) / 2;
 }
 
 const pct = (x: number) => `${Math.round(x * 100)}%`;
