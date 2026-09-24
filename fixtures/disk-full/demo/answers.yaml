@@ -1,0 +1,12 @@
+# What the model "answers" in the demo dry run: a probability for each option,
+# adding up to 1. skope acts only when the top one clears the ask's `sure`.
+Triage.ask:
+  s:clean_up: 0.03
+  s:restart: 0.88
+  s:page: 0.06
+  s:investigate: 0.03
+Restart.service:
+  nginx: 0.03
+  rsyslog: 0.03
+  myapp-worker: 0.91
+  myapp-api: 0.03

@@ -49,7 +49,8 @@ And this is what a reader sees:
 
 The bold keywords are the program. Everything else is guidance for whoever
 reads it, human or model. The whole skill is
-[`fixtures/disk-full/SKILL.md`](fixtures/disk-full/SKILL.md).
+[`fixtures/disk-full/SKILL.md`](fixtures/disk-full/SKILL.md). You can
+[try it in a minute](#try-it) with no API key.
 
 ---
 
@@ -127,6 +128,31 @@ If you use Claude Code (`~/.claude` exists), both the installer and
 [`write-skope-skill`](skills/write-skope-skill/SKILL.md) agent skill, which
 has an agent write skope skills test first. Set `SKOPE_NO_SKILL=1` to skip
 it.
+
+### Try it
+
+No API key, no config, and nothing real runs:
+
+```console
+$ skope --demo                        # writes the disk-full skill, its tests and fakes to ./skope-demo
+$ skope skope-demo/SKILL.md --test    # its unit tests
+PASS    false-alarm
+PASS    model-unsure
+PASS    nothing-fits
+PASS    restart-fixes-it
+PASS    restart-hangs
+PASS    restart-not-enough
+6 passed, 0 failed, 0 invalid
+$ skope skope-demo/SKILL.md --verify  # every path it can take, and how each ends
+$ skope skope-demo/SKILL.md --dry-run --fake skope-demo/answers.yaml --fake-exec skope-demo/commands.yaml
+```
+
+The dry run prints one JSON event per step. The faked model picks Restart
+and then `myapp-worker`, skope logs the restart it *would* do, and disk
+usage drops under target. Now make the model less sure: in `answers.yaml`,
+move 0.2 from `s:restart` to `s:page` (each ask's probabilities add up to
+1), or replace the whole answer with `Triage.ask: unsure`. Run it again,
+and skope hands off instead of guessing.
 
 ## Use
 
