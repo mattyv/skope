@@ -3,9 +3,9 @@
 **Write the runbook once. An agent can follow it, or skope can run it in
 milliseconds.**
 
-skope only acts when Jev is confident, hands everything else to a person or
-an agent, and the part that decides what runs is mathematically proven, not
-just tested.
+skope only acts when Jev is confident, and hands everything else to a
+person or an agent. Unlike a prompt, a skill can be unit tested, and the part
+that decides what runs is mathematically proven.
 
 A skope skill is an ordinary Markdown file. A person or a language model can
 read it and follow it. skope can also *execute* it: it runs the commands,
@@ -68,6 +68,16 @@ and decides who does each step:
 
 The common case costs about a tenth of a second of Jev time per question,
 instead of an agent session, and every decision is logged.
+
+**You can test it like code.** A skill an agent reads as a prompt can only
+be checked by trying it and reading what happened. A skope skill has unit
+tests: scenarios next to it fake the commands and answers, and
+`skope --test` checks the path, the outcome and every decision, with nothing
+real run, fast enough for CI. `skope --test --live` then asks the real model
+the same questions, several times each, and reports how often it chose right
+and how close it came to its confidence bar. That catches a question that's
+missing the evidence it needs before an incident does (see
+[Test](#test)).
 
 **Why trust it with production?** The core that decides what runs next is
 written in [Dafny](https://dafny.org), a language whose compiler checks
