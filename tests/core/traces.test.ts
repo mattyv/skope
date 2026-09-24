@@ -136,7 +136,7 @@ describe("dry run (SPEC §4.5, P3)", () => {
       { event: "would_do", cmd: "apt-get clean" },
       { event: "run", cmd: "df", exit: 0, timed_out: false, after_would_do: true },
       { event: "would_page", text: "done" },
-      { event: "outcome", outcome: "paged", reason: null, ask_calls: 0, effects: 1, dry_run: true },
+      { event: "outcome", outcome: "paged", reason: null, ask_calls: 0, effects: 0, dry_run: true },
     ]);
     expect(last(turns)).toEqual(PAGED);
   });
@@ -196,8 +196,62 @@ describe("check (SPEC §4.2)", () => {
   test("a value that isn't a number goes to failure handling: command_failed, or else skip carries on", () => {
     const bad = drive(compare(), config({ threshold: 85 }), [ok("n/a")]).turns;
     expect(bodies(bad)[1]).toMatchObject({ event: "check", left: null, right: "85", result: null });
-    expect(last(bad)).toEqual(handoff("command_failed"));
+    // The handoff detail is the comparison, not a command's exit (SPEC §4.2, §8.1).
+    expect(last(bad)).toEqual(handoff("command_failed", JSON.stringify({ expr: "{used} < {threshold}", left: "n/a", right: "85" })));
     expect(last(drive(compare(skip), config({ threshold: 85 }), [ok("n/a")]).turns)).toEqual(handoff("explicit"));
+  });
+
+  test("the comparison detail is JSON even when the value has quotes and control characters", () => {
+    const d = last(drive(compare(), config({ threshold: 85 }), [ok('a"b\\c\u0001')]).turns);
+    const detail = d?.kind === "done" && d.outcome.kind === "handoff" ? d.outcome.detail : null;
+    expect(JSON.parse(detail ?? "")).toEqual({ expr: "{used} < {threshold}", left: 'a"b\\c\u0001', right: "85" });
+  });
+
+  // Coercion: trim spaces, tabs, \r and \n, strip ONE %, then -?DIGITS(.DIGITS)? (SPEC §4.2).
+  for (const [out, left] of [
+    ["91%\r\n", "91"],
+    ["\t 7.5 ", "7.5"],
+    ["-3", "-3"],
+    ["91%%", null],
+    ["1.", null],
+    [".5", null],
+    ["", null],
+    ["1e3", null],
+  ] as const) {
+    test(`coerces ${JSON.stringify(out)} to ${left === null ? "not a number" : left}`, () => {
+      expect(bodies(drive(compare(skip), config({ threshold: 85 }), [ok(out)]).turns)[1]).toMatchObject({ left });
+    });
+  }
+
+  // Every operator at, below and above the boundary.
+  const ops: [string, boolean, boolean, boolean][] = [
+    ["<", true, false, false],
+    ["<=", true, true, false],
+    [">", false, false, true],
+    [">=", false, true, true],
+    ["==", false, true, false],
+    ["!=", true, false, true],
+  ];
+  for (const [op, below, equal, above] of ops) {
+    test(`${op}: 1 ${op} 2 is ${below}, 2 ${op} 2 is ${equal}, 3 ${op} 2 is ${above}`, () => {
+      const result = (l: string) => {
+        const p = program({ "s:a": section("A", [cmp(2, op, { num: l }, { num: "2" }, { stop: {} }), handOff(3)]) });
+        return last(drive(p, config(), []).turns);
+      };
+      const want = (b: boolean) => (b ? STOPPED : handoff("explicit"));
+      expect([result("1"), result("2"), result("3")]).toEqual([want(below), want(equal), want(above)]);
+    });
+  }
+
+  test("`check CMD succeeds` is false on any non-zero exit, 2 included", () => {
+    expect(last(drive(withCmd(), config(), [fail(2)]).turns)).toEqual(handoff("explicit"));
+  });
+
+  test("a check event after a would_do carries after_would_do", () => {
+    const p = program({
+      "s:a": section("A", [doCmd(2, cmd("apt-get clean")), cmp(3, "<", { num: "1" }, { num: "2" }, { stop: {} }), handOff(4)]),
+    });
+    expect(bodies(drive(p, config({}, true), []).turns)[1]).toMatchObject({ event: "check", after_would_do: true });
   });
 
   test("`check COND else [X]`: true carries on, false transfers", () => {
@@ -219,7 +273,9 @@ describe("check (SPEC §4.2)", () => {
     expect(last(turns)).toEqual({ kind: "choose", n: 3 });
     expect(last(drive(compare(), cfg, [ok(), { kind: "picked", i: 0 }]).turns)).toEqual(STOPPED);
     expect(last(drive(compare(), cfg, [ok(), { kind: "picked", i: 1 }]).turns)).toEqual(handoff("explicit"));
-    expect(last(drive(compare(), cfg, [ok(), { kind: "picked", i: 2 }]).turns)).toEqual(handoff("command_failed"));
+    expect(last(drive(compare(), cfg, [ok(), { kind: "picked", i: 2 }]).turns)).toEqual(
+      handoff("command_failed", JSON.stringify({ expr: "{used} < {threshold}", left: "", right: "85" })),
+    );
   });
 
   test("explore mode decides comparisons on known values itself", () => {

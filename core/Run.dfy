@@ -136,7 +136,7 @@ module SkopRun {
   {
     Ready(s);
     var e := Ev(s, WouldDoEv(RenderCmd(s.vars, DoParts(s.vars, a))));
-    var s1 := s.(log := s.log + [e], afterWouldDo := true, effects := s.effects + 1);
+    var s1 := s.(log := s.log + [e], afterWouldDo := true);
     WouldDoLogOk(s, s1, e);
     SameOk(s1);
     Then(e, Continue(s1, s.vars))
@@ -161,12 +161,27 @@ module SkopRun {
     var l, r := OperandVal(s.vars, c.l), OperandVal(s.vars, c.r);
     var a, b := Coerce(l), Coerce(r);
     var result := if a.Some? && b.Some? then Some(SkopValues.Compare(c.op, a.value, b.value)) else None;
-    var e := Ev(s, CheckEv(Expr(c), NumText(l), NumText(r), result, s.afterWouldDo));
-    Then(e, if result.None? then Failed(Log(s, e)) else CheckDone(Log(s, e), result.value))
+    AfterCheck(s, Ev(s, CheckEv(Expr(c), NumText(l), NumText(r), result, s.afterWouldDo)), result, Some(CmpDetail(c, l, r)))
+  }
+
+  // A check came out true, false, or (None) failed; e logs it.
+  function AfterCheck(s: State, e: CoreEvent, result: Option<bool>, detail: Option<string>): (res: (State, seq<CoreEvent>, Next))
+    requires Idle(s) && s.tasks[0].op.S? && Stmt0(s).Check? && Plain(s, e)
+    ensures Post(s, res, Busy(s))
+    decreases Busy(s), 4
+  {
+    Then(e, if result.None? then Failed(Log(s, e), detail) else CheckDone(Log(s, e), result.value))
   }
 
   // Failure handling for run, do and check (SPEC §4.3).
-  function Failed(s: State): (res: (State, seq<CoreEvent>, Next))
+  // A comparison that couldn't coerce, for the handoff record (SPEC §8.1):
+  // {"expr", "left", "right"} as JSON, with the operands as they were.
+  function CmpDetail(c: Cond, l: Val, r: Val): string requires c.Cmp? {
+    "{\"expr\":" + Json(Expr(c)) + ",\"left\":" + Json(Show(l)) + ",\"right\":" + Json(Show(r)) + "}"
+  }
+
+  // `detail` is Some for a comparison that couldn't coerce (CmpDetail).
+  function Failed(s: State, detail: Option<string>): (res: (State, seq<CoreEvent>, Next))
     requires Idle(s) && s.tasks[0].op.S?
     requires Stmt0(s).Run? || Stmt0(s).Do? || Stmt0(s).Check? || Stmt0(s).IfYesRun? || Stmt0(s).IfYesDo?
     ensures Post(s, res, Busy(s))
@@ -174,7 +189,7 @@ module SkopRun {
   {
     var st := Stmt0(s);
     match st.els
-    case NoElse => Finish(s, Handoff(CommandFailed, None))
+    case NoElse => Finish(s, Handoff(CommandFailed, detail))
     case Skip =>
       if st.Run? && st.binding.Some? then UnboundOk(s); Continue(s, s.vars - {st.binding.value})
       else SameOk(s); Continue(s, s.vars)
@@ -265,12 +280,25 @@ module SkopRun {
     case Invalid =>
       var e := Ev(s, AskEv(req.question, req.kind, None, None, None, st.sure, false, Range(st.form), Some(Unavailable), s.afterWouldDo));
       Then(e, Finish(Log(s, e), Handoff(AskUnavailable, Some(FailureText(Unavailable)))))
-    case Unsure(c, conf) =>
-      var e := Ev(s, AskEv(req.question, req.kind, Some(r.probs), Some(ChosenOf(st.form, ids, c)), Some(conf), st.sure, false, Range(st.form), None, s.afterWouldDo));
-      Then(e, GateMiss(Log(s, e)))
-    case Sure(c, conf) =>
-      var e := Ev(s, AskEv(req.question, req.kind, Some(r.probs), Some(ChosenOf(st.form, ids, c)), Some(conf), st.sure, true, Range(st.form), None, s.afterWouldDo));
-      Then(e, Accept(Log(s, e), c))
+    case Unsure(c, conf) => GateMissed(s, st, req, r, c, conf)
+    case Sure(c, conf) => GatePassed(s, st, req, r, c, conf)
+  }
+
+  function GateMissed(s: State, st: Stmt, req: AskRequest, r: Response, c: nat, conf: real): (res: (State, seq<CoreEvent>, Next))
+    requires Idle(s) && s.tasks[0].op.S? && Stmt0(s) == st && st.Ask? && r.AskAnswer? && c < |req.options|
+    ensures Post(s, res, Busy(s))
+  {
+    var e := Ev(s, AskEv(req.question, req.kind, Some(r.probs), Some(ChosenOf(st.form, Ids(req.options), c)), Some(conf), st.sure, false, Range(st.form), None, s.afterWouldDo));
+    Then(e, GateMiss(Log(s, e)))
+  }
+
+  function GatePassed(s: State, st: Stmt, req: AskRequest, r: Response, c: nat, conf: real): (res: (State, seq<CoreEvent>, Next))
+    requires Idle(s) && s.tasks[0].op.S? && Stmt0(s) == st && st.Ask? && r.AskAnswer?
+    requires FormOk(s.prog, st.form) && req.options == Options(s.prog, st.form) && c < |req.options|
+    ensures Post(s, res, Busy(s))
+  {
+    var e := Ev(s, AskEv(req.question, req.kind, Some(r.probs), Some(ChosenOf(st.form, Ids(req.options), c)), Some(conf), st.sure, true, Range(st.form), None, s.afterWouldDo));
+    Then(e, Accept(Log(s, e), c))
   }
 
   // The host answered the pending request.
@@ -282,45 +310,59 @@ module SkopRun {
     var s0 := s.(last := None);
     Ready(s0);
     match st
-    case Run(_, _, b, _) =>
-      var e := Ev(s0, RunEv(n.cmd, r.exit, r.timedOut, s.afterWouldDo));
-      var s1 := Log(s0, e);
-      Then(e,
-        if !Ok(r) then Failed(s1)
-        else if b.Some? then RunSlotOk(s1, RunSlot(r.stdout)); BindingOk(s1, RunSlot(r.stdout)); Continue(s1, s1.vars[b.value := RunSlot(r.stdout)])
-        else SameOk(s1); Continue(s1, s1.vars))
-    case IfYesRun(_, _, _) =>
-      var e := Ev(s0, RunEv(n.cmd, r.exit, r.timedOut, s.afterWouldDo));
-      Then(e, if Ok(r) then SameOk(Log(s0, e)); Continue(Log(s0, e), s0.vars) else Failed(Log(s0, e)))
-    case Do(_, _, _) =>
-      var e := Ev(s0, EffectEndEv(n.cmd, r.exit, r.timedOut));
-      Then(e, if Ok(r) then SameOk(Log(s0, e)); Continue(Log(s0, e), s0.vars) else Failed(Log(s0, e)))
-    case IfYesDo(_, _, _) =>
-      var e := Ev(s0, EffectEndEv(n.cmd, r.exit, r.timedOut));
-      Then(e, if Ok(r) then SameOk(Log(s0, e)); Continue(Log(s0, e), s0.vars) else Failed(Log(s0, e)))
+    case Run(_, _, _, _) => AfterRun(s0, Ev(s0, RunEv(n.cmd, r.exit, r.timedOut, s.afterWouldDo)), r)
+    case IfYesRun(_, _, _) => AfterExec(s0, Ev(s0, RunEv(n.cmd, r.exit, r.timedOut, s.afterWouldDo)), r)
+    case Do(_, _, _) => AfterExec(s0, Ev(s0, EffectEndEv(n.cmd, r.exit, r.timedOut)), r)
+    case IfYesDo(_, _, _) => AfterExec(s0, Ev(s0, EffectEndEv(n.cmd, r.exit, r.timedOut)), r)
     case Check(_, cond, _, _) =>
       if cond.Succeeds? then
         // A timeout is a failure, not false (SPEC §4.2).
-        var e := Ev(s0, CheckCmdEv(n.cmd, r.exit, r.timedOut, s.afterWouldDo));
-        Then(e, if r.timedOut || r.exit.None? then Failed(Log(s0, e)) else CheckDone(Log(s0, e), r.exit == Some(0)))
+        var result := if r.timedOut || r.exit.None? then None else Some(r.exit == Some(0));
+        AfterCheck(s0, Ev(s0, CheckCmdEv(n.cmd, r.exit, r.timedOut, s.afterWouldDo)), result, None)
       else
         // Explore mode (SPEC §5.4): true, false, or not a number.
         var l, rt := OperandVal(s0.vars, cond.l), OperandVal(s0.vars, cond.r);
         var result := if r.i == 0 then Some(true) else if r.i == 1 then Some(false) else None;
-        var e := Ev(s0, CheckEv(Expr(cond), NumText(l), NumText(rt), result, s.afterWouldDo));
-        Then(e, if result.None? then Failed(Log(s0, e)) else CheckDone(Log(s0, e), result.value))
-    case Ask(_, _, _, form, _) =>
-      var req := n.request;
-      var s1 := s0.(askCalls := s0.askCalls + 1);
-      CountOk(s0, s1);
-      if r.AskFailed? then
-        var e := Ev(s1, AskEv(req.question, req.kind, None, None, None, st.sure, false, Range(form), Some(r.error), s.afterWouldDo));
-        Then(e, Finish(Log(s1, e), Handoff(AskUnavailable, Some(FailureText(r.error)))))
-      else Answered(s1, st, req, r)
+        AfterCheck(s0, Ev(s0, CheckEv(Expr(cond), NumText(l), NumText(rt), result, s.afterWouldDo)), result, Some(CmpDetail(cond, l, rt)))
+    case Ask(_, _, _, _, _) => ResumeAsk(s0, st, n.request, r)
     case Page(_, _) =>
       var e := Ev(s0, PageEv(n.text, r.ok));
       Then(e, Finish(Log(s0, e), Paged))
     case _ => assert false; Finish(s0, Stopped)
+  }
+
+  // A `run` finished: bind its output, or failure handling.
+  function AfterRun(s: State, e: CoreEvent, r: Response): (res: (State, seq<CoreEvent>, Next))
+    requires Idle(s) && s.tasks[0].op.S? && Stmt0(s).Run? && Plain(s, e) && r.ExecResult?
+    ensures Post(s, res, Busy(s))
+  {
+    var s1, b := Log(s, e), Stmt0(s).binding;
+    Then(e,
+      if !Ok(r) then Failed(s1, None)
+      else if b.Some? then RunSlotOk(s1, RunSlot(r.stdout)); BindingOk(s1, RunSlot(r.stdout)); Continue(s1, s1.vars[b.value := RunSlot(r.stdout)])
+      else SameOk(s1); Continue(s1, s1.vars))
+  }
+
+  // An `if yes run`, `do` or `if yes do` finished: carry on, or failure handling.
+  function AfterExec(s: State, e: CoreEvent, r: Response): (res: (State, seq<CoreEvent>, Next))
+    requires Idle(s) && s.tasks[0].op.S? && (Stmt0(s).IfYesRun? || Stmt0(s).Do? || Stmt0(s).IfYesDo?) && Plain(s, e) && r.ExecResult?
+    ensures Post(s, res, Busy(s))
+  {
+    Then(e, if Ok(r) then SameOk(Log(s, e)); Continue(Log(s, e), s.vars) else Failed(Log(s, e), None))
+  }
+
+  // The backend answered, or failed.
+  function ResumeAsk(s0: State, st: Stmt, req: AskRequest, r: Response): (res: (State, seq<CoreEvent>, Next))
+    requires Idle(s0) && s0.tasks[0].op.S? && Stmt0(s0) == st && st.Ask? && (r.AskAnswer? || r.AskFailed?)
+    requires FormOk(s0.prog, st.form) && req.options == Options(s0.prog, st.form)
+    ensures Post(s0, res, Busy(s0))
+  {
+    var s1 := s0.(askCalls := s0.askCalls + 1);
+    CountOk(s0, s1);
+    if r.AskFailed? then
+      var e := Ev(s1, AskEv(req.question, req.kind, None, None, None, st.sure, false, Range(st.form), Some(r.error), s0.afterWouldDo));
+      Then(e, Finish(Log(s1, e), Handoff(AskUnavailable, Some(FailureText(r.error)))))
+    else Answered(s1, st, req, r)
   }
 
   // SPEC §5.2. Step after Done isn't allowed (P2), and the response must

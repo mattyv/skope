@@ -86,7 +86,9 @@ module SkopStep {
     | WouldPageEv(text: string)
     | TransferEv(from: string, to: string) // display names
     | OutcomeEv(outcome: Outcome, askCalls: nat, effects: nat, dry: bool)
-  // `at` is None only for OutcomeEv.
+  // `at` is where the event happened. The core always sets it, the outcome
+  // included: the instruction the run ended at (for a deadline, the one it
+  // would have started next).
   datatype CoreEvent = CoreEvent(at: Option<Where>, body: EventBody)
 
   datatype Mode = Concrete | Explore
