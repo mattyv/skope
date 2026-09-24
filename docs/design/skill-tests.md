@@ -1,6 +1,6 @@
 # Design: skill tests (`skope --test`)
 
-Status: draft, for discussion. Nothing here is built yet.
+Status: draft, revised after review (rev 2). Nothing here is built yet.
 
 ## Problem
 
@@ -83,60 +83,73 @@ survive edits:
 
 | Key | Matches | Example |
 |---|---|---|
-| `Section.var` | the `run … as var` (or `ask … as var`) in that section | `Counters.consumers` |
-| `Section#n` | the n-th instruction in that section, 1-based, for statements with no `as` | `Triage#1` |
+| `Section.var` | the statement in that section that binds `var` (`run … as var`, or an `ask` that binds it) | `Counters.consumers` |
 | `Section.ask` | the section's only `ask` (error if it has more than one) | `Classify.ask` |
 
 Section names resolve by slug, the same as `[Section]` references
 (SPEC §3.4), so `Counters.consumers` and `counters.consumers` are the same
-key.
+key. A statement without `as` keeps using its exact text or `line:N`.
+A key for "the n-th instruction" was considered and left out: it still
+shifts when an instruction is inserted above it. It can come back if a real
+skill needs it.
 
-Precedence, most specific first: `Section.var` / `Section.ask`, then
-`Section#n`, then `line:N`, then exact text. Existing fake files keep
-working unchanged.
+**Inside a `for each`**, a key matches the statement once per item. As
+today, a list of results is used in order, and the last one repeats.
 
-Checks on fake files, reported before the run:
+**Which key applies:**
 
-- A key that matches no statement is `E-FAKE-UNUSED` under `--test`, and
-  warning `W-FAKE-UNUSED` under `--fake` / `--fake-exec`. A stale key is
-  how the off-by-one line bug stayed hidden.
-- Two keys that match the same statement are `E-FAKE-AMBIGUOUS`.
+- Under `--test`, every statement that runs must match **exactly one** key.
+  Two keys matching the same statement is `E-FAKE-AMBIGUOUS`.
+- Under plain `--fake` / `--fake-exec`, existing files keep working:
+  `Section.var` / `Section.ask`, then `line:N`, then exact text.
+
+**Unused keys:** a key that matches no statement is `E-FAKE-UNUSED` under
+`--test`, and warning `W-FAKE-UNUSED` under `--fake` / `--fake-exec`. A
+stale key is how the off-by-one line bug stayed hidden. This is checked
+against the program before the run, not against what the run reached.
 
 ## `expect.yaml`
 
 Every field is optional, but a scenario must set at least one of
-`outcome`, `exit` or `path`.
+`outcome`, `exit`, `path` or `path_prefix`.
 
 ```yaml
 outcome: paged            # stopped | paged | handoff
 exit: 10                  # implied by outcome if left out
-path:                     # sections entered, in order; exact unless `prefix: true`
+path:                     # every section entered, in order
   - Triage
   - Queue
   - Counters
   - Classify
   - Consumer too slow
+# path_prefix: [Triage, Queue]   # instead of path: the run's path starts with these
 asks:
-  Classify:               # section with the ask (or Section.var for a `one of` / yes-no ask)
+  Classify:               # the section with the ask (or Section.var for one that binds)
     chosen: Consumer too slow
 page_contains: "can't keep up"
 handoff_reason: gate_failed   # when outcome is handoff
 max_ask_calls: 1
 live:                     # used only with --live
-  runs: 5
+  runs: 3
   min_hit_rate: 1.0       # share of runs that must choose `chosen`
-  min_margin: 5           # points the lowest confidence must clear `sure` by
+  min_margin: 5           # optional: points the lowest confidence must clear `sure` by
 ```
 
-`path` is checked against the `transfer` events. `asks.*.chosen` is
-checked against the `ask` event's `chosen`, with the section label mapped
-to its option id, so authors write labels, not `s:consumer_too_slow`.
+**`path`** is the entry section followed by the `to` of every `transfer`
+event: `[entry, ...transfer.to]`. It must match exactly. `path_prefix`
+must match the start of that list. Set one or the other, not both.
 
-A scenario is also checked **before it runs**. Its `path` must be one the
-explorer can take (reusing `--verify --trace`), so a scenario that expects
-an impossible path is reported as broken instead of as a failing run.
+**`asks.*.chosen`** is checked against the `ask` event's `chosen`, with the
+section label mapped to its option id, so authors write labels, not
+`s:consumer_too_slow`.
 
 ## Modes
+
+Both modes run the skill as `--apply` with the fake command handler. No
+real command runs, and the pager is faked too (SPEC §5.4), but `do`
+statements go through the fake handler like any other command. A scenario
+can therefore fake a `do` that fails or times out and check that the run
+hands off, as the acceptance suite's `do-timeout` scenarios already do.
 
 ### Scripted: `skope SKILL.md --test`
 
@@ -154,23 +167,31 @@ an impossible path is reported as broken instead of as a failing run.
   `ask` goes to the configured backend.
 - Each scenario runs `N` times (default: `live.runs`, else 3).
 - Per ask, the report gives the hit rate, the lowest and median
-  confidence, the margin (lowest confidence minus `sure`) and the
-  gate-failure count:
+  confidence, the margin (lowest confidence minus `sure`, in points) and
+  the gate-failure count. Confidence is shown in percent, the same unit as
+  `sure`:
 
   ```
-  autoack-backlog  Classify  chosen 3/3  conf min 0.97 med 0.97  sure 80  margin +17  PASS
-  backlog          Classify  chosen 3/3  conf min 0.81 med 0.81  sure 80  margin  +1  WARN near gate
+  autoack-backlog  Classify  chosen 3/3  conf min 97% med 97%  sure 80  margin +17  PASS
+  backlog          Classify  chosen 3/3  conf min 81% med 81%  sure 80  margin  +1  WARN near gate
   ```
 
-- A scenario fails when its hit rate is below `live.min_hit_rate`. It gets
-  a warning when the margin is below `live.min_margin` (default 5 points).
-  The warning is how the 0.81 case above would have been caught.
-- Before running, skope prints the number of calls it will make (`asks
-  reached × N × scenarios`) and the model it will use. Live results depend
-  on the model, so the report includes the backend and model, the same as
-  `ask` events do.
+- A scenario **fails** when its hit rate is below `live.min_hit_rate`, or
+  when it sets `live.min_margin` and the margin is below it. Without
+  `min_margin`, a margin under 5 points is a **warning**. So the 0.81 case
+  above fails CI once its scenario states a margin, and warns until then.
+- Before running, skope prints the **maximum** number of backend calls:
+  for each scenario, the most asks any path can reach (from the explorer,
+  as `--explain` counts cost), times its runs. The exact number can't be
+  known in advance: a wrong answer can lead down a path with more asks.
+  The report names the backend and model, as `ask` events do.
+- Live mode sends the backend exactly what a real run would: the question,
+  the guidance and the named context from the fake command results, all
+  redacted as usual (SPEC §9).
+- Answers are never cached. A cache would hide the model drift that live
+  mode exists to catch.
 
-## Coverage (phase 2)
+## Coverage (phase 4)
 
 `--test --coverage` compares the scenarios' paths with the explorer's
 paths and lists what no scenario reaches: sections, transfers, and each
@@ -178,28 +199,23 @@ ask's branches (every option, plus `unsure` and `unavailable`). The
 explorer already enumerates these for `--verify`, so this is a set
 difference, not new analysis.
 
-## Safety
-
-- `--test` implies the fake command handler. A command with no fake result
-  fails the scenario (`E-FAKE-UNMATCHED`). No real command runs, and the
-  pager is never called.
-- `--test` never runs a `do`, whether or not it's a dry run. Scenarios
-  still check that the path reaches a `do` (`would_do` events).
-- Live mode sends the backend exactly what a real run would: the question,
-  the guidance and the named context from the fake command results, all
-  redacted as usual (SPEC §9). Fake results are author-written, but they
-  go through redaction too.
-
 ## Exit codes
 
 | Code | Meaning |
 |---|---|
 | 0 | every scenario passed (warnings allowed) |
 | 60 | at least one scenario failed |
-| 40 | the skill or a scenario is invalid: lint error, bad fake or expect file, impossible path |
+| 40 | the skill or a scenario is invalid: lint error, bad fake or expect file, ambiguous or unused key |
 
 60 is new. It stays clear of the run outcomes (0, 10, 20, 30, 31, 40, 50),
 because a test run's code describes the tests, not a run.
+
+## Contract changes
+
+- `contracts/fakes.schema.json`: the new key forms.
+- SPEC §7.1: `E-FAKE-UNUSED`, `W-FAKE-UNUSED`, `E-FAKE-AMBIGUOUS`.
+- SPEC §7: `--test`, `--live`, `--coverage`, and exit code 60.
+- A new `contracts/expect.schema.json` for `expect.yaml`.
 
 ## Worked example
 
@@ -207,19 +223,19 @@ Queue triage with one `Classify` ask. The bug: an auto-ack consumer's ack
 rate is always 0, and the question didn't say which ack mode the consumer
 uses.
 
-`tests/autoack-backlog/commands.yaml`:
+`tests/autoack-backlog/commands.yaml` (statements without `as` keep their
+exact text as the key):
 
 ```yaml
-Triage#1:          { exit: 0 }
-Queue#1:           { exit: 0 }
-Counters.consumers: { exit: 0, stdout: "1" }
-Counters.ready:     { exit: 0, stdout: "50000" }
-Counters.unacked:   { exit: 0, stdout: "0" }
-Counters.pub_rate:  { exit: 0, stdout: "40" }
+"rabbitmq-diagnostics -q check_running": { exit: 0 }
+Counters.consumers:    { exit: 0, stdout: "1" }
+Counters.ready:        { exit: 0, stdout: "50000" }
+Counters.unacked:      { exit: 0, stdout: "0" }
+Counters.pub_rate:     { exit: 0, stdout: "40" }
 Counters.deliver_rate: { exit: 0, stdout: "5" }
-Counters.ack_rate:  { exit: 0, stdout: "0" }
-Classify.bindings:  { exit: 0, stdout: "queue\torders\torders.#" }
-Classify.ack_mode:  { exit: 0, stdout: "auto" }
+Counters.ack_rate:     { exit: 0, stdout: "0" }
+Classify.bindings:     { exit: 0, stdout: "queue\torders\torders.#" }
+Classify.ack_mode:     { exit: 0, stdout: "auto" }
 ```
 
 `tests/autoack-backlog/expect.yaml`:
@@ -232,36 +248,47 @@ asks:
 live:
   runs: 3
   min_hit_rate: 1.0
+  min_margin: 5
 ```
 
 Before the fix, `--test --live` fails: chosen 0/3, "Consumer stuck" at
-0.87–0.94. After it, the test passes: 3/3 at 0.97–0.98. Scripted mode
-passes both times, because the routing never changed. That's why the
-design needs both modes.
+87–94%. After it, the test passes: 3/3 at 97–98%. Scripted mode passes
+both times, because the routing never changed. That's why the design needs
+both modes.
 
 Inserting `Classify.ack_mode` didn't move any other key. With `line:N`
 keys, every key below the new line would have needed editing.
 
 ## Phasing
 
-1. **Stable keys** and `E-FAKE-UNUSED` / `W-FAKE-UNUSED` / `E-FAKE-AMBIGUOUS`.
-   Useful on their own for `--fake-exec`.
-2. **Scripted `--test`** with `expect.yaml`, `expected-exit` compatibility,
-   and the pre-run path check. Move `fixtures/` onto it.
-3. **`--live`** with hit rate, confidence and margin.
+1. **Stable keys** (`Section.var`, `Section.ask`) and `E-FAKE-UNUSED` /
+   `W-FAKE-UNUSED` / `E-FAKE-AMBIGUOUS`. Useful on their own for
+   `--fake-exec`.
+2. **Scripted `--test`** with `expect.yaml` and `expected-exit`
+   compatibility. Move `fixtures/` onto it.
+3. **`--live`** with hit rate, confidence, margin and the maximum-cost line.
 4. **`--coverage`.**
 
 Each phase starts with failing tests, as in PLAN.md.
 
+## Decided in review
+
+- Tests run as `--apply` with fakes, not as a dry run, so `do` failures
+  and timeouts can be tested.
+- An explicit `live.min_margin` fails the scenario; without one, a margin
+  under 5 points warns. No `--strict` flag.
+- `path` is `[entry, ...transfer.to]`; `path_prefix` is its prefix form.
+- The call count shown before a live run is a maximum, from the explorer.
+- Under `--test` each statement matches exactly one key; legacy precedence
+  stays for plain `--fake` / `--fake-exec`.
+- Left out: a pre-run check that `path` is possible (the run reports the
+  mismatch anyway, and `--verify --trace` takes events, not section lists),
+  the `Section#n` key, answer caching, and matching actions in `path`.
+- Scenarios stay under `tests/` next to the skill.
+
 ## Open questions
 
-1. Should `Section#n` count only instructions, or prose items too? Counting
-   instructions only is more stable, and this draft assumes it.
-2. Should live mode cache answers by request hash so reruns cost nothing?
-   It would hide model drift, so maybe only behind a flag.
-3. Is there a better home for scenarios than `tests/` inside the skill
-   directory? Agent skill loaders ignore subdirectories, so it's safe
-   there, but it ships with the skill.
-4. Should `path` also match on actions (`would_do`, `would_page`), or is
-   `page_contains` enough?
-5. Should a live WARN near the gate fail CI under a `--strict` flag?
+1. How much do Jev's answers vary between identical runs? If they're
+   nearly deterministic, repeating a scenario mostly costs calls, and
+   varying the evidence across scenarios finds more. Measure before
+   settling the default for `N`.
