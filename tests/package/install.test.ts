@@ -21,7 +21,9 @@ import { afterEach, describe, expect, test } from "vitest";
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
 const INSTALL_SH = join(ROOT, "install.sh");
 const VERSION = "9.9.9";
-const BINARY_NAME = `skop-${VERSION}-linux-x64`;
+// The release file install.sh will look for on this machine (its os/arch tables).
+const HOST = `${process.platform === "darwin" ? "darwin" : "linux"}-${process.arch}`;
+const BINARY_NAME = `skop-${VERSION}-${HOST}`;
 const FAKE_BINARY = `#!/bin/sh\necho "skop ${VERSION} (build identity ${"a".repeat(64)})"\n`;
 
 let server: Server | undefined;

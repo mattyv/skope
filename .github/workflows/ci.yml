@@ -94,6 +94,8 @@ jobs:
       - name: install.sh passes shellcheck (POSIX sh)
         if: runner.os == 'Linux'
         run: shellcheck -s sh install.sh
+      - name: Build (the bundle and binary are checked against the npm build)
+        run: npm run build
       - name: Bundle, standalone binary and installer tests (SPEC §5.5, §12.3)
         run: npx vitest run tests/package
 
