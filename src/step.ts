@@ -97,7 +97,7 @@ export const EVENT_FIELDS: Record<string, { core: string[]; host: string[] }> = 
   // commands started, which a dry run's would_do isn't, and a run that ends in error still needs them.
   outcome: { core: ["outcome", "reason", "dry_run"], host: ["ask_calls", "effects"] },
   // Host-only events: the core never emits these.
-  run_start: { core: [], host: ["params", "dry_run", "caller", "run_dir", "skop_version", "skop_build"] },
+  run_start: { core: [], host: ["params", "dry_run", "caller", "run_dir", "skope_version", "skope_build"] },
   handoff_page: { core: [], host: ["text", "ok"] },
   handoff_record: { core: [], host: ["path", "record"] },
   error: { core: [], host: ["code", "stage", "file", "message"] },

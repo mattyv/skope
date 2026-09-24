@@ -66,7 +66,7 @@ const TAIL_BYTES = 2048;
  * entities stop `<…>` links and `<!here>`; a zero-width space after `@`
  * stops mentions, and one inside `://` or after a dot between a word and a
  * letter stops URLs, `www.` and bare domains (`evil.example`); a markdown
- * link `[x](…)` gets its brackets backslash-escaped. skop's own parts of a
+ * link `[x](…)` gets its brackets backslash-escaped. skope's own parts of a
  * page (host, run dir, record path) are never passed through this.
  * Control characters are removed first (plainText).
  */

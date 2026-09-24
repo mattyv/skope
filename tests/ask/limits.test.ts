@@ -1,5 +1,5 @@
 // Backend limits (SPEC §6.2 table): a backend can only lower the
-// language's maximums, and skop checks the skill against them before the
+// language's maximums, and skope checks the skill against them before the
 // run starts (E-BACKEND-LIMIT, §12.2).
 
 import { describe, expect, test } from "vitest";

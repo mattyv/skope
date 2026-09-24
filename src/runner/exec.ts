@@ -38,7 +38,7 @@ export const CAP_BYTES = 1024 * 1024;
 const MAX_TIMER_MS = 2 ** 31 - 1;
 
 /**
- * The environment for every command (SPEC §4.4): skop's own, minus the
+ * The environment for every command (SPEC §4.4): skope's own, minus the
  * backend key variables, plus `LC_ALL=C`, which wins over an inherited one.
  */
 export function commandEnv(base: NodeJS.ProcessEnv, keyVars: readonly string[]): NodeJS.ProcessEnv {
@@ -86,7 +86,7 @@ export function liveCommands(): number {
 }
 
 /**
- * Stops every live command (SPEC §4.4, skop interrupted): SIGTERM to each
+ * Stops every live command (SPEC §4.4, skope interrupted): SIGTERM to each
  * group, up to `graceMs` for them to exit, then SIGKILL to any left.
  * Resolves once every command has closed. The host's SIGINT/SIGTERM
  * handler calls this, then releases the lock and ends with E-INTERRUPTED.

@@ -5,15 +5,15 @@
 // Each check returns a set of findings, and each has a lemma: no findings
 // means its WellFormed conjunct holds. Findings are sorted by line, then
 // code, once at the end.
-module SkopCheck {
-  import opened SkopAst
-  import opened SkopWellFormed
-  import SkopStep
+module SkopeCheck {
+  import opened SkopeAst
+  import opened SkopeWellFormed
+  import SkopeStep
 
-  type LintError = SkopStep.LintError
+  type LintError = SkopeStep.LintError
 
   function Err(code: string, src: Src): LintError {
-    SkopStep.LintError(code, src)
+    SkopeStep.LintError(code, src)
   }
 
   // Compiled comprehensions re-evaluate their ranges for every element, so

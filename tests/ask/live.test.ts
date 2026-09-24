@@ -1,8 +1,8 @@
 // Opt-in live tests (PLAN.md §4 D): one per backend and question kind,
-// recording the *raw* HTTP response body (not skop-ask's parsed
+// recording the *raw* HTTP response body (not skope-ask's parsed
 // AskOutput) so the fixtures in tests/recordings/ come straight from the
 // real APIs and can be replayed byte-for-byte in the unit tests above.
-// Skipped unless SKOP_LIVE=1 and the relevant API key are set, so they
+// Skipped unless SKOPE_LIVE=1 and the relevant API key are set, so they
 // never run in normal CI.
 
 import { writeFileSync } from "node:fs";
@@ -12,11 +12,11 @@ import { askOpenRouter } from "../../src/ask/openrouter.js";
 import type { AskRequest } from "../../src/ask/types.js";
 import { isFailure } from "../../src/ask/types.js";
 
-const live = process.env.SKOP_LIVE === "1";
+const live = process.env.SKOPE_LIVE === "1";
 const retryCfg = { timeoutMs: 10_000, retries: 1 };
 
 /** Wraps `fetch` so the raw response body — exactly what the API sent
- * back, before skop-ask parses it into an AskOutput — is captured to
+ * back, before skope-ask parses it into an AskOutput — is captured to
  * `recordingUrl` via `res.clone().text()`, leaving the real Response
  * untouched for askJev/askOpenRouter to consume normally. */
 function recordingFetch(recordingUrl: URL): typeof fetch {
@@ -87,7 +87,7 @@ const scoreRequest: AskRequest = {
   timeout_ms: 10_000,
 };
 
-describe.runIf(live && process.env.TYPESAFE_API_KEY)("jev live (SKOP_LIVE=1)", () => {
+describe.runIf(live && process.env.TYPESAFE_API_KEY)("jev live (SKOPE_LIVE=1)", () => {
   const jevConfig = {
     model: process.env.JEV_MODEL ?? "jev-1.13.0",
     apiKey: process.env.TYPESAFE_API_KEY as string,
@@ -112,7 +112,7 @@ describe.runIf(live && process.env.TYPESAFE_API_KEY)("jev live (SKOP_LIVE=1)", (
   });
 });
 
-describe.runIf(live && process.env.OPENROUTER_API_KEY)("openrouter live (SKOP_LIVE=1)", () => {
+describe.runIf(live && process.env.OPENROUTER_API_KEY)("openrouter live (SKOPE_LIVE=1)", () => {
   const openrouterConfig = {
     model: process.env.OPENROUTER_MODEL ?? "openai/gpt-4o-mini",
     apiKey: process.env.OPENROUTER_API_KEY as string,

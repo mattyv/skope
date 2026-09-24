@@ -1,12 +1,12 @@
 #!/usr/bin/env node
-// Computes skop's build identity (SPEC §7.2), copied from ply's scheme.
+// Computes skope's build identity (SPEC §7.2), copied from ply's scheme.
 //
 // Two numbers, two questions. The package version in package.json says
 // which release this is. It's edited by hand, so nothing forces it to move
 // when behaviour changes: ply shipped fourteen fixes under one unchanged
 // version string, and every stored result from the broken build kept being
-// trusted. The build identity answers "is this the same skop?": a sha256
-// over the source that decides what skop does.
+// trusted. The build identity answers "is this the same skope?": a sha256
+// over the source that decides what skope does.
 //
 // Hashed from file contents, not a git commit, so it works the same from a
 // clone, a dirty tree or a release tarball. In a git checkout only tracked
@@ -50,7 +50,7 @@ function listFiles(dir) {
 function trackedFiles() {
   try {
     // Tracked files plus untracked ones git doesn't ignore: a new module
-    // that isn't committed yet still changes what skop does.
+    // that isn't committed yet still changes what skope does.
     return execFileSync("git", ["ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", ...INPUT_DIRS], {
       cwd: ROOT,
       encoding: "utf8",
@@ -77,7 +77,7 @@ for (const path of files) {
 
 const { version } = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"));
 if (!/^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/.test(version ?? "")) {
-  throw new Error(`build-id: package.json version "${version}" isn't semver, so skop can't be built`);
+  throw new Error(`build-id: package.json version "${version}" isn't semver, so skope can't be built`);
 }
 
 const json = JSON.stringify({ version, build: hash.digest("hex") });

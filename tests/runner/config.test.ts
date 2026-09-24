@@ -1,4 +1,4 @@
-// Config loading (SPEC §9): $XDG_CONFIG_HOME/skop/config.yaml, defaults
+// Config loading (SPEC §9): $XDG_CONFIG_HOME/skope/config.yaml, defaults
 // filled in, and E-CONFIG for everything else that's wrong: never a silent
 // default.
 
@@ -11,7 +11,7 @@ import { ConfigError, defaultConfigPath, loadConfig } from "../../src/runner/con
 let dir: string;
 const savedEnv = { ...process.env };
 beforeEach(() => {
-  dir = mkdtempSync(join(tmpdir(), "skop-config-test-"));
+  dir = mkdtempSync(join(tmpdir(), "skope-config-test-"));
 });
 afterEach(() => {
   rmSync(dir, { recursive: true, force: true });
@@ -63,7 +63,7 @@ describe("loadConfig (SPEC §9)", () => {
         "  patterns:",
         "    - 'myco-[0-9a-f]{32}'",
         "on_handoff: none",
-        "state_dir: /tmp/skop-state",
+        "state_dir: /tmp/skope-state",
         "",
       ].join("\n"),
     );
@@ -74,7 +74,7 @@ describe("loadConfig (SPEC §9)", () => {
     expect(cfg.pager).toEqual({ command: "notify-send", timeout_ms: 9000 });
     expect(cfg.redact).toEqual({ defaults: true, patterns: ["myco-[0-9a-f]{32}"] });
     expect(cfg.on_handoff).toBe("none");
-    expect(cfg.state_dir).toBe("/tmp/skop-state");
+    expect(cfg.state_dir).toBe("/tmp/skope-state");
   });
 
   test("a missing config file at the default path loads all spec defaults", () => {
@@ -84,13 +84,13 @@ describe("loadConfig (SPEC §9)", () => {
     expect(cfg.ask).toEqual({ backend: "jev", timeout_ms: 2000, retries: 1 });
     expect(cfg.redact).toEqual({ defaults: true, patterns: [] });
     expect(cfg.on_handoff).toBe("page");
-    expect(cfg.state_dir).toBe("/xdg-state/skop");
+    expect(cfg.state_dir).toBe("/xdg-state/skope");
   });
 
   test("the default path, when it exists, is read", () => {
     process.env.XDG_CONFIG_HOME = dir;
-    mkdirSync(join(dir, "skop"));
-    write(`${FAKE}on_handoff: none\n`, "skop/config.yaml");
+    mkdirSync(join(dir, "skope"));
+    write(`${FAKE}on_handoff: none\n`, "skope/config.yaml");
     expect(loadConfig().on_handoff).toBe("none");
   });
 
@@ -209,23 +209,23 @@ describe("loadConfig (SPEC §9)", () => {
   describe("state_dir (P2-12)", () => {
     test("a leading $XDG_STATE_HOME is expanded", () => {
       process.env.XDG_STATE_HOME = "/xs";
-      expect(loadConfig(write(`${FAKE}state_dir: $XDG_STATE_HOME/skop\n`)).state_dir).toBe("/xs/skop");
+      expect(loadConfig(write(`${FAKE}state_dir: $XDG_STATE_HOME/skope\n`)).state_dir).toBe("/xs/skope");
     });
 
     test("an unset or relative XDG_STATE_HOME means ~/.local/state (XDG spec)", () => {
       delete process.env.XDG_STATE_HOME;
-      expect(loadConfig(write(`${FAKE}state_dir: $XDG_STATE_HOME/skop\n`)).state_dir).toBe(join(homedir(), ".local/state/skop"));
+      expect(loadConfig(write(`${FAKE}state_dir: $XDG_STATE_HOME/skope\n`)).state_dir).toBe(join(homedir(), ".local/state/skope"));
       process.env.XDG_STATE_HOME = "relative/state";
-      expect(loadConfig(write(`${FAKE}state_dir: $XDG_STATE_HOME/skop\n`)).state_dir).toBe(join(homedir(), ".local/state/skop"));
-      expect(loadConfig(write(FAKE)).state_dir).toBe(join(homedir(), ".local/state/skop"));
+      expect(loadConfig(write(`${FAKE}state_dir: $XDG_STATE_HOME/skope\n`)).state_dir).toBe(join(homedir(), ".local/state/skope"));
+      expect(loadConfig(write(FAKE)).state_dir).toBe(join(homedir(), ".local/state/skope"));
     });
 
     test("a leading ~ is expanded", () => {
-      expect(loadConfig(write(`${FAKE}state_dir: ~/skop-state\n`)).state_dir).toBe(join(homedir(), "skop-state"));
+      expect(loadConfig(write(`${FAKE}state_dir: ~/skope-state\n`)).state_dir).toBe(join(homedir(), "skope-state"));
       expect(loadConfig(write(`${FAKE}state_dir: "~"\n`)).state_dir).toBe(homedir());
     });
 
-    test.each(["relative/dir", "$XDG_STATE_HOMEX/skop", "~other/x", "''"])(
+    test.each(["relative/dir", "$XDG_STATE_HOMEX/skope", "~other/x", "''"])(
       "a state_dir that isn't absolute after expansion is E-CONFIG: %s",
       (v) => {
         process.env.XDG_STATE_HOME = "/xs";
@@ -269,13 +269,13 @@ describe("loadConfig (SPEC §9)", () => {
 describe("defaultConfigPath", () => {
   test("honours XDG_CONFIG_HOME", () => {
     process.env.XDG_CONFIG_HOME = "/xdg-config";
-    expect(defaultConfigPath()).toBe("/xdg-config/skop/config.yaml");
+    expect(defaultConfigPath()).toBe("/xdg-config/skope/config.yaml");
   });
 
   test("falls back to ~/.config when XDG_CONFIG_HOME is unset or relative (XDG spec)", () => {
     delete process.env.XDG_CONFIG_HOME;
-    expect(defaultConfigPath()).toBe(join(homedir(), ".config/skop/config.yaml"));
+    expect(defaultConfigPath()).toBe(join(homedir(), ".config/skope/config.yaml"));
     process.env.XDG_CONFIG_HOME = "relative/config";
-    expect(defaultConfigPath()).toBe(join(homedir(), ".config/skop/config.yaml"));
+    expect(defaultConfigPath()).toBe(join(homedir(), ".config/skope/config.yaml"));
   });
 });

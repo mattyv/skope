@@ -1,7 +1,7 @@
 // Process rules (SPEC §4.4): /bin/sh -c, /dev/null stdin (except the
 // pager), the command environment, its own process group,
 // SIGTERM+grace+SIGKILL on timeout, bounded timeouts, output capped at
-// capture time, and stopping every live command when skop is interrupted.
+// capture time, and stopping every live command when skope is interrupted.
 
 import { existsSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -21,7 +21,7 @@ afterEach(async () => {
 
 /** A path the command touches once its traps are set, so a test can wait for it. */
 function marker(name: string): string {
-  dir ??= mkdtempSync(join(tmpdir(), "skop-exec-test-"));
+  dir ??= mkdtempSync(join(tmpdir(), "skope-exec-test-"));
   return join(dir, name);
 }
 
@@ -50,10 +50,10 @@ describe("execCommand (SPEC §4.4)", () => {
     expect(r.stdout).toBe("page me\n");
   });
 
-  test("the environment is exactly the one given, not merged onto skop's own (P2-9)", async () => {
-    const r = await execCommand('echo "[$SKOP_EXEC_TEST_ONLY_GIVEN][$HOME]"', {
+  test("the environment is exactly the one given, not merged onto skope's own (P2-9)", async () => {
+    const r = await execCommand('echo "[$SKOPE_EXEC_TEST_ONLY_GIVEN][$HOME]"', {
       timeoutMs: 2000,
-      env: { SKOP_EXEC_TEST_ONLY_GIVEN: "yes" },
+      env: { SKOPE_EXEC_TEST_ONLY_GIVEN: "yes" },
     });
     expect(r.stdout).toBe("[yes][]\n");
   });
@@ -151,7 +151,7 @@ describe("execCommand (SPEC §4.4)", () => {
     expect(r.truncated).toBe(false);
   });
 
-  test("a pager that exits without reading a large message doesn't crash skop with EPIPE (P1-1)", async () => {
+  test("a pager that exits without reading a large message doesn't crash skope with EPIPE (P1-1)", async () => {
     const errors: unknown[] = [];
     const onError = (e: unknown) => errors.push(e);
     process.on("uncaughtException", onError);
@@ -170,7 +170,7 @@ describe("execCommand (SPEC §4.4)", () => {
 });
 
 describe("commandEnv (SPEC §4.4)", () => {
-  test("is skop's environment minus the backend key variables, plus LC_ALL=C", () => {
+  test("is skope's environment minus the backend key variables, plus LC_ALL=C", () => {
     const e = commandEnv({ PATH: "/bin", TYPESAFE_API_KEY: "k1", OPENROUTER_API_KEY: "k2", KEEP: "1" }, [
       "TYPESAFE_API_KEY",
       "OPENROUTER_API_KEY",
@@ -186,8 +186,8 @@ describe("commandEnv (SPEC §4.4)", () => {
   });
 
   test("a skill command never sees the backend key", async () => {
-    const e = commandEnv({ ...process.env, SKOP_TEST_KEY: "sekrit" }, ["SKOP_TEST_KEY"]);
-    const r = await execCommand('echo "[$SKOP_TEST_KEY]"; env | grep -c SKOP_TEST_KEY', { timeoutMs: 2000, env: e });
+    const e = commandEnv({ ...process.env, SKOPE_TEST_KEY: "sekrit" }, ["SKOPE_TEST_KEY"]);
+    const r = await execCommand('echo "[$SKOPE_TEST_KEY]"; env | grep -c SKOPE_TEST_KEY', { timeoutMs: 2000, env: e });
     expect(r.stdout).toBe("[]\n0\n");
   });
 
@@ -198,7 +198,7 @@ describe("commandEnv (SPEC §4.4)", () => {
   });
 });
 
-describe("stopAll (SPEC §4.4: skop interrupted, P2-13)", () => {
+describe("stopAll (SPEC §4.4: skope interrupted, P2-13)", () => {
   test("tracks live commands and stops them all: SIGTERM, then SIGKILL after the grace period", async () => {
     const [m1, m2] = [marker("polite"), marker("stubborn")];
     const polite = execCommand(`trap 'exit 7' TERM; touch '${m1}'; sleep 30 & wait`, { timeoutMs: 60_000, env });

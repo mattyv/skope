@@ -7,17 +7,17 @@
 // so these cover every sequence of responses.
 //
 // The per-step facts live in Run.dfy (Post) and Lemmas.dfy; the invariant
-// they carry (SkopState.Inv) is what makes them hold for a whole run: the
+// they carry (SkopeState.Inv) is what makes them hold for a whole run: the
 // dry-run flag, the program and the config never change, and the
 // variables stay modelled by B's analysis.
-module SkopProofs {
-  import opened SkopAst
-  import opened SkopStep
-  import opened SkopWellFormed
-  import opened SkopValues
-  import opened SkopState
-  import opened SkopLemmas
-  import opened SkopRun
+module SkopeProofs {
+  import opened SkopeAst
+  import opened SkopeStep
+  import opened SkopeWellFormed
+  import opened SkopeValues
+  import opened SkopeState
+  import opened SkopeLemmas
+  import opened SkopeRun
 
   type Host = (nat, Option<Next>) -> Response
 
@@ -141,7 +141,7 @@ module SkopProofs {
       (forall x | x in ctx :: x in PartVars(q))
       && forall x | x in PartVars(q) ::
            (x in s.vars && s.vars[x].b.origin == FromRunOutput ==> x in ctx && ctx[x] == Show(s.vars[x].b.value))
-           && (x !in s.vars && x in RunNames(s.prog) ==> x in ctx && ctx[x] == SkopState.Unavailable)
+           && (x !in s.vars && x in RunNames(s.prog) ==> x in ctx && ctx[x] == SkopeState.Unavailable)
            && (x in s.vars && s.vars[x].b.origin != FromRunOutput ==> x !in ctx)
            && (x !in s.vars && x !in RunNames(s.prog) ==> x !in ctx)
   {
@@ -246,7 +246,7 @@ module SkopProofs {
     var v := Gate(ids, r.probs, r.unassigned, st.sure);
     assert Answered(s1, st, req, r) == GatePassed(s1, st, req, r, v.chosen, v.conf);
     var e := Ev(s1, AskEv(req.question, req.kind, Some(r.probs), Some(ChosenOf(st.form, ids, v.chosen)), Some(v.conf), st.sure, true, Range(st.form), None, s1.afterWouldDo));
-    assert GatePassed(s1, st, req, r, v.chosen, v.conf) == SkopRun.Then(e, Accept(Log(s1, e), v.chosen));
+    assert GatePassed(s1, st, req, r, v.chosen, v.conf) == SkopeRun.Then(e, Accept(Log(s1, e), v.chosen));
     AcceptAdvance(Log(s1, e), v.chosen);
     assert Log(s1, e) == s.(last := None, askCalls := s.askCalls + 1, log := s.log + [e]);
   }
@@ -282,7 +282,7 @@ module SkopProofs {
     var v := Gate(ids, r.probs, r.unassigned, st.sure);
     assert Answered(s1, st, req, r) == GateMissed(s1, st, req, r, v.chosen, v.conf);
     var e := Ev(s1, AskEv(req.question, req.kind, Some(r.probs), Some(ChosenOf(st.form, ids, v.chosen)), Some(v.conf), st.sure, false, Range(st.form), None, s1.afterWouldDo));
-    assert GateMissed(s1, st, req, r, v.chosen, v.conf) == SkopRun.Then(e, GateMiss(Log(s1, e)));
+    assert GateMissed(s1, st, req, r, v.chosen, v.conf) == SkopeRun.Then(e, GateMiss(Log(s1, e)));
     SkipAdvance(Log(s1, e));
     assert Log(s1, e) == s.(last := None, askCalls := s.askCalls + 1, log := s.log + [e]);
   }

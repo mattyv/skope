@@ -16,8 +16,8 @@ import { fileURLToPath } from "node:url";
 import { afterAll, describe, expect, test } from "vitest";
 
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
-const WORK = mkdtempSync(join(tmpdir(), "skop-sea-test-"));
-const BINARY = join(WORK, "skop-bin");
+const WORK = mkdtempSync(join(tmpdir(), "skope-sea-test-"));
+const BINARY = join(WORK, "skope-bin");
 
 let blocked: string | undefined;
 try {
@@ -37,7 +37,7 @@ afterAll(() => {
 // below needs any other tool on PATH: --version touches nothing external,
 // and the dry-run fake-exec scenario never really executes commands.
 function emptyPath(): string {
-  return mkdtempSync(join(tmpdir(), "skop-sea-path-"));
+  return mkdtempSync(join(tmpdir(), "skope-sea-path-"));
 }
 
 describe.skipIf(blocked !== undefined)("standalone binary (SPEC §5.5)", () => {
@@ -58,7 +58,7 @@ describe.skipIf(blocked !== undefined)("standalone binary (SPEC §5.5)", () => {
   test("runs a fake scenario with its expected exit code, with node removed from PATH", () => {
     const skill = join(ROOT, "fixtures/disk-full/SKILL.md");
     const scenario = join(ROOT, "fixtures/disk-full/fakes/dry-run");
-    const config = mkdtempSync(join(tmpdir(), "skop-sea-config-"));
+    const config = mkdtempSync(join(tmpdir(), "skope-sea-config-"));
     const noNode = emptyPath();
     try {
       const env = {

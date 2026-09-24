@@ -1,6 +1,6 @@
 // The differential check (SPEC §12.4): "For each fake scenario, the
 // concrete trace MUST appear among the explore handler's paths.
-// `skop SKILL.md --verify --trace events.jsonl` checks one: it replays the
+// `skope SKILL.md --verify --trace events.jsonl` checks one: it replays the
 // trace's sequence of (section, line, response class) through the
 // explorer's graph and exits 0 if the explorer can take that path, 40 if
 // it can't. Deadline scenarios are excluded (§5.4)." Stream G: the deadline
@@ -15,11 +15,11 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
-import { runSkop } from "../lib/cli.js";
+import { runSkope } from "../lib/cli.js";
 import { allScenarios } from "../lib/scenarios.js";
 
 function writeTrace(events: object[]): string {
-  const dir = mkdtempSync(join(tmpdir(), "skop-trace-"));
+  const dir = mkdtempSync(join(tmpdir(), "skope-trace-"));
   const path = join(dir, "events.jsonl");
   writeFileSync(
     path,
@@ -35,23 +35,23 @@ describe("differential check: a real run's trace is one --verify's explorer can 
   for (const s of allScenarios().filter((s) => !s.name.startsWith("deadline"))) {
     test(`${s.fixture}/${s.name}: --verify --trace exits 0 on the run's own trace`, async () => {
       const mode = s.name === "dry-run" ? "--dry-run" : "--apply";
-      const run = await runSkop([s.skillPath, mode, "--fake", s.answersPath, "--fake-exec", s.commandsPath]);
+      const run = await runSkope([s.skillPath, mode, "--fake", s.answersPath, "--fake-exec", s.commandsPath]);
       expect(run.events.length).toBeGreaterThan(0);
       const trace = writeTrace(run.events);
 
-      const r = await runSkop([s.skillPath, "--verify", "--trace", trace]);
+      const r = await runSkope([s.skillPath, "--verify", "--trace", trace]);
       expect(r.code).toBe(0);
     });
 
     test(`${s.fixture}/${s.name}: --verify --trace exits 40 on a tampered trace`, async () => {
       const mode = s.name === "dry-run" ? "--dry-run" : "--apply";
-      const run = await runSkop([s.skillPath, mode, "--fake", s.answersPath, "--fake-exec", s.commandsPath]);
+      const run = await runSkope([s.skillPath, mode, "--fake", s.answersPath, "--fake-exec", s.commandsPath]);
       // Tamper with the trace by dropping its outcome event: no explored path ends mid-stream,
       // so the explorer can't have taken this (truncated) sequence.
       const tampered = run.events.filter((e) => (e as { event: string }).event !== "outcome");
       const trace = writeTrace(tampered);
 
-      const r = await runSkop([s.skillPath, "--verify", "--trace", trace]);
+      const r = await runSkope([s.skillPath, "--verify", "--trace", trace]);
       expect(r.code).toBe(40);
     });
   }

@@ -3,7 +3,7 @@
 //
 // Compiled Dafny checks nothing at run time, so this file enforces what
 // Start and Step require: the program lints clean (so it's WellFormed,
-// SkopCheck.LintSound), params and built-ins pass the core's input rules,
+// SkopeCheck.LintSound), params and built-ins pass the core's input rules,
 // each response answers the last request, and nothing steps after Done. It
 // refuses anything it can't hand to the core exactly.
 
@@ -11,7 +11,7 @@ import { toAst } from "./ast.js";
 import { _dafny, BigNumber, gen, Unsupported } from "./core.js";
 import { ANSWERS, type CoreEvent, type Next, type Outcome, REASONS, type Response, type RunConfig, type Val } from "./step.js";
 
-const { SkopAst, SkopStep, SkopState, SkopRun, SkopValues, SkopWellFormed, SkopCheck } = gen;
+const { SkopeAst, SkopeStep, SkopeState, SkopeRun, SkopeValues, SkopeWellFormed, SkopeCheck } = gen;
 type D = any;
 
 const str = (s: unknown, what: string): D => {
@@ -28,8 +28,8 @@ const bool = (b: unknown, what: string): boolean => {
   if (typeof b !== "boolean") throw new Unsupported(`${what} must be true or false, got ${JSON.stringify(b)}`);
   return b;
 };
-const some = (v: D) => SkopAst.Option.create_Some(v);
-const none = () => SkopAst.Option.create_None();
+const some = (v: D) => SkopeAst.Option.create_Some(v);
+const none = () => SkopeAst.Option.create_None();
 const opt = <T>(d: D, f: (x: D) => T): T | null => (d.is_Some ? f(d.dtor_value) : null);
 
 // A finite JS number as the exact rational of its decimal form.
@@ -40,8 +40,8 @@ function real(x: number): D {
 const unreal = (r: D): number => r.num.dividedBy(r.den).toNumber();
 
 function val(v: unknown, what: string): D {
-  if (typeof v === "string") return SkopStep.Val.create_Str(str(v, what));
-  return SkopStep.Val.create_Int(int(v, what));
+  if (typeof v === "string") return SkopeStep.Val.create_Str(str(v, what));
+  return SkopeStep.Val.create_Int(int(v, what));
 }
 const unval = (d: D): Val => (d.is_Str ? unstr(d.dtor_s) : d.dtor_i.toNumber());
 
@@ -55,27 +55,27 @@ function runConfig(cfg: RunConfig): D {
   if (cfg.mode !== "concrete" && cfg.mode !== "explore")
     throw new Unsupported(`mode must be concrete or explore, got ${JSON.stringify(cfg.mode)}`);
   // A dry-run flag that isn't a real boolean must not reach Dafny: `undefined` would run effects (P3).
-  return SkopStep.RunConfig.create_RunConfig(
+  return SkopeStep.RunConfig.create_RunConfig(
     valMap(cfg.params, "params"),
     valMap(cfg.builtins, "builtins"),
     bool(cfg.dry, "dry"),
-    cfg.mode === "concrete" ? SkopStep.Mode.create_Concrete() : SkopStep.Mode.create_Explore(),
+    cfg.mode === "concrete" ? SkopeStep.Mode.create_Concrete() : SkopeStep.Mode.create_Explore(),
   );
 }
 
 /** Params and built-ins that reach a command but fail the safe-value check (the host reports E-PARAM-UNSAFE). */
 export function unsafeInputs(program: unknown, cfg: RunConfig): string[] {
   const p = toAst(program);
-  const cmd = SkopState.__default.CmdNames(p);
+  const cmd = SkopeState.__default.CmdNames(p);
   const bad = (r: Record<string, Val>) =>
     Object.entries(r ?? {})
-      .filter(([k, v]) => cmd.contains(str(k, "name")) && !SkopWellFormed.__default.SafeValue(SkopValues.__default.Show(val(v, k))))
+      .filter(([k, v]) => cmd.contains(str(k, "name")) && !SkopeWellFormed.__default.SafeValue(SkopeValues.__default.Show(val(v, k))))
       .map(([k]) => k);
   return [...bad(cfg.params), ...bad(cfg.builtins)];
 }
 
 function response(r: Response): D {
-  const R = SkopStep.Response;
+  const R = SkopeStep.Response;
   switch (r.kind) {
     case "none":
       return R.create_NoResponse();
@@ -91,14 +91,14 @@ function response(r: Response): D {
       // A non-finite probability has no exact value, and the core would
       // reject the answer as invalid anyway (SPEC §6.1): same outcome.
       if (!nums.every((x) => typeof x === "number" && Number.isFinite(x))) {
-        return R.create_AskFailed(SkopStep.AskFailure.create_Unavailable(), str(r.backend, "backend"));
+        return R.create_AskFailed(SkopeStep.AskFailure.create_Unavailable(), str(r.backend, "backend"));
       }
       let m = _dafny.Map.Empty;
       for (const [k, x] of Object.entries(r.probs)) m = m.update(str(k, "option id"), real(x));
       return R.create_AskAnswer(m, real(r.unassigned), str(r.backend, "backend"), str(r.model, "model"), int(r.ms, "ms", 0));
     }
     case "ask_failed": {
-      const F = SkopStep.AskFailure;
+      const F = SkopeStep.AskFailure;
       if (r.error !== "unavailable" && r.error !== "request_too_large")
         throw new Unsupported(`unknown ask failure ${JSON.stringify(r.error)}`);
       return R.create_AskFailed(r.error === "unavailable" ? F.create_Unavailable() : F.create_RequestTooLarge(), str(r.backend, "backend"));
@@ -236,9 +236,9 @@ export class Interp {
   constructor(program: unknown, cfg: RunConfig) {
     const p = toAst(program);
     const c = runConfig(cfg);
-    const errors = [...SkopCheck.__default.Lint(p)].map((e: D) => `${unstr(e.dtor_code)} at line ${e.dtor_src.toNumber()}`);
+    const errors = [...SkopeCheck.__default.Lint(p)].map((e: D) => `${unstr(e.dtor_code)} at line ${e.dtor_src.toNumber()}`);
     if (errors.length > 0) throw new Unsupported(`the program doesn't lint clean: ${errors.join(", ")}`);
-    if (!SkopState.__default.InputsOk(p, c)) {
+    if (!SkopeState.__default.InputsOk(p, c)) {
       const bad = unsafeInputs(program, cfg);
       throw new Unsupported(
         bad.length > 0
@@ -246,7 +246,7 @@ export class Interp {
           : "params must be exactly the program's, and built-ins exactly host, run_id and skill",
       );
     }
-    this.state = SkopRun.__default.Start(p, c);
+    this.state = SkopeRun.__default.Start(p, c);
   }
 
   step(r: Response): { events: CoreEvent[]; next: Next } {
@@ -259,7 +259,7 @@ export class Interp {
         throw new Error(`picked ${r.i} is out of range for choose(${last.n})`);
       }
     }
-    const res = SkopRun.__default.Step(this.state, response(r));
+    const res = SkopeRun.__default.Step(this.state, response(r));
     this.state = res[0];
     this.last = toNext(res[2]);
     return { events: [...res[1]].map(event), next: this.last };

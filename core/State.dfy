@@ -4,14 +4,14 @@
 // to run, with every `for each` unrolled into its iterations when it's
 // reached. Each task carries, as ghost fields, the static environment
 // stream B's lint analysis assigns to its point in the program
-// (SkopWellFormed.Env). The invariant says the runtime variables are always
+// (SkopeWellFormed.Env). The invariant says the runtime variables are always
 // modelled by the first task's environment, so every name a command needs
 // is bound, and holds a value of an allowed kind (P6, P4).
-module SkopState {
-  import opened SkopAst
-  import opened SkopStep
-  import opened SkopWellFormed
-  import opened SkopValues
+module SkopeState {
+  import opened SkopeAst
+  import opened SkopeStep
+  import opened SkopeWellFormed
+  import opened SkopeValues
 
   // ---- runtime values ----
 

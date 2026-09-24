@@ -3,7 +3,7 @@
 // from the preprocessor's JSON and rejects anything the schema rejects.
 //
 // Phase 0 contract: lint and the interpreter are built on these types.
-module SkopAst {
+module SkopeAst {
   type Src = nat          // 1-based line in SKILL.md
   type SectionId = string // "s:" + slug (SPEC §3.4)
   type Name = string

@@ -13,8 +13,8 @@ import { fileURLToPath } from "node:url";
 import { afterAll, describe, expect, test } from "vitest";
 
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
-const BUNDLE_DIR = mkdtempSync(join(tmpdir(), "skop-bundle-out-"));
-const BUNDLE = join(BUNDLE_DIR, "skop.cjs");
+const BUNDLE_DIR = mkdtempSync(join(tmpdir(), "skope-bundle-out-"));
+const BUNDLE = join(BUNDLE_DIR, "skope.cjs");
 
 execFileSync(process.execPath, [join(ROOT, "scripts/package/bundle.mjs"), "--outfile", BUNDLE], {
   cwd: ROOT,
@@ -31,14 +31,14 @@ afterAll(() => {
 
 describe("bundle (SPEC §5.5)", () => {
   test("runs --version with no node_modules present", () => {
-    const isolated = mkdtempSync(join(tmpdir(), "skop-bundle-run-"));
+    const isolated = mkdtempSync(join(tmpdir(), "skope-bundle-run-"));
     try {
-      const isolatedBundle = join(isolated, "skop.cjs");
+      const isolatedBundle = join(isolated, "skope.cjs");
       cpSync(BUNDLE, isolatedBundle);
       // No node_modules directory exists anywhere above `isolated`; a
       // single-file bundle must not need one.
       const out = execFileSync(process.execPath, [isolatedBundle, "--version"], { cwd: isolated, encoding: "utf8" });
-      expect(out).toMatch(/^skop \d+\.\d+\.\d+ \(build identity [0-9a-f]{64}\)\n$/);
+      expect(out).toMatch(/^skope \d+\.\d+\.\d+ \(build identity [0-9a-f]{64}\)\n$/);
     } finally {
       rmSync(isolated, { recursive: true, force: true });
     }
@@ -54,9 +54,9 @@ describe("bundle (SPEC §5.5)", () => {
   test("lints and dry-runs fixtures/disk-full/SKILL.md matching the npm build", () => {
     const skill = join(ROOT, "fixtures/disk-full/SKILL.md");
     const scenario = join(ROOT, "fixtures/disk-full/fakes/dry-run");
-    const config = mkdtempSync(join(tmpdir(), "skop-bundle-config-"));
+    const config = mkdtempSync(join(tmpdir(), "skope-bundle-config-"));
     try {
-      mkdirSync(join(config, "skop"), { recursive: true });
+      mkdirSync(join(config, "skope"), { recursive: true });
       const env = {
         ...process.env,
         XDG_CONFIG_HOME: join(config, "config"),

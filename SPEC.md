@@ -1,4 +1,4 @@
-# skop (skill op) — Implementation Spec (v1, rev 18)
+# skope (skill op) — Implementation Spec (v1, rev 18)
 
 Audience: an engineer or LLM implementing this from scratch. Everything
 marked **MUST** is normative. Where this spec says "verify against current
@@ -12,7 +12,7 @@ v1.1: build them after milestones M1–M6 (§12.3).
 
 ## 1. What we're building
 
-`skop` executes **dual-use skills**: Markdown files that are readable as
+`skope` executes **dual-use skills**: Markdown files that are readable as
 normal agent skills (a big LLM can read and follow them) *and* executable by a
 small deterministic runtime.
 
@@ -21,7 +21,7 @@ small deterministic runtime.
   general model through **OpenRouter** (§6.2).
 - When the runtime is unsure (a confidence gate fails) or something
   unexpected happens, it **hands off**: it writes a record of what already
-  happened and exits. Whoever called skop (a person, a script, or an agent)
+  happened and exits. Whoever called skope (a person, a script, or an agent)
   takes it from there.
 - Agents never edit skills directly. They propose changes as diffs for a
   human to review.
@@ -38,11 +38,11 @@ Node.
   writes commands, and model output never reaches a shell.
 - Every skill is statically checkable: all paths terminate, all branches
   exist, worst-case cost is known before running.
-- Dry run never runs `do` commands and never pages. Skop can't prove that
+- Dry run never runs `do` commands and never pages. Skope can't prove that
   `run` and `check` commands are read-only, so authors must keep them that
   way (§11).
 - Lightweight: one CLI, logs to stdout.
-- Explicit: every run names its mode, `--apply` or `--dry-run`. Skop never
+- Explicit: every run names its mode, `--apply` or `--dry-run`. Skope never
   guesses from how it was started.
 
 ### 1.2 Non-goals (v1)
@@ -50,10 +50,10 @@ Node.
   unbounded loops, no recursion).
 - Answer and resume (v1.1). Today a handoff ends the run, so whoever picks
   it up owns the whole rest of the incident. In v1.1, when a run stops at an
-  `ask`, a person or agent picks one of the author's options, and skop
+  `ask`, a person or agent picks one of the author's options, and skope
   continues from that point. The answer goes through the same validation as
-  any backend's answer (P5), so the rest of the run keeps skop's checks. It needs
-  skop to save and restore a run's state mid-run.
+  any backend's answer (P5), so the rest of the run keeps skope's checks. It needs
+  skope to save and restore a run's state mid-run.
 - `guarantees:` block for custom effect properties (v1.1).
 - MCP server (v1.1; the CLI contract below is designed to be wrapped).
 - Multi-select and numeric answers. Use a `for each` of `yes | no` asks
@@ -72,7 +72,7 @@ flowchart TD
   md["SKILL.md"] --> pre["preprocess (TS)"]
   pre --> json["core program (JSON)<br/>+ source map"]
   json --> core["core (Dafny → JS)<br/>lint + interpreter"]
-  subgraph skop["skop wrapper (TS): logs, lock, config, deadline, handoff"]
+  subgraph skope["skope wrapper (TS): logs, lock, config, deadline, handoff"]
     loop["host loop"]
   end
   core <-->|"state, response ⇄<br/>state, events, request"| loop
@@ -89,8 +89,8 @@ that answers its requests changes.
 | `preprocess` | TypeScript | Parse Markdown (CommonMark AST), enforce the surface grammar, emit core JSON + source map. No semantic checks. |
 | `core` | Dafny → JS | Core AST types, semantic lint, interpreter step function, proofs |
 | `host` | TypeScript | The three request handlers and the loop that drives the core |
-| `skop-ask` | TypeScript | CLI: one question in, probabilities out. Backends: `jev`, `openrouter`, `fake` |
-| `skop` | TypeScript | CLI wrapper: preprocess, lint, lock, drive the host loop, stream logs, enforce budgets, handoff |
+| `skope-ask` | TypeScript | CLI: one question in, probabilities out. Backends: `jev`, `openrouter`, `fake` |
+| `skope` | TypeScript | CLI wrapper: preprocess, lint, lock, drive the host loop, stream logs, enforce budgets, handoff |
 
 ---
 
@@ -99,7 +99,7 @@ that answers its requests changes.
 ### 3.1 File layout
 A skill is a Markdown file, conventionally `<name>/SKILL.md`. It MUST start
 with YAML frontmatter. A file is runnable if and only if the frontmatter has
-`format: 1`. Files without it are plain agent skills and `skop` MUST
+`format: 1`. Files without it are plain agent skills and `skope` MUST
 refuse them with a clear error.
 
 ```yaml
@@ -203,7 +203,7 @@ Rules:
    anywhere rule 1 doesn't cover is `E-MISPLACED`, never prose. That
    includes before the first section, inside a blockquote (at any depth),
    in a list nested under a prose, option, rubric or data item, and in a
-   data section. Skop must never quietly skip something that looks like an
+   data section. Skope must never quietly skip something that looks like an
    instruction.
 8. **What counts as a list item** is what CommonMark renders as one:
    `-`, `*`, `+`, `1.` and `1)` markers, tab or space indentation, CRLF or
@@ -524,7 +524,7 @@ tells whoever picks up the record what to do (§8).
 - Run with `/bin/sh -c` (author-written text; interpolated values passed the
   safe-value check).
 - stdin is `/dev/null`, except for the pager, which gets its message on
-  stdin. The environment is skop's own, minus the backend key variables
+  stdin. The environment is skope's own, minus the backend key variables
   (`jev.key_env`, `openrouter.key_env`), plus `LC_ALL=C` so output is
   parseable. Skill commands never see the backend's key, and the key's
   value is also redacted like any secret (§9).
@@ -536,7 +536,7 @@ tells whoever picks up the record what to do (§8).
 - Timeouts are implemented by the host in Node, not with `timeout(1)`.
   Every timeout, from a skill or config, is 1 ms to 2³¹−1 ms (about 24
   days); anything else is `E-FRONTMATTER` or `E-CONFIG`.
-- **If skop itself is interrupted** (SIGINT or SIGTERM) while a command
+- **If skope itself is interrupted** (SIGINT or SIGTERM) while a command
   runs, it sends that command's group `SIGTERM`, waits the grace period,
   sends `SIGKILL`, releases the lock, and ends with outcome `error`,
   `E-INTERRUPTED`, exit 50. A `do` interrupted this way has effect status
@@ -552,9 +552,9 @@ silently never paging.
   outcome is still `paged` (exit 10) so callers see what would have happened.
 - handoff: same as a real run (§8), except the handoff page is logged as
   `would_page` instead of sent.
-- Skop never invokes the pager in dry run, whatever the reason: `page`,
+- Skope never invokes the pager in dry run, whatever the reason: `page`,
   handoff (§8) or a stale lock (§7).
-- `run` and `check` commands and backend calls run normally. Skop can't tell
+- `run` and `check` commands and backend calls run normally. Skope can't tell
   whether a command changes anything. Anything that might, including a
   tool's own "dry run" mode that runs hooks or reloads services, belongs in
   `do`.
@@ -572,9 +572,9 @@ silently never paging.
 
 ### 4.7 Question forms and patterns
 Backends answer three kinds of question, which match Jev's three types.
-Skop's four `ask` forms each use one of them:
+Skope's four `ask` forms each use one of them:
 
-| Skop form | Kind (§6.1) | Jev type | Result |
+| Skope form | Kind (§6.1) | Jev type | Result |
 |---|---|---|---|
 | `ask …` with a list of `[Section]` options | `choice` | Choice | transfers to the chosen section |
 | `→ one of [List] as x` | `choice` | Choice | binds the chosen item to `x` |
@@ -593,7 +593,7 @@ instructions. None of them needs new syntax:
 | A number | Measure it with `run`, then compare with `check`. The model never estimates numbers. | disk-full's usage checks |
 | "None of these fit" | An escape option, such as a section that hands off | Investigate in both examples |
 
-Skop has no arithmetic, so it can't count or add up answers. If a decision
+Skope has no arithmetic, so it can't count or add up answers. If a decision
 depends on a count, measure the count with a `run` command.
 
 **Writing questions.** These rules come from Jev's documentation, and
@@ -687,7 +687,7 @@ Next = Exec(cmd, kind: run | do | check, timeoutMs)
 
 ```mermaid
 sequenceDiagram
-  participant S as skop (host loop)
+  participant S as skope (host loop)
   participant C as core (Dafny)
   participant H as handler
   S->>C: Start(prog, runConfig)
@@ -729,7 +729,7 @@ CI runs `dafny verify` and fails on any unproven obligation.
 - **P2 One outcome.** `Done` is returned exactly once. `Step` after `Done` is
   not allowed (precondition).
 - **P3 Dry run.** If dry run is set, `Step` never returns `Exec` with kind
-  `do`, and never returns `Page`. P3 covers only what skop runs. It says
+  `do`, and never returns `Page`. P3 covers only what skope runs. It says
   nothing about what a `run` or `check` command does.
 - **P4 Taint.** Every `Exec` command string is a concatenation of author
   literals and trusted values that passed the safe-value check. Every backend
@@ -749,7 +749,7 @@ Shipped Dafny code MUST NOT contain `assume`, `{:axiom}` or
 `{:verify false}`. CI greps for them.
 
 ### 5.4 Handlers (TypeScript)
-- **real**: commands per §4.4, `skop-ask` (§6), the configured pager.
+- **real**: commands per §4.4, `skope-ask` (§6), the configured pager.
 - **fake**: `--fake` answers backend questions from a file (§6.2). `--fake-exec` answers
   commands from a file keyed by command text (after interpolation) or
   source-map id; value is `{exit, stdout, stderr, timed_out}`. An unmatched
@@ -785,9 +785,9 @@ Shipped Dafny code MUST NOT contain `assume`, `{:axiom}` or
   the generated code.
 - Ship three ways, all built from the same commit and stamped with the same
   build identity (§7.2):
-  - **Standalone binaries**, the default. skop runs on the machine that's
+  - **Standalone binaries**, the default. skope runs on the machine that's
     having the incident, which may not have Node. Each release has one
-    self-contained executable per platform: `skop-<version>-linux-x64`,
+    self-contained executable per platform: `skope-<version>-linux-x64`,
     `-linux-arm64` and `-darwin-arm64`, built as Node single executable
     applications, plus a `SHA256SUMS` file. The Linux binaries need glibc
     2.28 or newer; musl systems such as Alpine use the container.
@@ -803,20 +803,20 @@ Shipped Dafny code MUST NOT contain `assume`, `{:axiom}` or
     no binary for it;
   - download the binary and `SHA256SUMS` from the same release, check the
     binary's sha256 against it, and install nothing on a mismatch;
-  - install to `$SKOP_INSTALL_DIR`, default `~/.local/bin`, never use
+  - install to `$SKOPE_INSTALL_DIR`, default `~/.local/bin`, never use
     `sudo` itself, and say how to add the directory to `PATH` if it isn't
     there;
-  - install `$SKOP_VERSION` if set, otherwise the latest release;
-  - download from `$SKOP_DOWNLOAD_URL` if set, for mirrors and tests;
-  - finish by running `skop --version`.
+  - install `$SKOPE_VERSION` if set, otherwise the latest release;
+  - download from `$SKOPE_DOWNLOAD_URL` if set, for mirrors and tests;
+  - finish by running `skope --version`.
 
   The checksum catches a corrupt or truncated download, not a compromised
   release. Each release also carries GitHub build-provenance attestations,
   so `gh attestation verify` can check a binary came from this repo's
   release workflow.
 
-### 5.6 Verify report (`skop --verify`)
-From the explore handler, report the skop release version and build
+### 5.6 Verify report (`skope --verify`)
+From the explore handler, report the skope release version and build
 identity (§7.2), then:
 - total abstract paths; outcomes reachable (`stopped` / `paged` / `handoff`,
   with reasons)
@@ -831,13 +831,13 @@ identity (§7.2), then:
 
 ---
 
-## 6. `skop-ask` helper
+## 6. `skope-ask` helper
 
 ### 6.1 Contract
 ~~~
-skop-ask --request /path/req.json   # prints one JSON object to stdout
+skope-ask --request /path/req.json   # prints one JSON object to stdout
 ~~~
-skop itself calls the same code in-process, with the same inputs and
+skope itself calls the same code in-process, with the same inputs and
 validation, so the backend key never reaches a child process. The
 command exists for testing backends by hand.
 Request:
@@ -891,7 +891,7 @@ Exactly one backend is used per run.
 - supports `choice`, `yesno` and `score`;
 - reports `backend` and `model` with every answer, for the logs;
 - follows the shared timeout and retry rules below;
-- declares its limits. Before the run starts, skop checks the skill against
+- declares its limits. Before the run starts, skope checks the skill against
   the configured backend's limits. Anything over is `E-BACKEND-LIMIT`,
   exit 40. A backend can only lower the language's maximums:
 
@@ -944,7 +944,7 @@ fail again (§6.3).
                    "Page":"Nothing here is safe to try automatically. Tell a human.",
                    "Investigate":"Nothing in the lists fits. Work out what's filling the disk from the errors and sizes gathered in Triage. Don't run anything outside Cleanups or Services without asking a human first."}}}}
     ```
-    Response, from which `skop-ask` maps "Clean up" back to `s:clean_up`:
+    Response, from which `skope-ask` maps "Clean up" back to `s:clean_up`:
     ```json
     {"model":"jev-1.13.0",
      "answers":{"q":{"type":"choice","choice":"Clean up","confidence":0.76,
@@ -952,9 +952,9 @@ fail again (§6.3).
      "usage":{"input_tokens":1180,"output_tokens":30}}
     ```
   - **Option names are shown to the model**, so Jev's Choice keys are the
-    option labels, not skop's internal ids. A section option's key is its
+    option labels, not skope's internal ids. A section option's key is its
     display name ("Clean up") and a `one of` option's key is the item text.
-    `skop-ask` maps the keys back to ids before the core validates them.
+    `skope-ask` maps the keys back to ids before the core validates them.
     Labels are unique (§3.2, §3.6), so the mapping is exact.
   - `choice` → Jev *Choice*, with `criteria` = label → description (or
     null). `yesno` → Jev *Noul*, a 0–1 "is this yes?" probability; derive
@@ -964,12 +964,12 @@ fail again (§6.3).
     release, which silently shifts every tuned `sure`. An alias gets warning
     `W-MODEL-ALIAS` on every run, and so does a response whose `model`
     differs from the one configured.
-  - **SDK.** `skop-ask` MAY use TypeSafe's JavaScript SDK
-    (`@typesafe-ai/sdk`), with its own retries turned off so skop's time
+  - **SDK.** `skope-ask` MAY use TypeSafe's JavaScript SDK
+    (`@typesafe-ai/sdk`), with its own retries turned off so skope's time
     budget stays exact.
   - Map `score` → Jev *Score*. Send the rubric as Jev's `criteria` array,
     lowest level first. Jev numbers levels by array position from 0, so Jev
-    level `i` is skop level `LOW + i`. `skop-ask` converts the ids before the
+    level `i` is skope level `LOW + i`. `skope-ask` converts the ids before the
     core validates them.
   - Require Jev's full `probabilities` object; if any level is missing, the
     response is invalid. Never fill in missing probabilities. The gate uses
@@ -981,7 +981,7 @@ fail again (§6.3).
     statement of how sure it is isn't evidence. Never ask for one, and never
     use one.
   - **Prompt.** Label the options with single letters `A`, `B`, `C`, … in
-    order. The prompt, a fixed template shipped with skop, gives the
+    order. The prompt, a fixed template shipped with skope, gives the
     question, guidance and context. For each option it gives the letter,
     the option's **label**, and its description if it has one. It then asks
     for the letter alone. `one of` options have no description, so the
@@ -1023,7 +1023,7 @@ fail again (§6.3).
 - **`fake`**: reads `--fake answers.yaml`, keyed by question text (after
   interpolation) or by source-map id; value is a probs object or the literal
   `unsure`. Score probabilities are keyed by level id. Used by tests and
-  `skop --fake`.
+  `skope --fake`.
 
 ### 6.3 Context
 - Context = exactly the names in the question whose current value came
@@ -1040,7 +1040,7 @@ fail again (§6.3).
   at the end). This is an estimate, so it can't promise the full request
   fits (§6.2).
 - If the backend rejects a request as too large for the model's input
-  limit, `skop-ask` reports the backend as unavailable, and the run hands
+  limit, `skope-ask` reports the backend as unavailable, and the run hands
   off with reason `ask_unavailable` and detail `request_too_large`. It
   doesn't retry. Exact token counting can come later.
 - Every request, after redaction, is written to the run directory as
@@ -1049,10 +1049,10 @@ fail again (§6.3).
 
 ---
 
-## 7. `skop` CLI
+## 7. `skope` CLI
 
 ~~~
-skop <path/to/SKILL.md> [options]
+skope <path/to/SKILL.md> [options]
   --apply                 execute `do` commands and invoke the pager
   --dry-run               don't (§4.5); a run needs exactly one of these two
   --no-page               with --apply: don't page on handoff (§8)
@@ -1064,7 +1064,7 @@ skop <path/to/SKILL.md> [options]
   --lint                  parse + static checks only
   --fake answers.yaml     use the fake backend
   --fake-exec cmds.yaml   use the fake command handler; no real command runs
-  --config path           default: $XDG_CONFIG_HOME/skop/config.yaml
+  --config path           default: $XDG_CONFIG_HOME/skope/config.yaml
   --version               print the release version and build identity (§7.2)
   --help                  print these options to stdout and exit 0
 ~~~
@@ -1078,9 +1078,9 @@ Responsibilities, in order:
 2. Validate params and built-ins: types, and the safe-value check for any
    value that reaches a `CMD`. On failure, exit 40. This applies whoever the
    caller is, agents included.
-3. Acquire the lock at `$XDG_RUNTIME_DIR/skop/<name>.lock`. Without
+3. Acquire the lock at `$XDG_RUNTIME_DIR/skope/<name>.lock`. Without
    `XDG_RUNTIME_DIR`, as under a systemd system unit, use a per-user
-   directory `<OS temp dir>/skop-<uid>`, created with mode 0700; skop
+   directory `<OS temp dir>/skope-<uid>`, created with mode 0700; skope
    refuses it (`E-IO`) unless it's a real directory, not a symlink, owned
    by this user and not writable by anyone else. No native modules.
    - Create it atomically (write a temporary file, then hard-link it into
@@ -1197,8 +1197,8 @@ and have no codes.
 | `E-BACKEND-MODEL` | args | the `openrouter` model doesn't support logprobs, or its reasoning can't be turned off (§6.2) | |
 | `E-BACKEND-LIMIT` | args | the skill exceeds the configured backend's limits: options, Score levels or context (§6.2) | 21 options on `openrouter`; `ask_context: 40k tokens` on `jev` |
 | `E-FAKE-UNMATCHED` | runtime | `--fake-exec` has no answer for a command, or `--fake` has none for a question (§5.4) | |
-| `E-IO` | runtime | skop can't write its run directory or lock file | |
-| `E-INTERRUPTED` | runtime | skop was interrupted (SIGINT or SIGTERM); it stopped the running command and released the lock (§4.4) | Ctrl-C during a `do` |
+| `E-IO` | runtime | skope can't write its run directory or lock file | |
+| `E-INTERRUPTED` | runtime | skope was interrupted (SIGINT or SIGTERM); it stopped the running command and released the lock (§4.4) | Ctrl-C during a `do` |
 | `E-INTERNAL` | runtime | a runner bug. Unreachable by P6, so always a bug report | |
 
 Warnings don't stop a run:
@@ -1218,7 +1218,7 @@ Parse codes come from the preprocessor. Lint codes come from the Dafny core,
 so `LintError` carries the code. The rest come from the TypeScript host.
 
 ### 7.2 Version and build identity
-Skop has two numbers, because they answer different questions. The scheme
+Skope has two numbers, because they answer different questions. The scheme
 is copied from ply, which learned it the hard way: fourteen fixes shipped
 under one unchanged version string, and results from the broken build kept
 being trusted.
@@ -1226,11 +1226,11 @@ being trusted.
 - **Release version**: the semver `version` in `package.json`, edited by
   hand. It says which release this is. A release tag MUST match it (`v` +
   version).
-- **Build identity**: a sha256 over the source that decides what skop does,
+- **Build identity**: a sha256 over the source that decides what skope does,
   computed at build time by `scripts/build-id.mjs`. The inputs are every
   file under `src/`, `core/` and `contracts/`, plus `package.json`,
   `package-lock.json`, `.dafny-version` and the script itself. It answers
-  "is this the same skop?" A comment-only edit changes it too. That errs
+  "is this the same skope?" A comment-only edit changes it too. That errs
   towards treating results as stale, which is the safe direction.
 
 Rules:
@@ -1239,11 +1239,11 @@ Rules:
 - There's no fallback. If any input can't be read, or the version isn't
   semver, the build fails. A build that doesn't know its identity must not
   produce a package.
-- `skop --version` prints `skop 0.1.0 (build identity <sha256>)`.
-- Everything that records which skop produced it stamps **both** numbers,
+- `skope --version` prints `skope 0.1.0 (build identity <sha256>)`.
+- Everything that records which skope produced it stamps **both** numbers,
   from one shared constant: the `run_start` event, the handoff record, the
   verify report, and recorded backend fixtures. Anything that asks "was this
-  made by the skop I have?" compares the build identity, never the release
+  made by the skope I have?" compares the build identity, never the release
   version. Golden files are the exception: they ignore both numbers, since
   the build identity changes on every source edit (§12.3).
 
@@ -1251,34 +1251,34 @@ Rules:
 
 ## 8. Handoff
 
-Skop never launches an agent in v1. On handoff it writes the record to
+Skope never launches an agent in v1. On handoff it writes the record to
 `<run dir>/handoff.json` and prints the record as a `handoff_record`
 event. The events end `handoff_record`, then `handoff_page` if it pages,
 then `outcome`: `outcome` is always the last event.
 
 When nobody is watching, nobody would pick that record up. A systemd timer or
-an alert webhook just sees exit 20. So with `--apply`, skop also pages a
+an alert webhook just sees exit 20. So with `--apply`, skope also pages a
 human on handoff, unless one of these says not to:
 
 | Opt-out | Who uses it |
 |---|---|
 | `--no-page` | a person at a terminal who's reading the output |
-| `SKOP_CALLER=agent` in the environment | an agent that handles the record itself |
+| `SKOPE_CALLER=agent` in the environment | an agent that handles the record itself |
 | `on_handoff: none` in config (§9) | a caller that handles exit 20 itself |
 
-Skop decides from these flags and settings only, never from whether it has
+Skope decides from these flags and settings only, never from whether it has
 a terminal.
 
-- An agent that runs skop SHOULD set `SKOP_CALLER=agent`.
-- The handoff page says: `{host}: skop {skill} handed off ({reason}) in
+- An agent that runs skope SHOULD set `SKOPE_CALLER=agent`.
+- The handoff page says: `{host}: skope {skill} handed off ({reason}) in
   {section}. Record: {path}`. Only `{section}`, which the author wrote, is
-  escaped like page text; the host and record path are skop's own and stay
+  escaped like page text; the host and record path are skope's own and stay
   exactly as they are, so they can be copied.
 - A pager failure is logged and doesn't change the outcome. The outcome
   stays `handoff`, exit 20.
 - In dry run the page is logged as `would_page` (§4.5).
 
-Then skop exits 20.
+Then skope exits 20.
 
 ### 8.1 Handoff record
 ```json
@@ -1291,7 +1291,7 @@ Then skop exits 20.
  "effects":[{"cmd":"journalctl --vacuum-size=500M","status":"done"},
             {"cmd":"docker image prune -af","status":"unknown"}],
  "dry_run":true,
- "skop":{"version":"0.1.0","build":"1bfd…"},
+ "skope":{"version":"0.1.0","build":"1bfd…"},
  "preamble":"You are taking over a run of a runnable skill. …"}
 ```
 - `detail` depends on the reason: for `gate_failed` and `ask_unavailable`,
@@ -1328,7 +1328,7 @@ Put it in every record verbatim. Don't store it in skills.
 
 ## 9. Config
 
-`$XDG_CONFIG_HOME/skop/config.yaml`. Skills never contain provider
+`$XDG_CONFIG_HOME/skope/config.yaml`. Skills never contain provider
 details or secrets.
 
 ```yaml
@@ -1351,7 +1351,7 @@ redact:
   patterns:
     - 'myco-[0-9a-f]{32}'
 on_handoff: page          # page | none (§8)
-state_dir: $XDG_STATE_HOME/skop   # run directories (§10.1)
+state_dir: $XDG_STATE_HOME/skope   # run directories (§10.1)
 ```
 
 **Built-in redaction patterns** (on unless `redact.defaults: false`, which
@@ -1368,7 +1368,7 @@ logs warning `W-REDACT-OFF` on every run):
 - credentials in URLs: `://[^/\s:@]+:[^/\s@]+@`
 
 Each match is replaced by `[REDACTED]`. Patterns MUST run in linear time on hostile input (anyone who can write a
-log line can write to skop's input, §11), and a test redacts 1 MiB of
+log line can write to skope's input, §11), and a test redacts 1 MiB of
 each pattern's worst case within a time bound. Redaction runs on the
 whole captured text before anything is cut from it: a tail cut from
 unredacted text could start mid-secret. When the 1 MiB capture cap cut the
@@ -1400,7 +1400,7 @@ expands a leading `$XDG_STATE_HOME` or `~`, and must then be absolute.
 
 | `event` | Extra fields |
 |---|---|
-| `run_start` | `params`, `dry_run`, `caller`, `run_dir`, `skop_version`, `skop_build` (§7.2) |
+| `run_start` | `params`, `dry_run`, `caller`, `run_dir`, `skope_version`, `skope_build` (§7.2) |
 | `run` / `check_cmd` | `cmd`, `exit`, `ms`, `timed_out`, `truncated`, `stdout_hash` (of the redacted output, so a log can't be used to test guesses of a secret), `stdout_tail` (redacted, ≤2KB), `after_would_do` |
 | `check` | `expr`, `left`, `right`, `result`, `after_would_do`. `expr` is rendered from the core program: operands as `{name}` or the number, e.g. `{used} < {threshold}` (a decorative `%` is gone by then) |
 | `ask` | `probs` keyed by option id only; unassigned probability stays in the request file. `question` (as sent, §3.5: trusted values pasted in, `run` outputs named in backticks), `kind`, `probs`, `chosen`, `confidence`, `sure`, `passed`, `backend`, `model`, `ms`, `request_path`, `request_sha256`, `after_would_do`; for `score`, `range`, and `chosen` is an integer. If the backend failed, `probs`, `chosen` and `confidence` are `null` and `detail` is `unavailable` or `request_too_large` |
@@ -1429,29 +1429,29 @@ expands a leading `$XDG_STATE_HOME` or `~`, and must then be absolute.
    overrides from any caller.
 3. Every run names its mode; there's no default (§7).
    `do` and `page` only happen with `--apply` (P3).
-4. `run` and `check` commands SHOULD be read-only. Skop can't check this, so
+4. `run` and `check` commands SHOULD be read-only. Skope can't check this, so
    it's a review rule. Anything that might change the system, including a
    tool's own dry-run mode, goes in `do`.
 5. Safety rules belong in commands, not just prose. The runtime never reads
    prose. (Appendix B's "never issue a new key" is enforced by
    `--reuse-key`.)
-6. Skop never launches an agent. The handoff record marks machine output as
+6. Skope never launches an agent. The handoff record marks machine output as
    data.
 7. Redact before sending anything to the backend, and before logging. Built-in patterns are on by
    default.
 8. Page text is escaped. A pager failure never blocks the outcome.
    C0 and C1 control characters other than newline and tab are removed
-   from page text and from everything skop writes to stderr, so command
+   from page text and from everything skope writes to stderr, so command
    output can't drive a terminal.
 9. Backend probabilities are measured, never self-reported: Jev's own
    distribution, or token logprobs from OpenRouter.
 10. If the backend is down or answers badly, the result is a handoff, never "act
    anyway".
 11. A handoff under `--apply` pages a human unless explicitly told not to
-    (§8). Skop never guesses from how it was started.
+    (§8). Skope never guesses from how it was started.
 12. Command output can steer which option the model picks. Jev's docs say
     it doesn't treat its input as hostile, and anyone who can write a log
-    line can write to skop's context. The model still only chooses among
+    line can write to skope's context. The model still only chooses among
     the author's options, and command output never enters the question
     (§3.5). Authors SHOULD still put destructive options behind a `check` on
     a measured value, or a per-item `yes | no` with a high `sure`, rather
@@ -1562,7 +1562,7 @@ file paths.
   JSONL. Dry run issues no `do` and no page. A golden ignores the fields
   that change from run to run or from build to build: `ts`, `ms`,
   `run_id`, `host`, `skill_hash`, `run_dir`, `request_path`,
-  `request_sha256`, `path`, `file`, `skop_version` and `skop_build`.
+  `request_sha256`, `path`, `file`, `skope_version` and `skope_build`.
 - **M4 Real backends + runner features**: both `jev` and `openrouter`
   against recorded responses. For `jev` that covers option labels (not
   ids) as Choice keys, mapped back to ids; context holding only the named
@@ -1580,7 +1580,7 @@ file paths.
   exit codes, config.
 - **M5 Handoff**: record written and printed with the preamble; no agent
   launched. A handoff under `--apply` pages; `--no-page`,
-  `SKOP_CALLER=agent` and `on_handoff: none` each stop it; dry run logs
+  `SKOPE_CALLER=agent` and `on_handoff: none` each stop it; dry run logs
   `would_page`. The result doesn't depend on whether a terminal is attached.
 - **M6 Packaging**: binaries, installer, npm package and container image,
   with the identity and installer tests below passing. The fake-backed
@@ -1592,7 +1592,7 @@ file paths.
   fakes for each level, unsure, and backend unavailable.
 
 Identity tests (§7.2), in M6:
-- `skop --version` prints the release version and build identity.
+- `skope --version` prints the release version and build identity.
 - The `run_start` event, handoff record and verify report all carry the
   same build identity `--version` prints. One test sweeps them all, so a
   new place that stamps a version can't use a different constant.
@@ -1602,22 +1602,22 @@ Identity tests (§7.2), in M6:
 - The release workflow refuses a tag that doesn't match `package.json`.
 
 Installer tests (§5.5), in M6, against a local download server via
-`SKOP_DOWNLOAD_URL`:
+`SKOPE_DOWNLOAD_URL`:
 - It installs the binary for the machine's platform into
-  `SKOP_INSTALL_DIR`, and the installed `skop --version` prints the same
+  `SKOPE_INSTALL_DIR`, and the installed `skope --version` prints the same
   version and build identity as the npm package from the same commit.
 - A binary whose sha256 doesn't match `SHA256SUMS` fails the install and
   leaves nothing installed. So does a missing `SHA256SUMS`.
-- `SKOP_VERSION` picks the version; an unknown platform exits non-zero and
+- `SKOPE_VERSION` picks the version; an unknown platform exits non-zero and
   names it.
 
 ### 12.4 Differential check (optional but cheap)
 For each fake scenario, the concrete trace MUST appear among the explore
-handler's paths. `skop SKILL.md --verify --trace events.jsonl` checks one:
+handler's paths. `skope SKILL.md --verify --trace events.jsonl` checks one:
 it replays the trace's sequence of (section, line, response class) through
 the explorer's graph and exits 0 if the explorer can take that path, 40
 if it can't. Either way it prints one JSON line on stdout,
-`{"skop_version","skop_build","trace_fits":true}`, or with `false` and a
+`{"skope_version","skope_build","trace_fits":true}`, or with `false` and a
 `mismatch`: the first of the trace's core events no explored path takes,
 as `{index, event, section, line, class}` (`class` is the response class;
 all but `index` are `null` when the trace ends where every path goes on),
@@ -1901,14 +1901,14 @@ proposals directory, and the LLM fallback. Those lines are kept as history.
 
 - **Certbot's dry run moved to `do`.** It runs hooks and can reload the
   server, so it isn't a read. The dry-run guarantee now says it only covers
-  what skop runs.
+  what skope runs.
 - **Key rule enforced.** The renewal passes `--reuse-key`. Safety rules go in
   commands, not just prose.
 - **Unreachable-code rule fixed.** A false `check … → stop` carries on, so
   what follows is reachable. Rev 2 wrongly rejected both examples.
 - **Jev answers validated.** Exactly the offered options, each between 0
   and 1, summing to 1. Ties fail the gate. Proven as P5.
-- **Stale locks refused.** No takeover, since two runs could race. Skop
+- **Stale locks refused.** No takeover, since two runs could race. Skope
   pages a human and exits 31. Only the owner deletes its lock.
 - **Explorer fixed.** Non-numeric output is a third branch, and known values
   are part of the state, so no real path is missed.
@@ -1916,7 +1916,7 @@ proposals directory, and the LLM fallback. Those lines are kept as history.
   never killing a command midway. Jev and the pager have their own timeouts.
 - **Cut: LLM fallback.** It cost money and couldn't pass a gate. Jev down
   now means handoff.
-- **Cut: agent launching.** Skop writes the record, with the preamble, and
+- **Cut: agent launching.** Skope writes the record, with the preamble, and
   exits. The caller continues.
 - **Cut: the "this question should be a check" warning.** It was guesswork.
 
@@ -1939,7 +1939,7 @@ proposals directory, and the LLM fallback. Those lines are kept as history.
 - **Unattended handoffs page a human.** `on_handoff` defaults to paging when
   stdin isn't a terminal and the caller isn't an agent (§8). Before, a timer's
   handoff went nowhere.
-- **Unattended runs must pick a mode.** Without a terminal, skop needs
+- **Unattended runs must pick a mode.** Without a terminal, skope needs
   `--apply` or `--dry-run`, or it exits 40. A timer that forgot `--apply`
   used to run fine and never page.
 - **`stop` instruction added.** A section can now just finish.
@@ -1954,11 +1954,11 @@ proposals directory, and the LLM fallback. Those lines are kept as history.
 
 Rev 5 guessed whether a run was unattended from whether stdin was a
 terminal. That misfires for piped input, `ssh` commands and agents, and
-makes behaviour depend on how skop was started. Rev 6 drops the guess:
+makes behaviour depend on how skope was started. Rev 6 drops the guess:
 - **Every run names its mode.** `--apply` or `--dry-run` is required; there's
   no default.
 - **`--apply` pages on handoff.** Opt out with `--no-page`,
-  `SKOP_CALLER=agent`, or `on_handoff: none`.
+  `SKOPE_CALLER=agent`, or `on_handoff: none`.
 
 Also from a review of rev 5:
 - **Pager gets its message on stdin.** §4.4 said every command gets
@@ -1968,7 +1968,7 @@ Also from a review of rev 5:
   scoped out of exploration and the differential check.
 - **Score never invents probabilities.** Jev returns one for every level;
   anything missing is invalid.
-- **Score levels mapped.** Jev level `i` is skop level `LOW + i`.
+- **Score levels mapped.** Jev level `i` is skope level `LOW + i`.
 - **Score rubric required** for every level, since Jev's model sees only
   the descriptions.
 
@@ -2023,7 +2023,7 @@ Also, where things live in the Markdown:
 ### Rev 11 (checked against Jev's docs)
 
 - **Option labels are Jev's keys.** Jev shows option names to the model, so
-  skop sends "Clean up", not `s:clean_up`, and maps back. List items must be
+  skope sends "Clean up", not `s:clean_up`, and maps back. List items must be
   unique (`E-LIST-DUP`).
 - **Context is only what the question names.** Trusted values are pasted
   into the question; `run` outputs are named in backticks and sent as
@@ -2062,20 +2062,20 @@ Also, where things live in the Markdown:
 
 ### Rev 14 (backend-neutral wording and a backend contract)
 
-- **Generic names.** `jev-ask` is now `skop-ask`, `jev_state` is
+- **Generic names.** `jev-ask` is now `skope-ask`, `jev_state` is
   `ask_context`, `jev_calls` is `ask_calls`, and "Jev unavailable" is
   "backend unavailable". Earlier entries in this changelog keep the old
   names.
 - **Backend contract** (§6.2). Every backend takes the same request,
   returns the same answer shape, and declares its limits for options, Score
-  levels and context. Skop checks the skill against them before the run.
+  levels and context. Skope checks the skill against them before the run.
 - **Timeouts and retries** are now stated once, for every backend.
 - Jev stays the reference backend; its name remains where the text is about
   Jev itself.
 
 ### Rev 15 (question forms and patterns)
 
-- **New §4.7** maps skop's four `ask` forms onto the three backend kinds
+- **New §4.7** maps skope's four `ask` forms onto the three backend kinds
   and Jev's types, lists the patterns built from them (multi-select,
   thresholds, degrees, numbers, escape options), and collects the
   question-writing rules from Jev's docs.
@@ -2091,7 +2091,7 @@ Also, where things live in the Markdown:
 
 - **Two numbers, copied from ply** (§7.2). The release version in
   `package.json` says which release; a build identity hashed from the
-  source says whether it's the same skop. Both are printed by `--version`
+  source says whether it's the same skope. Both are printed by `--version`
   and stamped into `run_start`, the handoff record and the verify report.
 - **No fallback.** A build that can't hash its inputs fails.
 
@@ -2103,18 +2103,18 @@ Also, where things live in the Markdown:
   the core can tell a missing section, a wrong-kind reference and a list
   section with the wrong number of lists apart.
 - **`entry` and params carry their frontmatter line.**
-- **Goldens ignore skop's version and build identity**; nothing else
+- **Goldens ignore skope's version and build identity**; nothing else
   compares runs by them.
 - **A `page` event** records a real page and whether the pager succeeded.
 - **Events before a run** have `null` run fields.
 - **A failed `ask` event** has `null` answer fields and a `detail`.
 - **A warning's `stage`** is the stage that found it.
-- **Standalone binaries and `install.sh`** (§5.5), so skop can run on a
+- **Standalone binaries and `install.sh`** (§5.5), so skope can run on a
   machine without Node. The installer checks each download against the
   release's `SHA256SUMS`.
 - **Host details from review:** `stdout_hash` hashes the redacted output;
   fake files are schema-checked (`E-CONFIG`); an unreadable skill or trace
-  file is `E-USAGE`; the host calls `skop-ask`'s code in-process; warnings
+  file is `E-USAGE`; the host calls `skope-ask`'s code in-process; warnings
   about a run that goes ahead are emitted after `run_start`, so they carry
   its `run_id`.
 - **Integration details:** a deadline handoff points at the next request
@@ -2236,7 +2236,7 @@ multi-select, asked one item at a time. That's better for ops:
 The only gain would be one backend call instead of several, about 100ms each.
 
 **Numeric answers** (a number the model estimates):
-- Numbers in skop should be measured facts, read by `run` and compared by
+- Numbers in skope should be measured facts, read by `run` and compared by
   `check`.
 - `sure` has no single meaning on a distribution. Probability above X? Width
   of a range? It would need a new kind of gate to design, explain and prove.

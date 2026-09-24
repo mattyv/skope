@@ -1,6 +1,6 @@
-# skop build plan
+# skope build plan
 
-How to build skop from `SPEC.md` with several agents working in parallel,
+How to build skope from `SPEC.md` with several agents working in parallel,
 test-first, with every stage verified by CI. Milestones M1–M7 are defined in
 SPEC §12.3; this plan says who builds what, in what order, and how each
 piece is proven done.
@@ -54,7 +54,7 @@ flowchart TD
   P0 --> A["A: preprocessor"]
   P0 --> B["B: core lint"]
   P0 --> C["C: core interpreter + proofs"]
-  P0 --> D["D: backends (skop-ask)"]
+  P0 --> D["D: backends (skope-ask)"]
   P0 --> E["E: runner infrastructure"]
   P0 --> F["F: acceptance tests"]
   A --> G["Phase 2: integration<br/>host loop, CLI, explore, handoff"]
@@ -94,7 +94,7 @@ scratch):
 - `scripts/check_spec.py`: spec and plan checks, and the error-code
   coverage check.
 - `scripts/build-id.mjs`: the build identity (SPEC §7.2).
-- `LICENSE-MIT` and `LICENSE-APACHE`: skop is dual-licensed, like ply.
+- `LICENSE-MIT` and `LICENSE-APACHE`: skope is dual-licensed, like ply.
 
 **Repository and toolchain**
 - Node 20+, TypeScript, Vitest, and Biome as the formatter and linter
@@ -209,7 +209,7 @@ and options nothing in the spec needs (§6).
 
 **Done when:** CI is green on all three platforms, the Dafny spike runs from
 TypeScript, every contract has a schema, a generated type and at least one
-example that validates against it, `skop --version` prints the release
+example that validates against it, `skope --version` prints the release
 version and build identity, and the Phase 0 milestone review (§6.3) has no
 open blocking findings.
 
@@ -225,7 +225,7 @@ end-to-end review found one blocker (1 MiB command output overflowing
 Dafny's runtime), since fixed with a test.
 
 Left before a release, and needing a human:
-- Run the opt-in live backend tests (`SKOP_LIVE=1` with real Jev and
+- Run the opt-in live backend tests (`SKOPE_LIVE=1` with real Jev and
   OpenRouter keys) so the recordings come from the real APIs (§4 D).
 - Review the goldens listed in `tests/acceptance/REVIEW.md` (§4 F).
 - A first tagged release proves the release workflow end to end
@@ -300,7 +300,7 @@ follows the same loop:
 - **Done when:** `dafny verify` passes with P1–P6 and no `assume`, and the
   trace tests pass.
 
-### D. Backends: `skop-ask` (TypeScript)
+### D. Backends: `skope-ask` (TypeScript)
 - **Owns:** `src/ask/`, `tests/ask/`, `tests/recordings/`.
 - **Input:** the ask request schema. **Output:** the ask answer schema.
   Doesn't need the core at all.
@@ -509,7 +509,7 @@ One agent, joined by a second once the pieces arrive.
     scenarios with their expected exit codes.
 - **`install.sh`** (SPEC §5.5): POSIX `sh`, checked by `shellcheck` in CI.
   Its tests (SPEC §12.3) serve a release directory locally and point
-  `SKOP_DOWNLOAD_URL` at it, including a tampered binary and a missing
+  `SKOPE_DOWNLOAD_URL` at it, including a tampered binary and a missing
   `SHA256SUMS`.
 
 ---
@@ -577,7 +577,7 @@ Versioning follows ply (SPEC §7.2): a hand-edited release version in
    - refuses to go on if the tag doesn't match `package.json`;
    - builds the npm package once;
    - installs it on a clean machine on each platform, checks
-     `skop --version`, and lints and dry-runs each example skill with fakes;
+     `skope --version`, and lints and dry-runs each example skill with fakes;
    - builds a binary on each platform, writes `SHA256SUMS`, and adds a
      build-provenance attestation for each binary;
    - runs the installer against those files on each platform with no Node

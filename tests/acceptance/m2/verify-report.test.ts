@@ -5,7 +5,7 @@
 // assumption applies here. Expected failure until --verify exists.
 
 import { describe, expect, test } from "vitest";
-import { runSkop } from "../lib/cli.js";
+import { runSkope } from "../lib/cli.js";
 
 const DISK_FULL = new URL("../../../fixtures/disk-full/SKILL.md", import.meta.url).pathname;
 const CERT_EXPIRY = new URL("../../../fixtures/cert-expiry/SKILL.md", import.meta.url).pathname;
@@ -20,12 +20,12 @@ interface VerifyReport {
   max_ask_calls: number;
   max_effects: number;
   unreached_sections: string[];
-  skop_version: string;
-  skop_build: string;
+  skope_version: string;
+  skope_build: string;
 }
 
 async function verify(skill: string): Promise<VerifyReport> {
-  const r = await runSkop([skill, "--verify"], { input: undefined });
+  const r = await runSkope([skill, "--verify"], { input: undefined });
   // The report is the last stdout line; warning events come before it (SPEC §7).
   return JSON.parse(r.stdout.trim().split("\n").at(-1) ?? "") as VerifyReport;
 }
@@ -62,7 +62,7 @@ describe("M2: --verify (SPEC §5.4, §5.6)", () => {
   });
 
   test("lists each ask with the branches the explorer took there: one per option, unsure and unavailable (SPEC §5.6)", async () => {
-    const r = await runSkop([DISK_FULL, "--verify"]);
+    const r = await runSkope([DISK_FULL, "--verify"]);
     const report = JSON.parse(r.stdout.trim().split("\n").at(-1) as string) as { asks: object[] };
     expect(report.asks).toEqual([
       { section: "Triage", line: 27, kind: "choice", branches: { options: 4, unsure: 1, unavailable: 1 } },
@@ -71,11 +71,11 @@ describe("M2: --verify (SPEC §5.4, §5.6)", () => {
     ]);
   });
 
-  test("the report stamps the same build identity `skop --version` prints (SPEC §7.2)", async () => {
-    const version = await runSkop(["--version"]);
+  test("the report stamps the same build identity `skope --version` prints (SPEC §7.2)", async () => {
+    const version = await runSkope(["--version"]);
     const report = await verify(DISK_FULL);
     const m = version.stdout.match(/build identity ([0-9a-f]{64})/);
     expect(m).not.toBeNull();
-    expect(report.skop_build).toBe(m?.[1]);
+    expect(report.skope_build).toBe(m?.[1]);
   });
 });

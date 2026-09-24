@@ -340,7 +340,7 @@ export interface Result {
 }
 
 /**
- * One line of skop's JSON Lines output on stdout (SPEC §10). Exactly one event shape matches, chosen by `event`. Every shape has the common fields ts, run_id, skill, skill_hash, host, and optionally section and line; run_id, skill and skill_hash are null before a run exists. Nothing else is allowed.
+ * One line of skope's JSON Lines output on stdout (SPEC §10). Exactly one event shape matches, chosen by `event`. Every shape has the common fields ts, run_id, skill, skill_hash, host, and optionally section and line; run_id, skill and skill_hash are null before a run exists. Nothing else is allowed.
  */
 export type Event =
   | RunStartEvent
@@ -395,11 +395,11 @@ export interface RunStartEvent {
   dry_run: boolean;
   caller: "person" | "agent";
   run_dir: string;
-  skop_version: string;
+  skope_version: string;
   /**
    * Build identity, bare hex (SPEC §7.2).
    */
-  skop_build: string;
+  skope_build: string;
 }
 /**
  * A run command finished.
@@ -1024,8 +1024,8 @@ export const CODE_MEANINGS: Record<string, string> = {
   "E-BACKEND-MODEL": "the `openrouter` model doesn't support logprobs, or its reasoning can't be turned off (§6.2)",
   "E-BACKEND-LIMIT": "the skill exceeds the configured backend's limits: options, Score levels or context (§6.2)",
   "E-FAKE-UNMATCHED": "`--fake-exec` has no answer for a command, or `--fake` has none for a question (§5.4)",
-  "E-IO": "skop can't write its run directory or lock file",
-  "E-INTERRUPTED": "skop was interrupted (SIGINT or SIGTERM); it stopped the running command and released the lock (§4.4)",
+  "E-IO": "skope can't write its run directory or lock file",
+  "E-INTERRUPTED": "skope was interrupted (SIGINT or SIGTERM); it stopped the running command and released the lock (§4.4)",
   "E-INTERNAL": "a runner bug. Unreachable by P6, so always a bug report",
   "W-SCORE-THRESHOLD": "a Score variable is only used in one comparison against one threshold; a `yes | no` ask gates more reliably (v1.1)",
   "W-SCORE-UNUSED": "a Score variable is never used after it's bound (v1.1)",

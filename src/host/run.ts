@@ -63,7 +63,7 @@ class End extends Error {
 
 const sha256hex = (s: string | Buffer) => createHash("sha256").update(s).digest("hex");
 const meaning = (code: string) => CODE_MEANINGS[code] ?? code;
-/** Everything skop writes to stderr is plain text: no control characters from command output (SPEC §10). */
+/** Everything skope writes to stderr is plain text: no control characters from command output (SPEC §10). */
 const say = (s: string) => process.stderr.write(plainText(s));
 
 export async function runSkill(o: RunOptions): Promise<number> {
@@ -82,7 +82,7 @@ export async function runSkill(o: RunOptions): Promise<number> {
     if (e.event === "effect_start") effects++;
     // The core found the answer invalid, which counts as unavailable (SPEC §4.2): say so, as for a failed call.
     if (e.event === "ask" && e.detail !== undefined && !askFailed)
-      say("skop: the backend's answer was invalid, so it counts as the backend being unavailable\n");
+      say("skope: the backend's answer was invalid, so it counts as the backend being unavailable\n");
     process.stdout.write(`${JSON.stringify({ ts: new Date().toISOString(), ...run, host, ...e })}\n`);
   };
   // Warnings about a run that goes ahead are emitted after run_start, so they carry its run_id (SPEC §10).
@@ -149,7 +149,7 @@ export async function runSkill(o: RunOptions): Promise<number> {
       throw new End("invalid");
     }
     if (o.mode === "lint") {
-      say(`skop: ${o.file}: ok\n`);
+      say(`skope: ${o.file}: ok\n`);
       return 0;
     }
     if (o.mode === "verify" || o.mode === "explain") {
@@ -203,7 +203,7 @@ export async function runSkill(o: RunOptions): Promise<number> {
     const halt = <T>(r: T): Promise<T> => (interrupted ? new Promise<T>(() => {}) : Promise.resolve(r));
     const page = async (message: string): Promise<boolean> => {
       const ok = await halt(config.pager ? (await sendPage(config.pager, message, env)).ok : false);
-      if (!ok) say(`skop: the pager ${config.pager ? "failed" : "isn't configured"}; the page was: ${message}\n`);
+      if (!ok) say(`skope: the pager ${config.pager ? "failed" : "isn't configured"}; the page was: ${message}\n`);
       return ok;
     };
 
@@ -217,14 +217,16 @@ export async function runSkill(o: RunOptions): Promise<number> {
     }
     if (lock.status === "locked") {
       emit({ event: "locked", holder_pid: lock.holderPid });
-      say(`skop: another run (pid ${lock.holderPid}) holds the lock at ${lock.path}\n`);
+      say(`skope: another run (pid ${lock.holderPid}) holds the lock at ${lock.path}\n`);
       return end("locked");
     }
     if (lock.status === "stale") {
       emit({ event: "stale_lock", path: lock.path, holder_pid: lock.holderPid });
-      say(`skop: stale lock at ${lock.path}, left by a run that died. Check nothing is running, then remove it: rm ${lock.path}\n`);
-      // All skop's own words, so nothing is escaped: the path must stay copyable.
-      const message = plainText(`${host}: skop ${program.skill} found a stale lock at ${lock.path}. Check no run is live, then remove it.`);
+      say(`skope: stale lock at ${lock.path}, left by a run that died. Check nothing is running, then remove it: rm ${lock.path}\n`);
+      // All skope's own words, so nothing is escaped: the path must stay copyable.
+      const message = plainText(
+        `${host}: skope ${program.skill} found a stale lock at ${lock.path}. Check no run is live, then remove it.`,
+      );
       if (dryRun) emit({ event: "would_page", text: message });
       else emit({ event: "page", text: message, ok: await page(message) });
       return end("stale_lock");
@@ -247,10 +249,10 @@ export async function runSkill(o: RunOptions): Promise<number> {
       event: "run_start",
       params: Object.fromEntries(Object.entries(cfg.params).map(([k, v]) => [k, String(v)])),
       dry_run: dryRun,
-      caller: process.env.SKOP_CALLER === "agent" ? "agent" : "person",
+      caller: process.env.SKOPE_CALLER === "agent" ? "agent" : "person",
       run_dir: runDir,
-      skop_version: version,
-      skop_build: build,
+      skope_version: version,
+      skope_build: build,
     });
     flush();
 
@@ -286,7 +288,7 @@ export async function runSkill(o: RunOptions): Promise<number> {
         const t = Date.now();
         const out: AskOutput = answers ? askFake(answers, req, src) : await backend.ask(req);
         askFailed = isFailure(out);
-        if (isFailure(out)) say(`skop: the backend was unavailable: ${out.detail}\n`);
+        if (isFailure(out)) say(`skope: the backend was unavailable: ${out.detail}\n`);
         if (!answers && !isFailure(out) && config.jev && backend.name === "jev" && out.model !== config.jev.model)
           diag("warning", {
             code: "W-MODEL-ALIAS",
@@ -329,7 +331,7 @@ export async function runSkill(o: RunOptions): Promise<number> {
         variables: result.variables,
         effects: result.effects,
         dry_run: dryRun,
-        skop: { version, build },
+        skope: { version, build },
         preamble: PREAMBLE,
       };
       try {
@@ -338,11 +340,11 @@ export async function runSkill(o: RunOptions): Promise<number> {
         fail("E-IO", "runtime", `can't write ${path}: ${(err as Error).message}`);
       }
       emit({ event: "handoff_record", ...at, path, record });
-      const optedOut = o.noPage || process.env.SKOP_CALLER === "agent" || config.on_handoff === "none";
+      const optedOut = o.noPage || process.env.SKOPE_CALLER === "agent" || config.on_handoff === "none";
       if (!optedOut) {
         // Only the section name is the author's; the host and record path stay copyable.
         const message = plainText(
-          `${host}: skop ${program.skill} handed off (${result.outcome.reason}) in ${escapePage(at.section)}. Record: ${path}`,
+          `${host}: skope ${program.skill} handed off (${result.outcome.reason}) in ${escapePage(at.section)}. Record: ${path}`,
         );
         if (dryRun) emit({ event: "would_page", ...at, text: message });
         else emit({ event: "handoff_page", ...at, text: message, ok: await page(message) });

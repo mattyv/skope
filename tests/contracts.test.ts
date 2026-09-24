@@ -57,7 +57,7 @@ describe("core program schema (SPEC §5.1)", () => {
     ["a percent sign left on a number", (p) => (triage(p)[1].check.cond.cmp.r = { num: "85%" })],
     ["a sure above 100", (p) => (triage(p)[4].ask.sure = 101)],
     ["a format other than 1", (p) => (p.format = 2)],
-    // Mutation-testing regression cases (skop-h review): each of these pins a rule a broader
+    // Mutation-testing regression cases (skope-h review): each of these pins a rule a broader
     // schema would still satisfy, so it only fails if that rule is loosened.
     ["a skill name with an uppercase letter", (p) => (p.skill = "Disk-Full")],
     ["a run_timeout_ms of zero", (p) => (p.limits.run_timeout_ms = 0)],
@@ -146,7 +146,7 @@ describe("backend request and answer (SPEC §6.1)", () => {
     expect(answer({ probs: { yes: 1.1, no: -0.1 }, backend: "jev", model: "m", ms: 1 })).toBe(true);
   });
 
-  test("skop-ask prints an answer or a failure, never both", () => {
+  test("skope-ask prints an answer or a failure, never both", () => {
     expect(output({ error: "request_too_large", detail: "413 from jev", backend: "jev", model: "jev-1.13.0" })).toBe(true);
     expect(output({ probs: { yes: 1, no: 0 }, backend: "jev", model: "m", ms: 1 })).toBe(true);
     expect(output({ error: "timeout", detail: "", backend: "jev" })).toBe(false);
@@ -235,8 +235,8 @@ describe("log events (SPEC §10)", () => {
         dry_run: true,
         caller: "person",
         run_dir: "d",
-        skop_version: "0.1.0",
-        skop_build: `sha256:${"a".repeat(64)}`,
+        skope_version: "0.1.0",
+        skope_build: `sha256:${"a".repeat(64)}`,
       }),
     ).toBe(false);
     const end = { ...base, event: "outcome", outcome: "handoff", ask_calls: 0, effects: 0, dry_run: true };
@@ -258,7 +258,7 @@ describe("log events (SPEC §10)", () => {
     expect(new Set(examples.map((e) => e.event))).toEqual(new Set(kinds));
   });
 
-  // Mutation-testing regression cases (skop-h review): each pins a rule a looser schema would
+  // Mutation-testing regression cases (skope-h review): each pins a rule a looser schema would
   // still satisfy.
   test("rejects a skill_hash that isn't 64 lowercase hex digits", () => {
     expect(event({ ...base, skill_hash: "sha256:zz", event: "would_do", cmd: "x" })).toBe(false);

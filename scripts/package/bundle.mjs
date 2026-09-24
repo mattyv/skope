@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Bundles skop into one CommonJS file (SPEC §5.5): the CLI, the compiled
+// Bundles skope into one CommonJS file (SPEC §5.5): the CLI, the compiled
 // Dafny core and every runtime dependency (bignumber.js, js-yaml,
 // markdown-it), inlined with esbuild so Node's single executable
 // applications — which take one script — can embed it. The build identity
@@ -18,7 +18,7 @@ import * as esbuild from "esbuild";
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const args = process.argv.slice(2);
 const outAt = args.indexOf("--outfile");
-const OUT_FILE = outAt !== -1 ? resolve(process.cwd(), args[outAt + 1]) : join(ROOT, "dist-bundle", "skop.cjs");
+const OUT_FILE = outAt !== -1 ? resolve(process.cwd(), args[outAt + 1]) : join(ROOT, "dist-bundle", "skope.cjs");
 
 // Same computation the npm build stamps into dist/build-identity.js, so a
 // bundle built from the same source has the same identity as the package.
@@ -46,13 +46,13 @@ console.log(`bundle: wrote ${OUT_FILE}`);
 /** Resolves the generated build-identity module (src imports it statically) to the identity computed above, inlined as JSON. */
 function buildIdentityPlugin(identity) {
   return {
-    name: "skop-build-identity",
+    name: "skope-build-identity",
     setup(build) {
       build.onResolve({ filter: /build-identity(\.js|\.json)?$/ }, (args) => ({
         path: args.path,
-        namespace: "skop-build-identity",
+        namespace: "skope-build-identity",
       }));
-      build.onLoad({ filter: /.*/, namespace: "skop-build-identity" }, () => ({
+      build.onLoad({ filter: /.*/, namespace: "skope-build-identity" }, () => ({
         contents: JSON.stringify(identity),
         loader: "json",
       }));

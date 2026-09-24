@@ -1,4 +1,4 @@
-# skop container image (SPEC §5.5): ghcr.io/mattyv/skop, for machines that
+# skope container image (SPEC §5.5): ghcr.io/mattyv/skop, for machines that
 # want a pinned runtime rather than the npm package or a standalone binary
 # (for example musl systems such as Alpine, which the standalone Linux
 # binaries don't support — see SPEC §5.5).

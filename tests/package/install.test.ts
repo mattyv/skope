@@ -1,5 +1,5 @@
 // M6 packaging (SPEC §5.5, §12.3): install.sh, tested against a local HTTP
-// server standing in for a GitHub release, via SKOP_DOWNLOAD_URL. The
+// server standing in for a GitHub release, via SKOPE_DOWNLOAD_URL. The
 // "binary" is a tiny shell script that prints a fixed version line for
 // --version — install.sh doesn't care what the binary is, only that its
 // checksum matches and that it runs.
@@ -23,8 +23,8 @@ const INSTALL_SH = join(ROOT, "install.sh");
 const VERSION = "9.9.9";
 // The release file install.sh will look for on this machine (its os/arch tables).
 const HOST = `${process.platform === "darwin" ? "darwin" : "linux"}-${process.arch}`;
-const BINARY_NAME = `skop-${VERSION}-${HOST}`;
-const FAKE_BINARY = `#!/bin/sh\necho "skop ${VERSION} (build identity ${"a".repeat(64)})"\n`;
+const BINARY_NAME = `skope-${VERSION}-${HOST}`;
+const FAKE_BINARY = `#!/bin/sh\necho "skope ${VERSION} (build identity ${"a".repeat(64)})"\n`;
 
 let server: Server | undefined;
 let releaseDir: string;
@@ -37,9 +37,9 @@ afterEach(() => {
   if (workDir) rmSync(workDir, { recursive: true, force: true });
 });
 
-/** A directory holding a fake release's files, served two ways so both the default (latest) and $SKOP_VERSION paths can be tested: `/latest/download/<file>` and `/download/v<version>/<file>`, mirroring GitHub's own layout under $SKOP_DOWNLOAD_URL. */
+/** A directory holding a fake release's files, served two ways so both the default (latest) and $SKOPE_VERSION paths can be tested: `/latest/download/<file>` and `/download/v<version>/<file>`, mirroring GitHub's own layout under $SKOPE_DOWNLOAD_URL. */
 function makeRelease(files: Record<string, string | Buffer>): string {
-  const dir = mkdtempSync(join(tmpdir(), "skop-release-"));
+  const dir = mkdtempSync(join(tmpdir(), "skope-release-"));
   for (const [name, content] of Object.entries(files)) writeFileSync(join(dir, name), content);
   return dir;
 }
@@ -87,20 +87,20 @@ function run(env: Record<string, string | undefined>): Promise<{ status: number 
 }
 
 describe("install.sh (SPEC §5.5, §12.3)", () => {
-  test("installs the binary for the machine's platform into SKOP_INSTALL_DIR", async () => {
+  test("installs the binary for the machine's platform into SKOPE_INSTALL_DIR", async () => {
     releaseDir = makeRelease({ [BINARY_NAME]: FAKE_BINARY, SHA256SUMS: sumsFile(BINARY_NAME, FAKE_BINARY) });
     chmodSync(join(releaseDir, BINARY_NAME), 0o755);
     const url = await serve(releaseDir);
-    workDir = mkdtempSync(join(tmpdir(), "skop-install-"));
+    workDir = mkdtempSync(join(tmpdir(), "skope-install-"));
     const installDir = join(workDir, "bin");
 
-    const result = await run({ SKOP_DOWNLOAD_URL: url, SKOP_VERSION: VERSION, SKOP_INSTALL_DIR: installDir, HOME: workDir });
+    const result = await run({ SKOPE_DOWNLOAD_URL: url, SKOPE_VERSION: VERSION, SKOPE_INSTALL_DIR: installDir, HOME: workDir });
 
     // Progress and the PATH hint go to stderr (say()); only the final
-    // `skop --version` (the installed "binary" itself) writes to stdout.
+    // `skope --version` (the installed "binary" itself) writes to stdout.
     expect(result.status).toBe(0);
-    expect(result.stdout).toBe(`skop ${VERSION} (build identity ${"a".repeat(64)})\n`);
-    expect(existsSync(join(installDir, "skop"))).toBe(true);
+    expect(result.stdout).toBe(`skope ${VERSION} (build identity ${"a".repeat(64)})\n`);
+    expect(existsSync(join(installDir, "skope"))).toBe(true);
   });
 
   test("a binary whose sha256 doesn't match SHA256SUMS fails the install and installs nothing", async () => {
@@ -108,10 +108,10 @@ describe("install.sh (SPEC §5.5, §12.3)", () => {
     releaseDir = makeRelease({ [BINARY_NAME]: tampered, SHA256SUMS: sumsFile(BINARY_NAME, FAKE_BINARY) });
     chmodSync(join(releaseDir, BINARY_NAME), 0o755);
     const url = await serve(releaseDir);
-    workDir = mkdtempSync(join(tmpdir(), "skop-install-"));
+    workDir = mkdtempSync(join(tmpdir(), "skope-install-"));
     const installDir = join(workDir, "bin");
 
-    const result = await run({ SKOP_DOWNLOAD_URL: url, SKOP_VERSION: VERSION, SKOP_INSTALL_DIR: installDir, HOME: workDir });
+    const result = await run({ SKOPE_DOWNLOAD_URL: url, SKOPE_VERSION: VERSION, SKOPE_INSTALL_DIR: installDir, HOME: workDir });
 
     expect(result.status).not.toBe(0);
     expect(result.stderr).toMatch(/checksum mismatch/);
@@ -122,46 +122,46 @@ describe("install.sh (SPEC §5.5, §12.3)", () => {
     releaseDir = makeRelease({ [BINARY_NAME]: FAKE_BINARY });
     chmodSync(join(releaseDir, BINARY_NAME), 0o755);
     const url = await serve(releaseDir);
-    workDir = mkdtempSync(join(tmpdir(), "skop-install-"));
+    workDir = mkdtempSync(join(tmpdir(), "skope-install-"));
     const installDir = join(workDir, "bin");
 
-    const result = await run({ SKOP_DOWNLOAD_URL: url, SKOP_VERSION: VERSION, SKOP_INSTALL_DIR: installDir, HOME: workDir });
+    const result = await run({ SKOPE_DOWNLOAD_URL: url, SKOPE_VERSION: VERSION, SKOPE_INSTALL_DIR: installDir, HOME: workDir });
 
     expect(result.status).not.toBe(0);
     expect(result.stderr).toMatch(/SHA256SUMS/);
     expect(existsSync(installDir)).toBe(false);
   });
 
-  test("SKOP_VERSION picks the version, served under /download/v<version>/", async () => {
+  test("SKOPE_VERSION picks the version, served under /download/v<version>/", async () => {
     releaseDir = makeRelease({ [BINARY_NAME]: FAKE_BINARY, SHA256SUMS: sumsFile(BINARY_NAME, FAKE_BINARY) });
     chmodSync(join(releaseDir, BINARY_NAME), 0o755);
     const url = await serve(releaseDir);
-    workDir = mkdtempSync(join(tmpdir(), "skop-install-"));
+    workDir = mkdtempSync(join(tmpdir(), "skope-install-"));
     const installDir = join(workDir, "bin");
 
     // No "latest" route exists on this server (only /download/v<version>/),
-    // so this only succeeds if SKOP_VERSION was actually used to pick the URL.
-    const result = await run({ SKOP_DOWNLOAD_URL: url, SKOP_VERSION: VERSION, SKOP_INSTALL_DIR: installDir, HOME: workDir });
+    // so this only succeeds if SKOPE_VERSION was actually used to pick the URL.
+    const result = await run({ SKOPE_DOWNLOAD_URL: url, SKOPE_VERSION: VERSION, SKOPE_INSTALL_DIR: installDir, HOME: workDir });
 
     expect(result.status).toBe(0);
     expect(result.stdout).toContain(VERSION);
   });
 
-  test("defaults to /latest/download/ when SKOP_VERSION isn't set", async () => {
+  test("defaults to /latest/download/ when SKOPE_VERSION isn't set", async () => {
     releaseDir = makeRelease({ [BINARY_NAME]: FAKE_BINARY, SHA256SUMS: sumsFile(BINARY_NAME, FAKE_BINARY) });
     chmodSync(join(releaseDir, BINARY_NAME), 0o755);
     const url = await serve(releaseDir);
-    workDir = mkdtempSync(join(tmpdir(), "skop-install-"));
+    workDir = mkdtempSync(join(tmpdir(), "skope-install-"));
     const installDir = join(workDir, "bin");
 
-    const result = await run({ SKOP_DOWNLOAD_URL: url, SKOP_INSTALL_DIR: installDir, HOME: workDir });
+    const result = await run({ SKOPE_DOWNLOAD_URL: url, SKOPE_INSTALL_DIR: installDir, HOME: workDir });
 
     expect(result.status).toBe(0);
-    expect(existsSync(join(installDir, "skop"))).toBe(true);
+    expect(existsSync(join(installDir, "skope"))).toBe(true);
   });
 
   test("an unknown platform exits non-zero and names it", async () => {
-    workDir = mkdtempSync(join(tmpdir(), "skop-install-"));
+    workDir = mkdtempSync(join(tmpdir(), "skope-install-"));
     const fakeUnameDir = join(workDir, "fake-bin");
     mkdirSync(fakeUnameDir, { recursive: true });
     // Ignores its argument so both `uname -s` and `uname -m` return
@@ -172,8 +172,8 @@ describe("install.sh (SPEC §5.5, §12.3)", () => {
     const installDir = join(workDir, "bin");
     const result = await run({
       PATH: `${fakeUnameDir}:${process.env.PATH ?? ""}`,
-      SKOP_DOWNLOAD_URL: "http://127.0.0.1:1", // never reached: platform detection fails first
-      SKOP_INSTALL_DIR: installDir,
+      SKOPE_DOWNLOAD_URL: "http://127.0.0.1:1", // never reached: platform detection fails first
+      SKOPE_INSTALL_DIR: installDir,
       HOME: workDir,
     });
 

@@ -1,5 +1,5 @@
 // Semantic lint (SPEC §7.1): core program JSON through the Dafny core's
-// SkopCheck. Findings come back ordered by line, then code.
+// SkopeCheck. Findings come back ordered by line, then code.
 
 import { toAst } from "./ast.js";
 import { gen } from "./core.js";
@@ -12,6 +12,6 @@ const findings = (s: any): Finding[] =>
 /** Lint errors and warnings. Throws Unsupported on JSON the core program contract doesn't allow. */
 export function lint(program: unknown): { errors: Finding[]; warnings: Finding[] } {
   const p = toAst(program);
-  const [errors, warnings] = gen.SkopCheck.__default.LintAll(p);
+  const [errors, warnings] = gen.SkopeCheck.__default.LintAll(p);
   return { errors: findings(errors), warnings: findings(warnings) };
 }

@@ -1,4 +1,4 @@
-// What a clean lint guarantees the interpreter (SPEC §5.3 P6). SkopCheck
+// What a clean lint guarantees the interpreter (SPEC §5.3 P6). SkopeCheck
 // proves Lint(p) == [] ==> WellFormed(p), so the interpreter can require
 // WellFormed(p) and never meet a missing section or list, an unbound name,
 // or a value of the wrong kind.
@@ -21,8 +21,8 @@
 //   with, and Holds(In[target], c') for every c' it can transfer with.
 //   EntrySim starts the chain; NeverFallsOff says no section body just
 //   ends; Acyclic gives the termination rank.
-module SkopWellFormed {
-  import opened SkopAst
+module SkopeWellFormed {
+  import opened SkopeAst
 
   ghost predicate WellFormed(p: Program) {
     EntryOk(p)          // E-UNRESOLVED, E-REF-KIND (at the entry line)

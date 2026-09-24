@@ -1,12 +1,12 @@
-# skop
+# skope
 
 **Runbooks that an agent can read and a proven runtime can run.**
 
-A skop skill is an ordinary Markdown file. A person or a language model can
-read it and follow it. skop can also *execute* it: it runs the commands,
+A skope skill is an ordinary Markdown file. A person or a language model can
+read it and follow it. skope can also *execute* it: it runs the commands,
 checks the results, and at the branch points asks
 **[Jev](https://docs.typesafe.ai)**, TypeSafe's fast decision model, small
-multiple-choice questions. When Jev isn't sure enough, skop stops and hands
+multiple-choice questions. When Jev isn't sure enough, skope stops and hands
 the incident to a human or an agent, with a record of everything it already
 did.
 
@@ -51,12 +51,12 @@ reads it, human or model. The whole skill is
 ## Why
 
 Runbooks are either prose, which only a person or an expensive agent can
-follow, or scripts, which can't use judgement. skop keeps one file for both,
+follow, or scripts, which can't use judgement. skope keeps one file for both,
 and decides who does each step:
 
 - **Code does what's certain:** measurements, comparisons and commands.
 - **Jev makes the small judgement calls.** It only ever chooses between
-  options the author wrote, and skop only acts when Jev is confident
+  options the author wrote, and skope only acts when Jev is confident
   enough.
 - **A person or an agent takes over the rest,** with a record of what
   already happened.
@@ -68,17 +68,17 @@ instead of an agent session, and every decision is logged.
 
 ```console
 $ curl -fsSL https://github.com/mattyv/skop/releases/latest/download/install.sh | sh
-$ skop --version
-skop 0.1.0 (build identity 3f1c…)
+$ skope --version
+skope 0.1.0 (build identity 3f1c…)
 ```
 
 That installs a single self-contained binary for Linux (x64, arm64) or
 macOS (Apple silicon) into `~/.local/bin`. It doesn't need Node. The
 installer checks the download against the release's checksums before
-installing anything. Set `SKOP_VERSION` to pin a version, or
-`SKOP_INSTALL_DIR` to install elsewhere.
+installing anything. Set `SKOPE_VERSION` to pin a version, or
+`SKOPE_INSTALL_DIR` to install elsewhere.
 
-Or, with Node 20 or newer, `npm install -g skop`. Or run the container
+Or, with Node 20 or newer, `npm install -g skope`. Or run the container
 image, `ghcr.io/mattyv/skop`.
 
 ## Use
@@ -87,23 +87,23 @@ Check a skill before it ever runs. Lint catches dead ends, cycles, dangling
 links, and command output that could leak into a command:
 
 ```console
-$ skop disk-full/SKILL.md --lint
-$ skop disk-full/SKILL.md --explain    # sections, transfer graph, worst-case cost
-$ skop disk-full/SKILL.md --verify     # every path the run can take, and how each ends
+$ skope disk-full/SKILL.md --lint
+$ skope disk-full/SKILL.md --explain    # sections, transfer graph, worst-case cost
+$ skope disk-full/SKILL.md --verify     # every path the run can take, and how each ends
 ```
 
 Rehearse it with fake command results and fake answers. Nothing real runs:
 
 ```console
-$ skop disk-full/SKILL.md --dry-run --fake answers.yaml --fake-exec commands.yaml
+$ skope disk-full/SKILL.md --dry-run --fake answers.yaml --fake-exec commands.yaml
 ```
 
 Then run it for real. A dry run runs the read-only `run` and `check`
 commands, but never a `do` and never a page. Every run must say which it is:
 
 ```console
-$ skop disk-full/SKILL.md --dry-run                  # look, don't touch
-$ skop disk-full/SKILL.md --apply --param mount=/var # do it
+$ skope disk-full/SKILL.md --dry-run                  # look, don't touch
+$ skope disk-full/SKILL.md --apply --param mount=/var # do it
 ```
 
 Every step is one line of JSON on stdout:
@@ -144,38 +144,38 @@ prose, so a typo can't silently skip a step. The full grammar is in
 | locked | another run of this skill is in progress | 30 |
 | stale lock | an earlier run died holding the lock | 31 |
 | invalid | the skill failed its checks, so nothing ran | 40 |
-| error | something went wrong inside skop | 50 |
+| error | something went wrong inside skope | 50 |
 
 A handoff writes a record of what ran, what each command returned and why
-skop stopped. With `--apply`, skop also pages someone about it, so an
-unattended alert never ends in a record nobody reads. An agent calling skop
-sets `SKOP_CALLER=agent` and takes the record itself.
+skope stopped. With `--apply`, skope also pages someone about it, so an
+unattended alert never ends in a record nobody reads. An agent calling skope
+sets `SKOPE_CALLER=agent` and takes the record itself.
 
 ## Built on TypeSafe's Jev
 
-skop's questions are answered by **[Jev](https://docs.typesafe.ai)**,
+skope's questions are answered by **[Jev](https://docs.typesafe.ai)**,
 TypeSafe's System One model. Jev isn't a chatbot: it's trained to make fast,
 narrow decisions and to return a calibrated probability for every possible
-answer, which is exactly what skop's confidence thresholds need. It answers
+answer, which is exactly what skope's confidence thresholds need. It answers
 in about a tenth of a second.
 
-Each of skop's question forms maps onto one of Jev's three question types:
+Each of skope's question forms maps onto one of Jev's three question types:
 
-| In a skill | Jev question type | What skop does with the answer |
+| In a skill | Jev question type | What skope does with the answer |
 |---|---|---|
 | `ask` with a list of `[Section]` options | Choice | moves to the chosen section |
 | `→ one of [List] as x` | Choice | keeps the chosen item as `x` |
 | `→ yes \| no` | Noul | keeps yes or no, for `if yes` |
 | `→ 1 to 4 as x` | Score | keeps the level as `x`, for `check` |
 
-skop sends Jev only the evidence a question names. It pins a Jev version,
+skope sends Jev only the evidence a question names. It pins a Jev version,
 because a threshold like `sure 85%` is tuned against a particular model, and
 it checks every answer against the options the author wrote before acting on
 it. Get an API key from [TypeSafe](https://docs.typesafe.ai) and set
 `TYPESAFE_API_KEY`.
 
 ```yaml
-# ~/.config/skop/config.yaml
+# ~/.config/skope/config.yaml
 ask:
   backend: jev
 jev:
@@ -187,14 +187,14 @@ pager:
 
 **OpenRouter is the alternative.** Any model on
 [OpenRouter](https://openrouter.ai) that exposes token probabilities can
-answer instead. skop reads the model's probability for each option's
+answer instead. skope reads the model's probability for each option's
 letter, never a confidence the model writes about itself. A general model
 isn't trained for these decisions the way Jev is, so re-tune your
 thresholds before trusting a skill on it.
 
 Secrets are redacted before anything leaves the machine or reaches a log.
 
-## What skop guarantees
+## What skope guarantees
 
 | Guarantee | How |
 |---|---|
@@ -247,7 +247,7 @@ $ DAFNY=/path/to/dafny npm run core   # verify the proofs and rebuild core/gener
   and the CLI.
 - [`PLAN.md`](PLAN.md) is how it's built: phases, parallel agents,
   test-first streams, reviews and releases.
-- [`contracts/`](contracts/) holds the shapes the parts of skop agree on,
+- [`contracts/`](contracts/) holds the shapes the parts of skope agree on,
   with worked examples.
 
 ## License

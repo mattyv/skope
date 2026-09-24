@@ -1,11 +1,11 @@
-// The step lemmas: each move Step makes keeps the invariant (SkopState.Inv)
-// and lowers the measure. SkopRun calls them; Proofs.dfy builds P1-P6 on them.
-module SkopLemmas {
-  import opened SkopAst
-  import opened SkopStep
-  import opened SkopWellFormed
-  import opened SkopValues
-  import opened SkopState
+// The step lemmas: each move Step makes keeps the invariant (SkopeState.Inv)
+// and lowers the measure. SkopeRun calls them; Proofs.dfy builds P1-P6 on them.
+module SkopeLemmas {
+  import opened SkopeAst
+  import opened SkopeStep
+  import opened SkopeWellFormed
+  import opened SkopeValues
+  import opened SkopeState
 
   // ---- the log ----
 

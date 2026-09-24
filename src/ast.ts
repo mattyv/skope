@@ -1,4 +1,4 @@
-// Core program JSON (contracts/core-program.schema.json) to Dafny's SkopAst
+// Core program JSON (contracts/core-program.schema.json) to Dafny's SkopeAst
 // values (core/Ast.dfy), and back. Streams B and C build on this; the
 // round trip in tests/ast.test.ts proves nothing is dropped or rewritten.
 //
@@ -9,7 +9,7 @@
 import type { CoreProgram } from "./contracts.gen.js";
 import { _dafny, BigNumber, gen, Unsupported } from "./core.js";
 
-const { SkopAst } = gen;
+const { SkopeAst } = gen;
 type J = Record<string, unknown>;
 // A Dafny value. The generated code has no types.
 type D = any;
@@ -70,90 +70,90 @@ function map(v: unknown, at: string, f: (x: unknown, at: string) => D, key = str
   return m;
 }
 
-const some = (v: D) => SkopAst.Option.create_Some(v);
-const none = () => SkopAst.Option.create_None();
+const some = (v: D) => SkopeAst.Option.create_Some(v);
+const none = () => SkopeAst.Option.create_None();
 
 function parts(v: unknown, at: string): D {
   return seq(v, at, (p, at) => {
     const [k, o] = tag(p, at, ["lit", "var"]);
-    return k === "lit" ? SkopAst.Part.create_Lit(str(o.lit, at)) : SkopAst.Part.create_Var(name(o.var, at));
+    return k === "lit" ? SkopeAst.Part.create_Lit(str(o.lit, at)) : SkopeAst.Part.create_Var(name(o.var, at));
   });
 }
 
 function anchor(v: unknown, at: string): D {
   const a = obj(v, at, ["given", "expected"]);
-  return SkopAst.Anchor.create_Anchor(str(a.given, at), str(a.expected, at));
+  return SkopeAst.Anchor.create_Anchor(str(a.given, at), str(a.expected, at));
 }
 
 function ref(v: unknown, at: string): D {
   const r = obj(v, at, ["section"], ["anchor"]);
-  return SkopAst.SectionRef.create_SectionRef(str(r.section, at), "anchor" in r ? some(anchor(r.anchor, `${at}.anchor`)) : none());
+  return SkopeAst.SectionRef.create_SectionRef(str(r.section, at), "anchor" in r ? some(anchor(r.anchor, `${at}.anchor`)) : none());
 }
 
 function els(v: unknown, at: string): D {
-  if (v === null) return SkopAst.Else.create_NoElse();
+  if (v === null) return SkopeAst.Else.create_NoElse();
   if (isObj(v) && "skip" in v) {
     obj(v, at, ["skip"]);
     obj(v.skip, `${at}.skip`, []);
-    return SkopAst.Else.create_Skip();
+    return SkopeAst.Else.create_Skip();
   }
-  return SkopAst.Else.create_ElseTo(ref(v, at));
+  return SkopeAst.Else.create_ElseTo(ref(v, at));
 }
 
 function target(v: unknown, at: string): D {
   if (isObj(v) && "stop" in v) {
     obj(v, at, ["stop"]);
     obj(v.stop, `${at}.stop`, []);
-    return SkopAst.Target.create_StopTarget();
+    return SkopeAst.Target.create_StopTarget();
   }
-  return SkopAst.Target.create_To(ref(v, at));
+  return SkopeAst.Target.create_To(ref(v, at));
 }
 
 function doBody(v: unknown, at: string): D {
   const [k, o] = tag(v, at, ["cmd", "item"]);
-  return k === "cmd" ? SkopAst.DoBody.create_DoCmd(parts(o.cmd, `${at}.cmd`)) : SkopAst.DoBody.create_DoItem(name(o.item, at));
+  return k === "cmd" ? SkopeAst.DoBody.create_DoCmd(parts(o.cmd, `${at}.cmd`)) : SkopeAst.DoBody.create_DoItem(name(o.item, at));
 }
 
 const OPS: Record<string, string> = { "<": "Lt", "<=": "Le", ">": "Gt", ">=": "Ge", "==": "Eq", "!=": "Ne" };
 
 function operand(v: unknown, at: string): D {
   const [k, o] = tag(v, at, ["var", "num"]);
-  return k === "var" ? SkopAst.Operand.create_VarOp(name(o.var, at)) : SkopAst.Operand.create_Num(str(o.num, at));
+  return k === "var" ? SkopeAst.Operand.create_VarOp(name(o.var, at)) : SkopeAst.Operand.create_Num(str(o.num, at));
 }
 
 function cond(v: unknown, at: string): D {
   const [k, o] = tag(v, at, ["succeeds", "cmp"]);
-  if (k === "succeeds") return SkopAst.Cond.create_Succeeds(parts(o.succeeds, `${at}.succeeds`));
+  if (k === "succeeds") return SkopeAst.Cond.create_Succeeds(parts(o.succeeds, `${at}.succeeds`));
   const c = obj(o.cmp, `${at}.cmp`, ["op", "l", "r"]);
   const op = typeof c.op === "string" ? OPS[c.op] : undefined;
   if (!op) throw new Unsupported(`${at}: unknown comparison ${JSON.stringify(c.op)}`);
-  return SkopAst.Cond.create_Cmp(SkopAst.CmpOp[`create_${op}`](), operand(c.l, `${at}.l`), operand(c.r, `${at}.r`));
+  return SkopeAst.Cond.create_Cmp(SkopeAst.CmpOp[`create_${op}`](), operand(c.l, `${at}.l`), operand(c.r, `${at}.r`));
 }
 
 function askForm(a: J, at: string): D {
   const [k, o] = tag(a, at, ["sections", "yesno", "one_of", "score"], ["question", "sure", "else"]);
   switch (k) {
     case "sections":
-      return SkopAst.AskForm.create_Sections(
+      return SkopeAst.AskForm.create_Sections(
         seq(o.sections, `${at}.sections`, (x, at) => {
           const s = obj(x, at, ["src", "section"], ["anchor"]);
           const { src, ...r } = s;
-          return SkopAst.AskOption.create_AskOption(nat(src, at), ref(r, at));
+          return SkopeAst.AskOption.create_AskOption(nat(src, at), ref(r, at));
         }),
       );
     case "yesno":
-      return SkopAst.AskForm.create_YesNo(name(obj(o.yesno, `${at}.yesno`, ["as"]).as, at));
+      return SkopeAst.AskForm.create_YesNo(name(obj(o.yesno, `${at}.yesno`, ["as"]).as, at));
     case "one_of": {
       const x = obj(o.one_of, `${at}.one_of`, ["list", "as"]);
-      return SkopAst.AskForm.create_OneOf(ref(x.list, `${at}.one_of.list`), name(x.as, at));
+      return SkopeAst.AskForm.create_OneOf(ref(x.list, `${at}.one_of.list`), name(x.as, at));
     }
     default: {
       const x = obj(o.score, `${at}.score`, ["low", "high", "rubric", "as"]);
       const rubric = seq(x.rubric, `${at}.score.rubric`, (y, at) => {
         const r = obj(y, at, ["src", "level", "text"]);
-        return SkopAst.RubricLine.create_RubricLine(nat(r.src, at), int(r.level, at), str(r.text, at));
+        return SkopeAst.RubricLine.create_RubricLine(nat(r.src, at), int(r.level, at), str(r.text, at));
       });
-      return SkopAst.AskForm.create_Score(int(x.low, at), int(x.high, at), rubric, name(x.as, at));
+      return SkopeAst.AskForm.create_Score(int(x.low, at), int(x.high, at), rubric, name(x.as, at));
     }
   }
 }
@@ -167,7 +167,7 @@ function stmt(v: unknown, at: string): D {
   switch (k) {
     case "run": {
       const r = obj(s.run, `${where}.run`, ["cmd"], ["as"]);
-      return SkopAst.Stmt.create_Run(
+      return SkopeAst.Stmt.create_Run(
         src,
         parts(r.cmd, `${where}.run.cmd`),
         "as" in r ? some(name(r.as, where)) : none(),
@@ -175,19 +175,19 @@ function stmt(v: unknown, at: string): D {
       );
     }
     case "do":
-      return SkopAst.Stmt.create_Do(src, doBody(s.do, `${where}.do`), els(s.else, `${where}.else`));
+      return SkopeAst.Stmt.create_Do(src, doBody(s.do, `${where}.do`), els(s.else, `${where}.else`));
     case "check": {
       const c = obj(s.check, `${where}.check`, ["cond", "then", "else"]);
       // SPEC §3.4: `check COND` needs a target, an else, or both.
       if (c.then === null && c.else === null) throw new Unsupported(`${where}: a check needs a target or an else`);
       const onTrue = c.then === null ? none() : some(target(c.then, `${where}.check.then`));
-      return SkopAst.Stmt.create_Check(src, cond(c.cond, `${where}.check.cond`), onTrue, els(c.else, `${where}.check.else`));
+      return SkopeAst.Stmt.create_Check(src, cond(c.cond, `${where}.check.cond`), onTrue, els(c.else, `${where}.check.else`));
     }
     case "ask": {
       const a = obj(s.ask, `${where}.ask`, ["question", "sure", "else"], ["sections", "yesno", "one_of", "score"]);
       const sure = nat(a.sure, `${where}.ask.sure`);
       if (sure.gt(100)) throw new Unsupported(`${where}: sure must be 0–100`);
-      return SkopAst.Stmt.create_Ask(
+      return SkopeAst.Stmt.create_Ask(
         src,
         parts(a.question, `${where}.ask.question`),
         sure,
@@ -197,7 +197,7 @@ function stmt(v: unknown, at: string): D {
     }
     case "for_each": {
       const f = obj(s.for_each, `${where}.for_each`, ["var", "list", "body"]);
-      return SkopAst.Stmt.create_ForEach(
+      return SkopeAst.Stmt.create_ForEach(
         src,
         name(f.var, where),
         ref(f.list, `${where}.for_each.list`),
@@ -209,20 +209,20 @@ function stmt(v: unknown, at: string): D {
       const [which] = tag(y, `${where}.if_yes`, ["run", "do"], ["else"]);
       if (which === "run") {
         const r = obj(y.run, `${where}.if_yes.run`, ["cmd"]);
-        return SkopAst.Stmt.create_IfYesRun(src, parts(r.cmd, `${where}.if_yes.run.cmd`), els(y.else, `${where}.if_yes.else`));
+        return SkopeAst.Stmt.create_IfYesRun(src, parts(r.cmd, `${where}.if_yes.run.cmd`), els(y.else, `${where}.if_yes.else`));
       }
-      return SkopAst.Stmt.create_IfYesDo(src, doBody(y.do, `${where}.if_yes.do`), els(y.else, `${where}.if_yes.else`));
+      return SkopeAst.Stmt.create_IfYesDo(src, doBody(y.do, `${where}.if_yes.do`), els(y.else, `${where}.if_yes.else`));
     }
     case "then":
-      return SkopAst.Stmt.create_Then(src, ref(s.then, `${where}.then`));
+      return SkopeAst.Stmt.create_Then(src, ref(s.then, `${where}.then`));
     case "page":
-      return SkopAst.Stmt.create_Page(src, parts(s.page, `${where}.page`));
+      return SkopeAst.Stmt.create_Page(src, parts(s.page, `${where}.page`));
     case "hand_off":
       obj(s.hand_off, `${where}.hand_off`, []);
-      return SkopAst.Stmt.create_HandOff(src);
+      return SkopeAst.Stmt.create_HandOff(src);
     default:
       obj(s.stop, `${where}.stop`, []);
-      return SkopAst.Stmt.create_Stop(src);
+      return SkopeAst.Stmt.create_Stop(src);
   }
 }
 
@@ -230,43 +230,43 @@ function item(v: unknown, at: string): D {
   const [k, i] = tag(v, at, ["action", "value"], ["src"]);
   obj(i, at, ["src", k]);
   const src = nat(i.src, `${at}.src`);
-  if (k === "value") return SkopAst.Item.create_Value(src, str(i.value, at));
+  if (k === "value") return SkopeAst.Item.create_Value(src, str(i.value, at));
   const a = obj(i.action, `${at}.action`, ["label", "cmd"]);
-  return SkopAst.Item.create_Action(src, str(a.label, at), parts(a.cmd, `${at}.action.cmd`));
+  return SkopeAst.Item.create_Action(src, str(a.label, at), parts(a.cmd, `${at}.action.cmd`));
 }
 
 function section(v: unknown, at: string): D {
   if (isObj(v) && "body" in v) {
     const s = obj(v, at, ["name", "src", "guidance", "body"]);
     const guidance = s.guidance === null ? none() : some(str(s.guidance, `${at}.guidance`));
-    return SkopAst.Section.create_Instructions(str(s.name, at), nat(s.src, `${at}.src`), guidance, seq(s.body, `${at}.body`, stmt));
+    return SkopeAst.Section.create_Instructions(str(s.name, at), nat(s.src, `${at}.src`), guidance, seq(s.body, `${at}.body`, stmt));
   }
   const s = obj(v, at, ["name", "src", "lists"]);
   const lists = seq(s.lists, `${at}.lists`, (l, at) => {
     const x = obj(l, at, ["src", "items"]);
-    return SkopAst.List.create_List(nat(x.src, `${at}.src`), seq(x.items, `${at}.items`, item));
+    return SkopeAst.List.create_List(nat(x.src, `${at}.src`), seq(x.items, `${at}.items`, item));
   });
-  return SkopAst.Section.create_Other(str(s.name, at), nat(s.src, `${at}.src`), lists);
+  return SkopeAst.Section.create_Other(str(s.name, at), nat(s.src, `${at}.src`), lists);
 }
 
 function param(v: unknown, at: string): D {
   const [k, p] = tag(v, at, ["str", "int"], ["src"]);
   obj(p, at, ["src", k]);
   const src = nat(p.src, `${at}.src`);
-  return k === "str" ? SkopAst.Param.create_PStr(str(p.str, at), src) : SkopAst.Param.create_PInt(int(p.int, at), src);
+  return k === "str" ? SkopeAst.Param.create_PStr(str(p.str, at), src) : SkopeAst.Param.create_PInt(int(p.int, at), src);
 }
 
-/** Core program JSON to a SkopAst.Program. Throws Unsupported on anything the contract doesn't allow. */
+/** Core program JSON to a SkopeAst.Program. Throws Unsupported on anything the contract doesn't allow. */
 export function toAst(json: CoreProgram | unknown): D {
   const p = obj(json, "program", ["skill", "format", "entry", "params", "limits", "sections"]);
   if (p.format !== 1) throw new Unsupported(`program: format must be 1, got ${JSON.stringify(p.format)}`);
   const e = obj(p.entry, "entry", ["section", "src"]);
   const l = obj(p.limits, "limits", ["run_timeout_ms", "do_timeout_ms", "deadline_ms", "ask_context_tokens"]);
-  return SkopAst.Program.create_Program(
+  return SkopeAst.Program.create_Program(
     str(p.skill, "skill"),
-    SkopAst.Entry.create_Entry(str(e.section, "entry"), nat(e.src, "entry.src")),
+    SkopeAst.Entry.create_Entry(str(e.section, "entry"), nat(e.src, "entry.src")),
     map(p.params, "params", param, name),
-    SkopAst.Limits.create_Limits(
+    SkopeAst.Limits.create_Limits(
       nat(l.run_timeout_ms, "limits"),
       nat(l.do_timeout_ms, "limits"),
       nat(l.deadline_ms, "limits"),
@@ -353,7 +353,7 @@ function sectionJ(d: D): J {
   return { name: S(d.dtor_name), src: N(d.dtor_src), lists };
 }
 
-/** A SkopAst.Program back to core program JSON. */
+/** A SkopeAst.Program back to core program JSON. */
 export function fromAst(d: D): CoreProgram {
   const l = d.dtor_limits;
   return {

@@ -307,9 +307,9 @@ function dataItem(item: Item): List["items"][number] | null {
   return text && isPlainText(text) ? { src, value: text } : null;
 }
 
-/** The E-UNKNOWN-BOLD message: HTML bold is named as such, with the skop spelling when it's a keyword. */
+/** The E-UNKNOWN-BOLD message: HTML bold is named as such, with the skope spelling when it's a keyword. */
 function unknownBold(lead: { content: string; html?: true }): string {
   if (!lead.html) return `**${lead.content}** isn't a keyword${suggestKeyword(lead.content)}`;
   const keyword = KEYWORDS.find((k) => k === lead.content.trim().toLowerCase());
-  return keyword ? `HTML bold isn't skop bold; use **${keyword}**` : `HTML bold isn't skop bold${suggestKeyword(lead.content)}`;
+  return keyword ? `HTML bold isn't skope bold; use **${keyword}**` : `HTML bold isn't skope bold${suggestKeyword(lead.content)}`;
 }

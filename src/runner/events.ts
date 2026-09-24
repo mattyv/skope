@@ -48,7 +48,7 @@ const CONTROLS = /[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/g;
 
 /**
  * Text with every C0 and C1 control character removed except `\n` and `\t`,
- * so nothing skop writes to a terminal or a pager (ESC sequences, BEL, CR,
+ * so nothing skope writes to a terminal or a pager (ESC sequences, BEL, CR,
  * NUL, CSI) can drive it. Page text and everything on stderr go through this.
  */
 export function plainText(s: string): string {

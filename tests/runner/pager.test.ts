@@ -12,7 +12,7 @@ const env = commandEnv(process.env, []);
 
 let dir: string;
 function freshDir() {
-  dir = mkdtempSync(join(tmpdir(), "skop-pager-test-"));
+  dir = mkdtempSync(join(tmpdir(), "skope-pager-test-"));
   return dir;
 }
 afterEach(() => {
@@ -23,9 +23,9 @@ describe("sendPage (SPEC §8)", () => {
   test("the pager command gets the message on stdin", async () => {
     const d = freshDir();
     const out = join(d, "captured.txt");
-    const r = await sendPage({ command: `cat > ${out}`, timeout_ms: 2000 }, "hk-app-03: skop disk-full handed off", env);
+    const r = await sendPage({ command: `cat > ${out}`, timeout_ms: 2000 }, "hk-app-03: skope disk-full handed off", env);
     expect(r.ok).toBe(true);
-    expect(readFileSync(out, "utf8")).toBe("hk-app-03: skop disk-full handed off");
+    expect(readFileSync(out, "utf8")).toBe("hk-app-03: skope disk-full handed off");
   });
 
   test("a pager that exits non-zero reports ok: false without throwing", async () => {
@@ -62,9 +62,9 @@ describe("sendPage (SPEC §8)", () => {
     const d = freshDir();
     const out = join(d, "env.txt");
     const r = await sendPage(
-      { command: `echo "[\${SKOP_PAGER_TEST_KEY-unset}][$LC_ALL]" > ${out}`, timeout_ms: 2000 },
+      { command: `echo "[\${SKOPE_PAGER_TEST_KEY-unset}][$LC_ALL]" > ${out}`, timeout_ms: 2000 },
       "m",
-      commandEnv({ ...process.env, SKOP_PAGER_TEST_KEY: "k" }, ["SKOP_PAGER_TEST_KEY"]),
+      commandEnv({ ...process.env, SKOPE_PAGER_TEST_KEY: "k" }, ["SKOPE_PAGER_TEST_KEY"]),
     );
     expect(r.ok).toBe(true);
     expect(readFileSync(out, "utf8")).toBe("[unset][C]\n");

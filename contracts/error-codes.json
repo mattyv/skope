@@ -197,12 +197,12 @@
   {
     "code": "E-IO",
     "stage": "runtime",
-    "meaning": "skop can't write its run directory or lock file"
+    "meaning": "skope can't write its run directory or lock file"
   },
   {
     "code": "E-INTERRUPTED",
     "stage": "runtime",
-    "meaning": "skop was interrupted (SIGINT or SIGTERM); it stopped the running command and released the lock (§4.4)"
+    "meaning": "skope was interrupted (SIGINT or SIGTERM); it stopped the running command and released the lock (§4.4)"
   },
   {
     "code": "E-INTERNAL",

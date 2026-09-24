@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Builds skop's standalone binary as a Node single executable application
+// Builds skope's standalone binary as a Node single executable application
 // (SPEC §5.5): the CommonJS bundle (scripts/package/bundle.mjs), embedded
 // into a copy of the Node binary with `--experimental-sea-config` and
 // `postject`. Ad-hoc signed on macOS (`codesign --sign -`) so it runs.
@@ -12,8 +12,8 @@
 //              it, a fresh bundle is always built from the current source,
 //              so a stale one can't ship under a newer build identity.
 //   --outfile  Where to write the binary. Defaults to
-//              dist-bin/skop-<platform>-<arch>; the release workflow
-//              renames the result to skop-<version>-<os>-<arch>.
+//              dist-bin/skope-<platform>-<arch>; the release workflow
+//              renames the result to skope-<version>-<os>-<arch>.
 
 import { execFileSync } from "node:child_process";
 import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -29,11 +29,11 @@ function arg(name, fallback) {
 }
 
 const nodeBin = arg("--node", process.execPath);
-const bundlePath = arg("--bundle", join(ROOT, "dist-bundle", "skop.cjs"));
+const bundlePath = arg("--bundle", join(ROOT, "dist-bundle", "skope.cjs"));
 if (process.argv.includes("--bundle") && !existsSync(bundlePath)) throw new Error(`sea: no bundle at ${bundlePath}`);
 const outFile = arg(
   "--outfile",
-  join(ROOT, "dist-bin", `skop-${process.platform}-${process.arch}${process.platform === "win32" ? ".exe" : ""}`),
+  join(ROOT, "dist-bin", `skope-${process.platform}-${process.arch}${process.platform === "win32" ? ".exe" : ""}`),
 );
 
 if (!process.argv.includes("--bundle")) {
@@ -48,10 +48,10 @@ if (!existsSync(postjectCli)) {
   throw new Error(`sea: postject not found at ${postjectCli}; is it installed as a devDependency?`);
 }
 
-const work = mkdtempSync(join(tmpdir(), "skop-sea-"));
+const work = mkdtempSync(join(tmpdir(), "skope-sea-"));
 try {
   const configPath = join(work, "sea-config.json");
-  const blobPath = join(work, "skop.blob");
+  const blobPath = join(work, "skope.blob");
   writeFileSync(
     configPath,
     JSON.stringify({

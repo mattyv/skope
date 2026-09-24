@@ -12,10 +12,10 @@ a hand-edited `.jsonl` file. Re-run it after any edit
 This pass (post external-review, SPEC rev 18) fixed:
 - **G1**: `handoff_record.record` now carries the full SPEC §8.1 shape
   (`skill`, `section`, `line`, `reason`, `detail` for `gate_failed`/
-  `ask_unavailable` asks, `variables`, `effects`, `dry_run`, `skop`,
+  `ask_unavailable` asks, `variables`, `effects`, `dry_run`, `skope`,
   `preamble` — the §8.2 text verbatim), not the `{reason}` stub it used to
   be. `tests/helpers/golden.ts` still ignores `record.run_id`/`host`/
-  `skill_hash`/`skop`.
+  `skill_hash`/`skope`.
 - **G2**: event order in every scenario is `handoff_record`, then
   `handoff_page` if it pages, then `outcome` last (already the order the
   generator produced; this pass re-checked it against SPEC §8). Not
@@ -25,7 +25,7 @@ This pass (post external-review, SPEC rev 18) fixed:
   run dir; `tests/helpers/golden.ts` now replaces those exact substrings
   (taken from the stream's own `run_start`) with `<host>`/`<run_id>`/
   `<run_dir>` before comparing, so goldens don't need to hardcode
-  `test-host`/`r-test`/`/tmp/skop/runs/r-test` to match a real run.
+  `test-host`/`r-test`/`/tmp/skope/runs/r-test` to match a real run.
 - **G4**: `check.expr` is now `{used} < {threshold}` (no decorative `%`),
   matching "rendered from the core program" (SPEC §10).
 - **G5**: `ask.question` is the question **as sent** (SPEC §3.5): names
@@ -65,15 +65,15 @@ This pass (post external-review, SPEC rev 18) fixed:
   `--verify --trace <events.jsonl>` flag from §12.4 instead of an invented
   `--verify --json` "paths" listing, using the trace file format's actual
   shape (an ordinary events.jsonl). It builds the trace from each
-  scenario's own M3 run (via `runSkop`), not from the golden, and checks
+  scenario's own M3 run (via `runSkope`), not from the golden, and checks
   both that a real run's trace is accepted (exit 0) and that a truncated
   one is rejected (exit 40). The stray `"hand_off"` entry (not a real event
   kind) is gone from the event-kind filter.
-- **P1**: `tests/acceptance/lib/cli.ts`'s `runSkop` now builds a clean,
+- **P1**: `tests/acceptance/lib/cli.ts`'s `runSkope` now builds a clean,
   disposable environment per call — a fresh temp dir supplies
   `XDG_CONFIG_HOME`, `XDG_STATE_HOME` and `XDG_RUNTIME_DIR`, which also
   fixes lock collisions between parallel test runs at
-  `$XDG_RUNTIME_DIR/skop/<name>.lock` (SPEC §7 step 3). `SKOP_CALLER` is
+  `$XDG_RUNTIME_DIR/skope/<name>.lock` (SPEC §7 step 3). `SKOPE_CALLER` is
   stripped from the inherited environment unless a test sets it. Unless a
   test passes its own `--config`, a config is written with a harmless pager
   (`pager.command: "cat > /dev/null"`, so `page`/`handoff_page` events come
