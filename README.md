@@ -66,8 +66,16 @@ and decides who does each step:
 - **A person or an agent takes over the rest,** with a record of what
   already happened.
 
-The common case costs about a tenth of a second of Jev time per question,
-instead of an agent session, and every decision is logged.
+**It's fast and cheap.** An agent following a runbook reads the whole file
+and every command's output, and reasons over several turns: minutes and a
+real model bill per incident. skope runs the commands and checks itself,
+which cost nothing, and only asks Jev the judgement calls. Each is one small
+question with just the evidence it names, answered in about a tenth of a
+second. So the common case takes seconds and costs a fraction of a cent, the
+agent's time is kept for the incidents that need it, and every decision is
+logged. For an outside measure of the same pattern, the
+[jev-oncall](https://github.com/mingleiw/jev-oncall) alert triager reports
+418 ms at p50 and $0.04 per 1,000 alerts.
 
 **You can test it like code.** A skill an agent reads as a prompt can only
 be checked by trying it and reading what happened. A skope skill has unit
