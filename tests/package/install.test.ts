@@ -103,6 +103,34 @@ describe("install.sh (SPEC §5.5, §12.3)", () => {
     expect(existsSync(join(installDir, "skope"))).toBe(true);
   });
 
+  test("installs the write-skope-skill skill when Claude Code is set up, unless SKOPE_NO_SKILL is set", async () => {
+    // A binary that records its arguments, so the test sees what install.sh asked of it.
+    const binary = '#!/bin/sh\necho "$@" >> "$HOME/calls"\necho "skope 9.9.9"\n';
+    releaseDir = makeRelease({ [BINARY_NAME]: binary, SHA256SUMS: sumsFile(BINARY_NAME, binary) });
+    const url = await serve(releaseDir);
+    workDir = mkdtempSync(join(tmpdir(), "skope-install-"));
+    const env = { SKOPE_DOWNLOAD_URL: url, SKOPE_VERSION: VERSION, SKOPE_INSTALL_DIR: join(workDir, "bin"), HOME: workDir };
+    const calls = () => readFileSync(join(workDir, "calls"), "utf8");
+
+    // No ~/.claude: nothing to install into, so it only says how.
+    let result = await run(env);
+    expect(result.status).toBe(0);
+    expect(calls()).toBe("--version\n");
+    expect(result.stderr).toContain("skope --install-skill");
+
+    mkdirSync(join(workDir, ".claude"));
+    rmSync(join(workDir, "calls"));
+    result = await run(env);
+    expect(result.status).toBe(0);
+    // Its output goes to stderr: stdout stays the one --version line.
+    expect(result.stdout).toBe("skope 9.9.9\n");
+    expect(calls()).toBe(`--install-skill ${join(workDir, ".claude", "skills")}\n--version\n`);
+
+    rmSync(join(workDir, "calls"));
+    result = await run({ ...env, SKOPE_NO_SKILL: "1" });
+    expect(calls()).toBe("--version\n");
+  });
+
   test("a binary whose sha256 doesn't match SHA256SUMS fails the install and installs nothing", async () => {
     const tampered = `${FAKE_BINARY}# tampered\n`;
     releaseDir = makeRelease({ [BINARY_NAME]: tampered, SHA256SUMS: sumsFile(BINARY_NAME, FAKE_BINARY) });

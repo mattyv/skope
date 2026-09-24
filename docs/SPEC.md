@@ -849,7 +849,16 @@ Shipped Dafny code MUST NOT contain `assume`, `{:axiom}` or
     there;
   - install `$SKOPE_VERSION` if set, otherwise the latest release;
   - download from `$SKOPE_DOWNLOAD_URL` if set, for mirrors and tests;
+  - install the write-skope-skill agent skill with `skope --install-skill`
+    when Claude Code's directory (`$CLAUDE_CONFIG_DIR`, else `~/.claude`)
+    exists, unless `$SKOPE_NO_SKILL` is set, and never fail the install
+    over it; otherwise say how to install it;
   - finish by running `skope --version`.
+
+  A global npm install installs the skill the same way, from a
+  `postinstall` script that does nothing for a local install. The skill,
+  `skills/write-skope-skill/SKILL.md`, has an agent write a skope skill
+  test first (§7.3); it's built into skope, so the binary carries it too.
 
   The checksum catches a corrupt or truncated download, not a compromised
   release. Each release also carries GitHub build-provenance attestations,
@@ -1117,6 +1126,11 @@ skope <path/to/SKILL.md> [options]
   --config path           default: $XDG_CONFIG_HOME/skope/config.yaml
   --version               print the release version and build identity (§7.2)
   --help                  print these options to stdout and exit 0
+
+skope --install-skill [DIR]
+                          write the write-skope-skill agent skill into DIR/write-skope-skill/
+                          (default: $CLAUDE_CONFIG_DIR/skills, else ~/.claude/skills), replacing
+                          an older copy; takes no skill file or other option
 ~~~
 
 `skope` with no arguments prints the same options to stderr and exits 40,
@@ -1806,6 +1820,11 @@ Installer tests (§5.5), in M6, against a local download server via
   leaves nothing installed. So does a missing `SHA256SUMS`.
 - `SKOPE_VERSION` picks the version; an unknown platform exits non-zero and
   names it.
+- It runs `skope --install-skill` into Claude Code's directory when that
+  exists, and not when `SKOPE_NO_SKILL` is set; stdout stays the one
+  `--version` line.
+- `skope --install-skill` writes the skill as committed, and the example
+  skill and `tests.yaml` in it pass `--lint` and `--test`.
 
 ### 12.4 Differential check (optional but cheap)
 For each fake scenario, the concrete trace MUST appear among the explore

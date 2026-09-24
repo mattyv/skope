@@ -3,6 +3,7 @@
 
 import { parseArgs } from "node:util";
 import IDENTITY from "./build-identity.js";
+import { installSkill } from "./host/installSkill.js";
 import { runSkill } from "./host/run.js";
 import { runTests } from "./host/test.js";
 import { plainText } from "./runner/events.js";
@@ -10,6 +11,7 @@ import { plainText } from "./runner/events.js";
 const USAGE = `usage: skope <SKILL.md> (--apply | --dry-run) [--no-page] [--param k=v]... [--fake answers.yaml] [--fake-exec cmds.yaml] [--config path]
        skope <SKILL.md> --lint | --explain | --verify [--trace events.jsonl]
        skope <SKILL.md> --test [--scenario DIR or NAME] [--live] [--runs N] [--param k=v]... [--config path]
+       skope --install-skill [DIR]
        skope --version | --help`;
 
 // SPEC §7's option list.
@@ -29,6 +31,8 @@ const HELP = `usage: skope <path/to/SKILL.md> [options]
   --fake answers.yaml     use the fake backend
   --fake-exec cmds.yaml   use the fake command handler; no real command runs
   --config path           default: $XDG_CONFIG_HOME/skope/config.yaml
+  --install-skill [DIR]   install the write-skope-skill agent skill, which has an agent write skope
+                          skills test first, into DIR (default: ~/.claude/skills); nothing else goes with it
   --version               print the release version and build identity
   --help                  print this`;
 
@@ -44,6 +48,8 @@ async function main(argv: string[]): Promise<number> {
     console.log(`skope ${version} (build identity ${build})`);
     return 0;
   }
+  // No skill file: it installs one. An optional directory, and nothing else.
+  if (argv[0] === "--install-skill" && argv.length <= 2 && !argv[1]?.startsWith("-")) return installSkill(argv[1] || undefined);
   let values: ReturnType<typeof parse>["values"] = {};
   let positionals: string[] = [];
   let usage: string | undefined;

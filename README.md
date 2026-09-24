@@ -1,6 +1,11 @@
 # skope
 
-**Runbooks that an agent can read and a proven runtime can run.**
+**Write the runbook once. An agent can follow it, or skope can run it in
+milliseconds.**
+
+skope only acts when Jev is confident, and hands everything else to a
+person or an agent. Unlike a prompt, a skill can be unit tested, and the part
+that decides what runs is mathematically proven.
 
 A skope skill is an ordinary Markdown file. A person or a language model can
 read it and follow it. skope can also *execute* it: it runs the commands,
@@ -61,8 +66,35 @@ and decides who does each step:
 - **A person or an agent takes over the rest,** with a record of what
   already happened.
 
-The common case costs about a tenth of a second of Jev time per question,
-instead of an agent session, and every decision is logged.
+**It's fast and cheap.** An agent following a runbook reads the whole file
+and every command's output, and reasons over several turns: minutes and a
+real model bill per incident. skope runs the commands and checks itself,
+which cost nothing, and only asks Jev the judgement calls. Each is one small
+question with just the evidence it names, answered in about a tenth of a
+second. So the common case takes seconds and costs a fraction of a cent, the
+agent's time is kept for the incidents that need it, and every decision is
+logged. For an outside measure of the same pattern, the
+[jev-oncall](https://github.com/mingleiw/jev-oncall) alert triager reports
+418 ms at p50 and $0.04 per 1,000 alerts.
+
+**You can test it like code.** A skill an agent reads as a prompt can only
+be checked by trying it and reading what happened. A skope skill has unit
+tests: scenarios next to it fake the commands and answers, and
+`skope --test` checks the path, the outcome and every decision, with nothing
+real run, fast enough for CI. `skope --test --live` then asks the real model
+the same questions, several times each, and reports how often it chose right
+and how close it came to its confidence bar. That catches a question that's
+missing the evidence it needs before an incident does (see
+[Test](#test)).
+
+**Why trust it with production?** The core that decides what runs next is
+written in [Dafny](https://dafny.org), a language whose compiler checks
+mathematical proofs alongside the code. Tests show a bug isn't there for the
+inputs you tried; a proof shows it can't happen for any skill or any run. So
+"a dry run never runs a `do`" and "command output never ends up in a command"
+aren't hopes backed by a test suite. They're checked on every commit, with no
+shortcuts (no `assume`, no skipped proofs). The rest of skope, which talks to
+the shell, the pager and the backend, is ordinary tested TypeScript.
 
 ## Install
 
@@ -89,6 +121,12 @@ $ curl -fsSL https://github.com/mattyv/skope/releases/download/v0.1.0-beta.1/ins
 ```
 
 or `npm install -g skope@beta`, or `ghcr.io/mattyv/skope:0.1.0-beta.1`.
+
+If you use Claude Code (`~/.claude` exists), both the installer and
+`npm install -g` also install the
+[`write-skope-skill`](skills/write-skope-skill/SKILL.md) agent skill, which
+has an agent write skope skills test first. Set `SKOPE_NO_SKILL=1` to skip
+it.
 
 ## Use
 
@@ -239,6 +277,14 @@ over `sure` warns; set `live.min_margin` to make it fail, and
 the backend, and they cost what the calls cost: skope prints the most it
 will make before it starts.
 
+**Having an agent write the skill?** skope comes with
+[`write-skope-skill`](skills/write-skope-skill/SKILL.md), an agent skill
+that makes the agent write `tests.yaml` first, watch it fail, then write
+the skill until `--lint`, `--verify` and `--test` are clean, and finally
+check the questions with `--live`. Installing skope puts it in Claude
+Code's skills directory if you have one; `skope --install-skill [DIR]`
+installs it anywhere else, such as `.claude/skills` in your repo.
+
 ### Run
 
 Then run it for real. A dry run runs the read-only `run` and `check`
@@ -378,6 +424,10 @@ questions, and re-check them when you change the model version.
 
 ## What skope guarantees
 
+"Proven" below means a Dafny proof over every possible skill and every
+possible run, re-checked by CI on every commit. A change that broke one of
+these wouldn't get through CI, even if every test still passed.
+
 | Guarantee | How |
 |---|---|
 | The model only ever picks one of the author's options. It never writes a command. | The grammar can't express anything else, and it's proven. |
@@ -385,7 +435,7 @@ questions, and re-check them when you change the model version.
 | A dry run never executes a `do`. | Proven over every possible run. |
 | Every run ends, with exactly one outcome. | Proven. |
 | Every skill is checked before it runs. | Lint, proven sound: a skill that passes can't hit an internal error. |
-| Confidence is measured, never self-reported. | Jev's calibrated distribution, or token probabilities. |
+| Confidence is measured, never self-reported. | The probability Jev gives each option, or a model's token probabilities; never a confidence the model writes about itself. |
 
 ## How it works
 
@@ -431,6 +481,8 @@ $ DAFNY=/path/to/dafny npm run core   # verify the proofs and rebuild core/gener
   test-first streams, reviews and releases.
 - [`docs/design/`](docs/design/) holds designs for work in progress, such
   as [skill tests](docs/design/skill-tests.md).
+- [`skills/write-skope-skill`](skills/write-skope-skill/SKILL.md) teaches
+  an agent to write skope skills test first.
 - [`contracts/`](contracts/) holds the shapes the parts of skope agree on,
   with worked examples.
 
