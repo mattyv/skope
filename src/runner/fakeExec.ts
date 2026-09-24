@@ -41,10 +41,17 @@ function capture(s: string): { text: string; truncated: boolean } {
     : { text: s, truncated: false };
 }
 
-export function fakeExec(commands: FakesCommands, clock?: FakeClock): FakeExecHandler {
+/** Two keys answer the same command: only an error under `--test` (strict). */
+export class FakeAmbiguous extends Error {
+  readonly code = "E-FAKE-AMBIGUOUS";
+}
+
+export function fakeExec(commands: FakesCommands, clock?: FakeClock, strict = false): FakeExecHandler {
   const counts = new Map<string, number>();
   return async (req) => {
     const lineKey = `line:${req.src}`;
+    if (strict && Object.hasOwn(commands, lineKey) && Object.hasOwn(commands, req.cmd))
+      throw new FakeAmbiguous(`--fake-exec has two answers for line ${req.src}: ${lineKey} and its text, ${req.cmd}`);
     const key = Object.hasOwn(commands, lineKey) ? lineKey : Object.hasOwn(commands, req.cmd) ? req.cmd : undefined;
     if (key === undefined) throw new FakeUnmatchedCommand(`--fake-exec has no answer for: ${req.cmd} (line ${req.src})`);
     const entry = commands[key] as Result | Result[];

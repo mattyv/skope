@@ -132,6 +132,40 @@ Leave out `--fake` to rehearse against the real backend with fake command
 results: that's how you check a skill's questions and thresholds.
 [`fixtures/`](fixtures/) has worked pairs for the example skills.
 
+To keep a rehearsal, save it as a test. Put each scenario in its own
+directory under `tests/` next to the skill, with its fakes and an
+`expect.yaml` that says what should happen:
+
+```
+disk-full/
+  SKILL.md
+  tests/
+    restart/
+      commands.yaml
+      answers.yaml
+      expect.yaml
+```
+
+```yaml
+outcome: paged
+path: [Triage, Restart, Page]
+asks:
+  Triage: { chosen: Restart }
+  Restart.service: { chosen: myapp-worker }
+page_contains: "at 91%"
+```
+
+```console
+$ skope disk-full/SKILL.md --test
+PASS    restart
+1 passed, 0 failed, 0 invalid
+```
+
+Nothing real runs, not even the pager, and `do` steps go through the fakes,
+so you can test what happens when one fails. It exits 0 when every scenario
+passes, 60 when one fails, and 40 when a scenario itself is broken, so it
+fits in CI. `--scenario tests/restart` runs just one.
+
 Then run it for real. A dry run runs the read-only `run` and `check`
 commands, but never a `do` and never a page. It does ask the backend, so a
 skill with an `ask` needs one configured (see below) even to dry-run. Every

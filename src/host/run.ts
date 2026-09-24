@@ -46,6 +46,13 @@ export interface RunOptions {
   fake?: string;
   fakeExec?: string;
   config?: string;
+  /**
+   * Set by `--test` (docs/design/skill-tests.md): the run's output goes to
+   * `out` and `err` instead of stdout and stderr, it takes no lock, writes
+   * its run directory under `stateDir`, never calls the configured pager,
+   * and holds its fake files to the strict key rules.
+   */
+  test?: { out(line: string): void; err(text: string): void; stateDir: string };
 }
 
 export const EXIT = { stopped: 0, paged: 10, handoff: 20, locked: 30, stale_lock: 31, invalid: 40, error: 50 } as const;
@@ -78,7 +85,9 @@ export async function runSkill(o: RunOptions): Promise<number> {
   // what the backend is sent. Until the config is read, only the built-in patterns apply.
   let redactor: Redactor = buildRedactor();
   /** Everything skope writes to stderr is plain text: no control characters from command output (SPEC §10). */
-  const say = (s: string) => process.stderr.write(plainText(redactor.redact(s)));
+  const toErr = (s: string) => (o.test ? o.test.err(s) : process.stderr.write(s));
+  const toOut = (s: string) => (o.test ? o.test.out(s) : process.stdout.write(s));
+  const say = (s: string) => toErr(plainText(redactor.redact(s)));
 
   const emit = (e: Record<string, unknown>) => {
     // Counted here, not taken from the core's outcome, so a run that ends in error still reports them.
@@ -87,7 +96,7 @@ export async function runSkill(o: RunOptions): Promise<number> {
     // The core found the answer invalid, which counts as unavailable (SPEC §4.2): say so, as for a failed call.
     if (e.event === "ask" && e.detail !== undefined && !askFailed)
       say("skope: the backend's answer was invalid, so it counts as the backend being unavailable\n");
-    process.stdout.write(`${JSON.stringify(redactDeep(redactor, { ts: new Date().toISOString(), ...run, host, ...e }))}\n`);
+    toOut(`${JSON.stringify(redactDeep(redactor, { ts: new Date().toISOString(), ...run, host, ...e }))}\n`);
   };
   // Warnings about a run that goes ahead are emitted after run_start, so they carry its run_id (SPEC §10).
   const held: Diagnostic[] = [];
@@ -169,7 +178,7 @@ export async function runSkill(o: RunOptions): Promise<number> {
         config,
         params: params(program, o.params, fail),
         start: (c) => new Interp(program, c),
-        emit: (e) => process.stdout.write(`${JSON.stringify(redactDeep(redactor, e))}\n`),
+        emit: (e) => toOut(`${JSON.stringify(redactDeep(redactor, e))}\n`),
         say: (line) => say(`${line}\n`),
       });
     }
@@ -190,12 +199,14 @@ export async function runSkill(o: RunOptions): Promise<number> {
         `${unsafe.join(", ")} fails the safe-value check (§3.5): a value in a command may use only A-Z a-z 0-9 . _ / : @ % + = , - and can't start with -`,
       );
 
+    if (o.test) config.state_dir = o.test.stateDir;
     const backend = await checkBackend(program, config, o, fail, diag);
     const fakes = <T extends Record<string, unknown>>(path: string | undefined, kind: FakeKind): T | undefined => {
       if (path === undefined) return undefined;
-      const { doc, issues } = resolveFakeKeys(program, readFakes(path, kind, fail) as T, kind);
+      const strict = o.test !== undefined;
+      const { doc, issues } = resolveFakeKeys(program, readFakes(path, kind, fail) as T, kind, strict);
       for (const i of issues) {
-        if (i.code === "E-FAKE-AMBIGUOUS") fail(i.code, "args", `${path}: ${i.message}`);
+        if (i.code !== "W-FAKE-UNUSED") fail(i.code, "args", `${path}: ${i.message}`);
         diag("warning", { code: i.code, stage: "args", message: `${path}: ${i.message}` });
       }
       return doc;
@@ -215,24 +226,33 @@ export async function runSkill(o: RunOptions): Promise<number> {
     let interrupted = false;
     const halt = <T>(r: T): Promise<T> => (interrupted ? new Promise<T>(() => {}) : Promise.resolve(r));
     const clock = createFakeClock();
-    const fakeRun = commands ? fakeExec(commands, clock) : undefined;
+    const fakeRun = commands ? fakeExec(commands, clock, o.test !== undefined) : undefined;
     // With --fake-exec no real command runs, the pager included (SPEC §5.4): commands.yaml can
     // answer the pager command like any other, and without an answer the page succeeds.
     const fakePage = async (fake: NonNullable<typeof fakeRun>, cmd: string) =>
       Object.hasOwn(commands ?? {}, cmd) ? (await fake({ cmd, src: 0 })).exit === 0 : true;
     const page = async (message: string): Promise<boolean> => {
       const text = redactor.redact(message);
+      // Without a pager a real run can't page, but a test's page never depends on this machine's
+      // config: it succeeds unless commands.yaml answers the pager command with a failure.
       const ok = await halt(
-        !config.pager ? false : fakeRun ? await fakePage(fakeRun, config.pager.command) : (await sendPage(config.pager, text, env)).ok,
+        fakeRun
+          ? config.pager
+            ? await fakePage(fakeRun, config.pager.command)
+            : o.test !== undefined
+          : config.pager
+            ? (await sendPage(config.pager, text, env)).ok
+            : false,
       );
       if (!ok) say(`skope: the pager ${config.pager ? "failed" : "isn't configured"}; the page was: ${text}\n`);
       return ok;
     };
 
     // Step 3: the lock (SPEC §7).
+    // A test runs nothing real, so it takes no lock: it can't collide with a real run.
     let lock: ReturnType<typeof acquireLock>;
     try {
-      lock = acquireLock(program.skill);
+      lock = o.test ? { status: "acquired", release: () => {} } : acquireLock(program.skill);
     } catch (err) {
       if (err instanceof LockError) return fail("E-IO", "runtime", err.message);
       throw err;
@@ -255,7 +275,7 @@ export async function runSkill(o: RunOptions): Promise<number> {
     }
     release = lock.release;
     // Whatever ends the process (an uncaught error included), the lock goes with it.
-    process.once("exit", release);
+    if (!o.test) process.once("exit", release);
 
     // Step 4: run directory, run_start, the loop.
     const runDir = join(config.state_dir, "runs", runId);
@@ -286,7 +306,7 @@ export async function runSkill(o: RunOptions): Promise<number> {
       diag("error", { code: "E-INTERRUPTED", stage: "runtime", message: `interrupted by ${signal}` });
       process.exit(end("error"));
     };
-    process.on("SIGINT", onSignal).on("SIGTERM", onSignal);
+    if (!o.test) process.on("SIGINT", onSignal).on("SIGTERM", onSignal);
 
     const started = Date.now();
     let asks = 0;
@@ -318,7 +338,7 @@ export async function runSkill(o: RunOptions): Promise<number> {
           fail("E-IO", "runtime", `can't write ${path}: ${(err as Error).message}`);
         }
         const t = Date.now();
-        const out: AskOutput = answers ? askFake(answers, req, src) : await backend.ask(req);
+        const out: AskOutput = answers ? askFake(answers, req, src, o.test !== undefined) : await backend.ask(req);
         askFailed = isFailure(out);
         if (isFailure(out)) say(`skope: the backend was unavailable: ${out.detail}\n`);
         if (!answers && !isFailure(out) && config.jev && backend.name === "jev" && out.model !== config.jev.model)
@@ -385,7 +405,8 @@ export async function runSkill(o: RunOptions): Promise<number> {
     return end(result.outcome.kind, result.outcome.kind === "handoff" ? result.outcome.reason : null);
   } catch (err) {
     if (err instanceof End) return end(err.ending);
-    const code = (err as { code?: string }).code === "E-FAKE-UNMATCHED" ? "E-FAKE-UNMATCHED" : "E-INTERNAL";
+    const given = (err as { code?: string }).code;
+    const code = given === "E-FAKE-UNMATCHED" || given === "E-FAKE-AMBIGUOUS" ? given : "E-INTERNAL";
     diag("error", { code, stage: "runtime", message: (err as Error).message });
     return end("error");
   } finally {

@@ -81,4 +81,21 @@ describe("resolveFakeKeys", () => {
     expect(resolveFakeKeys(p, { "Main.ask": 1 }, "answers").issues).toMatchObject([{ code: "E-FAKE-AMBIGUOUS", key: "Main.ask" }]);
     expect(resolveFakeKeys(p, { "Main.again": 1 }, "answers")).toEqual({ doc: { "line:13": 1 }, issues: [] });
   });
+
+  describe("strict, under --test", () => {
+    test("E-FAKE-UNUSED: an unused stable or line:N key is an error", () => {
+      const { issues } = resolveFakeKeys(diskFull, { "Triage.nope": 1, "line:21": 2 }, "commands", true);
+      expect(issues.map((i) => i.code)).toEqual(["E-FAKE-UNUSED", "E-FAKE-UNUSED"]);
+    });
+
+    test("a key that falls back to exact text stays a warning: it may be a command", () => {
+      const p = skill("- **run** `fix.sh`\n- **stop**\n\n## Fix\nFix it.\n\n- **stop**");
+      expect(resolveFakeKeys(p, { "fix.sh": 1 }, "commands", true).issues).toMatchObject([{ code: "W-FAKE-UNUSED" }]);
+    });
+
+    test("E-FAKE-AMBIGUOUS: a stable key and a line:N key for the same statement", () => {
+      const { issues } = resolveFakeKeys(diskFull, { "line:23": 1, "Triage.used": 2 }, "commands", true);
+      expect(issues).toMatchObject([{ code: "E-FAKE-AMBIGUOUS", key: "Triage.used" }]);
+    });
+  });
 });
