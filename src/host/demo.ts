@@ -24,9 +24,11 @@ export function writeDemo(dir = "skope-demo"): number {
   const skill = join(dir, "SKILL.md");
   say(`skope: wrote a demo skill into ${dir}. Nothing below runs a real command or needs an API key.
 
-  skope ${skill} --verify     # every path the skill can take, and how each ends
-  skope ${skill} --test       # its unit tests, from ${join(dir, "tests.yaml")}
-  skope ${skill} --dry-run --fake ${join(dir, "answers.yaml")} --fake-exec ${join(dir, "commands.yaml")}
-                              # one run, as JSON events, with faked commands and model`);
+  # every path the skill can take, and how each ends
+  skope ${skill} --verify
+  # its unit tests, from ${join(dir, "tests.yaml")}
+  skope ${skill} --test
+  # one run, as JSON events, with faked commands and model
+  skope ${skill} --dry-run --fake ${join(dir, "answers.yaml")} --fake-exec ${join(dir, "commands.yaml")}`);
   return 0;
 }

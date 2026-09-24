@@ -15,6 +15,8 @@ multiple-choice questions. When Jev isn't sure enough, skope stops and hands
 the incident to a human or an agent, with a record of everything it already
 did.
 
+![skope --demo: six unit tests pass, a dry run where a sure model restarts a service, and one where an unsure model hands off](docs/demo.gif)
+
 This is what you write:
 
 ```markdown
