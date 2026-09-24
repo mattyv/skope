@@ -1,10 +1,13 @@
 // `skope SKILL.md --test` (docs/design/skill-tests.md, SPEC §7.3): run each
-// scenario under the skill's tests/ directory with its fake commands, as an
-// --apply run that runs nothing real, and check what happened against its
-// expect.yaml (or the older expected-exit). Scripted, answers come from the
-// scenario's answers.yaml. With --live, every ask goes to the configured
-// backend, and each scenario runs several times: the report gives its hit
-// rate and, per ask, the answers chosen and how far confidence cleared sure.
+// scenario under the skill's tests/ directory, and each scenario tests.yaml
+// (beside SKILL.md) defines, with its fake commands, as an --apply run that
+// runs nothing real, and check what happened against its expect.yaml (or
+// the older expected-exit). Scripted, answers come from the scenario's
+// answers.yaml, filled in for any `asks` entry it doesn't already answer
+// (src/runner/deriveAnswers.ts). With --live, every ask goes to the
+// configured backend, and each scenario runs several times: the report
+// gives its hit rate and, per ask, the answers chosen and how far
+// confidence cleared sure.
 //
 // Output: one JSON line per scenario, then a summary line, on stdout; a
 // readable line for each on stderr. Exit 0 when every scenario passes, 60
@@ -15,21 +18,24 @@ import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { load as loadYaml } from "js-yaml";
 import IDENTITY from "../build-identity.js";
-import type { CoreProgram, Section } from "../contracts.gen.js";
+import type { CoreProgram } from "../contracts.gen.js";
 import { Interp } from "../interp.js";
 import { preprocess } from "../preprocess/index.js";
 import { sectionId } from "../preprocess/slug.js";
+import { findAsk } from "../runner/askOptions.js";
 import { type Config, loadConfig } from "../runner/config.js";
+import { deriveAnswers } from "../runner/deriveAnswers.js";
 import { plainText } from "../runner/events.js";
 import { type Expect, expectError } from "../runner/expect.js";
-import { resolveFakeKeys } from "../runner/fakeKeys.js";
+import { askLine } from "../runner/fakeKeys.js";
+import { readTestsYaml } from "../runner/testsYaml.js";
 import { explore } from "./explore.js";
 import { EXIT, params, runSkill } from "./run.js";
 import { costs } from "./verify.js";
 
 export interface TestOptions {
   file: string;
-  /** One scenario directory instead of every directory under tests/. */
+  /** One scenario instead of every one under tests/ and in tests.yaml: a directory, or a tests.yaml scenario's name. */
   scenario?: string;
   params: string[];
   config?: string;
@@ -45,7 +51,8 @@ export const DEFAULT_RUNS = 10;
 export const WARN_MARGIN = 5;
 
 type Event = { event: string } & Record<string, unknown>;
-type Scenario = { name: string; dir: string; expect: Expect; commands: string; answers?: string };
+type Scenario = { name: string; expect: Expect; commands: unknown; answers?: unknown };
+type ScenarioRow = Scenario | { name: string; invalid: string };
 type Result = { pass: true } | { pass: false; mismatch: string } | { invalid: string };
 type Run = { code: number; events: Event[] } | { invalid: string };
 
@@ -53,15 +60,29 @@ export async function runTests(o: TestOptions): Promise<number> {
   const out = (e: Record<string, unknown>) => process.stdout.write(`${JSON.stringify(e)}\n`);
   const say = (s: string) => process.stderr.write(plainText(`${s}\n`));
 
-  const dirs = o.scenario !== undefined ? [resolve(o.scenario)] : scenarioDirs(join(dirname(resolve(o.file)), "tests"));
+  const testsDir = join(dirname(resolve(o.file)), "tests");
+  const folderDirs = scenarioDirs(testsDir);
+  const folderNames = new Set(folderDirs.map((d) => basename(d)));
+  const yamlPath = join(dirname(resolve(o.file)), "tests.yaml");
+  const yamlRows = readTestsYamlFile(yamlPath, folderNames);
+
+  let scenarios: ScenarioRow[] = [...folderDirs.map(readFolderScenario), ...yamlRows].sort((a, b) => a.name.localeCompare(b.name));
+  if (o.scenario !== undefined) {
+    const p = resolve(o.scenario);
+    if (existsSync(p) && statSync(p).isDirectory()) scenarios = [readFolderScenario(p)];
+    else {
+      const found = yamlRows.find((r) => r.name === o.scenario);
+      scenarios = [found ?? { name: o.scenario, invalid: `no scenario named ${o.scenario}` }];
+    }
+  }
+
   const stateDir = mkdtempSync(join(tmpdir(), "skope-test-"));
   const tally = { passed: 0, failed: 0, invalid: 0 };
-  if (dirs.length === 0) {
-    say(`skope: no scenarios: ${join(dirname(o.file), "tests")} has no scenario directories`);
+  if (scenarios.length === 0) {
+    say(`skope: no scenarios: ${testsDir} has no scenario directories, and ${yamlPath} doesn't define any`);
     tally.invalid++;
   }
   const program = parse(o.file);
-  const scenarios = dirs.map(readScenario);
   const summary: Record<string, unknown> = {};
 
   if (o.live) {
@@ -76,7 +97,7 @@ export async function runTests(o: TestOptions): Promise<number> {
   }
 
   for (const s of scenarios) {
-    const name = "invalid" in s ? basename(s.dir) : s.name;
+    const name = s.name;
     const dir = join(stateDir, name);
     const report = "invalid" in s ? s : program === null ? { invalid: "the skill doesn't parse" } : undefined;
     const r: Result & { live?: Record<string, unknown>; lines?: string[] } =
@@ -104,7 +125,7 @@ export async function runTests(o: TestOptions): Promise<number> {
     for (const l of r.lines ?? []) say(`        ${l}`);
   }
   const { version, build } = IDENTITY;
-  out({ skope_version: version, skope_build: build, scenarios: dirs.length, ...tally, ...summary });
+  out({ skope_version: version, skope_build: build, scenarios: scenarios.length, ...tally, ...summary });
   say(`${tally.passed} passed, ${tally.failed} failed, ${tally.invalid} invalid`);
   return tally.invalid > 0 ? EXIT.invalid : tally.failed > 0 ? 60 : 0;
 }
@@ -117,6 +138,19 @@ function scenarioDirs(root: string): string[] {
     .map((n) => join(root, n))
     .filter((p) => statSync(p).isDirectory())
     .sort();
+}
+
+/** tests.yaml's scenarios, or why each one (or, if it can't be read at all, a single entry named
+ * tests.yaml) can't be used. No file at all contributes nothing. */
+function readTestsYamlFile(path: string, folderNames: ReadonlySet<string>): ScenarioRow[] {
+  if (!existsSync(path)) return [];
+  let doc: unknown;
+  try {
+    doc = loadYaml(readFileSync(path, "utf8"));
+  } catch (err) {
+    return [{ name: "tests.yaml", invalid: `can't read tests.yaml: ${(err as Error).message}` }];
+  }
+  return readTestsYaml(doc, folderNames).map((r) => ("scenario" in r ? r.scenario : r));
 }
 
 function parse(file: string): CoreProgram | null {
@@ -136,13 +170,22 @@ function readConfig(path: string | undefined): Config | null {
   }
 }
 
-/** A scenario's files, or why they can't be used. */
-function readScenario(dir: string): Scenario | { invalid: string; dir: string } {
-  const bad = (invalid: string) => ({ invalid, dir });
-  const commands = join(dir, "commands.yaml");
-  if (!existsSync(commands)) return bad(`${dir} has no commands.yaml`);
-  const answers = join(dir, "answers.yaml");
-  const base = { name: basename(dir), dir, commands, answers: existsSync(answers) ? answers : undefined };
+/** A folder scenario's files, or why they can't be used. */
+function readFolderScenario(dir: string): ScenarioRow {
+  const name = basename(dir);
+  const bad = (invalid: string) => ({ name, invalid });
+  const commandsPath = join(dir, "commands.yaml");
+  if (!existsSync(commandsPath)) return bad(`${dir} has no commands.yaml`);
+  let commands: unknown;
+  let answers: unknown;
+  try {
+    commands = loadYaml(readFileSync(commandsPath, "utf8"));
+    const answersPath = join(dir, "answers.yaml");
+    if (existsSync(answersPath)) answers = loadYaml(readFileSync(answersPath, "utf8"));
+  } catch (err) {
+    return bad(`can't read the fakes: ${(err as Error).message}`);
+  }
+  const base = { name, commands, answers };
   const expectFile = join(dir, "expect.yaml");
   const exitFile = join(dir, "expected-exit");
   try {
@@ -177,14 +220,22 @@ function maxAsks(program: CoreProgram, overrides: string[], config: Config | nul
 }
 const DEFAULT_COSTS_CONFIG = { ask: { timeout_ms: 2000, retries: 1 } } as Config;
 
-/** One run of a scenario: scripted with its answers.yaml, or live against the configured backend. */
-async function runOnce(o: TestOptions, s: Scenario, stateDir: string, live: boolean): Promise<Run> {
+/**
+ * One run of a scenario: scripted with its answers.yaml, or live against the configured backend.
+ * Its (possibly tests.yaml-merged) commands and answers are written into `stateDir` and run from
+ * there, exactly like a folder scenario's own files. In scripted mode, `expect.asks` fills in any
+ * answer the scenario doesn't already give (src/runner/deriveAnswers.ts); live mode never reads
+ * answers.yaml, so none of that applies to it.
+ */
+async function runOnce(o: TestOptions, program: CoreProgram, s: Scenario, stateDir: string, live: boolean): Promise<Run> {
   mkdirSync(stateDir, { recursive: true });
-  // Every ask needs an answer: with no answers.yaml, any ask the run reaches is unmatched.
-  let answers = s.answers;
-  if (!live && answers === undefined) {
-    answers = join(stateDir, "answers.yaml");
-    writeFileSync(answers, "{}");
+  const commandsPath = join(stateDir, "commands.yaml");
+  writeFileSync(commandsPath, JSON.stringify(s.commands ?? {}));
+  let answersPath: string | undefined;
+  if (!live) {
+    answersPath = join(stateDir, "answers.yaml");
+    const merged = deriveAnswers(program, s.expect.asks, (s.answers as Record<string, unknown>) ?? {});
+    writeFileSync(answersPath, JSON.stringify(merged));
   }
   const lines: string[] = [];
   const code = await runSkill({
@@ -194,8 +245,8 @@ async function runOnce(o: TestOptions, s: Scenario, stateDir: string, live: bool
     dryRun: false,
     noPage: false,
     params: o.params,
-    fake: live ? undefined : answers,
-    fakeExec: s.commands,
+    fake: live ? undefined : answersPath,
+    fakeExec: commandsPath,
     config: o.config,
     // Scripted runs don't read the personal config: its redact patterns and on_handoff would change
     // what a scenario sees. Live runs need it for the backend; an explicit --config always applies.
@@ -220,7 +271,7 @@ async function runOnce(o: TestOptions, s: Scenario, stateDir: string, live: bool
 }
 
 async function scripted(o: TestOptions, program: CoreProgram, s: Scenario, stateDir: string): Promise<Result> {
-  const run = await runOnce(o, s, stateDir, false);
+  const run = await runOnce(o, program, s, stateDir, false);
   if ("invalid" in run) return run;
   const mismatch = check(s.expect, run.code, run.events, program);
   if (mismatch !== null && typeof mismatch === "object") return mismatch;
@@ -259,7 +310,7 @@ async function liveScenario(o: TestOptions, program: CoreProgram, s: Scenario, s
   let hits = 0;
   let firstMiss: string | undefined;
   for (let i = 1; i <= runs; i++) {
-    const run = await runOnce(o, s, join(stateDir, `run-${i}`), true);
+    const run = await runOnce(o, program, s, join(stateDir, `run-${i}`), true);
     if ("invalid" in run) return run;
     const mismatch = check(s.expect, run.code, run.events, program);
     if (mismatch !== null && typeof mismatch === "object") return mismatch;
@@ -394,20 +445,5 @@ export function check(expect: Expect, code: number, events: Event[], program: Co
 
 /** Whether the ask on `line` offers sections as its options, rather than a list, yes/no or a Score. */
 function sectionOptions(program: CoreProgram, line: number): boolean {
-  type Body = Section["body"];
-  const find = (body: Body): boolean =>
-    body.some((st) =>
-      "ask" in st && st.src === line ? st.ask.sections !== undefined : "for_each" in st && find(st.for_each.body as Body),
-    );
-  return Object.values(program.sections).some((sec) => "body" in sec && find(sec.body));
-}
-
-/** The line of the ask an `asks` key names: `Section` (its only ask) or `Section.var` (the ask that binds var). */
-function askLine(program: CoreProgram, key: string): number | null {
-  for (const k of [key, `${key}.ask`]) {
-    const { doc, issues } = resolveFakeKeys(program, { [k]: true }, "answers", true);
-    const lineKey = Object.keys(doc).find((d) => /^line:\d+$/.test(d));
-    if (lineKey && issues.length === 0) return Number(lineKey.slice(5));
-  }
-  return null;
+  return findAsk(program, line)?.sections !== undefined;
 }
