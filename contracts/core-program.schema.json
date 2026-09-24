@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/mattyv/skop/contracts/core-program.schema.json",
+  "$id": "https://github.com/mattyv/skope/contracts/core-program.schema.json",
   "title": "CoreProgram",
   "description": "Core program JSON (SPEC §5.1): what the preprocessor emits and the Dafny core consumes. The preprocessor only parses; every semantic check (references resolve, taint, bound names, ...) is the core's job, so this schema accepts programs that will fail lint. `src` is always the 1-based line in SKILL.md.",
   "type": "object",

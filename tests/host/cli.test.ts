@@ -115,6 +115,57 @@ describe("run flow", () => {
     expect(r.stderr).toContain("disk is full");
   });
 
+  test("a secret in a param is redacted from events, stderr, the pager, the ask request and the handoff record (SPEC §9)", async () => {
+    const secret = "FAKE_SECRET_123";
+    const sent = join(mkdtempSync(join(tmpdir(), "skope-pager-")), "page.txt");
+    const state = mkdtempSync(join(tmpdir(), "skope-state-"));
+    const config = file("config.yaml", `ask:\n  backend: fake\npager:\n  command: 'cat > ${sent}; exit 1'\nstate_dir: ${state}\n`);
+    const path = skill(
+      '- **ask** Is {note} fine? · sure 80%\n  - [Other]\n  - [Third]\n\n## Other\nElse.\n\n- **page** "rotated {note}"\n\n## Third\nOr this.\n\n- **hand off**',
+      "params:\n  note: x\n",
+    );
+    const answers = file("answers.yaml", JSON.stringify({ "line:12": { "s:other": 0.95, "s:third": 0.05 } }));
+    const note = `password=${secret}`;
+    const paged = await runSkope([path, "--apply", "--config", config, "--fake", answers, "--param", `note=${note}`]);
+    expect(paged.code).toBe(10);
+    expect(find(paged.events, "page")?.text).toBe("rotated [REDACTED]");
+    expect(readFileSync(sent, "utf8")).toBe("rotated [REDACTED]");
+    const request = readFileSync(find(paged.events, "ask")?.request_path as string, "utf8");
+    expect(JSON.parse(request).question).toBe("Is [REDACTED] fine?");
+    const handedOff = await runSkope([
+      path,
+      "--apply",
+      "--no-page",
+      "--config",
+      config,
+      "--fake",
+      file("answers.yaml", JSON.stringify({ "line:12": { "s:other": 0.05, "s:third": 0.95 } })),
+      "--param",
+      `note=${note}`,
+    ]);
+    expect(handedOff.code).toBe(20);
+    const record = readFileSync(find(handedOff.events, "handoff_record")?.path as string, "utf8");
+    for (const [what, text] of [
+      ["stdout", paged.stdout + handedOff.stdout],
+      ["stderr", paged.stderr + handedOff.stderr],
+      ["ask request", request],
+      ["handoff record", record],
+    ])
+      expect(text, what).not.toContain(secret);
+  });
+
+  test("with --fake-exec the pager never runs; commands.yaml can answer it (SPEC §5.4)", async () => {
+    const ran = join(mkdtempSync(join(tmpdir(), "skope-pager-")), "ran");
+    const config = file("config.yaml", `ask:\n  backend: fake\npager:\n  command: 'touch ${ran}'\n`);
+    const path = skill('- **page** "disk is full"');
+    const quiet = await runSkope([path, "--apply", "--config", config, "--fake-exec", file("c.yaml", "{}")]);
+    expect(find(quiet.events, "page")).toMatchObject({ ok: true });
+    const failing = file("c.yaml", JSON.stringify({ [`touch ${ran}`]: { exit: 1 } }));
+    const failed = await runSkope([path, "--apply", "--config", config, "--fake-exec", failing]);
+    expect(find(failed.events, "page")).toMatchObject({ ok: false });
+    expect(existsSync(ran)).toBe(false);
+  });
+
   // C0 and C1 controls except \n and \t: OSC title, clear screen, BEL, CR, NUL, CSI (U+009B), DEL.
   // biome-ignore lint/suspicious/noControlCharactersInRegex: finding them is the point.
   const CONTROLS = /[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/;
@@ -177,7 +228,7 @@ describe("run flow", () => {
     );
     // A 1 ms timeout and no retries: the call is abandoned before any answer can come back.
     const config = file("config.yaml", "ask:\n  timeout_ms: 1\n  retries: 0\njev:\n  model: jev-1.13.0\n  key_env: SKOPE_TEST_KEY\n");
-    const r = await runSkope([path, "--dry-run", "--config", config], { env: { SKOPE_TEST_KEY: "k" } });
+    const r = await runSkope([path, "--dry-run", "--config", config], { env: { SKOPE_TEST_KEY: "sk-test-0123456789" } });
     expect(r.code).toBe(20);
     expect(find(r.events, "ask")).toMatchObject({ backend: "jev", model: "jev-1.13.0", detail: "unavailable", probs: null });
     expect(find(r.events, "handoff_record")?.record).toMatchObject({ reason: "ask_unavailable" });

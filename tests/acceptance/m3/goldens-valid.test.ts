@@ -15,7 +15,7 @@ const require = createRequire(import.meta.url);
 const Ajv2020 = require("ajv/dist/2020").default;
 const ajv = new Ajv2020({ allErrors: true, strict: true, allowUnionTypes: true });
 ajv.addSchema(JSON.parse(readFileSync(`${ROOT}/contracts/event.schema.json`, "utf8")));
-const validateEvent = ajv.getSchema("https://github.com/mattyv/skop/contracts/event.schema.json");
+const validateEvent = ajv.getSchema("https://github.com/mattyv/skope/contracts/event.schema.json");
 if (!validateEvent) throw new Error("couldn't load event.schema.json");
 
 const EXIT_FOR_OUTCOME: Record<string, number> = {

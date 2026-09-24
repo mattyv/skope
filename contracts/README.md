@@ -76,7 +76,8 @@ Decisions the spec left open, made here:
   names run outputs in backticks), or by `line:N`, which wins. A list of
   command results is used in order and the last repeats. `unsure` is a
   uniform answer, so the gate always fails; `unavailable` is a backend
-  failure. `ms` advances the host's clock, so deadline scenarios can be
+  failure. Under `--fake-exec` the pager is answered by its
+  `pager.command` text too, and succeeds when there's no answer (SPEC §5.4). `ms` advances the host's clock, so deadline scenarios can be
   written.
 - **Events:** `run_id`, `skill` and `skill_hash` are `null` before a run
   exists. `caller` is `person` or `agent`. `skope_build` is bare hex. A

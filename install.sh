@@ -1,7 +1,7 @@
 #!/bin/sh
 # Installs a skope standalone binary (SPEC §5.5):
 #
-#   curl -fsSL https://github.com/mattyv/skop/releases/latest/download/install.sh | sh
+#   curl -fsSL https://github.com/mattyv/skope/releases/latest/download/install.sh | sh
 #
 # POSIX sh, checked with shellcheck. Supported platforms: linux x64/arm64,
 # darwin arm64 (SPEC §5.5) — anything else exits non-zero, naming itself.
@@ -16,7 +16,7 @@
 #                      uses sudo.
 set -eu
 
-repo="mattyv/skop"
+repo="mattyv/skope"
 install_dir="${SKOPE_INSTALL_DIR:-"$HOME/.local/bin"}"
 
 say() { printf '%s\n' "$*" >&2; }

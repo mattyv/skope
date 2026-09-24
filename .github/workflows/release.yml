@@ -157,6 +157,11 @@ jobs:
             platform: darwin
             arch: arm64
     runs-on: ${{ matrix.os }}
+    # attest-build-provenance signs with an OIDC token and stores the attestation.
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/checkout@v4
         with:

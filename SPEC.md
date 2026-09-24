@@ -1,4 +1,4 @@
-# skope (skill op) — Implementation Spec (v1, rev 18)
+# skope (skill op) — Implementation Spec (v1, rev 19)
 
 Audience: an engineer or LLM implementing this from scratch. Everything
 marked **MUST** is normative. Where this spec says "verify against current
@@ -529,7 +529,9 @@ tells whoever picks up the record what to do (§8).
   parseable. Skill commands never see the backend's key, and the key's
   value is also redacted like any secret (§9).
 - Each command runs in its own process group. On timeout: `SIGTERM` to the
-  group, 5s grace, then `SIGKILL` to the group.
+  group, 5s grace, then `SIGKILL` to the group. A stopped command isn't
+  finished until its whole group is gone: the shell exiting on `SIGTERM`
+  doesn't cancel the `SIGKILL` due to what it left running.
 - stdout and stderr are captured separately, each capped at 1 MiB **at
   capture time**, keeping the tail. A capped stream sets `truncated: true` in
   the log.
@@ -753,9 +755,10 @@ Shipped Dafny code MUST NOT contain `assume`, `{:axiom}` or
 - **fake**: `--fake` answers backend questions from a file (§6.2). `--fake-exec` answers
   commands from a file keyed by command text (after interpolation) or
   source-map id; value is `{exit, stdout, stderr, timed_out}`. An unmatched
-  command is an error (exit 50). With `--fake-exec`, no skill command
-  ever really runs. The pager isn't a skill command: it still runs the
-  configured `pager.command`, so tests configure a harmless one.
+  command is an error (exit 50). With `--fake-exec`, no real command
+  runs, the pager included: a page is answered from the file by the
+  `pager.command` text like any command (exit 0 means it succeeded), and
+  succeeds when the file has no answer for it.
 - **explore**: used by `--verify` and `--explain`. It must reach every path
   a real run could take.
   - Values from `run` are unknown. A comparison on an unknown value has three
@@ -793,10 +796,10 @@ Shipped Dafny code MUST NOT contain `assume`, `{:axiom}` or
     2.28 or newer; musl systems such as Alpine use the container.
   - **An npm package**, for machines that already have Node 20 or newer.
     No native dependencies.
-  - **A container image**, `ghcr.io/mattyv/skop`, for linux/amd64 and
+  - **A container image**, `ghcr.io/mattyv/skope`, for linux/amd64 and
     linux/arm64.
 - **`install.sh`** installs a binary: `curl -fsSL
-  https://github.com/mattyv/skop/releases/latest/download/install.sh | sh`.
+  https://github.com/mattyv/skope/releases/latest/download/install.sh | sh`.
   It MUST:
   - be POSIX `sh`, and pass `shellcheck`;
   - detect the OS and CPU, and exit non-zero naming the platform if there's
@@ -1367,7 +1370,12 @@ logs warning `W-REDACT-OFF` on every run):
 - the values of the backend key variables (§4.4), literally
 - credentials in URLs: `://[^/\s:@]+:[^/\s@]+@`
 
-Each match is replaced by `[REDACTED]`. Patterns MUST run in linear time on hostile input (anyone who can write a
+Each match is replaced by `[REDACTED]`. Redaction applies wherever text
+leaves skope: every event, every stderr line, the pager's message, the
+handoff record, and the ask request (saved and sent), so a secret in a
+param, a question or guidance is caught as well as one in command output.
+Option ids aren't redacted, since the answer is keyed by them. Commands
+run with the values as given. Patterns MUST run in linear time on hostile input (anyone who can write a
 log line can write to skope's input, §11), and a test redacts 1 MiB of
 each pattern's worst case within a time bound. Redaction runs on the
 whole captured text before anything is cut from it: a tail cut from
@@ -2157,6 +2165,17 @@ Also, where things live in the Markdown:
   each line keeps its source line.
 - **The event contract is one shape per event**, with an example of each
   in `contracts/examples/events.jsonl`.
+
+
+### Rev 19 (after the release review)
+
+- **A stopped command's whole group must be gone** before it counts as
+  finished (§4.4): a descendant that ignores `SIGTERM` still gets the
+  `SIGKILL`, so nothing outlives the lock.
+- **`--fake-exec` fakes the pager too** (§5.4), replacing rev 18's "the
+  pager still runs under `--fake-exec`".
+- **Redaction covers everything that leaves skope** (§9), not only command
+  output: params, questions and guidance too.
 
 ---
 

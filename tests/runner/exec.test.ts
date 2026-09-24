@@ -3,7 +3,8 @@
 // SIGTERM+grace+SIGKILL on timeout, bounded timeouts, output capped at
 // capture time, and stopping every live command when skope is interrupted.
 
-import { existsSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, test, vi } from "vitest";
@@ -18,6 +19,17 @@ afterEach(async () => {
   if (dir) rmSync(dir, { recursive: true, force: true });
   dir = undefined;
 });
+
+/** Whether a process is running: not gone, and not a zombie waiting to be reaped (PID 1 may never reap it). */
+function running(pid: number): boolean {
+  try {
+    return !execFileSync("ps", ["-o", "stat=", "-p", String(pid)], { encoding: "utf8" })
+      .trim()
+      .startsWith("Z");
+  } catch {
+    return false;
+  }
+}
 
 /** A path the command touches once its traps are set, so a test can wait for it. */
 function marker(name: string): string {
@@ -93,6 +105,27 @@ describe("execCommand (SPEC §4.4)", () => {
     expect(r.signal).toBe("SIGKILL");
     expect(elapsed).toBeGreaterThanOrEqual(700);
     expect(elapsed).toBeLessThan(10_000);
+  });
+
+  test("a timed-out command stays live until its whole group is gone, even after the shell exits", async () => {
+    // The shell dies on SIGTERM; its background child ignores SIGTERM and holds no pipe, so
+    // `close` fires while the child still runs. It must still get SIGKILL before the result.
+    const pidFile = marker("survivor");
+    const start = Date.now();
+    const p = execCommand(`(trap "" TERM; exec sleep 30) >/dev/null 2>&1 & echo $! > '${pidFile}'; sleep 30`, {
+      timeoutMs: 200,
+      graceMs: 600,
+      env,
+    });
+    await vi.waitFor(() => expect(existsSync(pidFile)).toBe(true));
+    const survivor = Number(readFileSync(pidFile, "utf8"));
+    await new Promise((res) => setTimeout(res, 400));
+    expect(liveCommands()).toBe(1); // the shell is gone, the survivor isn't
+    const r = await p;
+    expect(r.timedOut).toBe(true);
+    expect(Date.now() - start).toBeGreaterThanOrEqual(800);
+    expect(liveCommands()).toBe(0);
+    expect(running(survivor)).toBe(false);
   });
 
   test("the default grace period is 5s: a SIGTERM-ignoring command is still alive well after its timeout", async () => {
@@ -222,6 +255,22 @@ describe("stopAll (SPEC §4.4: skope interrupted, P2-13)", () => {
     await stopAll(20_000);
     expect((await c).signal).toBe("SIGTERM");
     expect(Date.now() - start).toBeLessThan(5000);
+  });
+
+  test("waits for every process in a stopped group, not just the shell", async () => {
+    const pidFile = marker("survivor");
+    const p = execCommand(`(trap "" TERM; exec sleep 30) >/dev/null 2>&1 & echo $! > '${pidFile}'; sleep 30`, {
+      timeoutMs: 60_000,
+      env,
+    });
+    await vi.waitFor(() => expect(existsSync(pidFile)).toBe(true));
+    const survivor = Number(readFileSync(pidFile, "utf8"));
+    const start = Date.now();
+    await stopAll(300);
+    expect(Date.now() - start).toBeGreaterThanOrEqual(300);
+    expect(liveCommands()).toBe(0);
+    expect(running(survivor)).toBe(false);
+    await p;
   });
 
   test("with nothing running, it returns at once", async () => {

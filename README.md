@@ -67,7 +67,7 @@ instead of an agent session, and every decision is logged.
 ## Install
 
 ```console
-$ curl -fsSL https://github.com/mattyv/skop/releases/latest/download/install.sh | sh
+$ curl -fsSL https://github.com/mattyv/skope/releases/latest/download/install.sh | sh
 $ skope --version
 skope 0.1.0 (build identity 3f1c…)
 ```
@@ -79,7 +79,7 @@ installing anything. Set `SKOPE_VERSION` to pin a version, or
 `SKOPE_INSTALL_DIR` to install elsewhere.
 
 Or, with Node 20 or newer, `npm install -g skope`. Or run the container
-image, `ghcr.io/mattyv/skop`.
+image, `ghcr.io/mattyv/skope`.
 
 ## Use
 

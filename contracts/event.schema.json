@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/mattyv/skop/contracts/event.schema.json",
+  "$id": "https://github.com/mattyv/skope/contracts/event.schema.json",
   "title": "Event",
   "description": "One line of skope's JSON Lines output on stdout (SPEC §10). Exactly one event shape matches, chosen by `event`. Every shape has the common fields ts, run_id, skill, skill_hash, host, and optionally section and line; run_id, skill and skill_hash are null before a run exists. Nothing else is allowed.",
   "oneOf": [

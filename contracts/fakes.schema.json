@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/mattyv/skop/contracts/fakes.schema.json",
+  "$id": "https://github.com/mattyv/skope/contracts/fakes.schema.json",
   "title": "Fakes",
   "description": "The fake handlers' files (SPEC §5.4, §6.2), after YAML parsing. A key is the question or command text after interpolation, exactly as it would be sent: a question has run outputs named in backticks (SPEC §3.5). Or it's `line:N` for the statement on line N of SKILL.md, which wins when both match. Each fake scenario directory also holds `expected-exit`: the exit code the run must end with (PLAN.md §3).",
   "$defs": {

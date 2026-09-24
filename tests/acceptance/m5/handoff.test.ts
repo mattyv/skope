@@ -4,9 +4,9 @@
 // doesn't depend on whether a terminal is attached." All expected failures
 // until stream G's handoff paging lands (PLAN.md §4 F, §7).
 
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { describe, expect, test } from "vitest";
 import { runSkope } from "../lib/cli.js";
 
@@ -90,10 +90,11 @@ describe("M5: handoff (SPEC §8)", () => {
   });
 
   test("a pager failure is logged but doesn't change the outcome (still handoff, exit 20)", async () => {
-    // A pager command that always fails, configured explicitly, so the page attempt fails
-    // without needing a real notification channel.
-    const config = tempConfig("pager:\n  command: 'exit 1'\nask:\n  backend: fake\n");
-    const r = await runSkope([SKILL, "--apply", "--config", config, "--fake", ANSWERS, "--fake-exec", COMMANDS]);
+    // Under --fake-exec the pager doesn't run either (SPEC §5.4): commands.yaml answers it, here with a failure.
+    const config = tempConfig("pager:\n  command: notify-oncall\nask:\n  backend: fake\n");
+    const commands = join(dirname(config), "commands.yaml");
+    writeFileSync(commands, JSON.stringify({ ...JSON.parse(readFileSync(COMMANDS, "utf8")), "notify-oncall": { exit: 1 } }));
+    const r = await runSkope([SKILL, "--apply", "--config", config, "--fake", ANSWERS, "--fake-exec", commands]);
     const page = r.events.find((e: { event: string }) => e.event === "handoff_page") as unknown as { ok: boolean } | undefined;
     expect(page?.ok).toBe(false);
     expect(r.code).toBe(20);

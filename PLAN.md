@@ -585,7 +585,7 @@ Versioning follows ply (SPEC §7.2): a hand-edited release version in
    - creates the GitHub release with the binaries, `SHA256SUMS`,
      `install.sh` and the package attached;
    - builds and pushes the container image to
-     `ghcr.io/mattyv/skop` for linux/amd64 and linux/arm64;
+     `ghcr.io/mattyv/skope` for linux/amd64 and linux/arm64;
    - publishes to npm, only if an `NPM_TOKEN` secret is set.
 
 The release workflow fails on purpose until there's code to release: it

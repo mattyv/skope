@@ -13,7 +13,7 @@ const read = (p: string) => JSON.parse(readFileSync(new URL(`../contracts/${p}`,
 const ajv = new Ajv2020({ allErrors: true, strict: true, allowUnionTypes: true });
 for (const f of ["core-program", "ask", "fakes", "event"]) ajv.addSchema(read(`${f}.schema.json`));
 const schema = (f: string, def = "") => {
-  const v = ajv.getSchema(`https://github.com/mattyv/skop/contracts/${f}.schema.json${def}`);
+  const v = ajv.getSchema(`https://github.com/mattyv/skope/contracts/${f}.schema.json${def}`);
   if (!v) throw new Error(`no schema ${f}${def}`);
   return v;
 };
