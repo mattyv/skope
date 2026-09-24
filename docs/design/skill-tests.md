@@ -39,7 +39,7 @@ own acceptance tests, not by any command a skill author can run.
   - **Scripted** (answers faked): free, deterministic, fast, and suitable
     for CI. It tests the logic: checks, thresholds and routing.
   - **Live** (real backend, commands faked): tests the questions. Each
-    scenario runs N times, and the report shows hit rate and lowest
+    scenario runs 10 times by default, and the report shows hit rate and lowest
     confidence against `sure`.
 - Fake keys that survive editing: keyed by section and variable name, not
   by line number.
@@ -130,7 +130,7 @@ page_contains: "can't keep up"
 handoff_reason: gate_failed   # when outcome is handoff
 max_ask_calls: 1
 live:                     # used only with --live
-  runs: 3
+  runs: 10                # optional; default 10
   min_hit_rate: 1.0       # share of runs that must choose `chosen`
   min_margin: 5           # optional: points the lowest confidence must clear `sure` by
 ```
@@ -165,7 +165,13 @@ hands off, as the acceptance suite's `do-timeout` scenarios already do.
 
 - Commands come from `commands.yaml`. `answers.yaml` is ignored, and every
   `ask` goes to the configured backend.
-- Each scenario runs `N` times (default: `live.runs`, else 3).
+- Each scenario runs 10 times by default. Two overrides, the more
+  specific winning:
+  - `live.runs` in a scenario's `expect.yaml` sets that scenario's count,
+    e.g. fewer for a costly scenario, more for one near the gate;
+  - `--live N` on the command line sets every scenario's count for that
+    invocation, over `live.runs`: `--live 1` for a quick smoke check, more
+    for a release check.
 - Per ask, the report gives the hit rate, the lowest and median
   confidence, the margin (lowest confidence minus `sure`, in points) and
   the gate-failure count. Confidence is shown in percent, the same unit as
@@ -246,7 +252,7 @@ asks:
   Classify:
     chosen: Consumer too slow
 live:
-  runs: 3
+  runs: 3                 # overrides the default of 10 for this scenario
   min_hit_rate: 1.0
   min_margin: 5
 ```
@@ -285,10 +291,5 @@ Each phase starts with failing tests, as in PLAN.md.
   mismatch anyway, and `--verify --trace` takes events, not section lists),
   the `Section#n` key, answer caching, and matching actions in `path`.
 - Scenarios stay under `tests/` next to the skill.
-
-## Open questions
-
-1. How much do Jev's answers vary between identical runs? If they're
-   nearly deterministic, repeating a scenario mostly costs calls, and
-   varying the evidence across scenarios finds more. Measure before
-   settling the default for `N`.
+- Live runs default to 10 per scenario. `live.runs` overrides it per
+  scenario, and `--live N` overrides both for one invocation.
