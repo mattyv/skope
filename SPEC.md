@@ -927,7 +927,8 @@ fail again (§6.3).
   - **Request.** `POST https://api.typesafe.ai/v1/systemone` with a bearer
     key. `jev.url` overrides the endpoint for another host serving the same
     System One API, such as OpenRouter
-    (`https://openrouter.ai/api/v1/systemone`, model `typesafe/jev-1.13`,
+    (`https://openrouter.ai/api/v1/systemone`, model
+    `typesafe/jev-1.13-20260917`, a dated snapshot that counts as pinned,
     key `OPENROUTER_API_KEY`). It must be `https://` so the key never
     travels in the clear. The body has three top-level fields: `state` = the context object
     (§6.3), `model` = `jev.model`, and `questions`, a map holding one

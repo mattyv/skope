@@ -208,6 +208,12 @@ describe("W-MODEL-ALIAS (SPEC §6.2)", () => {
     expect(isModelAlias("jev-1.13.0")).toBe(false);
   });
 
+  test("on OpenRouter, a dated snapshot is pinned; the bare version and ~latest float", () => {
+    expect(isModelAlias("typesafe/jev-1.13-20260917")).toBe(false);
+    expect(isModelAlias("typesafe/jev-1.13")).toBe(true);
+    expect(isModelAlias("~typesafe/jev-latest")).toBe(true);
+  });
+
   test("modelMismatch end-to-end: a response reporting a different model than configured is visible to the caller", async () => {
     const res = {
       model: "jev-1.14.0",

@@ -20,9 +20,12 @@ export interface JevConfig {
 
 const DEFAULT_URL = "https://api.typesafe.ai/v1/systemone";
 
-/** An alias like `jev-latest` (SPEC §6.2): anything that isn't a plain `jev-X.Y.Z`. */
+// TypeSafe pins as jev-X.Y.Z; OpenRouter pins as a dated snapshot, typesafe/jev-X.Y-YYYYMMDD.
+const PINNED_MODEL = /^(jev-\d+\.\d+\.\d+|typesafe\/jev-\d+\.\d+-\d{8})$/;
+
+/** An alias like `jev-latest` (SPEC §6.2): anything that isn't a pinned version. */
 export function isModelAlias(model: string): boolean {
-  return !/^jev-\d+\.\d+\.\d+$/.test(model);
+  return !PINNED_MODEL.test(model);
 }
 
 interface JevQuestion {

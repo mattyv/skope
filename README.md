@@ -199,7 +199,7 @@ Point the `jev` backend at it:
 
 ```yaml
 jev:
-  model: typesafe/jev-1.13
+  model: typesafe/jev-1.13-20260917   # dated snapshot = pinned
   key_env: OPENROUTER_API_KEY
   url: https://openrouter.ai/api/v1/systemone
 ```

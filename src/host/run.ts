@@ -9,7 +9,7 @@ import { hostname } from "node:os";
 import { join } from "node:path";
 import { load as loadYaml } from "js-yaml";
 import { askFake } from "../ask/fake.js";
-import { askJev } from "../ask/jev.js";
+import { askJev, isModelAlias } from "../ask/jev.js";
 import { JEV_LIMITS, OPENROUTER_LIMITS } from "../ask/limits.js";
 import { askOpenRouter, checkModel } from "../ask/openrouter.js";
 import { type AskOutput, checkAskLimits, isFailure } from "../ask/types.js";
@@ -449,11 +449,11 @@ async function checkBackend(
     if (!m.ok) fail("E-BACKEND-MODEL", "args", m.error ?? `openrouter model ${block.model} can't be used`);
     contextTokens = m.contextTokens ?? null;
     supportsReasoning = m.supportsReasoning;
-  } else if (!/^jev-\d+\.\d+\.\d+$/.test(block.model)) {
+  } else if (isModelAlias(block.model)) {
     diag("warning", {
       code: "W-MODEL-ALIAS",
       stage: "args",
-      message: `jev.model ${block.model} is an alias; pin a version like jev-1.13.0`,
+      message: `jev.model ${block.model} is an alias; pin a version like jev-1.13.0 (or typesafe/jev-1.13-20260917 on OpenRouter)`,
     });
   }
   for (const a of asks) {
