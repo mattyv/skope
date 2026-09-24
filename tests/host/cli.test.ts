@@ -136,6 +136,8 @@ describe("run flow", () => {
     const r = await runSkop([join(tmpdir(), "no-such-\u001b]0;x\u0007-\r-\u009b.md"), "--apply"]);
     expect(r.code).toBe(40);
     expect(r.stderr).toContain("E-USAGE");
+    // The diagnostic line shows them escaped, so the operator can see they were there.
+    expect(r.stderr).toContain("no-such-\\u001b]0;x\\u0007-\\r-\\u009b.md");
     expect(r.stderr).not.toMatch(CONTROLS);
   });
 
@@ -219,9 +221,9 @@ describe("run flow", () => {
     expect(detail).toEqual({ expr: "{x} > 1", left: check.left, right: check.right });
   });
 
-  test("a command that fails right after a comparison still gets the command's detail", async () => {
+  test("a command that fails after a comparison that couldn't coerce (else skip) gets the command's detail", async () => {
     const r = await runSkop([
-      skill("- **run** `echo 5` as x\n- **check** {x} > 9 → stop\n- **run** `exit 3`\n- **stop**"),
+      skill("- **run** `echo abc` as x\n- **check** {x} > 9 → stop · else skip\n- **run** `exit 3`\n- **stop**"),
       "--apply",
       "--no-page",
     ]);
@@ -421,7 +423,7 @@ describe("review fixes", () => {
     const text = find(r.events, "handoff_page")?.text as string;
     const path = find(r.events, "handoff_record")?.path as string;
     expect(text).toBe(`${find(r.events, "run_start")?.host}: skop tiny handed off (explicit) in Main. Record: ${path}`);
-    expect(text).not.toContain("​");
+    expect(text).not.toContain("\u200b");
   });
 
   test("S4: links and mentions from run output are still broken in a page", async () => {
@@ -429,7 +431,7 @@ describe("review fixes", () => {
     const r = await runSkop([skill(`- **run** \`echo '${out}'\` as out\n- **page** "look: {out}"`), "--apply"]);
     const text = find(r.events, "page")?.text as string;
     expect(text).not.toMatch(/:\/\/|www\.e|evil\.e|\[x\]\(|@here/);
-    expect(text.replace(/​/g, "").replace(/\\/g, "")).toBe(`look: ${out}`);
+    expect(text.replace(/\u200b/g, "").replace(/\\/g, "")).toBe(`look: ${out}`);
   });
 
   test("with no pager configured, a page reports ok: false and the message goes to stderr", async () => {

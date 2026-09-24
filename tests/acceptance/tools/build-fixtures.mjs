@@ -177,9 +177,9 @@ function escapePage(t) {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/\[([^[\]\n]*)\]\(/g, "\\[$1\\](")
-    .replace(/@/g, "@​")
-    .replace(/:\/\//g, ":/​/")
-    .replace(/(?<=[\p{L}\p{N}])\.(?=\p{L})/gu, ".​");
+    .replace(/@/g, "@\u200b")
+    .replace(/:\/\//g, ":/\u200b/")
+    .replace(/(?<=[\p{L}\p{N}])\.(?=\p{L})/gu, ".\u200b");
 }
 
 const EXIT = { stopped: 0, paged: 10, handoff: 20, locked: 30, stale_lock: 31, invalid: 40, error: 50 };

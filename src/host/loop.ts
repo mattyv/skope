@@ -78,9 +78,9 @@ export function escapePage(text: string): string {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/\[([^[\]\n]*)\]\(/g, "\\[$1\\](")
-    .replace(/@/g, "@​")
-    .replace(/:\/\//g, ":/​/")
-    .replace(/(?<=[\p{L}\p{N}])\.(?=\p{L})/gu, ".​");
+    .replace(/@/g, "@\u200b")
+    .replace(/:\/\//g, ":/\u200b/")
+    .replace(/(?<=[\p{L}\p{N}])\.(?=\p{L})/gu, ".\u200b");
 }
 
 export async function runLoop(interp: Interp, ctx: LoopContext): Promise<LoopResult> {
