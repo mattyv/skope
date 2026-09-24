@@ -317,6 +317,11 @@ jobs:
     permissions:
       contents: write
     steps:
+      # install.sh is attached from the release commit, not an artifact. Checkout comes first
+      # because it cleans the workspace.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
       - uses: actions/download-artifact@v4
         with:
           name: package
