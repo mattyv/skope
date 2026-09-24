@@ -6,7 +6,7 @@ import type { CoreProgram, Section } from "../contracts.gen.js";
 import type { Config } from "../runner/config.js";
 import { DEFAULT_GRACE_MS } from "../runner/exec.js";
 import type { RunConfig, Val } from "../step.js";
-import { askMs, type Costs, type Explorable, explore, traceFits, traceOf } from "./explore.js";
+import { askMs, type Costs, coreEventsOf, type Explorable, explore, responseClass, signature, traceFits } from "./explore.js";
 
 export type ReadOnly = { verify: true; trace?: Record<string, unknown>[] } | { explain: true };
 
@@ -18,6 +18,8 @@ export interface VerifyInput {
   start(cfg: RunConfig): Explorable;
   /** One JSON line on stdout. */
   emit(e: Record<string, unknown>): void;
+  /** One readable line on stderr. */
+  say(line: string): void;
 }
 
 const EXPLORE_BUILTINS = { host: "host", run_id: "r-explore", skill: "skill" };
@@ -46,8 +48,25 @@ export function readOnly(mode: ReadOnly, v: VerifyInput): number {
         return [k, t === undefined ? d : typeof d === "number" ? Number(t) : t];
       }),
     );
-    const fits = traceFits(v.start(cfg(start?.dry_run ?? false, params)), traceOf(events), c);
-    return fits ? 0 : 40;
+    const core = coreEventsOf(events);
+    const { fits, at } = traceFits(v.start(cfg(start?.dry_run ?? false, params)), core.map(signature), c);
+    const { version, build } = IDENTITY;
+    if (fits) {
+      v.emit({ skop_version: version, skop_build: build, trace_fits: true });
+      return 0;
+    }
+    // The first trace event no explored path takes (SPEC §12.4), or none: the trace ends early.
+    const e = core[at];
+    const mismatch = e
+      ? { index: at, event: e.event, section: e.section ?? null, line: e.line ?? null, class: responseClass(e) }
+      : { index: at, event: null, section: null, line: null, class: null };
+    v.emit({ skop_version: version, skop_build: build, trace_fits: false, mismatch });
+    v.say(
+      e
+        ? `skop: the trace doesn't fit: no explored path has ${e.event}${e.event === "outcome" ? "" : ` at ${e.section}:${e.line}`} (${mismatch.class}), core event ${at + 1} of ${core.length}`
+        : `skop: the trace doesn't fit: it ends after ${core.length} core events, where every explored path goes on`,
+    );
+    return 40;
   }
 
   const s = explore(v.start(cfg(false)), c);

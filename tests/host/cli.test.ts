@@ -352,6 +352,24 @@ describe("review fixes", () => {
     }
   });
 
+  test("S10: --verify --trace that doesn't fit says which step the explorer couldn't follow (SPEC §12.4)", async () => {
+    const path = skill("- **run** `true`\n- **run** `true`\n- **stop**");
+    const run = await runSkop([path, "--apply"]);
+    expect(run.code).toBe(0);
+    // Move the second command to a line no path has.
+    const events = run.events.map((e) => (e.event === "run" && e.line === 11 ? { ...e, line: 99 } : e));
+    const trace = file("t.jsonl", events.map((e) => JSON.stringify(e)).join("\n"));
+    const r = await runSkop([path, "--verify", "--trace", trace]);
+    expect(r.code).toBe(40);
+    const report = JSON.parse(r.stdout.trim().split("\n").at(-1) as string);
+    expect(report).toMatchObject({ trace_fits: false, mismatch: { index: 1, event: "run", section: "Main", line: 99, class: "ok" } });
+    expect(r.stderr).toMatch(/run at Main:99 \(ok\)/);
+
+    const ok = await runSkop([path, "--verify", "--trace", file("t.jsonl", run.stdout)]);
+    expect(ok.code).toBe(0);
+    expect(JSON.parse(ok.stdout.trim().split("\n").at(-1) as string)).toMatchObject({ trace_fits: true });
+  });
+
   test("E-USAGE: an unreadable or malformed --trace file", async () => {
     for (const trace of [join(tmpdir(), "no-such-trace.jsonl"), file("t.jsonl", "not json\n"), file("t.jsonl", "[1]\n")]) {
       const r = await runSkop([skill("- **stop**"), "--verify", "--trace", trace]);

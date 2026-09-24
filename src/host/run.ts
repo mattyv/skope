@@ -146,6 +146,7 @@ export async function runSkill(o: RunOptions): Promise<number> {
         params: params(program, o.params, fail),
         start: (c) => new Interp(program, c),
         emit: (e) => process.stdout.write(`${JSON.stringify(e)}\n`),
+        say: (line) => say(`${line}\n`),
       });
     }
 

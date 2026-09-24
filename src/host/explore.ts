@@ -174,38 +174,56 @@ const CORE_EVENTS = new Set(Object.keys(EVENT_FIELDS).filter((k) => (EVENT_FIELD
  * how the request was answered, not values the explorer doesn't know.
  */
 export function signature(e: Record<string, unknown>): string {
-  const cls = (() => {
-    switch (e.event) {
-      case "run":
-      case "check_cmd":
-      case "effect_end":
-        return e.timed_out ? "timeout" : e.exit === 0 ? "ok" : "fail";
-      case "check":
-        return String(e.result);
-      case "ask":
-        return e.passed ? String(e.chosen) : e.detail ? "unavailable" : "unsure";
-      case "transfer":
-        return String(e.to);
-      case "outcome":
-        return `${e.outcome}:${e.reason}`;
-      default:
-        return "";
-    }
-  })();
+  const cls = responseClass(e);
   return e.event === "outcome" ? `outcome ${cls}` : `${e.event} ${e.section}:${e.line} ${cls}`;
+}
+
+/** How a trace event's request was answered, as far as the explorer can tell. */
+export function responseClass(e: Record<string, unknown>): string {
+  switch (e.event) {
+    case "run":
+    case "check_cmd":
+    case "effect_end":
+      return e.timed_out ? "timeout" : e.exit === 0 ? "ok" : "fail";
+    case "check":
+      return String(e.result);
+    case "ask":
+      return e.passed ? String(e.chosen) : e.detail ? "unavailable" : "unsure";
+    case "transfer":
+      return String(e.to);
+    case "outcome":
+      return `${e.outcome}:${e.reason}`;
+    default:
+      return "";
+  }
+}
+
+/** The core events of a run's events.jsonl: the ones a trace is replayed on. */
+export function coreEventsOf(events: Record<string, unknown>[]): Record<string, unknown>[] {
+  return events.filter((e) => CORE_EVENTS.has(e.event as string));
 }
 
 /** The core events of a run's events.jsonl, as signatures. */
 export function traceOf(events: Record<string, unknown>[]): string[] {
-  return events.filter((e) => CORE_EVENTS.has(e.event as string)).map(signature);
+  return coreEventsOf(events).map(signature);
 }
 
 const flat = (e: CoreEvent) => ({ ...(e.at ?? {}), ...e }) as Record<string, unknown>;
 
-/** Whether the explorer can take exactly this path, start to outcome (SPEC §12.4). */
-export function traceFits(start: Explorable, trace: string[], costs: Costs): boolean {
+/**
+ * Whether the explorer can take exactly this path, start to outcome (SPEC
+ * §12.4). If it can't, `at` is the first trace event no explored path
+ * takes: the furthest any path got. `trace.length` means the trace ends
+ * where every matching path goes on.
+ */
+export function traceFits(start: Explorable, trace: string[], costs: Costs): { fits: boolean; at: number } {
   const failed = new Set<string>();
-  const matches = (events: CoreEvent[], i: number) => events.every((e, k) => trace[i + k] === signature(flat(e)));
+  let furthest = 0;
+  const matches = (events: CoreEvent[], i: number) => {
+    const k = events.findIndex((e, k) => trace[i + k] !== signature(flat(e)));
+    furthest = Math.max(furthest, k < 0 ? i + events.length : i + k);
+    return k < 0;
+  };
   const visit = (run: Explorable, next: Next, i: number): boolean => {
     if (next.kind === "done") return i === trace.length;
     const key = `${i} ${run.key()}`;
@@ -219,7 +237,8 @@ export function traceFits(start: Explorable, trace: string[], costs: Costs): boo
     return false;
   };
   const first = start.step({ kind: "none" });
-  return matches(first.events, 0) && visit(start, first.next, first.events.length);
+  const fits = matches(first.events, 0) && visit(start, first.next, first.events.length);
+  return { fits, at: fits ? trace.length : furthest };
 }
 
 /** Worst-case time for one ask: every attempt, and the longest wait before each retry (SPEC §6.2). */

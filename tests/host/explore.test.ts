@@ -138,7 +138,7 @@ describe("trace replay (SPEC §12.4)", () => {
   ];
 
   test("a real run's path is one the explorer can take", () => {
-    expect(traceFits(toy(), traceOf(run), costs)).toBe(true);
+    expect(traceFits(toy(), traceOf(run), costs).fits).toBe(true);
   });
 
   test("a failed gate matches the unsure branch, whichever option led", () => {
@@ -147,16 +147,26 @@ describe("trace replay (SPEC §12.4)", () => {
       { event: "ask", section: "Main", line: 2, chosen: "s:b", passed: false },
       { event: "outcome", outcome: "handoff", reason: "gate_failed" },
     ];
-    expect(traceFits(toy(), traceOf(gate), costs)).toBe(true);
+    expect(traceFits(toy(), traceOf(gate), costs).fits).toBe(true);
   });
 
   test("a truncated, reordered or altered trace isn't", () => {
-    expect(traceFits(toy(), traceOf(run.slice(0, -1)), costs)).toBe(false);
-    expect(traceFits(toy(), traceOf([...run, run[1]] as Record<string, unknown>[]), costs)).toBe(false);
+    expect(traceFits(toy(), traceOf(run.slice(0, -1)), costs).fits).toBe(false);
+    expect(traceFits(toy(), traceOf([...run, run[1]] as Record<string, unknown>[]), costs).fits).toBe(false);
     const altered = run.map((e) => (e.event === "ask" ? { ...e, chosen: "s:a" } : e));
-    expect(traceFits(toy(), traceOf(altered), costs)).toBe(false);
+    expect(traceFits(toy(), traceOf(altered), costs).fits).toBe(false);
     const deadline = [...run.slice(0, 3), { event: "outcome", outcome: "handoff", reason: "deadline" }];
-    expect(traceFits(toy(), traceOf(deadline), costs)).toBe(false);
+    expect(traceFits(toy(), traceOf(deadline), costs).fits).toBe(false);
+  });
+
+  test("S10: a trace that doesn't fit says which of its core events no explored path takes", () => {
+    // Truncated: every event matches, but the trace ends where the path goes on.
+    expect(traceFits(toy(), traceOf(run.slice(0, -1)), costs)).toEqual({ fits: false, at: 5 });
+    // An extra event after the outcome.
+    expect(traceFits(toy(), traceOf([...run, run[1]] as Record<string, unknown>[]), costs)).toEqual({ fits: false, at: 6 });
+    // A deadline outcome after the first do: the explorer never hands off there.
+    const deadline = [...run.slice(0, 3), { event: "outcome", outcome: "handoff", reason: "deadline" }];
+    expect(traceFits(toy(), traceOf(deadline), costs)).toEqual({ fits: false, at: 2 });
   });
 
   test("signatures keep where and how, not values the explorer doesn't know", () => {

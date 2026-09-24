@@ -1615,8 +1615,14 @@ For each fake scenario, the concrete trace MUST appear among the explore
 handler's paths. `skop SKILL.md --verify --trace events.jsonl` checks one:
 it replays the trace's sequence of (section, line, response class) through
 the explorer's graph and exits 0 if the explorer can take that path, 40
-if it can't. Deadline scenarios are excluded (§5.4). This tests the host
-glue, since both share one interpreter.
+if it can't. Either way it prints one JSON line on stdout,
+`{"skop_version","skop_build","trace_fits":true}`, or with `false` and a
+`mismatch`: the first of the trace's core events no explored path takes,
+as `{index, event, section, line, class}` (`class` is the response class;
+all but `index` are `null` when the trace ends where every path goes on),
+and a readable line on stderr. A mismatch is a verify result, not an
+error, so it has no code. Deadline scenarios are excluded (§5.4). This
+tests the host glue, since both share one interpreter.
 Run in CI.
 
 ---
