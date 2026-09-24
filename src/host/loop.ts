@@ -86,7 +86,14 @@ export async function runLoop(interp: Interp, ctx: LoopContext): Promise<LoopRes
   let response: Response = { kind: "none" };
 
   for (;;) {
-    const { events, next } = interp.step(response);
+    const step = interp.step(response);
+    const next = step.next;
+    // Checked before this step's events go out: the core reports a do's effect_start in the
+    // step that requests it, and past the deadline that do never starts (SPEC §5.4, §7 step 5).
+    const late = next.kind !== "done" && ctx.now() >= ctx.deadlineMs;
+    const last = step.events.at(-1);
+    const unstarted = late && next.kind === "exec" && next.exec === "do" && last?.event === "effect_start" && last.cmd === next.cmd;
+    const events = unstarted ? step.events.slice(0, -1) : step.events;
     for (const e of events) {
       const { at, ...body } = e;
       if (body.event === "outcome") {
@@ -111,7 +118,7 @@ export async function runLoop(interp: Interp, ctx: LoopContext): Promise<LoopRes
       ctx.emit(out);
     }
     if (next.kind === "done") throw new Error("the core finished without an outcome event");
-    if (ctx.now() >= ctx.deadlineMs) {
+    if (late) {
       response = { kind: "deadline" };
       continue;
     }

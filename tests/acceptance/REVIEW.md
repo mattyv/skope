@@ -175,6 +175,7 @@ Known caveats still open:
 | cert-expiry | `do-timeout` | Renew's second `do` (line 38, no else) times out → handoff (command_failed) |
 | cert-expiry | `command-failed` | Triage's `run` (line 25, no else) fails → handoff (command_failed) |
 | cert-expiry | `deadline` | Huge simulated `ms` exceeds `limits.deadline` → handoff (deadline) before the next step |
+| cert-expiry | `deadline-before-do` | Renew's dry run (line 37) runs past `limits.deadline` → handoff (deadline) at line 38; that `do` never starts: no `effect_start`, not in `effects`, `effects: 1` |
 | cert-expiry | `tie-unassigned` | Triage ask ties via `unassigned` (0.5/0.25/0/0.25) → handoff (gate_failed) |
 | cert-expiry | `page-direct` | Triage → Page directly |
 | cert-expiry | `investigate-handoff` | Triage → Investigate → hand off (explicit) |

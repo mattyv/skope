@@ -1604,6 +1604,73 @@ function ceRunStart(dry_run) {
   );
 }
 
+// --- deadline-before-do: the Renew dry run (line 37) takes past limits.deadline, so the renewal
+// on line 38 never starts. No effect_start for it, it isn't in the record's effects, and the
+// outcome counts one effect (SPEC §7 step 5, §10) ---
+{
+  const events = [
+    ceRunStart(false),
+    mk.checkCmd(CE, { section: "Triage", line: 23, cmd: ceCheckCmd, exit: 1, stdout: "Certificate will expire\n" }),
+    mk.checkCmd(CE, { section: "Triage", line: 24, cmd: ceDiskCmd, exit: 1, stdout: "Certificate will expire\n" }),
+    mk.run(CE, {
+      section: "Triage",
+      line: 25,
+      cmd: "systemctl list-timers certbot.timer --no-pager",
+      exit: 0,
+      stdout: "certbot.timer active\n",
+    }),
+    mk.run(CE, { section: "Triage", line: 26, cmd: "journalctl -u certbot -n 50 --no-pager", exit: 0, stdout: "no recent failures\n" }),
+    mk.ask(CE, {
+      section: "Triage",
+      line: 28,
+      question: "Given `timer` and `renew_log`, what's the best next step?",
+      kind: "choice",
+      probs: { "s:renew": 0.875, "s:page": 0.0625, "s:investigate": 0.0625 },
+      chosen: "s:renew",
+      confidence: 0.875,
+      sure: 85,
+      passed: true,
+    }),
+    mk.transfer(CE, { section: "Triage", line: 28, from: "Triage", to: "Renew" }),
+    mk.effectStart(CE, { section: "Renew", line: 37, cmd: "certbot renew --dry-run --cert-name example.com" }),
+    mk.effectEnd(CE, { section: "Renew", line: 37, cmd: "certbot renew --dry-run --cert-name example.com", exit: 0 }),
+    mk.handoffRecord(CE, {
+      section: "Renew",
+      line: 38,
+      record: buildRecord({
+        skill: CE,
+        section: "Renew",
+        line: 38,
+        reason: "deadline",
+        variables: { timer: "certbot.timer active", renew_log: "no recent failures" },
+        effects: [{ cmd: "certbot renew --dry-run --cert-name example.com", status: "done" }],
+        dry_run: false,
+      }),
+    }),
+    mk.handoffPage(CE, {
+      section: "Renew",
+      line: 38,
+      text: "test-host: skop cert-expiry handed off (deadline) in Renew. Record: /tmp/skop/runs/r-test/handoff.json",
+      ok: true,
+    }),
+    mk.outcome(CE, { outcome: "handoff", reason: "deadline", ask_calls: 1, effects: 1, dry_run: false }),
+  ];
+  emit(
+    "fixtures/cert-expiry",
+    "deadline-before-do",
+    events,
+    { "line:28": { "s:renew": 0.875, "s:page": 0.0625, "s:investigate": 0.0625 } },
+    {
+      "line:23": { exit: 1, stdout: "Certificate will expire\n" },
+      "line:24": { exit: 1, stdout: "Certificate will expire\n" },
+      "line:25": { exit: 0, stdout: "certbot.timer active\n" },
+      "line:26": { exit: 0, stdout: "no recent failures\n" },
+      "line:37": { exit: 0, ms: 1_000_000 },
+    },
+    "handoff",
+  );
+}
+
 // --- tie-unassigned: a tie via `unassigned` fails the gate (SPEC §4.2, §12.2-style). All dyadic.
 {
   const events = [

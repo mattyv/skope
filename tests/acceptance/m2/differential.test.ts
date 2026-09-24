@@ -32,7 +32,7 @@ function writeTrace(events: object[]): string {
 }
 
 describe("differential check: a real run's trace is one --verify's explorer can take (SPEC §12.4)", () => {
-  for (const s of allScenarios().filter((s) => s.name !== "deadline")) {
+  for (const s of allScenarios().filter((s) => !s.name.startsWith("deadline"))) {
     test(`${s.fixture}/${s.name}: --verify --trace exits 0 on the run's own trace`, async () => {
       const mode = s.name === "dry-run" ? "--dry-run" : "--apply";
       const run = await runSkop([s.skillPath, mode, "--fake", s.answersPath, "--fake-exec", s.commandsPath]);

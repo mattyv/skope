@@ -115,6 +115,36 @@ describe("host loop", () => {
     expect(core.got[1]).toEqual({ kind: "deadline" });
   });
 
+  test("S2: past the deadline before a do, its effect_start isn't emitted or counted: it never started", async () => {
+    const handoff: Next = { kind: "done", outcome: { kind: "handoff", reason: "deadline", detail: null } };
+    const core = scripted([
+      { events: [{ at, event: "effect_start", cmd: "sleep 2" }], next: exec("sleep 2", "do") },
+      {
+        events: [
+          { at, event: "effect_end", cmd: "sleep 2", exit: 0, timed_out: false },
+          { at: { section: "Triage", line: 4 }, event: "effect_start", cmd: "touch X" },
+        ],
+        next: { ...exec("touch X", "do"), src: 4 } as Next,
+      },
+      { events: [outcome], next: handoff },
+    ]);
+    // The deadline passes while the first do runs.
+    let t = 0;
+    const h = handlers({
+      exec: async () => {
+        t = 2000;
+        return result();
+      },
+    });
+    const { r, emitted } = await drive(core, h, { now: () => t, deadlineMs: 1000 });
+    expect(emitted.map((e) => [e.event, e.cmd])).toEqual([
+      ["effect_start", "sleep 2"],
+      ["effect_end", "sleep 2"],
+    ]);
+    expect(r.effects).toEqual([{ cmd: "sleep 2", status: "done" }]);
+    expect(core.got[2]).toEqual({ kind: "deadline" });
+  });
+
   test("before the deadline, the request is performed", async () => {
     const core = scripted([
       { events: [], next: exec("df") },
