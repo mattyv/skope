@@ -1408,14 +1408,17 @@ strict key error. It's also invalid when its `expect.yaml` is bad or an
 (`E-FAKE-AMBIGUOUS`, which can surface mid-run).
 
 **Live** (`--test --live [--runs N]`) asks the configured backend instead
-of `answers.yaml`, with the commands still faked, and runs each scenario
+of `answers.yaml` (which it doesn't read, so a broken one doesn't matter), with the commands still faked, and runs each scenario
 several times: `--runs N`, else its `live.runs`, else 10. A run is a **hit**
 when it satisfies the whole `expect.yaml`; an expected ask the run never
 reached is a miss. The scenario fails when its hit rate is under
 `live.min_hit_rate` (default 1), or when it sets `live.min_margin` and an ask
 named in `asks` has a margin under it. The margin is that ask's lowest
 confidence, in points, minus `sure`, over the runs that reached it: 81%
-against sure 80 is +1. Without `min_margin`, a margin under 5 is a warning.
+against sure 80 is +1. It's compared unrounded and shown to one decimal,
+so 84.6% against sure 80 is +4.6, under a `min_margin` of 5. Without
+`min_margin`, a margin under 5 is a warning. The median confidence of an
+even number of runs is the mean of the middle two.
 Before running, skope prints the most backend calls the runs could make:
 the most asks any path can reach (from the explorer, as `--explain`
 counts), times each scenario's runs. It can't know the exact number, since a

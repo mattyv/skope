@@ -88,10 +88,31 @@ function readScenario(
   };
 }
 
+/** The document with every `answers` removed, from defaults and from each scenario. */
+function withoutAnswers(doc: unknown): unknown {
+  if (!isObj(doc)) return doc;
+  const drop = (v: unknown) => {
+    if (!isObj(v)) return v;
+    const { answers: _, ...rest } = v;
+    return rest;
+  };
+  const out: Obj = { ...doc };
+  if ("defaults" in out) out.defaults = drop(out.defaults);
+  if (isObj(out.scenarios)) out.scenarios = Object.fromEntries(Object.entries(out.scenarios).map(([k, v]) => [k, drop(v)]));
+  return out;
+}
+
 /** Every scenario a parsed tests.yaml document defines, merged with its defaults, or why each one
  * can't be used. `folderNames` are the tests/ folder scenarios already found next to it: a
  * tests.yaml scenario with the same name is invalid rather than silently picked over. */
-export function readTestsYaml(doc: unknown, folderNames: ReadonlySet<string>, program: CoreProgram | null = null): TestsYamlRow[] {
+export function readTestsYaml(
+  doc: unknown,
+  folderNames: ReadonlySet<string>,
+  program: CoreProgram | null = null,
+  opts: { ignoreAnswers?: boolean } = {},
+): TestsYamlRow[] {
+  // --live never uses answers, so it never checks them either: a broken one mustn't stop the run.
+  if (opts.ignoreAnswers) doc = withoutAnswers(doc);
   const bad = shapeError(doc);
   if (bad !== null) {
     // Nothing can be told apart from the document alone: one invalid entry stands for it all.
