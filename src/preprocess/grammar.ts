@@ -11,7 +11,7 @@ export type Keyword = (typeof KEYWORDS)[number];
 export type Lead =
   | { kind: "keyword"; keyword: Keyword; colon: boolean; rest: string }
   | { kind: "note" } // bold ending in `:`, e.g. `**Note:**`: prose
-  | { kind: "unknown"; content: string }; // any other bold: E-UNKNOWN-BOLD
+  | { kind: "unknown"; content: string; html?: true }; // any other bold: E-UNKNOWN-BOLD
 
 /** Classifies an item by its leading `**bold**` or `__bold__` span (SPEC §3.3
  * rule 3), or returns null when the item doesn't start with bold. Emphasis
@@ -21,7 +21,7 @@ export function classifyLead(text: string): Lead | null {
   // HTML bold renders like **bold** but isn't skop's bold: an error, not a
   // silent prose item (SPEC §3.3 rule 3).
   const html = /^<(b|strong)>(.*?)<\/\1>/i.exec(text);
-  if (html) return { kind: "unknown", content: html[2] ?? "" };
+  if (html) return { kind: "unknown", content: html[2] ?? "", html: true };
   const delim = text.slice(0, 2);
   if (delim !== "**" && delim !== "__") return null;
   const close = text.indexOf(delim, 3);

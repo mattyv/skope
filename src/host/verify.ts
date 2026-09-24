@@ -76,6 +76,11 @@ export function readOnly(mode: ReadOnly, v: VerifyInput): number {
   const { version, build } = IDENTITY;
   const maxima = { max_ask_calls: s.maxAsks, max_effects: s.maxEffects, worst_case_ms: s.maxMs, asks: s.asks };
   if ("explain" in mode) {
+    const n = (k: number, word: string) => `${k} ${word}${k === 1 ? "" : "s"}`;
+    const entry = (v.program.sections[v.program.entry.section] as Section).name;
+    v.say(
+      `skop: ${n(sections.length, "section")}, entry ${entry}; at most ${n(s.maxAsks, "ask")} and ${n(s.maxEffects, "effect")}; worst case ${s.maxMs / 1000}s`,
+    );
     v.emit({
       skop_version: version,
       skop_build: build,

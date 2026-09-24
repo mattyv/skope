@@ -449,3 +449,85 @@ describe("review fixes", () => {
     expect(r.events.filter((e) => e.code === "W-SECTION-UNREACHED")).toHaveLength(1);
   });
 });
+
+describe("final review nits", () => {
+  test("--help prints every flag in SPEC §7 to stdout and exits 0", async () => {
+    const r = await runSkop(["--help"]);
+    expect(r.code).toBe(0);
+    for (const flag of [
+      "--apply",
+      "--dry-run",
+      "--no-page",
+      "--param",
+      "--explain",
+      "--verify",
+      "--trace",
+      "--lint",
+      "--fake",
+      "--fake-exec",
+      "--config",
+      "--version",
+      "--help",
+    ])
+      expect(r.stdout, flag).toContain(flag);
+    expect(r.stderr).toBe("");
+  });
+
+  test("--lint success prints one ok line to stderr; stdout stays empty", async () => {
+    const path = skill("- **stop**");
+    const r = await runSkop([path, "--lint"]);
+    expect(r.code).toBe(0);
+    expect(r.stdout).toBe("");
+    expect(r.stderr).toBe(`skop: ${path}: ok\n`);
+  });
+
+  test("--explain prints its JSON on stdout and a short summary on stderr", async () => {
+    const r = await runSkop([skill("- **do** `x`\n- **stop**"), "--explain"]);
+    expect(r.code).toBe(0);
+    expect(r.stdout.trim().split("\n")).toHaveLength(1);
+    expect(JSON.parse(r.stdout)).toMatchObject({ entry: "Main", max_effects: 1 });
+    expect(r.stderr).toMatch(/^skop: 1 section, entry Main; at most 0 asks and 1 effect; worst case \d+(\.\d+)?s\n$/);
+  });
+
+  test("locked prints who holds the lock and where", async () => {
+    const runtime = mkdtempSync(join(tmpdir(), "skop-rt-"));
+    mkdirSync(join(runtime, "skop"), { mode: 0o700 });
+    const lock = join(runtime, "skop", "tiny.lock");
+    writeFileSync(lock, JSON.stringify({ pid: process.pid, startTime: null }));
+    const r = await runSkop([skill("- **stop**"), "--apply"], { env: { XDG_RUNTIME_DIR: runtime } });
+    expect(r.code).toBe(30);
+    expect(r.stderr).toContain(`skop: another run (pid ${process.pid}) holds the lock at ${lock}`);
+  });
+
+  test("<b>run</b> says HTML bold isn't skop bold", async () => {
+    const r = await runSkop([skill("- <b>run</b> `df`\n- **stop**"), "--lint"]);
+    expect(r.code).toBe(40);
+    expect(find(r.events, "error", "E-UNKNOWN-BOLD")?.message).toContain("HTML bold isn't skop bold; use **run**");
+  });
+
+  test("E-USAGE: a skill file that isn't valid UTF-8 is refused, not patched with U+FFFD", async () => {
+    const path = skill("- **stop**");
+    writeFileSync(path, Buffer.concat([readFileSync(path), Buffer.from([0xff, 0xfe, 0x0a])]));
+    const r = await runSkop([path, "--lint"]);
+    expect(r.code).toBe(40);
+    expect(find(r.events, "error", "E-USAGE")?.message).toMatch(/UTF-8/);
+  });
+
+  test("an invalid backend answer prints a stderr line, like an unavailable one", async () => {
+    const path = skill(
+      "- **run** `df` as used\n- **ask** Given {used}, which? · sure 80%\n  - [Other]\n  - [Third]\n\n## Other\nElse.\n\n- **stop**\n\n## Third\nOr this.\n\n- **stop**",
+    );
+    const answers = file("a.yaml", '{"line:11": {"s:other": 0.5, "s:third": 0.9}}');
+    const r = await runSkop([path, "--apply", "--no-page", "--fake", answers]);
+    expect(r.code).toBe(20);
+    expect(find(r.events, "ask")).toMatchObject({ detail: "unavailable" });
+    expect(r.stderr).toMatch(/skop: the backend's answer was invalid/);
+  });
+
+  test("E-PARAM-UNSAFE says which characters are allowed", async () => {
+    const path = skill("- **run** `echo {m}`\n- **stop**", "params:\n  m: /\n");
+    const r = await runSkop([path, "--apply", "--param", "m=/; rm -rf /"]);
+    expect(r.code).toBe(40);
+    expect(find(r.events, "error", "E-PARAM-UNSAFE")?.message).toContain("A-Z a-z 0-9 . _ / : @ % + = , -");
+  });
+});

@@ -1066,6 +1066,7 @@ skop <path/to/SKILL.md> [options]
   --fake-exec cmds.yaml   use the fake command handler; no real command runs
   --config path           default: $XDG_CONFIG_HOME/skop/config.yaml
   --version               print the release version and build identity (§7.2)
+  --help                  print these options to stdout and exit 0
 ~~~
 
 Responsibilities, in order:

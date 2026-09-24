@@ -29,7 +29,7 @@ export class LockError extends Error {
 
 export type LockResult =
   | { status: "acquired"; release(): void }
-  | { status: "locked"; holderPid: number }
+  | { status: "locked"; path: string; holderPid: number }
   | { status: "stale"; path: string; holderPid: number | null };
 
 /** What a lock file holds. `startTime` is `processStartId`, or null where it can't be found. */
@@ -166,7 +166,9 @@ export function acquireLock(name: string, dir: string = lockDir()): LockResult {
       const holder = parseLock(text);
       // Our own pid in the lock is an earlier process that had it.
       if (holder === null || holder.pid === process.pid) return { status: "stale", path: file, holderPid: holder?.pid ?? null };
-      return holderAlive(holder) ? { status: "locked", holderPid: holder.pid } : { status: "stale", path: file, holderPid: holder.pid };
+      return holderAlive(holder)
+        ? { status: "locked", path: file, holderPid: holder.pid }
+        : { status: "stale", path: file, holderPid: holder.pid };
     }
     throw new LockError(`lock file ${file} keeps appearing and disappearing`);
   } finally {

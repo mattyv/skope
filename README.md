@@ -69,7 +69,7 @@ instead of an agent session, and every decision is logged.
 ```console
 $ curl -fsSL https://github.com/mattyv/skop/releases/latest/download/install.sh | sh
 $ skop --version
-skop 1.0.0 (build identity 3f1c…)
+skop 0.1.0 (build identity 3f1c…)
 ```
 
 That installs a single self-contained binary for Linux (x64, arm64) or

@@ -73,11 +73,16 @@ export async function runSkill(o: RunOptions): Promise<number> {
   const dryRun = o.mode === "run" && o.apply !== o.dryRun ? o.dryRun : null;
   let askCalls = 0;
   let effects = 0;
+  // Whether the last ask's backend call failed, which the handler already said on stderr.
+  let askFailed = false;
 
   const emit = (e: Record<string, unknown>) => {
     // Counted here, not taken from the core's outcome, so a run that ends in error still reports them.
     if (e.event === "ask") askCalls++;
     if (e.event === "effect_start") effects++;
+    // The core found the answer invalid, which counts as unavailable (SPEC §4.2): say so, as for a failed call.
+    if (e.event === "ask" && e.detail !== undefined && !askFailed)
+      say("skop: the backend's answer was invalid, so it counts as the backend being unavailable\n");
     process.stdout.write(`${JSON.stringify({ ts: new Date().toISOString(), ...run, host, ...e })}\n`);
   };
   // Warnings about a run that goes ahead are emitted after run_start, so they carry its run_id (SPEC §10).
@@ -125,7 +130,13 @@ export async function runSkill(o: RunOptions): Promise<number> {
     } catch (err) {
       return fail("E-USAGE", "args", `can't read ${o.file}: ${(err as Error).message}`);
     }
-    const parsed = preprocess(text.toString("utf8"));
+    let source: string;
+    try {
+      source = new TextDecoder("utf-8", { fatal: true }).decode(text);
+    } catch {
+      return fail("E-USAGE", "args", `can't read ${o.file}: it isn't valid UTF-8`);
+    }
+    const parsed = preprocess(source);
     if ("errors" in parsed) {
       for (const e of parsed.errors) diag("error", { code: e.code, stage: "parse", file: o.file, line: e.line, message: e.message });
       throw new End("invalid");
@@ -137,7 +148,10 @@ export async function runSkill(o: RunOptions): Promise<number> {
       for (const e of found.errors) diag("error", { code: e.code, stage: "lint", file: o.file, line: e.line, message: meaning(e.code) });
       throw new End("invalid");
     }
-    if (o.mode === "lint") return 0;
+    if (o.mode === "lint") {
+      say(`skop: ${o.file}: ok\n`);
+      return 0;
+    }
     if (o.mode === "verify" || o.mode === "explain") {
       const trace = o.trace === undefined ? undefined : readTrace(o.trace, fail);
       return readOnly(o.mode === "verify" ? { verify: true, trace } : { explain: true }, {
@@ -159,7 +173,12 @@ export async function runSkill(o: RunOptions): Promise<number> {
       mode: "concrete",
     };
     const unsafe = unsafeInputs(program, cfg);
-    if (unsafe.length > 0) fail("E-PARAM-UNSAFE", "args", `${unsafe.join(", ")} fails the safe-value check (§3.5)`);
+    if (unsafe.length > 0)
+      fail(
+        "E-PARAM-UNSAFE",
+        "args",
+        `${unsafe.join(", ")} fails the safe-value check (§3.5): a value in a command may use only A-Z a-z 0-9 . _ / : @ % + = , - and can't start with -`,
+      );
 
     const backend = await checkBackend(program, config, o, fail, diag);
     const answers = o.fake ? (readFakes(o.fake, "answers", fail) as FakesAnswers) : undefined;
@@ -198,6 +217,7 @@ export async function runSkill(o: RunOptions): Promise<number> {
     }
     if (lock.status === "locked") {
       emit({ event: "locked", holder_pid: lock.holderPid });
+      say(`skop: another run (pid ${lock.holderPid}) holds the lock at ${lock.path}\n`);
       return end("locked");
     }
     if (lock.status === "stale") {
@@ -265,6 +285,7 @@ export async function runSkill(o: RunOptions): Promise<number> {
         }
         const t = Date.now();
         const out: AskOutput = answers ? askFake(answers, req, src) : await askBackend(body, backend);
+        askFailed = isFailure(out);
         if (isFailure(out)) say(`skop: the backend was unavailable: ${out.detail}\n`);
         if (!answers && !isFailure(out) && config.jev && backend.SKOP_ASK_BACKEND === "jev" && out.model !== config.jev.model)
           diag("warning", {

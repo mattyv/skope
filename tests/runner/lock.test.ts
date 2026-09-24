@@ -86,7 +86,7 @@ describe("acquireLock (SPEC §7 step 3)", () => {
     const pid = await liveChild();
     writeLock({ pid, startTime: processStartId(pid) });
     const before = readFileSync(lockFile(), "utf8");
-    expect(acquireLock("myskill", dir)).toEqual({ status: "locked", holderPid: pid });
+    expect(acquireLock("myskill", dir)).toEqual({ status: "locked", path: lockFile(), holderPid: pid });
     expect(readFileSync(lockFile(), "utf8")).toBe(before);
   });
 
@@ -114,7 +114,7 @@ describe("acquireLock (SPEC §7 step 3)", () => {
       throw Object.assign(new Error("kill EPERM"), { code: "EPERM" });
     });
     writeLock({ pid: 4242, startTime: null });
-    expect(acquireLock("myskill", dir)).toEqual({ status: "locked", holderPid: 4242 });
+    expect(acquireLock("myskill", dir)).toEqual({ status: "locked", path: lockFile(), holderPid: 4242 });
   });
 
   test.each([
@@ -182,7 +182,7 @@ describe("acquireLock (SPEC §7 step 3)", () => {
     const winners = results.filter((r) => r.status === "acquired");
     expect(winners).toHaveLength(1);
     const winner = winners[0] as RaceResult;
-    for (const r of results.filter((x) => x !== winner)) expect(r).toEqual({ pid: r.pid, status: "locked", holderPid: winner.pid });
+    for (const r of results.filter((x) => x !== winner)) expect(r).toMatchObject({ pid: r.pid, status: "locked", holderPid: winner.pid });
     expect(existsSync(lockFile())).toBe(false); // the winner released it on the way out
   });
 });

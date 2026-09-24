@@ -10,7 +10,7 @@ import type { CoreProgram, List, OtherSection, Section, Stmt } from "../contract
 import { type Block, type Item, isPlainText, parseBlocks, plainText } from "./blocks.js";
 import { mkErr, type ParseError } from "./errors.js";
 import { parseFrontmatter } from "./frontmatter.js";
-import { type BracketRef, Cursor, classifyLead, GRAMMAR_ERROR, leadingKeyword, splitParts, suggestKeyword } from "./grammar.js";
+import { type BracketRef, Cursor, classifyLead, GRAMMAR_ERROR, KEYWORDS, leadingKeyword, splitParts, suggestKeyword } from "./grammar.js";
 import { githubSlug, sectionId } from "./slug.js";
 import {
   parseAsk,
@@ -162,7 +162,7 @@ class Preprocessor {
     const lead = classifyLead(item.text);
     if (lead?.kind !== "keyword") {
       if (lead?.kind === "unknown") {
-        this.err("E-UNKNOWN-BOLD", item.line, `**${lead.content}** isn't a keyword${suggestKeyword(lead.content)}`);
+        this.err("E-UNKNOWN-BOLD", item.line, unknownBold(lead));
       }
       this.scanMisplaced(item.blocks); // prose, subject to rule 7
       return null;
@@ -305,4 +305,11 @@ function dataItem(item: Item): List["items"][number] | null {
     return label && isPlainText(label) && cmd !== null && cur.atEnd() ? { src, action: { label, cmd: splitParts(cmd) } } : null;
   }
   return text && isPlainText(text) ? { src, value: text } : null;
+}
+
+/** The E-UNKNOWN-BOLD message: HTML bold is named as such, with the skop spelling when it's a keyword. */
+function unknownBold(lead: { content: string; html?: true }): string {
+  if (!lead.html) return `**${lead.content}** isn't a keyword${suggestKeyword(lead.content)}`;
+  const keyword = KEYWORDS.find((k) => k === lead.content.trim().toLowerCase());
+  return keyword ? `HTML bold isn't skop bold; use **${keyword}**` : `HTML bold isn't skop bold${suggestKeyword(lead.content)}`;
 }
