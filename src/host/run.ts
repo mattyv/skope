@@ -5,9 +5,9 @@
 
 import { createHash, randomBytes } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { createRequire } from "node:module";
 import { hostname } from "node:os";
 import { join } from "node:path";
+import Ajv2020Module from "ajv/dist/2020.js";
 import { load as loadYaml } from "js-yaml";
 import { runAsk } from "../ask/cli.js";
 import { askFake } from "../ask/fake.js";
@@ -474,7 +474,8 @@ export function fitContext(context: Record<string, string>, maxChars: number): R
 }
 
 // ajv is the one validator that reads contracts/fakes.schema.json exactly as the contract tests do.
-const Ajv2020 = createRequire(import.meta.url)("ajv/dist/2020").default;
+// ajv is CommonJS with a `default` export; unwrap it the same way under Node and in the bundle.
+const Ajv2020: any = (Ajv2020Module as any).default ?? Ajv2020Module;
 let fakesAjv: { getSchema(ref: string): ((v: unknown) => boolean) & { errors?: unknown } } | undefined;
 
 /** A --fake or --fake-exec file, checked against contracts/fakes.schema.json before the run (SPEC §7.1 E-CONFIG). */

@@ -5,15 +5,10 @@
 // type or out-of-range value, or the selected backend with no config block.
 
 import { closeSync, fstatSync, openSync, readFileSync } from "node:fs";
-import { createRequire } from "node:module";
 import { homedir } from "node:os";
 import { isAbsolute, join } from "node:path";
+import { load as loadYaml } from "js-yaml";
 import { compilePattern } from "./redact.js";
-
-// js-yaml ships no type declarations for this project's TS setup; treated
-// as untyped at the boundary, like the generated Dafny code in core.ts.
-const require = createRequire(import.meta.url);
-const loadYaml: (s: string) => unknown = require("js-yaml").load;
 
 export class ConfigError extends Error {
   readonly code = "E-CONFIG";

@@ -4,13 +4,9 @@
 // checks it prints the same `--version` as the npm build and runs a fake
 // scenario with its expected exit code, with `node` removed from PATH.
 //
-// Skips (with a clear reason) when:
-// - the platform's Node build doesn't support single executable
-//   applications (no --experimental-sea-config, or postject can't inject
-//   into this platform's binary format);
-// - the bundle itself can't run yet — the same createRequire(import.meta.url)
-//   gap documented in tests/package/bundle.test.ts, which blocks every SEA
-//   binary the same way since it embeds the same bundle.
+// Skips (with the reason) only when this platform's Node can't build a
+// single executable application at all. A binary that builds but doesn't
+// run is a failure, not a skip.
 
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
@@ -27,19 +23,9 @@ let blocked: string | undefined;
 try {
   execFileSync(process.execPath, [join(ROOT, "scripts/package/sea.mjs"), "--outfile", BINARY], { cwd: ROOT, stdio: "pipe" });
 } catch (err) {
-  blocked = `sea build failed (SEA/postject may be unsupported on this platform, or the bundle can't run — see tests/package/bundle.test.ts): ${
+  blocked = `sea build failed (single executable applications may be unsupported on this platform): ${
     err instanceof Error ? err.message : String(err)
   }`;
-}
-
-if (blocked === undefined) {
-  try {
-    execFileSync(BINARY, ["--version"], { encoding: "utf8" });
-  } catch (err) {
-    blocked = `the built binary can't run --version (see tests/package/bundle.test.ts for the likely cause): ${
-      err instanceof Error ? err.message : String(err)
-    }`;
-  }
 }
 
 afterAll(() => {
@@ -56,9 +42,8 @@ function emptyPath(): string {
 
 describe.skipIf(blocked !== undefined)("standalone binary (SPEC §5.5)", () => {
   test("prints the same --version as the npm build", () => {
-    execFileSync(process.execPath, ["-e", "require('fs').rmSync('dist',{recursive:true,force:true})"], { cwd: ROOT });
-    execFileSync(process.execPath, [join(ROOT, "scripts/build-id.mjs"), "--write", "dist/build-identity.json"], { cwd: ROOT });
-    execFileSync("npx", ["tsc", "-p", "tsconfig.build.json"], { cwd: ROOT, stdio: "pipe" });
+    // dist/ is built by `npm test`'s pretest step; rebuilding it here would
+    // race every other test that runs dist/cli.js.
     const npmOut = execFileSync(process.execPath, [join(ROOT, "dist/cli.js"), "--version"], { encoding: "utf8" });
 
     const noNode = emptyPath();

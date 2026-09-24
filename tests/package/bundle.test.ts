@@ -4,15 +4,6 @@
 // (which take one script) can embed it. This tests the bundle runs with no
 // node_modules present at all, and that it lints and dry-runs a fixture
 // with the same result as the npm-built CLI (dist/cli.js).
-//
-// Known gap (see the M6 packaging report): src/core.ts and
-// src/runner/config.ts resolve their CommonJS dependencies with
-// `createRequire(import.meta.url)`. esbuild can't bundle that call
-// statically, and Node evaluates `import.meta.url` to an empty string once
-// flattened into a single CJS file, so `createRequire(undefined)` throws at
-// startup. Until those become static imports (a src/** change outside this
-// agent's scope), the bundle can't run; the tests below skip with that
-// reason instead of failing a gap someone else is already closing.
 
 import { execFileSync } from "node:child_process";
 import { cpSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
@@ -34,22 +25,11 @@ function runBundle(args: string[], opts: { cwd?: string } = {}) {
   return execFileSync(process.execPath, [BUNDLE, ...args], { cwd: opts.cwd ?? ROOT, encoding: "utf8" });
 }
 
-let blocked: string | undefined;
-try {
-  runBundle(["--version"]);
-} catch (err) {
-  blocked =
-    "the bundle can't run yet: src/core.ts and src/runner/config.ts use " +
-    "createRequire(import.meta.url), which breaks once bundled to one CJS " +
-    "file (see this test file's header). Underlying error: " +
-    (err instanceof Error ? err.message : String(err));
-}
-
 afterAll(() => {
   rmSync(BUNDLE_DIR, { recursive: true, force: true });
 });
 
-describe.skipIf(blocked !== undefined)("bundle (SPEC §5.5)", () => {
+describe("bundle (SPEC §5.5)", () => {
   test("runs --version with no node_modules present", () => {
     const isolated = mkdtempSync(join(tmpdir(), "skop-bundle-run-"));
     try {
@@ -65,9 +45,8 @@ describe.skipIf(blocked !== undefined)("bundle (SPEC §5.5)", () => {
   });
 
   test("--version matches the npm build's output", () => {
-    execFileSync(process.execPath, ["-e", "require('fs').rmSync('dist',{recursive:true,force:true})"], { cwd: ROOT });
-    execFileSync(process.execPath, [join(ROOT, "scripts/build-id.mjs"), "--write", "dist/build-identity.json"], { cwd: ROOT });
-    execFileSync("npx", ["tsc", "-p", "tsconfig.build.json"], { cwd: ROOT, stdio: "pipe" });
+    // dist/ is built by `npm test`'s pretest step; rebuilding it here would
+    // race every other test that runs dist/cli.js.
     const npmOut = execFileSync(process.execPath, [join(ROOT, "dist/cli.js"), "--version"], { encoding: "utf8" });
     expect(runBundle(["--version"])).toBe(npmOut);
   });
@@ -106,5 +85,3 @@ describe.skipIf(blocked !== undefined)("bundle (SPEC §5.5)", () => {
     }
   });
 });
-
-test.skipIf(blocked === undefined)(`SKIPPED: ${blocked ?? ""}`, () => {});

@@ -6,12 +6,13 @@
 // int, bool or char. So the adapters check them: anything they can't
 // represent exactly is an error (Unsupported), never a silent rewrite.
 
-import { createRequire } from "node:module";
+// Static imports, so a single-file bundle can inline them (SPEC §5.5).
+import BigNumberLib from "bignumber.js";
+import core from "../core/generated/core.cjs";
 
-const require = createRequire(import.meta.url);
 // Dafny's output has no types, so it's `any` here and in the adapters.
-export const gen: any = require("../core/generated/core.cjs");
-export const BigNumber: any = require("bignumber.js");
+export const gen: any = core;
+export const BigNumber: any = BigNumberLib;
 export const { _dafny } = gen;
 
 /** Input the core can't represent exactly. */

@@ -10,7 +10,7 @@
 // Usage: node scripts/package/bundle.mjs [--outfile path]
 
 import { execFileSync } from "node:child_process";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, rmSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as esbuild from "esbuild";
@@ -20,7 +20,7 @@ const args = process.argv.slice(2);
 const outAt = args.indexOf("--outfile");
 const OUT_FILE = outAt !== -1 ? resolve(process.cwd(), args[outAt + 1]) : join(ROOT, "dist-bundle", "skop.cjs");
 
-// Same computation the npm build stamps into dist/build-identity.json, so a
+// Same computation the npm build stamps into dist/build-identity.js, so a
 // bundle built from the same source has the same identity as the package.
 const identity = JSON.parse(execFileSync(process.execPath, [join(ROOT, "scripts", "build-id.mjs")], { cwd: ROOT, encoding: "utf8" }));
 
@@ -41,25 +41,14 @@ await esbuild.build({
   plugins: [buildIdentityPlugin(identity)],
 });
 
-// Compatibility shim: src/host/identity.ts currently reads
-// build-identity.json at runtime via `readFileSync(new URL("../build-
-// identity.json", import.meta.url))`, resolved relative to its own compiled
-// file's path (dist/host/identity.js -> dist/build-identity.json). Bundled
-// into one file, that relative path lands next to the bundle's directory,
-// not inside it, so drop the file there too. Once identity.ts imports the
-// JSON statically instead (tracked as a needed src change, see the M6
-// report), the esbuild plugin below inlines it directly and this file stops
-// being read; it's harmless to keep shipping.
-writeFileSync(join(dirname(OUT_FILE), "..", "build-identity.json"), `${JSON.stringify(identity)}\n`);
-
 console.log(`bundle: wrote ${OUT_FILE}`);
 
-/** Resolves any import/require path containing "build-identity" to the identity computed above, inlined as JSON so the bundle needs no sidecar file once identity.ts imports it statically. */
+/** Resolves the generated build-identity module (src imports it statically) to the identity computed above, inlined as JSON. */
 function buildIdentityPlugin(identity) {
   return {
     name: "skop-build-identity",
     setup(build) {
-      build.onResolve({ filter: /build-identity(\.json)?$/ }, (args) => ({
+      build.onResolve({ filter: /build-identity(\.js|\.json)?$/ }, (args) => ({
         path: args.path,
         namespace: "skop-build-identity",
       }));
