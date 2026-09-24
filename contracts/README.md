@@ -73,7 +73,8 @@ Decisions the spec left open, made here:
 - **`sure` is 0–100.** Anything else fails the schema; the preprocessor
   reports it as `E-GRAMMAR`.
 - **Fakes** are keyed by the text exactly as it would be sent (a question
-  names run outputs in backticks), or by `line:N`, which wins. A list of
+  names run outputs in backticks), by `line:N`, or by `Section.var` /
+  `Section.ask`, which survive edits; the most specific wins (SPEC §5.4). A list of
   command results is used in order and the last repeats. `unsure` is a
   uniform answer, so the gate always fails; `unavailable` is a backend
   failure. Under `--fake-exec` the pager is answered by its

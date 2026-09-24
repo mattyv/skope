@@ -107,20 +107,26 @@ Rehearse it with fake command results and fake answers. Nothing real runs:
 $ skope disk-full/SKILL.md --dry-run --fake answers.yaml --fake-exec commands.yaml
 ```
 
-Both files are JSON (so also YAML), keyed by the skill's line number or by
-the exact command or question text after interpolation. Every command the
-run reaches needs an answer, or it stops with `E-FAKE-UNMATCHED`:
+Both files are JSON (so also YAML). Key each entry by what the statement
+binds, `Section.var`, or by `Section.ask` for a section's only question.
+Those keys survive edits to the skill. A statement that binds nothing
+takes its line number, `line:N`, or its exact text after interpolation.
+Every command the run reaches needs an answer, or it stops with
+`E-FAKE-UNMATCHED`:
 
 ```json
 {
-  "line:23": { "exit": 0, "stdout": " 96%\n" },
-  "line:25": { "exit": 0, "stdout": "no obvious cause\n" }
+  "Triage.used": { "exit": 0, "stdout": " 96%\n" },
+  "Triage.errors": { "exit": 0, "stdout": "no obvious cause\n" }
 }
 ```
 
 ```json
-{ "line:27": { "s:clean_up": 0.05, "s:restart": 0.05, "s:page": 0.85, "s:investigate": 0.05 } }
+{ "Triage.ask": { "s:clean_up": 0.05, "s:restart": 0.05, "s:page": 0.85, "s:investigate": 0.05 } }
 ```
+
+A key that names no statement gets warning `W-FAKE-UNUSED`, and one that
+names two (a section that binds `used` twice) is `E-FAKE-AMBIGUOUS`.
 
 Leave out `--fake` to rehearse against the real backend with fake command
 results: that's how you check a skill's questions and thresholds.

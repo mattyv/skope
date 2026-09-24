@@ -23,6 +23,7 @@ import { type Config, loadConfig } from "../runner/config.js";
 import { type Diagnostic, diagnosticLine, plainText, type Stage } from "../runner/events.js";
 import { commandEnv, execCommand, stopAll } from "../runner/exec.js";
 import { createFakeClock, fakeExec } from "../runner/fakeExec.js";
+import { type FakeKind, resolveFakeKeys } from "../runner/fakeKeys.js";
 import { fakesError } from "../runner/fakes.js";
 import { acquireLock, LockError } from "../runner/lock.js";
 import { sendPage } from "../runner/pager.js";
@@ -190,8 +191,17 @@ export async function runSkill(o: RunOptions): Promise<number> {
       );
 
     const backend = await checkBackend(program, config, o, fail, diag);
-    const answers = o.fake ? (readFakes(o.fake, "answers", fail) as FakesAnswers) : undefined;
-    const commands = o.fakeExec ? (readFakes(o.fakeExec, "commands", fail) as FakesCommands) : undefined;
+    const fakes = <T extends Record<string, unknown>>(path: string | undefined, kind: FakeKind): T | undefined => {
+      if (path === undefined) return undefined;
+      const { doc, issues } = resolveFakeKeys(program, readFakes(path, kind, fail) as T, kind);
+      for (const i of issues) {
+        if (i.code === "E-FAKE-AMBIGUOUS") fail(i.code, "args", `${path}: ${i.message}`);
+        diag("warning", { code: i.code, stage: "args", message: `${path}: ${i.message}` });
+      }
+      return doc;
+    };
+    const answers = fakes<FakesAnswers>(o.fake, "answers");
+    const commands = fakes<FakesCommands>(o.fakeExec, "commands");
 
     const env = commandEnv(process.env, keyVars);
     if (!redactor.usingDefaults)
