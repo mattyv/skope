@@ -615,6 +615,28 @@ apply to any backend:
   question and its negation needn't add up to 100%.
 - **Name the evidence.** A question sees only the `run` outputs it names
   (§6.3).
+- **Put the deciding fact in the evidence.** When the right answer can't
+  be worked out from what the question sees, Jev is confidently wrong,
+  not unsure: in an independent study it gave 0.74 on average to answers
+  that were right 45% of the time.[^ood] The gate can't catch that; only a
+  better question can, and `--test --live` (§7.3) is how to find one.
+
+**Choosing `sure`.** Set it from `--test --live` margins on your own
+questions, not from a round number. The same study found miscalibration
+depends on the question type, on the same inputs: yes/no answers were
+under-confident (right more often than they claimed), Choice answers
+slightly over-confident, and Score answers badly over-confident. So a
+yes/no gate errs on the side of handing off, and a Score level shouldn't
+carry a gate on its own (`W-SCORE-THRESHOLD`). skope gates on the chosen
+option's probability, never on a confidence the backend reports about
+itself, which the study also found less reliable. Jev's probabilities come
+in steps of 0.01 and are often exactly 0 or 1, so a `sure` finer than a
+whole percent means nothing.
+
+[^ood]: scienthoon, *jev-ood-calibration*: 4,621 published Jev calls, 900
+of them on synthetic support tickets whose labels the model couldn't have
+seen. Expected calibration error 0.08 for Choice and yes/no, 0.33 for
+Score. <https://github.com/scienthoon/jev-ood-calibration>
 
 Appendix E explains why multi-select and numeric answers are patterns, not
 features.
@@ -1238,7 +1260,7 @@ Warnings don't stop a run:
 
 | Code | Meaning |
 |---|---|
-| `W-SCORE-THRESHOLD` | a Score variable is only used in one comparison against one threshold; a `yes \| no` ask gates more reliably (v1.1) |
+| `W-SCORE-THRESHOLD` | a Score variable is only used in one comparison against one threshold; a `yes \| no` ask gates more reliably, since Score confidence runs high (§4.7) (v1.1) |
 | `W-SCORE-UNUSED` | a Score variable is never used after it's bound (v1.1) |
 | `W-SECTION-UNREACHED` | no path reaches a section (§5.6) |
 | `W-ASK-NO-CONTEXT` | an `ask` question names nothing that could hold `run` output, so the model gets no evidence (§6.3) |

@@ -3,12 +3,12 @@
 // SIGTERM+grace+SIGKILL on timeout, bounded timeouts, output capped at
 // capture time, and stopping every live command when skope is interrupted.
 
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { commandEnv, DEFAULT_GRACE_MS, execCommand, liveCommands, stopAll } from "../../src/runner/exec.js";
+import { commandEnv, DEFAULT_GRACE_MS, execCommand, groupAlive, liveCommands, stopAll } from "../../src/runner/exec.js";
 
 const env = commandEnv(process.env, []);
 const node = JSON.stringify(process.execPath);
@@ -207,6 +207,43 @@ describe("execCommand (SPEC §4.4)", () => {
     } finally {
       process.off("uncaughtException", onError);
     }
+  });
+});
+
+describe("groupAlive", () => {
+  test("a group that holds only a zombie is gone: a zombie can't run, and its parent may reap it late", async () => {
+    // The parent forks a child into its own group; the child exits at once and the parent never
+    // reaps it, so that group holds exactly one zombie for as long as the parent sleeps.
+    const parent = spawn(
+      "python3",
+      ["-c", "import os,time\npid=os.fork()\nif pid==0:\n  os.setpgid(0,0)\n  os._exit(0)\nprint(pid,flush=True)\ntime.sleep(30)"],
+      { stdio: ["ignore", "pipe", "inherit"] },
+    );
+    try {
+      const zombie = Number((await new Promise<Buffer>((res) => parent.stdout.once("data", res))).toString().trim());
+      await vi.waitFor(() => expect(running(zombie)).toBe(false)); // it has exited, and is a zombie
+      // kill still sees the group: no error on Linux, EPERM on macOS for a group of zombies.
+      let seen = "ok";
+      try {
+        process.kill(-zombie, 0);
+      } catch (err) {
+        seen = (err as NodeJS.ErrnoException).code ?? "error";
+      }
+      expect(["ok", "EPERM"]).toContain(seen);
+      expect(groupAlive(zombie)).toBe(false);
+    } finally {
+      parent.kill("SIGKILL");
+    }
+  });
+
+  test("a group with a running member is alive", async () => {
+    // The shell leads its own group, so its pid is the group id.
+    const pidFile = marker("leader");
+    const p = execCommand(`echo $$ > '${pidFile}.tmp' && mv '${pidFile}.tmp' '${pidFile}'; exec sleep 30`, { timeoutMs: 60_000, env });
+    await vi.waitFor(() => expect(existsSync(pidFile)).toBe(true));
+    expect(groupAlive(Number(readFileSync(pidFile, "utf8")))).toBe(true);
+    await stopAll(0);
+    await p;
   });
 });
 

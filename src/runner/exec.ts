@@ -6,7 +6,8 @@
 // with `timeout(1)`. Live process groups are tracked so the host's
 // SIGINT/SIGTERM handler can stop them all (`stopAll`, E-INTERRUPTED).
 
-import { spawn } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 
 export interface ExecResult {
   /** null when the command timed out or was killed by a signal. */
@@ -79,20 +80,52 @@ function killGroup(pid: number, signal: NodeJS.Signals) {
 }
 
 /**
- * Whether any process is left in the group. EPERM means one is, owned by
- * someone else (a setuid child).
+ * Whether any process that can still run is left in the group. A zombie
+ * can't, and waits only for its parent (often init, after the shell died)
+ * to reap it, which can take seconds; kill(-pgid, 0) still counts it. So
+ * a group that kill says is there is checked member by member. EPERM means
+ * a member exists, owned by someone else (a setuid child).
  */
-function groupAlive(pid: number): boolean {
+export function groupAlive(pgid: number): boolean {
   try {
-    process.kill(-pid, 0);
-    return true;
+    process.kill(-pgid, 0);
   } catch (err) {
-    return (err as NodeJS.ErrnoException).code === "EPERM";
+    if ((err as NodeJS.ErrnoException).code !== "EPERM") return false;
+  }
+  return liveMember(pgid);
+}
+
+/** Whether the group has a member that isn't a zombie: /proc on Linux, `ps` elsewhere. */
+function liveMember(pgid: number): boolean {
+  if (existsSync("/proc/self/stat")) {
+    for (const pid of readdirSync("/proc")) {
+      if (!/^\d+$/.test(pid)) continue;
+      let stat: string;
+      try {
+        stat = readFileSync(`/proc/${pid}/stat`, "utf8");
+      } catch {
+        continue; // exited while we looked
+      }
+      // Fields after the command name, which is in parentheses and may hold anything: state, ppid, pgrp.
+      const [state, , pgrp] = stat.slice(stat.lastIndexOf(")") + 2).split(" ");
+      if (pgrp === String(pgid) && state !== "Z" && state !== "X") return true;
+    }
+    return false;
+  }
+  try {
+    return execFileSync("ps", ["-A", "-o", "pgid=,stat="], { encoding: "utf8" })
+      .split("\n")
+      .some((line) => {
+        const [group, stat] = line.trim().split(/\s+/);
+        return group === String(pgid) && stat !== undefined && !stat.startsWith("Z");
+      });
+  } catch {
+    return true; // can't tell: keep waiting, bounded by the SIGKILL
   }
 }
 
 const POLL_MS = 20;
-/** After SIGKILL, anything still in the group is a zombie waiting to be reaped: it can't run, so stop waiting. */
+/** After SIGKILL, anything still counted (a process stuck in the kernel) can't act: stop waiting. */
 const ZOMBIE_MS = 1000;
 
 interface LiveCommand {

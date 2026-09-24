@@ -1035,7 +1035,7 @@ export const CODE_MEANINGS: Record<string, string> = {
   "E-IO": "skope can't write its run directory or lock file",
   "E-INTERRUPTED": "skope was interrupted (SIGINT or SIGTERM); it stopped the running command and released the lock (§4.4)",
   "E-INTERNAL": "a runner bug. Unreachable by P6, so always a bug report",
-  "W-SCORE-THRESHOLD": "a Score variable is only used in one comparison against one threshold; a `yes | no` ask gates more reliably (v1.1)",
+  "W-SCORE-THRESHOLD": "a Score variable is only used in one comparison against one threshold; a `yes | no` ask gates more reliably, since Score confidence runs high (§4.7) (v1.1)",
   "W-SCORE-UNUSED": "a Score variable is never used after it's bound (v1.1)",
   "W-SECTION-UNREACHED": "no path reaches a section (§5.6)",
   "W-ASK-NO-CONTEXT": "an `ask` question names nothing that could hold `run` output, so the model gets no evidence (§6.3)",

@@ -222,7 +222,7 @@
   {
     "code": "W-SCORE-THRESHOLD",
     "stage": "warning",
-    "meaning": "a Score variable is only used in one comparison against one threshold; a `yes | no` ask gates more reliably (v1.1)"
+    "meaning": "a Score variable is only used in one comparison against one threshold; a `yes | no` ask gates more reliably, since Score confidence runs high (§4.7) (v1.1)"
   },
   {
     "code": "W-SCORE-UNUSED",
