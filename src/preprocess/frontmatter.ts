@@ -30,9 +30,13 @@ const UNIT_MS: Record<string, number> = { s: 1000, m: 60_000, h: 3_600_000 };
 /** A positive integer the core can hold exactly, or null. */
 const positive = (n: number): number | null => (Number.isSafeInteger(n) && n >= 1 ? n : null);
 
+/** Every duration is 1 ms to 2^31 − 1 ms (SPEC §4.4), the longest a Node timer can wait. */
+const MAX_MS = 2 ** 31 - 1;
+
 function parseDurationMs(s: unknown): number | null {
   const m = typeof s === "string" ? /^(\d+)(s|m|h)$/.exec(s.trim()) : null;
-  return m ? positive(Number(m[1]) * (UNIT_MS[m[2] as string] as number)) : null;
+  const ms = m ? positive(Number(m[1]) * (UNIT_MS[m[2] as string] as number)) : null;
+  return ms !== null && ms <= MAX_MS ? ms : null;
 }
 
 function parseTokens(s: unknown): number | null {
@@ -136,7 +140,7 @@ export function parseFrontmatter(lines: string[], errors: ParseError[]): Frontma
         const target = Object.hasOwn(DURATIONS, key) ? DURATIONS[key] : undefined;
         const n = target ? parseDurationMs(value) : key === "ask_context" ? parseTokens(value) : null;
         if (n !== null) limits[target ?? "ask_context_tokens"] = n;
-        else if (target) bad(`limits.${key}`, `\`${key}\` must be a positive duration, like "30s", "5m" or "1h"`, "limits");
+        else if (target) bad(`limits.${key}`, `\`${key}\` must be a duration from 1s to 596h (2^31 − 1 ms), like "30s", "5m" or "1h"`, "limits");
         else if (key === "ask_context") bad(`limits.${key}`, '`ask_context` must be a positive size, like "4k tokens"', "limits");
         else bad(`limits.${key}`, `unknown limit \`${key}\` (run_timeout, do_timeout, deadline, ask_context)`, "limits");
       }

@@ -35,6 +35,25 @@ describe("E-FRONTMATTER (parse): a frontmatter field is missing or invalid", () 
     const errs = codesAt(md);
     expect(errs.some((e) => e.code === "E-FRONTMATTER" && e.line === 6)).toBe(true);
   });
+
+  // S1: every timeout is 1 ms to 2^31 − 1 ms (SPEC §4.4); a longer one used to pass lint
+  // and fail at run time with E-INTERNAL. The deadline is bounded the same way.
+  test.each([
+    ["run_timeout", "99999999999s"],
+    ["do_timeout", "596524h"],
+    ["deadline", "35792m"],
+    ["run_timeout", "2147484s"],
+  ])("%s: %s is past 2^31 − 1 ms", (key, value) => {
+    const md = ["---", "name: test", "description: x", "format: 1", "limits:", `  ${key}: ${value}`, "---", "# Title"].join("\n");
+    expect(codesAt(md)).toContainEqual({ code: "E-FRONTMATTER", line: 6 });
+  });
+
+  test("2147483s (just under 2^31 − 1 ms) is accepted for every duration", () => {
+    for (const key of ["run_timeout", "do_timeout", "deadline"]) {
+      const md = ["---", "name: test", "description: x", "format: 1", "limits:", `  ${key}: 2147483s`, "---", "## T", "- **stop**"].join("\n");
+      expect("errors" in preprocess(md), key).toBe(false);
+    }
+  });
 });
 
 describe("E-DUP-SECTION (parse): two sections share a name, ignoring case", () => {

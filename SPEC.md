@@ -115,6 +115,7 @@ limits:                         # optional; defaults shown
   run_timeout: 30s              # run and check commands
   do_timeout: 5m                # do commands
   deadline: 15m                 # whole run; checked between steps (§7)
+                                # each duration: 1s to 2³¹−1 ms, as §4.4 says
   ask_context: 4k tokens        # must fit the backend's context limit (§6.2)
 ---
 ```
