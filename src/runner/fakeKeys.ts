@@ -33,15 +33,19 @@ interface Target {
   /** The variable it binds, if any. */
   binds?: string;
   ask: boolean;
-  /** Its command or question, when that has no variables: the text an exact-text key would use. */
-  text?: string;
+  /** What an exact-text key for it could be: its command or question with any value for each variable. */
+  text?: RegExp;
 }
 
 type Parts = { lit?: string; var?: string }[];
-const literal = (parts: unknown): string | undefined =>
-  Array.isArray(parts) && (parts as Parts).every((p) => typeof p.lit === "string")
-    ? (parts as Parts).map((p) => p.lit).join("")
+const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+/** A pattern for the text `parts` can interpolate to: literals as written, a variable as anything. */
+const template = (parts: unknown): RegExp | undefined =>
+  Array.isArray(parts)
+    ? new RegExp(`^${(parts as Parts).map((p) => (typeof p.lit === "string" ? escapeRegExp(p.lit) : "[\\s\\S]*")).join("")}$`)
     : undefined;
+// `do step` runs an action item's command: any of them could be the text.
+const ANY = /[\s\S]*/;
 
 /** The statements in a body, loops included, that `kind`'s fake handler answers. */
 function targets(body: Stmt[], kind: FakeKind): Target[] {
@@ -50,13 +54,16 @@ function targets(body: Stmt[], kind: FakeKind): Target[] {
     if (kind === "answers") {
       if (!("ask" in st)) return [];
       const a = st.ask;
-      return [{ src: st.src, binds: a.yesno?.as ?? a.one_of?.as ?? a.score?.as, ask: true, text: literal(a.question) }];
+      return [{ src: st.src, binds: a.yesno?.as ?? a.one_of?.as ?? a.score?.as, ask: true, text: template(a.question) }];
     }
-    const cmd = (body: unknown) => literal((body as { cmd?: unknown } | undefined)?.cmd);
+    const cmd = (body: unknown) => {
+      const b = body as { cmd?: unknown; item?: string } | undefined;
+      return b?.item !== undefined ? ANY : template(b?.cmd);
+    };
     if ("run" in st) return [{ src: st.src, binds: st.run.as, ask: false, text: cmd(st.run) }];
     if ("do" in st) return [{ src: st.src, ask: false, text: cmd(st.do) }];
     if ("if_yes" in st) return [{ src: st.src, ask: false, text: cmd(st.if_yes.run ?? st.if_yes.do) }];
-    if ("check" in st && "succeeds" in st.check.cond) return [{ src: st.src, ask: false, text: literal(st.check.cond.succeeds) }];
+    if ("check" in st && "succeeds" in st.check.cond) return [{ src: st.src, ask: false, text: template(st.check.cond.succeeds) }];
     return [];
   });
 }
@@ -68,7 +75,7 @@ function targets(body: Stmt[], kind: FakeKind): Target[] {
  * it stays an exact-text key. One that names a section but nothing in it
  * stays an exact-text key too, with a warning: a command like `fix.sh` in a
  * skill with a `## Fix` section has the same shape. Under --test that's an
- * error unless the key is some statement's exact text. `.ask` means the
+ * error unless some command or question could interpolate to the key. `.ask` means the
  * section's ask only in answer files; in command files it's a variable
  * named `ask`.
  */
@@ -84,7 +91,12 @@ export function resolveFakeKeys<T extends Record<string, unknown>>(
   for (const [id, s] of Object.entries(program.sections)) if ("body" in s) bySection.set(id, targets(s.body, kind));
   const all = [...bySection.values()].flat();
   const lines = new Set(all.map((t) => t.src));
-  const texts = new Set(all.map((t) => t.text));
+  // A `do step` could run any action item, so their commands are what its text can be.
+  const actions = Object.values(program.sections).flatMap((sec) =>
+    "lists" in sec ? sec.lists.flatMap((l) => l.items.flatMap((i) => ("action" in i ? [template(i.action.cmd)] : []))) : [],
+  );
+  const texts = [...all.map((t) => t.text), ...actions].filter((r): r is RegExp => r !== undefined && r !== ANY);
+  const couldBeText = (key: string) => texts.some((r) => r.test(key));
 
   const issues: FakeKeyIssue[] = [];
   const out: Record<string, unknown> = {};
@@ -110,7 +122,7 @@ export function resolveFakeKeys<T extends Record<string, unknown>>(
     if (hits.length === 0) {
       issues.push({
         // Under --test, still only a warning when it is some statement's exact text.
-        code: texts.has(key) ? "W-FAKE-UNUSED" : unused,
+        code: couldBeText(key) ? "W-FAKE-UNUSED" : unused,
         key,
         message: `${kind} key ${key}: section ${m[1]} has no ${what}; it's still matched as exact text`,
       });

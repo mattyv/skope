@@ -12,7 +12,7 @@ import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { load as loadYaml } from "js-yaml";
 import IDENTITY from "../build-identity.js";
-import type { CoreProgram } from "../contracts.gen.js";
+import type { CoreProgram, Section } from "../contracts.gen.js";
 import { preprocess } from "../preprocess/index.js";
 import { sectionId } from "../preprocess/slug.js";
 import { plainText } from "../runner/events.js";
@@ -156,6 +156,10 @@ export function check(expect: Expect, code: number, events: Event[], program: Co
   const error = events.find((e) => e.event === "error");
   const got = `${outcome?.outcome ?? "no outcome"}${outcome?.reason ? ` (${outcome.reason})` : ""}${error ? `, ${error.code}: ${error.message}` : ""}`;
 
+  // A run that broke (no fake for a command or question, or any other runtime error) fails
+  // whatever else expect.yaml checks, unless the scenario says that's what it expects.
+  const broke = events.find((e) => e.event === "error" && e.stage === "runtime");
+  if (broke && expect.exit !== EXIT.error) return `the run failed: ${broke.code}: ${broke.message}`;
   if (expect.outcome !== undefined && outcome?.outcome !== expect.outcome) return `outcome: expected ${expect.outcome}, got ${got}`;
   const exit = expect.exit ?? (expect.outcome !== undefined ? EXIT[expect.outcome] : undefined);
   if (exit !== undefined && code !== exit) return `exit: expected ${exit}, got ${code}: ${got}`;
@@ -176,11 +180,10 @@ export function check(expect: Expect, code: number, events: Event[], program: Co
     const ask = events.findLast((e) => e.event === "ask" && e.line === line);
     if (!ask) return `asks.${key}: expected ${want.chosen}, but the run never reached that ask`;
     const chosen = ask.chosen as string | number | null;
-    const matches =
-      typeof chosen === "string" && chosen.startsWith("s:")
-        ? sectionId(String(want.chosen)) === chosen
-        : String(want.chosen) === String(chosen);
-    const label = typeof chosen === "string" && chosen.startsWith("s:") ? (program.sections[chosen]?.name ?? chosen) : chosen;
+    // Only a section-option ask chooses by section id; a list item is its value, whatever it looks like.
+    const bySection = sectionOptions(program, line);
+    const matches = bySection ? sectionId(String(want.chosen)) === chosen : String(want.chosen) === String(chosen);
+    const label = bySection && typeof chosen === "string" ? (program.sections[chosen]?.name ?? chosen) : chosen;
     if (!matches) return `asks.${key}: expected ${want.chosen}, got ${label ?? `nothing (${ask.detail ?? "no answer"})`}`;
     if (!ask.passed) return `asks.${key}: chose ${want.chosen}, but below sure (confidence ${ask.confidence}, sure ${ask.sure}%)`;
   }
@@ -193,6 +196,16 @@ export function check(expect: Expect, code: number, events: Event[], program: Co
   if (expect.max_ask_calls !== undefined && ((outcome?.ask_calls as number) ?? 0) > expect.max_ask_calls)
     return `max_ask_calls: expected at most ${expect.max_ask_calls}, got ${outcome?.ask_calls}`;
   return null;
+}
+
+/** Whether the ask on `line` offers sections as its options, rather than a list, yes/no or a Score. */
+function sectionOptions(program: CoreProgram, line: number): boolean {
+  type Body = Section["body"];
+  const find = (body: Body): boolean =>
+    body.some((st) =>
+      "ask" in st && st.src === line ? st.ask.sections !== undefined : "for_each" in st && find(st.for_each.body as Body),
+    );
+  return Object.values(program.sections).some((sec) => "body" in sec && find(sec.body));
 }
 
 /** The line of the ask an `asks` key names: `Section` (its only ask) or `Section.var` (the ask that binds var). */

@@ -1298,21 +1298,26 @@ statements go through the fakes, so a failing `do` can be tested. The run
 takes no lock and keeps its run directory in a temporary directory. The fake
 files are held to strict key rules: every statement that runs matches
 exactly one key (`E-FAKE-AMBIGUOUS` otherwise), and a stable or `line:N`
-key that names nothing is `E-FAKE-UNUSED`, unless it's exactly the text of
-some command or question in the skill, like `fix.sh` next to a `## Fix`
-section, which stays a warning.
+key that names nothing is `E-FAKE-UNUSED`, unless some command or question
+in the skill could interpolate to it (with any value for each variable, and
+any action item's command for a `do step`), like `fix.sh` next to a
+`## Fix` section; that stays a warning.
 
 `expect.yaml` checks, in this order, and reports the first difference:
 `outcome` and `exit` (implied by `outcome` when not given),
 `handoff_reason`, `path` (the entry section, then the `to` of every
 `transfer`, matched by slug) or `path_prefix`, `asks` (keyed by a section
-with one ask, or `Section.var`; `chosen` is the option's label, and the ask
+with one ask, or `Section.var`; `chosen` is the option's label: a section
+name for an ask whose options are sections, else the list item, `yes` or
+`no`, or the Score level, compared as written; the ask
 must also have cleared `sure`; the last answer counts when the ask runs more
 than once), `page_contains`, and `max_ask_calls`. `live` is read but not yet
 used.
 
-A scenario **fails** when the run differs from `expect.yaml`, including when
-a command or question has no fake (`E-FAKE-UNMATCHED`). It's **invalid**
+A scenario **fails** when the run differs from `expect.yaml`. It also fails
+when the run breaks with a runtime error, such as a command or question
+with no fake (`E-FAKE-UNMATCHED`), whatever else `expect.yaml` checks,
+unless it sets `exit: 50`. It's **invalid**
 when its own files can't be used: a bad `expect.yaml`, a strict key error,
 a skill that doesn't lint, or an `asks` key that names no single ask.
 
