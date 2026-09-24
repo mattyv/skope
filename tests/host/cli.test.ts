@@ -216,7 +216,12 @@ describe("run flow", () => {
     test("a run that asks is E-CONFIG before it starts, whether the file exists or not", async () => {
       for (const r of [await runSkope([asks(), "--dry-run", "--config", pagerOnly()]), await runSkope([asks(), "--dry-run"], noConfig())]) {
         expect(r.code).toBe(40);
-        expect(find(r.events, "error", "E-CONFIG")?.message).toMatch(/no jev block/);
+        const message = find(r.events, "error", "E-CONFIG")?.message;
+        expect(message).toMatch(/no jev block/);
+        // Says how to fix it, not only what's wrong: the keys to add and where Jev is served.
+        expect(message).toMatch(/model/);
+        expect(message).toMatch(/key_env/);
+        expect(message).toMatch(/openrouter\.ai\/api\/v1\/systemone/);
         expect(find(r.events, "run_start")).toBeUndefined();
       }
     });

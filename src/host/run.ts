@@ -420,6 +420,14 @@ interface Backend {
   ask(request: AskRequest): Promise<AskOutput>;
 }
 
+// Printed when a skill asks and the selected backend has no config block (SPEC §9).
+const BLOCK_HINT: Record<string, string> = {
+  jev:
+    "Add to the config: jev: { model, key_env }. From TypeSafe: model jev-1.13.0, key_env TYPESAFE_API_KEY. " +
+    "From OpenRouter: model typesafe/jev-1.13-20260917, key_env OPENROUTER_API_KEY, url https://openrouter.ai/api/v1/systemone.",
+  openrouter: "Add to the config: openrouter: { model, key_env }, with a model that returns logprobs and can run without reasoning.",
+};
+
 /** Checks the configured backend before the run (SPEC §6.2) and returns how to ask it. */
 async function checkBackend(
   program: CoreProgram,
@@ -438,7 +446,7 @@ async function checkBackend(
     return none;
   }
   const block = name === "jev" ? config.jev : config.openrouter;
-  if (!block) return fail("E-CONFIG", "args", `ask.backend is ${name}, but the config has no ${name} block`);
+  if (!block) return fail("E-CONFIG", "args", `ask.backend is ${name}, but the config has no ${name} block. ${BLOCK_HINT[name]}`);
   const apiKey = process.env[block.key_env];
   if (!apiKey) return fail("E-CONFIG", "args", `${name}: no API key in $${block.key_env}`);
   const limits = name === "jev" ? JEV_LIMITS : OPENROUTER_LIMITS;

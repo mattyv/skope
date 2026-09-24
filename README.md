@@ -107,8 +107,29 @@ Rehearse it with fake command results and fake answers. Nothing real runs:
 $ skope disk-full/SKILL.md --dry-run --fake answers.yaml --fake-exec commands.yaml
 ```
 
+Both files are JSON (so also YAML), keyed by the skill's line number or by
+the exact command or question text after interpolation. Every command the
+run reaches needs an answer, or it stops with `E-FAKE-UNMATCHED`:
+
+```json
+{
+  "line:23": { "exit": 0, "stdout": " 96%\n" },
+  "line:25": { "exit": 0, "stdout": "no obvious cause\n" }
+}
+```
+
+```json
+{ "line:27": { "s:clean_up": 0.05, "s:restart": 0.05, "s:page": 0.85, "s:investigate": 0.05 } }
+```
+
+Leave out `--fake` to rehearse against the real backend with fake command
+results: that's how you check a skill's questions and thresholds.
+[`fixtures/`](fixtures/) has worked pairs for the example skills.
+
 Then run it for real. A dry run runs the read-only `run` and `check`
-commands, but never a `do` and never a page. Every run must say which it is:
+commands, but never a `do` and never a page. It does ask the backend, so a
+skill with an `ask` needs one configured (see below) even to dry-run. Every
+run must say which it is:
 
 ```console
 $ skope disk-full/SKILL.md --dry-run                  # look, don't touch
@@ -194,8 +215,10 @@ pager:
   command: /usr/local/bin/page-oncall   # reads the message on stdin
 ```
 
-Jev is also served by OpenRouter, billed to your OpenRouter account.
-Point the `jev` backend at it:
+Jev is also served by OpenRouter, billed to your OpenRouter account. It
+isn't a chat model, so it doesn't appear in OpenRouter's `/api/v1/models`
+list, and the `openrouter` backend below can't use it. Point the `jev`
+backend at OpenRouter's System One endpoint instead:
 
 ```yaml
 jev:
@@ -203,6 +226,10 @@ jev:
   key_env: OPENROUTER_API_KEY
   url: https://openrouter.ai/api/v1/systemone
 ```
+
+skope reads the key from its own environment, so a shell that hasn't
+re-read your profile since you changed the key sends the old one. A `401`
+from the backend usually means that.
 
 **OpenRouter is the alternative.** Any model on
 [OpenRouter](https://openrouter.ai) that exposes token probabilities can
