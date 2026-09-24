@@ -69,7 +69,7 @@ my-skill/
 ```
 
 `skope my-skill/SKILL.md --test` runs every directory under
-`my-skill/tests/`. `--test <dir>` runs one scenario.
+`my-skill/tests/`. `--test --scenario <dir>` runs one scenario.
 
 `fixtures/*/fakes/*/expected-exit` still works: a scenario with
 `expected-exit` and no `expect.yaml` checks only the exit code. That lets
@@ -100,6 +100,9 @@ today, a list of results is used in order, and the last one repeats.
 
 - Under `--test`, every statement that runs must match **exactly one** key.
   Two keys matching the same statement is `E-FAKE-AMBIGUOUS`.
+- In every mode, a `Section.var` or `Section.ask` key must match exactly one
+  statement. A section that binds `var` twice, or has two asks, makes that
+  key `E-FAKE-AMBIGUOUS`; key those statements by exact text or `line:N`.
 - Under plain `--fake` / `--fake-exec`, existing files keep working:
   `Section.var` / `Section.ask`, then `line:N`, then exact text.
 
@@ -131,7 +134,7 @@ handoff_reason: gate_failed   # when outcome is handoff
 max_ask_calls: 1
 live:                     # used only with --live
   runs: 10                # optional; default 10
-  min_hit_rate: 1.0       # share of runs that must choose `chosen`
+  min_hit_rate: 1.0       # share of runs that must be hits (default 1.0)
   min_margin: 5           # optional: points the lowest confidence must clear `sure` by
 ```
 
@@ -161,7 +164,7 @@ hands off, as the acceptance suite's `do-timeout` scenarios already do.
   plus a summary line. `mismatch` names the first difference: expected
   `Consumer too slow` at `Classify`, got `Consumer stuck`.
 
-### Live: `skope SKILL.md --test --live [N]`
+### Live: `skope SKILL.md --test --live [--runs N]`
 
 - Commands come from `commands.yaml`. `answers.yaml` is ignored, and every
   `ask` goes to the configured backend.
@@ -169,9 +172,18 @@ hands off, as the acceptance suite's `do-timeout` scenarios already do.
   specific winning:
   - `live.runs` in a scenario's `expect.yaml` sets that scenario's count,
     e.g. fewer for a costly scenario, more for one near the gate;
-  - `--live N` on the command line sets every scenario's count for that
-    invocation, over `live.runs`: `--live 1` for a quick smoke check, more
+  - `--runs N` on the command line sets every scenario's count for that
+    invocation, over `live.runs`: `--runs 1` for a quick smoke check, more
     for a release check.
+
+  Ten gives hit rates in 10% steps. Reassess the default once there's data
+  on real providers' variance and cost.
+- **A run is a hit** when it satisfies the whole `expect.yaml`: outcome,
+  exit, path, every `asks.*.chosen`, `page_contains`, `handoff_reason` and
+  `max_ask_calls`. An expected ask the run never reached is a miss. A
+  scenario's hit rate is hits over runs, and `live.min_hit_rate` is the
+  only threshold on it: with 0.8, two runs out of ten may miss in any way
+  and the scenario still passes.
 - Per ask, the report gives the hit rate, the lowest and median
   confidence, the margin (lowest confidence minus `sure`, in points) and
   the gate-failure count. Confidence is shown in percent, the same unit as
@@ -183,7 +195,8 @@ hands off, as the acceptance suite's `do-timeout` scenarios already do.
   ```
 
 - A scenario **fails** when its hit rate is below `live.min_hit_rate`, or
-  when it sets `live.min_margin` and the margin is below it. Without
+  when it sets `live.min_margin` and the margin is below it. The margin is
+  taken over the runs that reached the ask. Without
   `min_margin`, a margin under 5 points is a **warning**. So the 0.81 case
   above fails CI once its scenario states a margin, and warns until then.
 - Before running, skope prints the **maximum** number of backend calls:
@@ -220,7 +233,9 @@ because a test run's code describes the tests, not a run.
 
 - `contracts/fakes.schema.json`: the new key forms.
 - SPEC §7.1: `E-FAKE-UNUSED`, `W-FAKE-UNUSED`, `E-FAKE-AMBIGUOUS`.
-- SPEC §7: `--test`, `--live`, `--coverage`, and exit code 60.
+- SPEC §7: `--test`, `--scenario`, `--live`, `--runs`, `--coverage`, and
+  exit code 60. Every flag takes a fixed number of values, so the existing
+  argument parser handles them.
 - A new `contracts/expect.schema.json` for `expect.yaml`.
 
 ## Worked example
@@ -292,4 +307,10 @@ Each phase starts with failing tests, as in PLAN.md.
   the `Section#n` key, answer caching, and matching actions in `path`.
 - Scenarios stay under `tests/` next to the skill.
 - Live runs default to 10 per scenario. `live.runs` overrides it per
-  scenario, and `--live N` overrides both for one invocation.
+  scenario, and `--runs N` overrides both for one invocation.
+- The command line is `--test [--scenario DIR] [--live] [--runs N]`: no
+  flag has an optional value.
+- A live hit is a run that satisfies the whole `expect.yaml`; an unreached
+  expected ask is a miss; `min_hit_rate` is the only threshold on hits.
+- A `Section.var` or `Section.ask` key must match exactly one statement,
+  as well as each statement matching exactly one key.
