@@ -177,7 +177,6 @@ jobs:
           echo "node=$PWD/node-v$PINNED_NODE_VERSION-${{ matrix.platform }}-${{ matrix.arch }}/bin/node" >> "$GITHUB_OUTPUT"
       - name: Bundle and build the standalone binary (SPEC §5.5)
         run: |
-          node scripts/package/bundle.mjs
           node scripts/package/sea.mjs \
             --node "${{ steps.pinned.outputs.node }}" \
             --outfile "dist-bin/skop-${{ needs.resolve.outputs.version }}-${{ matrix.platform }}-${{ matrix.arch }}"

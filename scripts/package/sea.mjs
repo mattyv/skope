@@ -8,8 +8,9 @@
 //   --node     Node executable to embed the blob into. Defaults to the
 //              running Node (process.execPath), which is what a local
 //              build uses; CI passes a pinned Node build (PLAN.md §8).
-//   --bundle   Pre-built CommonJS bundle to embed. Built with
-//              scripts/package/bundle.mjs first if this doesn't exist.
+//   --bundle   Pre-built CommonJS bundle to embed, used as given. Without
+//              it, a fresh bundle is always built from the current source,
+//              so a stale one can't ship under a newer build identity.
 //   --outfile  Where to write the binary. Defaults to
 //              dist-bin/skop-<platform>-<arch>; the release workflow
 //              renames the result to skop-<version>-<os>-<arch>.
@@ -29,12 +30,13 @@ function arg(name, fallback) {
 
 const nodeBin = arg("--node", process.execPath);
 const bundlePath = arg("--bundle", join(ROOT, "dist-bundle", "skop.cjs"));
+if (process.argv.includes("--bundle") && !existsSync(bundlePath)) throw new Error(`sea: no bundle at ${bundlePath}`);
 const outFile = arg(
   "--outfile",
   join(ROOT, "dist-bin", `skop-${process.platform}-${process.arch}${process.platform === "win32" ? ".exe" : ""}`),
 );
 
-if (!existsSync(bundlePath)) {
+if (!process.argv.includes("--bundle")) {
   execFileSync(process.execPath, [join(ROOT, "scripts", "package", "bundle.mjs"), "--outfile", bundlePath], {
     cwd: ROOT,
     stdio: "inherit",
