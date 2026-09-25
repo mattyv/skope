@@ -578,7 +578,8 @@ Versioning follows ply (SPEC §7.2): a hand-edited release version in
    - builds the npm package once;
    - installs it on a clean machine on each platform, checks
      `skope --version`, and lints and dry-runs each example skill with fakes;
-   - builds a binary on each platform, writes `SHA256SUMS`, and adds a
+   - builds a binary on each platform, writes `SHA256SUMS` for the binaries
+     and the package, and adds a
      build-provenance attestation for each binary;
    - runs the installer against those files on each platform with no Node
      on the machine, then the same checks as for the package;

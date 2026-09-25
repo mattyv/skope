@@ -99,6 +99,23 @@ jobs:
       - name: Bundle, standalone binary and installer tests (SPEC §5.5, §12.3)
         run: npx vitest run tests/package
 
+  # Only the release used to build the image, so a broken Dockerfile first failed a release.
+  # amd64 is enough to catch that; the release still builds amd64 and arm64.
+  container:
+    name: Container image
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+      - name: Build the image
+        run: docker build -t skope-ci .
+      - name: The image runs skope
+        run: |
+          docker run --rm skope-ci --version
+          docker run --rm -v "$PWD/fixtures:/fixtures:ro" skope-ci /fixtures/disk-full/SKILL.md --lint
+
   dafny:
     name: Dafny proofs
     runs-on: ubuntu-latest
