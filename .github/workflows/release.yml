@@ -203,7 +203,7 @@ jobs:
 
   checksums:
     name: SHA256SUMS
-    needs: [resolve, binaries]
+    needs: [resolve, package, binaries]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
@@ -211,6 +211,12 @@ jobs:
           pattern: binary-*
           path: dist-bin
           merge-multiple: true
+      # The npm package is checksummed too, so every download on the release can be verified.
+      # install.sh picks its binary by the -<os>-<arch> suffix, so the .tgz line doesn't affect it.
+      - uses: actions/download-artifact@v4
+        with:
+          name: package
+          path: dist-bin
       - run: cd dist-bin && sha256sum skope-* > SHA256SUMS && cat SHA256SUMS
       - uses: actions/upload-artifact@v4
         with:

@@ -855,7 +855,8 @@ Shipped Dafny code MUST NOT contain `assume`, `{:axiom}` or
     having the incident, which may not have Node. Each release has one
     self-contained executable per platform: `skope-<version>-linux-x64`,
     `-linux-arm64` and `-darwin-arm64`, built as Node single executable
-    applications, plus a `SHA256SUMS` file. The Linux binaries need glibc
+    applications, plus a `SHA256SUMS` file covering the binaries and the npm
+    package. The Linux binaries need glibc
     2.28 or newer; musl systems such as Alpine use the container.
   - **An npm package**, for machines that already have Node 20 or newer.
     No native dependencies.
