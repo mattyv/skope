@@ -7,6 +7,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { load } from "js-yaml";
 import { describe, expect, test } from "vitest";
 
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
@@ -23,12 +24,13 @@ describe("skope --install-skill", () => {
     expect(readFileSync(join(ROOT, "src", "embedded.gen.ts"), "utf8")).toBe(generate());
   });
 
-  test("writes the skill into the directory given", () => {
+  test("writes both skills into the directory given", () => {
     const dir = mkdtempSync(join(tmpdir(), "skope-skills-"));
     const r = skope(["--install-skill", dir]);
     expect(r.status).toBe(0);
     expect(r.stdout).toBe("");
-    expect(readFileSync(join(dir, "write-skope-skill", "SKILL.md"), "utf8")).toBe(readFileSync(SOURCE, "utf8"));
+    for (const name of ["write-skope-skill", "run-skope-skill"])
+      expect(readFileSync(join(dir, name, "SKILL.md"), "utf8")).toBe(readFileSync(join(ROOT, "skills", name, "SKILL.md"), "utf8"));
   });
 
   test("defaults to $CLAUDE_CONFIG_DIR/skills, and replaces an older copy", () => {
@@ -50,7 +52,18 @@ describe("skope --install-skill", () => {
     writeFileSync(file, "");
     const r = skope(["--install-skill", file]);
     expect(r.status).toBe(50);
-    expect(r.stderr).toContain("couldn't install the write-skope-skill skill");
+    expect(r.stderr).toContain("couldn't install the skope agent skills");
+  });
+});
+
+describe("the shipped agent skills", () => {
+  // agentskills.io/specification: what claude.ai accepts on upload.
+  test.each(["write-skope-skill", "run-skope-skill"])("%s is a valid Agent Skill", (name) => {
+    const text = readFileSync(join(ROOT, "skills", name, "SKILL.md"), "utf8");
+    const fm = load((/^---\n([\s\S]*?)\n---\n/.exec(text) as RegExpExecArray)[1] as string) as Record<string, unknown>;
+    expect(Object.keys(fm).sort()).toEqual(["description", "name"]);
+    expect(fm.name).toBe(name);
+    expect((fm.description as string).length).toBeLessThanOrEqual(1024);
   });
 });
 
@@ -103,6 +116,7 @@ describe("npm postinstall", () => {
     const claude = mkdtempSync(join(tmpdir(), "skope-claude-"));
     expect(postinstall({ npm_config_global: "true", CLAUDE_CONFIG_DIR: claude }).status).toBe(0);
     expect(existsSync(join(claude, "skills", "write-skope-skill", "SKILL.md"))).toBe(true);
+    expect(existsSync(join(claude, "skills", "run-skope-skill", "SKILL.md"))).toBe(true);
   });
 
   test("a local install, SKOPE_NO_SKILL, or no Claude Code installs nothing, and still succeeds", () => {

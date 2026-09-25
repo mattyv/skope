@@ -5,8 +5,8 @@ description: Check and renew TLS certificates before they expire. Use when a cer
 
 # Cert expiry
 
-*A [skope](https://github.com/mattyv/skope) skill: the bold steps are the
-procedure, and `{names}` in them are params, set in the skope block below.*
+*A [skope](https://github.com/mattyv/skope) skill. Run it with the run-skope-skill skill if you have
+it; if not, the bold steps are the procedure, and `{names}` are params set in the skope block below.*
 
 ```skope
 format: 1

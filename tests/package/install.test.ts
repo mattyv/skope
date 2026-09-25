@@ -103,7 +103,7 @@ describe("install.sh (SPEC §5.5, §12.3)", () => {
     expect(existsSync(join(installDir, "skope"))).toBe(true);
   });
 
-  test("installs the write-skope-skill skill when Claude Code is set up, unless SKOPE_NO_SKILL is set", async () => {
+  test("installs the agent skills when Claude Code is set up, unless SKOPE_NO_SKILL is set", async () => {
     // A binary that records its arguments, so the test sees what install.sh asked of it.
     const binary = '#!/bin/sh\necho "$@" >> "$HOME/calls"\necho "skope 9.9.9"\n';
     releaseDir = makeRelease({ [BINARY_NAME]: binary, SHA256SUMS: sumsFile(BINARY_NAME, binary) });

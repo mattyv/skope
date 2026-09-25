@@ -14,8 +14,9 @@
 #                      GitHub release's download URL.
 #   SKOPE_INSTALL_DIR   Where to install. Defaults to ~/.local/bin. Never
 #                      uses sudo.
-#   SKOPE_NO_SKILL      Set to skip installing the write-skope-skill agent
-#                      skill into Claude Code's skills directory.
+#   SKOPE_NO_SKILL      Set to skip installing skope's agent skills
+#                      (write-skope-skill, run-skope-skill) into Claude
+#                      Code's skills directory.
 set -eu
 
 repo="mattyv/skope"
@@ -118,16 +119,16 @@ case ":$PATH:" in
     ;;
 esac
 
-# --- the write-skope-skill agent skill (SPEC §5.5): into Claude Code's
+# --- skope's agent skills (SPEC §5.5): into Claude Code's
 # skills directory if Claude Code is set up here. Never fails the install. ---
 claude_dir="${CLAUDE_CONFIG_DIR:-"$HOME/.claude"}"
 if [ -n "${SKOPE_NO_SKILL:-}" ]; then
   :
 elif [ -d "$claude_dir" ]; then
   "$install_dir/skope" --install-skill "$claude_dir/skills" >&2 ||
-    say "Couldn't install the write-skope-skill skill; run skope --install-skill to try again."
+    say "Couldn't install skope's agent skills; run skope --install-skill to try again."
 else
-  say "To have an agent write skope skills test first: skope --install-skill [DIR]"
+  say "To teach an agent to write and run skope skills: skope --install-skill [DIR]"
 fi
 
 "$install_dir/skope" --version

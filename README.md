@@ -126,10 +126,12 @@ $ curl -fsSL https://github.com/mattyv/skope/releases/download/v0.1.0-beta.2/ins
 or `npm install -g skope@beta`, or `ghcr.io/mattyv/skope:0.1.0-beta.2`.
 
 If you use Claude Code (`~/.claude` exists), both the installer and
-`npm install -g` also install the
-[`write-skope-skill`](skills/write-skope-skill/SKILL.md) agent skill, which
-has an agent write skope skills test first. Set `SKOPE_NO_SKILL=1` to skip
-it.
+`npm install -g` also install two agent skills:
+[`write-skope-skill`](skills/write-skope-skill/SKILL.md) has an agent write
+skope skills test first, and
+[`run-skope-skill`](skills/run-skope-skill/SKILL.md) has one run a skope
+skill (with skope if it's there, by hand if not) and take over when skope
+hands off. Set `SKOPE_NO_SKILL=1` to skip them.
 
 ### Try it
 
@@ -311,8 +313,9 @@ will make before it starts.
 that makes the agent write `tests.yaml` first, watch it fail, then write
 the skill until `--lint`, `--verify` and `--test` are clean, and finally
 check the questions with `--live`. Installing skope puts it in Claude
-Code's skills directory if you have one; `skope --install-skill [DIR]`
-installs it anywhere else, such as `.claude/skills` in your repo.
+Code's skills directory if you have one, along with `run-skope-skill`;
+`skope --install-skill [DIR]` installs them anywhere else, such as
+`.claude/skills` in your repo.
 
 ### Run
 
@@ -515,8 +518,10 @@ $ DAFNY=/path/to/dafny npm run core   # verify the proofs and rebuild core/gener
   test-first streams, reviews and releases.
 - [`docs/design/`](docs/design/) holds designs for work in progress, such
   as [skill tests](docs/design/skill-tests.md).
-- [`skills/write-skope-skill`](skills/write-skope-skill/SKILL.md) teaches
-  an agent to write skope skills test first.
+- [`skills/`](skills/) holds the agent skills skope installs:
+  [`write-skope-skill`](skills/write-skope-skill/SKILL.md) (write skope
+  skills test first) and [`run-skope-skill`](skills/run-skope-skill/SKILL.md)
+  (run one, or take over a handoff).
 - [`contracts/`](contracts/) holds the shapes the parts of skope agree on,
   with worked examples.
 

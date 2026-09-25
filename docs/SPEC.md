@@ -119,8 +119,8 @@ description: ...                # required, one line (used by agents)
 
 # Disk full
 
-*A skope skill: the bold steps are the procedure, and {names} are params,
-set in the skope block below.*
+*A skope skill. Run it with the run-skope-skill skill if you have it; if
+not, the bold steps are the procedure, and {names} are params set below.*
 
 ```skope
 format: 1                       # required for runnable skills
@@ -874,16 +874,19 @@ Shipped Dafny code MUST NOT contain `assume`, `{:axiom}` or
     there;
   - install `$SKOPE_VERSION` if set, otherwise the latest release;
   - download from `$SKOPE_DOWNLOAD_URL` if set, for mirrors and tests;
-  - install the write-skope-skill agent skill with `skope --install-skill`
+  - install skope's agent skills with `skope --install-skill`
     when Claude Code's directory (`$CLAUDE_CONFIG_DIR`, else `~/.claude`)
     exists, unless `$SKOPE_NO_SKILL` is set, and never fail the install
     over it; otherwise say how to install it;
   - finish by running `skope --version`.
 
-  A global npm install installs the skill the same way, from a
-  `postinstall` script that does nothing for a local install. The skill,
-  `skills/write-skope-skill/SKILL.md`, has an agent write a skope skill
-  test first (§7.3); it's built into skope, so the binary carries it too.
+  A global npm install installs the skills the same way, from a
+  `postinstall` script that does nothing for a local install. There are
+  two, built into skope so the binary carries them too:
+  `skills/write-skope-skill/SKILL.md` has an agent write a skope skill test
+  first (§7.3), and `skills/run-skope-skill/SKILL.md` has one run a skope
+  skill (with skope, or by hand) and take over a handoff (§8). Both are
+  plain Agent Skills, valid for upload to claude.ai.
 
   The checksum catches a corrupt or truncated download, not a compromised
   release. Each release also carries GitHub build-provenance attestations,
@@ -1157,9 +1160,9 @@ skope --demo [DIR]        write the disk-full skill (fixtures/disk-full/SKILL.md
                           ./skope-demo), and print what to try; never overwrites, needs no config
                           or API key; takes no skill file or other option
 skope --install-skill [DIR]
-                          write the write-skope-skill agent skill into DIR/write-skope-skill/
-                          (default: $CLAUDE_CONFIG_DIR/skills, else ~/.claude/skills), replacing
-                          an older copy; takes no skill file or other option
+                          write the agent skills write-skope-skill and run-skope-skill into
+                          DIR/<name>/ (default: $CLAUDE_CONFIG_DIR/skills, else ~/.claude/skills),
+                          replacing older copies; takes no skill file or other option
 ~~~
 
 `skope` with no arguments prints the same options to stderr and exits 40,
@@ -1853,8 +1856,9 @@ Installer tests (§5.5), in M6, against a local download server via
 - It runs `skope --install-skill` into Claude Code's directory when that
   exists, and not when `SKOPE_NO_SKILL` is set; stdout stays the one
   `--version` line.
-- `skope --install-skill` writes the skill as committed, and the example
-  skill and `tests.yaml` in it pass `--lint` and `--test`.
+- `skope --install-skill` writes both skills as committed; each is a valid
+  Agent Skill; and write-skope-skill's example skill and `tests.yaml` pass
+  `--lint` and `--test`.
 
 ### 12.4 Differential check (optional but cheap)
 For each fake scenario, the concrete trace MUST appear among the explore
@@ -1908,8 +1912,8 @@ description: Free disk space safely when a Linux volume fills up. Use when a dis
 
 # Disk full
 
-*A [skope](https://github.com/mattyv/skope) skill: the bold steps are the
-procedure, and `{names}` in them are params, set in the skope block below.*
+*A [skope](https://github.com/mattyv/skope) skill. Run it with the run-skope-skill skill if you have
+it; if not, the bold steps are the procedure, and `{names}` are params set in the skope block below.*
 
 ```skope
 format: 1
@@ -2027,8 +2031,8 @@ description: Check and renew TLS certificates before they expire. Use when a cer
 
 # Cert expiry
 
-*A [skope](https://github.com/mattyv/skope) skill: the bold steps are the
-procedure, and `{names}` in them are params, set in the skope block below.*
+*A [skope](https://github.com/mattyv/skope) skill. Run it with the run-skope-skill skill if you have
+it; if not, the bold steps are the procedure, and `{names}` are params set in the skope block below.*
 
 ```skope
 format: 1
@@ -2438,8 +2442,8 @@ description: Decide what to do about a burst of system errors. Use when an error
 
 # Error triage
 
-*A [skope](https://github.com/mattyv/skope) skill: the bold steps are the
-procedure, and `{names}` in them are params, set in the skope block below.*
+*A [skope](https://github.com/mattyv/skope) skill. Run it with the run-skope-skill skill if you have
+it; if not, the bold steps are the procedure, and `{names}` are params set in the skope block below.*
 
 ```skope
 format: 1

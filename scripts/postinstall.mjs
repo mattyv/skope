@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// After `npm install -g skope`, installs the write-skope-skill agent skill
+// After `npm install -g skope`, installs skope's agent skills
 // into Claude Code's skills directory, as install.sh does (SPEC §5.5): only
 // for a global install, only if Claude Code is set up here, and never
 // failing the install. SKOPE_NO_SKILL skips it.

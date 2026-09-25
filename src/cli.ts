@@ -34,8 +34,9 @@ const HELP = `usage: skope <path/to/SKILL.md> [options]
   --config path           default: $XDG_CONFIG_HOME/skope/config.yaml
   --demo [DIR]            write a demo skill with tests and fakes into DIR (default: ./skope-demo) and
                           say what to try; needs no API key; nothing else goes with it
-  --install-skill [DIR]   install the write-skope-skill agent skill, which has an agent write skope
-                          skills test first, into DIR (default: ~/.claude/skills); nothing else goes with it
+  --install-skill [DIR]   install the agent skills write-skope-skill (write skills test first) and
+                          run-skope-skill (run one, or take over a handoff) into DIR (default:
+                          ~/.claude/skills); nothing else goes with it
   --version               print the release version and build identity
   --help                  print this`;
 
