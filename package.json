@@ -1,6 +1,6 @@
 {
   "name": "skope",
-  "version": "0.1.0-beta.1",
+  "version": "0.1.0-beta.2",
   "description": "Run dual-use skills: Markdown an agent can read and a small, proven runtime can execute.",
   "license": "MIT OR Apache-2.0",
   "repository": {

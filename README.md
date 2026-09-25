@@ -120,10 +120,10 @@ image, `ghcr.io/mattyv/skope`.
 beta by name:
 
 ```console
-$ curl -fsSL https://github.com/mattyv/skope/releases/download/v0.1.0-beta.1/install.sh | SKOPE_VERSION=0.1.0-beta.1 sh
+$ curl -fsSL https://github.com/mattyv/skope/releases/download/v0.1.0-beta.2/install.sh | SKOPE_VERSION=0.1.0-beta.2 sh
 ```
 
-or `npm install -g skope@beta`, or `ghcr.io/mattyv/skope:0.1.0-beta.1`.
+or `npm install -g skope@beta`, or `ghcr.io/mattyv/skope:0.1.0-beta.2`.
 
 If you use Claude Code (`~/.claude` exists), both the installer and
 `npm install -g` also install the
