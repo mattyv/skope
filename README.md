@@ -358,6 +358,16 @@ run moves from section to section until it ends.
 | **hand off** | Hands the incident to a person or agent, with the section's prose as instructions |
 | **stop** | Ends the run |
 
+Variables come from `run … as x` (the command's trimmed output), from an
+`ask`'s answer, and from params. They can go into `check`, `ask` questions
+and `page` text. **Command output never goes into a command** (lint rejects
+it as `E-TAINT`), so a command can use params and items from the skill's own
+lists, including one an `ask` picked, but never what another command
+printed. There's no arithmetic either: `check` only compares. Do the maths
+inside a command (`free -m | awk '/Mem/ {print int($3*100/$2)}'`). To
+combine two measurements, take them in one command, or compare them with
+`check {after} < {before}`.
+
 A bold word that looks like a keyword but isn't one is an error, never
 prose, so a typo can't silently skip a step. The full grammar is in
 [`docs/SPEC.md`](docs/SPEC.md).

@@ -166,7 +166,16 @@ Rules that keep a skill safe and testable:
   confidence runs high; gate on yes/no instead.
 - **`do` only what's reversible or explicitly approved,** and only
   interpolate params and list items into commands. Command output can
-  never go into a command; lint enforces this.
+  never go into a command (`E-TAINT`): output could hold `; rm -rf /`.
+  To act on what a command found, let an `ask` pick from a list you wrote
+  (`→ one of [Services] as service`, then `do systemctl restart {service}`).
+- **No arithmetic: do the maths in the command.** `check` only compares
+  (`<`, `<=`, `>`, `>=`, `==`, `!=`) a variable with a number or another
+  variable. Compute inside one command, e.g.
+  `` `free -m | awk '/Mem/ {print int($3*100/$2)}'` as mem_pct ``, with
+  params allowed (`awk -v t={threshold}`). You can't combine two earlier
+  outputs in a command (`$(( {a} - {b} ))` is `E-TAINT`): measure both in
+  one command, or compare them with `check {after} < {before}`.
 - **Every section ends** in `stop`, `page`, `hand off` or `then [X]`.
 
 ## 5. Check, then green
