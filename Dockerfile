@@ -5,7 +5,10 @@
 
 FROM node:20-slim AS build
 WORKDIR /app
+# npm ci runs the postinstall script, so it goes in first. It does nothing here: it only installs
+# agent skills after a global npm install.
 COPY package.json package-lock.json ./
+COPY scripts/postinstall.mjs ./scripts/
 RUN npm ci
 COPY tsconfig.json tsconfig.build.json ./
 COPY scripts ./scripts
@@ -18,6 +21,7 @@ RUN npm run build
 FROM node:20-slim
 WORKDIR /app
 COPY package.json package-lock.json ./
+COPY scripts/postinstall.mjs ./scripts/
 RUN npm ci --omit=dev
 COPY --from=build /app/dist ./dist
 COPY core/generated ./core/generated
