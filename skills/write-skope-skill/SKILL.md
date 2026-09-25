@@ -137,6 +137,12 @@ takes over.
 - myapp-worker
 ````
 
+Layout: the frontmatter holds only `name` and `description` (and other
+Agent Skills keys). `format: 1`, params and limits go in the `skope` block,
+because agents never see frontmatter and claude.ai rejects unknown keys
+there. Keep the note line under the title: it tells an agent that loads the
+skill what the bold steps are.
+
 Keywords: **run**, **do**, **check**, **ask**, **for each**, **if yes**,
 **then**, **page**, **hand off**, **stop**. A bold word that isn't a
 keyword is an error. Ask forms: a list of `[Section]` options; `→ yes | no`

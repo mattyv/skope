@@ -715,7 +715,7 @@ Bound variables can hold an `int` (params already can).
   list).
 - Targets are tagged (`{"stop":{}}` vs `{"section":"s:page"}`), so a
   section named "Page" or "Stop" can't collide with a keyword.
-- `entry` and each param carry the frontmatter line they came from, so
+- `entry` and each param carry the skope block line they came from, so
   errors about them have a line. A defaulted `entry` points at the first
   instruction section's heading.
 - Every statement carries `src`, its line in SKILL.md, so errors and log
@@ -1136,7 +1136,7 @@ skope <path/to/SKILL.md> [options]
   --apply                 execute `do` commands and invoke the pager
   --dry-run               don't (§4.5); a run needs exactly one of these two
   --no-page               with --apply: don't page on handoff (§8)
-  --param k=v             override a frontmatter param (repeatable, typed, safe-value checked)
+  --param k=v             override a param from the skope block (repeatable, typed, safe-value checked)
   --explain               print sections, transfer graph, and worst-case cost; run nothing
   --verify                run the explore handler and print the verify report; run nothing.
                           The report is the last stdout line; warning events come before it
@@ -2359,7 +2359,7 @@ Also, where things live in the Markdown:
 - **Every section is in the core program**, under one `s:` namespace, so
   the core can tell a missing section, a wrong-kind reference and a list
   section with the wrong number of lists apart.
-- **`entry` and params carry their frontmatter line.**
+- **`entry` and params carry their skope block line.**
 - **Goldens ignore skope's version and build identity**; nothing else
   compares runs by them.
 - **A `page` event** records a real page and whether the pager succeeded.

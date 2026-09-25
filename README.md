@@ -334,8 +334,13 @@ Every step is one line of JSON on stdout:
 
 ## The language
 
-A skill is Markdown with YAML frontmatter and `format: 1`. Each `##` heading
-is a section, and a run moves from section to section until it ends.
+A skill is an ordinary agent skill, with `name` and `description` in its
+frontmatter, plus a `skope` code block after the title that holds
+`format: 1`, the params and the limits. The block is in the body, not the
+frontmatter, so an agent following the skill can see the params' defaults,
+and the frontmatter stays valid for uploading to claude.ai. A line under the
+title tells agents it's a skope skill. Each `##` heading is a section, and a
+run moves from section to section until it ends.
 
 | Keyword | Does |
 |---|---|

@@ -81,7 +81,7 @@ export interface CoreProgram {
   skill: string;
   format: 1;
   /**
-   * The `entry:` frontmatter value and its line; when defaulted, the first instruction section and its heading line.
+   * The skope block's `entry:` value and its line; when defaulted, the first instruction section and its heading line.
    */
   entry: {
     section: SectionId;

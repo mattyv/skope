@@ -20,7 +20,7 @@ const HELP = `usage: skope <path/to/SKILL.md> [options]
   --apply                 execute \`do\` commands and invoke the pager
   --dry-run               don't; a run needs exactly one of these two
   --no-page               with --apply: don't page on handoff
-  --param k=v             override a frontmatter param (repeatable, typed, safe-value checked)
+  --param k=v             override a param from the skope block (repeatable, typed, safe-value checked)
   --explain               print sections, transfer graph, and worst-case cost; run nothing
   --verify                run the explore handler and print the verify report; run nothing
   --trace events.jsonl    with --verify: check that one run's path is one the explorer can take
