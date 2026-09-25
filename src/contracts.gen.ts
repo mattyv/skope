@@ -992,8 +992,8 @@ export interface StaleLockEvent {
 
 /** SPEC §7.1: each error and warning code's meaning, from contracts/error-codes.json. */
 export const CODE_MEANINGS: Record<string, string> = {
-  "E-NOT-RUNNABLE": "no `format: 1` in the frontmatter (§3.1)",
-  "E-FRONTMATTER": "a frontmatter field is missing or invalid",
+  "E-NOT-RUNNABLE": "no skope block with `format: 1` in the intro (§3.1)",
+  "E-FRONTMATTER": "a frontmatter or skope block field is missing, invalid or not allowed there",
   "E-DUP-SECTION": "two sections have the same slug (§3.4)",
   "E-SECTION-KIND": "a section used as a list doesn't contain exactly one list (§3.2)",
   "E-MISPLACED": "a list item starting with a keyword where instructions aren't recognised (§3.3 rule 7)",
@@ -1042,6 +1042,7 @@ export const CODE_MEANINGS: Record<string, string> = {
   "W-ASK-NO-CONTEXT": "an `ask` question names nothing that could hold `run` output, so the model gets no evidence (§6.3)",
   "W-MODEL-ALIAS": "`jev.model` is an alias, or a response came from a different model than configured (§6.2)",
   "W-NO-GUIDANCE": "a section offered as an `ask` option has no guidance paragraph (§3.2)",
+  "W-NO-SKOPE-NOTE": "the intro never says the file is a skope skill, so an agent that loads it (and never sees the frontmatter or knows the format) can't tell (§3.1)",
   "W-CONFIG-PERMS": "the config file is group-writable or owned by someone other than this user or root; `pager.command` runs through `sh`, so whoever can write the file can run commands (§9). A world-writable config is `E-CONFIG`.",
   "W-REDACT-OFF": "built-in redaction patterns are turned off (§9)",
   "W-FAKE-UNUSED": "a fake key names no statement: a `line:N` with nothing on that line, or a `Section.var` / `Section.ask` the section doesn't have (§5.4)"

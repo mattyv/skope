@@ -87,17 +87,23 @@ isn't testing the change: fix the scenario.
 
 ## 4. Write the skill
 
-```markdown
+````markdown
 ---
 name: disk-full
 description: Free disk space safely when a volume fills up. Use when a disk alert fires.
+---
+
+# Disk full
+
+*A [skope](https://github.com/mattyv/skope) skill: the bold steps are the
+procedure, and `{names}` in them are params, set in the skope block below.*
+
+```skope
 format: 1
 params:
   mount: /
   threshold: 85
----
-
-# Disk full
+```
 
 One paragraph of intent: what "safe" means, what never to do.
 
@@ -129,7 +135,7 @@ takes over.
 ## Services
 - nginx
 - myapp-worker
-```
+````
 
 Keywords: **run**, **do**, **check**, **ask**, **for each**, **if yes**,
 **then**, **page**, **hand off**, **stop**. A bold word that isn't a

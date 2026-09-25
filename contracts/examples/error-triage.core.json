@@ -3,7 +3,7 @@
   "format": 1,
   "entry": {
     "section": "s:triage",
-    "src": 15
+    "src": 21
   },
   "params": {},
   "limits": {
@@ -15,11 +15,11 @@
   "sections": {
     "s:triage": {
       "name": "Triage",
-      "src": 15,
+      "src": 21,
       "guidance": "Read the recent errors and rate how severe they are.",
       "body": [
         {
-          "src": 18,
+          "src": 24,
           "run": {
             "cmd": [
               {
@@ -31,7 +31,7 @@
           "else": null
         },
         {
-          "src": 19,
+          "src": 25,
           "ask": {
             "question": [
               {
@@ -54,22 +54,22 @@
               "as": "severity",
               "rubric": [
                 {
-                  "src": 20,
+                  "src": 26,
                   "level": 1,
                   "text": "known noise, nothing to do"
                 },
                 {
-                  "src": 21,
+                  "src": 27,
                   "level": 2,
                   "text": "worth a human look, not urgent"
                 },
                 {
-                  "src": 22,
+                  "src": 28,
                   "level": 3,
                   "text": "degraded service"
                 },
                 {
-                  "src": 23,
+                  "src": 29,
                   "level": 4,
                   "text": "outage or data at risk"
                 }
@@ -78,7 +78,7 @@
           }
         },
         {
-          "src": 24,
+          "src": 30,
           "check": {
             "cond": {
               "cmp": {
@@ -98,7 +98,7 @@
           }
         },
         {
-          "src": 25,
+          "src": 31,
           "check": {
             "cond": {
               "cmp": {
@@ -118,7 +118,7 @@
           }
         },
         {
-          "src": 26,
+          "src": 32,
           "then": {
             "section": "s:page"
           }
@@ -127,11 +127,11 @@
     },
     "s:page": {
       "name": "Page",
-      "src": 28,
+      "src": 34,
       "guidance": null,
       "body": [
         {
-          "src": 29,
+          "src": 35,
           "page": [
             {
               "var": "host"
@@ -157,11 +157,11 @@
     },
     "s:unsure": {
       "name": "Unsure",
-      "src": 31,
+      "src": 37,
       "guidance": "An unwatched alert shouldn't end in a handoff nobody reads. If the rating is unclear, page.",
       "body": [
         {
-          "src": 35,
+          "src": 41,
           "page": [
             {
               "var": "host"
@@ -181,11 +181,11 @@
     },
     "s:investigate": {
       "name": "Investigate",
-      "src": 37,
+      "src": 43,
       "guidance": "The errors look real but not urgent. Find the cause from the errors gathered in Triage and suggest a fix or a change to this skill as a diff.",
       "body": [
         {
-          "src": 38,
+          "src": 44,
           "hand_off": {}
         }
       ]

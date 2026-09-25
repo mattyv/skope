@@ -27,7 +27,7 @@ describe("M7: --verify on error-triage (SPEC §12.2)", () => {
     const r = await runSkope([ERROR_TRIAGE, "--verify"]);
     expect(r.code).toBe(0);
     const report = JSON.parse(r.stdout.trim().split("\n").at(-1) as string);
-    expect(report.asks).toEqual([{ section: "Triage", line: 19, kind: "score", branches: { options: 4, unsure: 1, unavailable: 1 } }]);
+    expect(report.asks).toEqual([{ section: "Triage", line: 25, kind: "score", branches: { options: 4, unsure: 1, unavailable: 1 } }]);
   });
 });
 

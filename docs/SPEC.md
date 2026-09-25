@@ -98,14 +98,31 @@ that answers its requests changes.
 
 ### 3.1 File layout
 A skill is a Markdown file, conventionally `<name>/SKILL.md`. It MUST start
-with YAML frontmatter. A file is runnable if and only if the frontmatter has
-`format: 1`. Files without it are plain agent skills and `skope` MUST
-refuse them with a clear error.
+with YAML frontmatter holding only [Agent Skills](https://agentskills.io/specification)
+keys: `name`, `description`, and optionally `license`, `compatibility`,
+`metadata` and `allowed-tools`. Any other key is `E-FRONTMATTER`, since
+claude.ai rejects a skill with one.
 
-```yaml
+skope's own settings go in a **skope block**: a fenced code block with the
+info string `skope`, in the intro (after the frontmatter, before the first
+`##` section). A file is runnable if and only if it has one with `format: 1`.
+Files without it are plain agent skills, and `skope` MUST refuse them with a
+clear error. The block is in the body, not the frontmatter, because agents
+never see frontmatter: an agent following the skill reads the params'
+defaults here.
+
+~~~markdown
 ---
 name: disk-full                 # required, [a-z0-9-]+
 description: ...                # required, one line (used by agents)
+---
+
+# Disk full
+
+*A skope skill: the bold steps are the procedure, and {names} are params,
+set in the skope block below.*
+
+```skope
 format: 1                       # required for runnable skills
 entry: Triage                   # optional; default = first instruction section
 params:                         # optional; name: default (int or string)
@@ -117,8 +134,16 @@ limits:                         # optional; defaults shown
   deadline: 15m                 # whole run; checked between steps (§7)
                                 # each duration: 1s to 2³¹−1 ms, as §4.4 says
   ask_context: 4k tokens        # must fit the backend's context limit (§6.2)
----
 ```
+~~~
+
+- A skill has one skope block. Any other key in it is `E-FRONTMATTER`.
+- The intro SHOULD say, outside the block, that the file is a skope skill,
+  as the note line above does, so an agent that loads it knows what the
+  bold steps are. An intro that never mentions skope gets `W-NO-SKOPE-NOTE`.
+- `format`, `entry`, `params` or `limits` in the frontmatter (where skope
+  0.1.0-beta.1 read them) is `E-NOT-RUNNABLE` when there's no skope block,
+  with a message saying to move them, and `E-FRONTMATTER` when there is.
 
 ### 3.2 Document structure
 - `# Heading` (level 1): title. It and everything before the first `##`
@@ -1229,8 +1254,8 @@ and have no codes.
 
 | Code | Stage | Meaning | Example |
 |---|---|---|---|
-| `E-NOT-RUNNABLE` | parse | no `format: 1` in the frontmatter (§3.1) | a plain agent skill |
-| `E-FRONTMATTER` | parse | a frontmatter field is missing or invalid | no `description`; `run_timeout: soon` |
+| `E-NOT-RUNNABLE` | parse | no skope block with `format: 1` in the intro (§3.1) | a plain agent skill |
+| `E-FRONTMATTER` | parse | a frontmatter or skope block field is missing, invalid or not allowed there | no `description`; `run_timeout: soon`; `params` in the frontmatter |
 | `E-DUP-SECTION` | parse | two sections have the same slug (§3.4) | `## Page` twice; `## Clean up` and `## Clean-up` |
 | `E-SECTION-KIND` | lint | a section used as a list doesn't contain exactly one list (§3.2) | `[Notes]` where Notes has two lists |
 | `E-MISPLACED` | parse | a list item starting with a keyword where instructions aren't recognised (§3.3 rule 7) | `- **run** …` in a blockquote |
@@ -1284,6 +1309,7 @@ Warnings don't stop a run:
 | `W-ASK-NO-CONTEXT` | an `ask` question names nothing that could hold `run` output, so the model gets no evidence (§6.3) |
 | `W-MODEL-ALIAS` | `jev.model` is an alias, or a response came from a different model than configured (§6.2) |
 | `W-NO-GUIDANCE` | a section offered as an `ask` option has no guidance paragraph (§3.2) |
+| `W-NO-SKOPE-NOTE` | the intro never says the file is a skope skill, so an agent that loads it (and never sees the frontmatter or knows the format) can't tell (§3.1) |
 | `W-CONFIG-PERMS` | the config file is group-writable or owned by someone other than this user or root; `pager.command` runs through `sh`, so whoever can write the file can run commands (§9). A world-writable config is `E-CONFIG`. |
 | `W-REDACT-OFF` | built-in redaction patterns are turned off (§9) |
 | `W-FAKE-UNUSED` | a fake key names no statement: a `line:N` with nothing on that line, or a `Section.var` / `Section.ask` the section doesn't have (§5.4) |
@@ -1491,7 +1517,7 @@ Then skope exits 20.
 ### 8.1 Handoff record
 ```json
 {"run_id":"r-8f2c","skill":"disk-full","skill_hash":"sha256:…","host":"hk-app-03",
- "section":"Triage","line":22,"reason":"gate_failed",
+ "section":"Triage","line":28,"reason":"gate_failed",
  "detail":{"question":"What's the best next step?",
            "probs":{"s:clean_up":0.55,"s:restart":0.40,"s:page":0.03,"s:investigate":0.02},
            "sure":85},
@@ -1878,6 +1904,14 @@ Run in CI.
 ---
 name: disk-full
 description: Free disk space safely when a Linux volume fills up. Use when a disk usage alert fires or a host is close to full.
+---
+
+# Disk full
+
+*A [skope](https://github.com/mattyv/skope) skill: the bold steps are the
+procedure, and `{names}` in them are params, set in the skope block below.*
+
+```skope
 format: 1
 params:
   mount: /
@@ -1887,9 +1921,7 @@ limits:
   run_timeout: 30s
   do_timeout: 10m
   ask_context: 4k tokens
----
-
-# Disk full
+```
 
 Free space safely when a volume fills up. Never delete anything you're
 unsure about. Prefer reversible actions, and page a human rather than guess.
@@ -1991,6 +2023,14 @@ flowchart LR
 ---
 name: cert-expiry
 description: Check and renew TLS certificates before they expire. Use when a cert expiry alert fires or a site shows an expiring certificate.
+---
+
+# Cert expiry
+
+*A [skope](https://github.com/mattyv/skope) skill: the bold steps are the
+procedure, and `{names}` in them are params, set in the skope block below.*
+
+```skope
 format: 1
 params:
   domain: example.com
@@ -1999,9 +2039,7 @@ limits:
   run_timeout: 60s
   do_timeout: 5m
   ask_context: 2k tokens
----
-
-# Cert expiry
+```
 
 Keep TLS certificates renewed. **Never** issue a cert with a new key
 unless a human asks. Renewal should be boring: dry run first, then renew,
@@ -2396,13 +2434,19 @@ Also, where things live in the Markdown:
 ---
 name: error-triage
 description: Decide what to do about a burst of system errors. Use when an error-rate alert fires.
+---
+
+# Error triage
+
+*A [skope](https://github.com/mattyv/skope) skill: the bold steps are the
+procedure, and `{names}` in them are params, set in the skope block below.*
+
+```skope
 format: 1
 limits:
   run_timeout: 30s
   ask_context: 4k tokens
----
-
-# Error triage
+```
 
 Work out how bad a burst of errors is, then either leave it, hand it to
 someone to look at, or page.

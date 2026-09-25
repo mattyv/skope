@@ -12,8 +12,11 @@ import { runSkope } from "../acceptance/lib/cli.js";
 const SKILL = `---
 name: big-output
 description: A run whose command prints a lot.
-format: 1
 ---
+A skope skill.
+\`\`\`skope
+format: 1
+\`\`\`
 
 ## Triage
 Look at the log.
@@ -42,7 +45,7 @@ function scenario(answer: unknown): string[] {
   writeFileSync(join(dir, "SKILL.md"), SKILL);
   // JSON is YAML; the fake files accept either.
   writeFileSync(join(dir, "commands.json"), JSON.stringify({ "journalctl -n 100000": { exit: 0, stdout: LOG } }));
-  writeFileSync(join(dir, "answers.json"), JSON.stringify({ "line:11": answer }));
+  writeFileSync(join(dir, "answers.json"), JSON.stringify({ "line:14": answer }));
   return [join(dir, "SKILL.md"), "--apply", "--fake", join(dir, "answers.json"), "--fake-exec", join(dir, "commands.json")];
 }
 

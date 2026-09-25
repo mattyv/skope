@@ -117,12 +117,14 @@ describe("npm postinstall", () => {
 });
 
 describe("the write-skope-skill example", () => {
-  // The first ```yaml block is its tests.yaml and the ```markdown block its skill.
+  // The first ```yaml block is its tests.yaml and the ````markdown block (four backticks, since
+  // the skill holds a ```skope block) its skill.
   const text = readFileSync(SOURCE, "utf8");
-  const block = (lang: string) => (new RegExp(`^\`\`\`${lang}\\n([\\s\\S]*?)^\`\`\`$`, "m").exec(text) as RegExpExecArray)[1] as string;
+  const block = (fence: string, lang: string) =>
+    (new RegExp(`^${fence}${lang}\\n([\\s\\S]*?)^${fence}$`, "m").exec(text) as RegExpExecArray)[1] as string;
   const dir = mkdtempSync(join(tmpdir(), "skope-example-"));
-  writeFileSync(join(dir, "SKILL.md"), block("markdown"));
-  writeFileSync(join(dir, "tests.yaml"), block("yaml"));
+  writeFileSync(join(dir, "SKILL.md"), block("````", "markdown"));
+  writeFileSync(join(dir, "tests.yaml"), block("```", "yaml"));
 
   test("lints clean", () => {
     const r = skope([join(dir, "SKILL.md"), "--lint"]);

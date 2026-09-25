@@ -25,7 +25,7 @@ import {
   type Ref,
 } from "./statements.js";
 
-export type PreprocessResult = { program: CoreProgram } | { errors: ParseError[] };
+export type PreprocessResult = { program: CoreProgram; warnings: ParseError[] } | { errors: ParseError[] };
 
 export function preprocess(markdown: string): PreprocessResult {
   try {
@@ -110,7 +110,11 @@ class Preprocessor {
       limits: fm.limits,
       sections: Object.fromEntries(raws.flatMap((rs) => (rs.id === null ? [] : [[rs.id, built.get(rs) as Section | OtherSection]]))),
     };
-    return { program };
+    // Agents never see frontmatter, so the intro is where they learn this is a skope skill.
+    const warnings = fm.noted
+      ? []
+      : [mkErr("W-NO-SKOPE-NOTE", fm.blockLine, "the intro doesn't say this is a skope skill; agents reading it won't know (SPEC §3.1)")];
+    return { program, warnings };
   }
 
   resolve = (b: BracketRef): Ref => {

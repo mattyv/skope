@@ -12,28 +12,95 @@ function codesAt(md: string): { code: string; line: number }[] {
   return result.errors.map((e) => ({ code: e.code, line: e.line }));
 }
 
-describe("E-NOT-RUNNABLE (parse): no format: 1 in the frontmatter", () => {
+describe("E-NOT-RUNNABLE (parse): no skope block with format: 1", () => {
   test("a plain agent skill with no frontmatter at all", () => {
     const md = "# Just a heading\n\nSome prose.\n";
     expect(codesAt(md)).toEqual([{ code: "E-NOT-RUNNABLE", line: 1 }]);
   });
 
-  test("frontmatter present but format: 1 is missing", () => {
+  test("frontmatter but no skope block", () => {
     const md = "---\nname: test\ndescription: x\n---\n# Title\n";
     expect(codesAt(md)).toContainEqual({ code: "E-NOT-RUNNABLE", line: 1 });
   });
 });
 
+describe("the skope block (SPEC §3.1)", () => {
+  const message = (md: string) => {
+    const r = preprocess(md);
+    return "errors" in r ? r.errors.map((e) => `${e.code}@${e.line}: ${e.message}`) : [];
+  };
+
+  test("beta.1 layout, format: 1 in the frontmatter, says to move it", () => {
+    const md = "---\nname: t\ndescription: d\nformat: 1\nparams:\n  a: 1\n---\n## T\n- **stop**\n";
+    expect(message(md)).toEqual([
+      expect.stringMatching(/^E-NOT-RUNNABLE@1: `format`, `params` are in the frontmatter: move them into a ```skope block/),
+    ]);
+  });
+
+  test("a skope key left in the frontmatter beside a block is E-FRONTMATTER at its line", () => {
+    const md = "---\nname: t\ndescription: d\nlimits:\n  deadline: 5m\n---\nA skope skill.\n```skope\nformat: 1\n```\n## T\n- **stop**\n";
+    expect(codesAt(md)).toEqual([{ code: "E-FRONTMATTER", line: 4 }]);
+  });
+
+  test("any key the Agent Skills spec doesn't allow is E-FRONTMATTER, since claude.ai rejects it", () => {
+    const md =
+      "---\nname: t\ndescription: d\nauthor: me\nmetadata:\n  team: sre\n---\nA skope skill.\n```skope\nformat: 1\n```\n## T\n- **stop**\n";
+    expect(message(md)).toEqual([expect.stringMatching(/^E-FRONTMATTER@4: `author` isn't an Agent Skills frontmatter key/)]);
+  });
+
+  test("an unknown key in the block, a block without format: 1, a second block, and an unclosed block", () => {
+    const fm = "---\nname: t\ndescription: d\n---\nA skope skill.\n";
+    expect(codesAt(`${fm}\`\`\`skope\nformat: 1\ntimeout: 5s\n\`\`\`\n## T\n- **stop**\n`)).toEqual([{ code: "E-FRONTMATTER", line: 8 }]);
+    expect(codesAt(`${fm}\`\`\`skope\nparams:\n  a: 1\n\`\`\`\n## T\n- **stop**\n`)).toEqual([{ code: "E-FRONTMATTER", line: 6 }]);
+    expect(codesAt(`${fm}\`\`\`skope\nformat: 1\n\`\`\`\n\`\`\`skope\nformat: 1\n\`\`\`\n## T\n- **stop**\n`)).toEqual([
+      { code: "E-FRONTMATTER", line: 9 },
+    ]);
+    expect(codesAt(`${fm}\`\`\`skope\nformat: 1\n## T\n- **stop**\n`)).toEqual([{ code: "E-FRONTMATTER", line: 6 }]);
+  });
+
+  test("a skope block after the first section doesn't count", () => {
+    const md = "---\nname: t\ndescription: d\n---\nA skope skill.\n## T\n- **stop**\n\n```skope\nformat: 1\n```\n";
+    expect(codesAt(md)).toEqual([{ code: "E-NOT-RUNNABLE", line: 1 }]);
+  });
+
+  test("~~~ fences work too, and the block's lines are what params point at", () => {
+    const md = "---\nname: t\ndescription: d\n---\n# T\n\nA skope skill.\n\n~~~skope\nformat: 1\nparams:\n  a: 1\n~~~\n## T\n- **stop**\n";
+    const r = preprocess(md);
+    expect("program" in r && r.program.params).toEqual({ a: { int: 1, src: 12 } });
+  });
+
+  test("W-NO-SKOPE-NOTE: an intro that never says skope, outside the block", () => {
+    const warnings = (intro: string) => {
+      const r = preprocess(`---\nname: t\ndescription: d\n---\n${intro}\n\`\`\`skope\nformat: 1\n\`\`\`\n## T\n- **stop**\n`);
+      return "program" in r ? r.warnings.map((w) => ({ code: w.code, line: w.line })) : null;
+    };
+    expect(warnings("# Title")).toEqual([{ code: "W-NO-SKOPE-NOTE", line: 6 }]);
+    expect(warnings("# Title\n\n*A skope skill.*")).toEqual([]);
+  });
+});
+
 describe("E-FRONTMATTER (parse): a frontmatter field is missing or invalid", () => {
   test("no description", () => {
-    const md = "---\nname: test\nformat: 1\n---\n# Title\n";
+    const md = "---\nname: test\n---\nA skope skill.\n```skope\nformat: 1\n```\n# Title\n";
     expect(codesAt(md)).toContainEqual({ code: "E-FRONTMATTER", line: 1 });
   });
 
   test("run_timeout: soon", () => {
-    const md = ["---", "name: test", "description: x", "format: 1", "limits:", "  run_timeout: soon", "---", "# Title"].join("\n");
+    const md = [
+      "---",
+      "name: test",
+      "description: x",
+      "---",
+      "A skope skill.",
+      "```skope",
+      "format: 1",
+      "limits:",
+      "  run_timeout: soon",
+      "```",
+      "# Title",
+    ].join("\n");
     const errs = codesAt(md);
-    expect(errs.some((e) => e.code === "E-FRONTMATTER" && e.line === 6)).toBe(true);
+    expect(errs.some((e) => e.code === "E-FRONTMATTER" && e.line === 9)).toBe(true);
   });
 
   // S1: every timeout is 1 ms to 2^31 − 1 ms (SPEC §4.4); a longer one used to pass lint
@@ -44,15 +111,38 @@ describe("E-FRONTMATTER (parse): a frontmatter field is missing or invalid", () 
     ["deadline", "35792m"],
     ["run_timeout", "2147484s"],
   ])("%s: %s is past 2^31 − 1 ms", (key, value) => {
-    const md = ["---", "name: test", "description: x", "format: 1", "limits:", `  ${key}: ${value}`, "---", "# Title"].join("\n");
-    expect(codesAt(md)).toContainEqual({ code: "E-FRONTMATTER", line: 6 });
+    const md = [
+      "---",
+      "name: test",
+      "description: x",
+      "---",
+      "A skope skill.",
+      "```skope",
+      "format: 1",
+      "limits:",
+      `  ${key}: ${value}`,
+      "```",
+      "# Title",
+    ].join("\n");
+    expect(codesAt(md)).toContainEqual({ code: "E-FRONTMATTER", line: 9 });
   });
 
   test("2147483s (just under 2^31 − 1 ms) is accepted for every duration", () => {
     for (const key of ["run_timeout", "do_timeout", "deadline"]) {
-      const md = ["---", "name: test", "description: x", "format: 1", "limits:", `  ${key}: 2147483s`, "---", "## T", "- **stop**"].join(
-        "\n",
-      );
+      const md = [
+        "---",
+        "name: test",
+        "description: x",
+        "---",
+        "A skope skill.",
+        "```skope",
+        "format: 1",
+        "limits:",
+        `  ${key}: 2147483s`,
+        "```",
+        "## T",
+        "- **stop**",
+      ].join("\n");
       expect("errors" in preprocess(md), key).toBe(false);
     }
   });

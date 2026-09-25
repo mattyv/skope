@@ -2,12 +2,12 @@
   {
     "code": "E-NOT-RUNNABLE",
     "stage": "parse",
-    "meaning": "no `format: 1` in the frontmatter (§3.1)"
+    "meaning": "no skope block with `format: 1` in the intro (§3.1)"
   },
   {
     "code": "E-FRONTMATTER",
     "stage": "parse",
-    "meaning": "a frontmatter field is missing or invalid"
+    "meaning": "a frontmatter or skope block field is missing, invalid or not allowed there"
   },
   {
     "code": "E-DUP-SECTION",
@@ -248,6 +248,11 @@
     "code": "W-NO-GUIDANCE",
     "stage": "warning",
     "meaning": "a section offered as an `ask` option has no guidance paragraph (§3.2)"
+  },
+  {
+    "code": "W-NO-SKOPE-NOTE",
+    "stage": "warning",
+    "meaning": "the intro never says the file is a skope skill, so an agent that loads it (and never sees the frontmatter or knows the format) can't tell (§3.1)"
   },
   {
     "code": "W-CONFIG-PERMS",

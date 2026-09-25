@@ -165,6 +165,7 @@ export async function runSkill(o: RunOptions): Promise<number> {
       throw new End("invalid");
     }
     const program = parsed.program;
+    for (const w of parsed.warnings) diag("warning", { code: w.code, stage: "parse", file: o.file, line: w.line, message: w.message });
     const found = lint(program);
     for (const w of found.warnings) diag("warning", { code: w.code, stage: "lint", file: o.file, line: w.line, message: meaning(w.code) });
     if (found.errors.length > 0) {

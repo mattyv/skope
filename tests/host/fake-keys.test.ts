@@ -31,7 +31,7 @@ describe("stable fake keys (SPEC §5.4)", () => {
       "Triage.used": { exit: 0, stdout: " 93%\n" },
       "Triage.errors": { exit: 0, stdout: "myapp-worker OOM\n" },
       "Triage.biggest": { exit: 0, stdout: "40G\t/var\n" },
-      "line:47": { exit: 0 }, // a do binds nothing, so it keeps its line
+      "line:53": { exit: 0 }, // a do binds nothing, so it keeps its line
       "Restart.used": { exit: 0, stdout: " 91%\n" },
     });
     const answers = file("answers.yaml", {
@@ -58,7 +58,7 @@ describe("stable fake keys (SPEC §5.4)", () => {
     const skill = join(dir, "SKILL.md");
     writeFileSync(
       skill,
-      "---\nname: tiny\ndescription: t\nformat: 1\n---\n\n## Main\nDo it.\n\n- **run** `echo 1` as n\n- **run** `echo 2` as n\n- **stop**\n",
+      "---\nname: tiny\ndescription: t\n---\nA skope skill.\n```skope\nformat: 1\n```\n\n## Main\nDo it.\n\n- **run** `echo 1` as n\n- **run** `echo 2` as n\n- **stop**\n",
     );
     const r = await runSkope([skill, "--apply", "--fake-exec", file("commands.yaml", { "Main.n": { exit: 0 } })]);
     expect(r.code).toBe(40);

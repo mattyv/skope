@@ -329,7 +329,7 @@ $ skope disk-full/SKILL.md --apply --param mount=/var # do it
 Every step is one line of JSON on stdout:
 
 ```json
-{"ts":"2026-09-23T03:12:44Z","run_id":"r-8f2c","skill":"disk-full","skill_hash":"sha256:…","host":"hk-app-03","event":"would_do","section":"Clean up","line":38,"cmd":"journalctl --vacuum-size=500M"}
+{"ts":"2026-09-23T03:12:44Z","run_id":"r-8f2c","skill":"disk-full","skill_hash":"sha256:…","host":"hk-app-03","event":"would_do","section":"Clean up","line":44,"cmd":"journalctl --vacuum-size=500M"}
 ```
 
 ## The language

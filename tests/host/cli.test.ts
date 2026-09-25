@@ -14,7 +14,10 @@ const CLI = fileURLToPath(new URL("../../dist/cli.js", import.meta.url));
 function skill(body: string, frontmatter = ""): string {
   const dir = mkdtempSync(join(tmpdir(), "skope-skill-"));
   const path = join(dir, "SKILL.md");
-  writeFileSync(path, `---\nname: tiny\ndescription: a test skill\nformat: 1\n${frontmatter}---\n\n## Main\nDo the thing.\n\n${body}\n`);
+  writeFileSync(
+    path,
+    `---\nname: tiny\ndescription: a test skill\n---\nA skope skill.\n\`\`\`skope\nformat: 1\n${frontmatter}\`\`\`\n\n## Main\nDo the thing.\n\n${body}\n`,
+  );
   return path;
 }
 
@@ -124,7 +127,7 @@ describe("run flow", () => {
       '- **ask** Is {note} fine? · sure 80%\n  - [Other]\n  - [Third]\n\n## Other\nElse.\n\n- **page** "rotated {note}"\n\n## Third\nOr this.\n\n- **hand off**',
       "params:\n  note: x\n",
     );
-    const answers = file("answers.yaml", JSON.stringify({ "line:12": { "s:other": 0.95, "s:third": 0.05 } }));
+    const answers = file("answers.yaml", JSON.stringify({ "line:15": { "s:other": 0.95, "s:third": 0.05 } }));
     const note = `password=${secret}`;
     const paged = await runSkope([path, "--apply", "--config", config, "--fake", answers, "--param", `note=${note}`]);
     expect(paged.code).toBe(10);
@@ -139,7 +142,7 @@ describe("run flow", () => {
       "--config",
       config,
       "--fake",
-      file("answers.yaml", JSON.stringify({ "line:12": { "s:other": 0.05, "s:third": 0.95 } })),
+      file("answers.yaml", JSON.stringify({ "line:15": { "s:other": 0.05, "s:third": 0.95 } })),
       "--param",
       `note=${note}`,
     ]);
@@ -293,7 +296,7 @@ describe("run flow", () => {
       "- **run** `seq 1 50` as log\n- **ask** Given {log}, which? · sure 80%\n  - [Other]\n  - [Third]\n\n## Other\nElse.\n\n- **stop**\n\n## Third\nOr this.\n\n- **stop**",
       "limits:\n  ask_context: 3 tokens\n",
     );
-    const answers = file("a.yaml", '{"line:13": {"s:other": 1, "s:third": 0}}');
+    const answers = file("a.yaml", '{"line:16": {"s:other": 1, "s:third": 0}}');
     const r = await runSkope([path, "--apply", "--fake", answers]);
     expect(r.code).toBe(0);
     const request = JSON.parse(readFileSync(find(r.events, "ask")?.request_path as string, "utf8"));
@@ -429,7 +432,7 @@ describe("review fixes", () => {
     const run = await runSkope([path, "--apply"]);
     expect(run.code).toBe(0);
     // Move the second command to a line no path has.
-    const events = run.events.map((e) => (e.event === "run" && e.line === 11 ? { ...e, line: 99 } : e));
+    const events = run.events.map((e) => (e.event === "run" && e.line === 14 ? { ...e, line: 99 } : e));
     const trace = file("t.jsonl", events.map((e) => JSON.stringify(e)).join("\n"));
     const r = await runSkope([path, "--verify", "--trace", trace]);
     expect(r.code).toBe(40);
@@ -452,9 +455,9 @@ describe("review fixes", () => {
 
   test("E-CONFIG: --fake and --fake-exec files are checked against contracts/fakes.schema.json before the run", async () => {
     const cases = [
-      ["--fake", file("a.yaml", '{"line:11": "maybe"}')],
+      ["--fake", file("a.yaml", '{"line:14": "maybe"}')],
       ["--fake", file("a.yaml", "[1, 2]")],
-      ["--fake-exec", file("c.yaml", '{"line:10": {"exit": 0, "sdtout": "typo"}}')],
+      ["--fake-exec", file("c.yaml", '{"line:13": {"exit": 0, "sdtout": "typo"}}')],
       ["--fake-exec", file("c.yaml", "{ not yaml")],
     ];
     for (const [flag, path] of cases) {
@@ -466,7 +469,7 @@ describe("review fixes", () => {
   });
 
   test("ask requests and the handoff record are private files (0600) in a fresh run directory", async () => {
-    const answers = file("a.yaml", '{"line:11": {"s:other": 0, "s:third": 1}}');
+    const answers = file("a.yaml", '{"line:14": {"s:other": 0, "s:third": 1}}');
     const r = await runSkope([ask(), "--apply", "--no-page", "--fake", answers], { env: {} });
     expect(r.code).toBe(20);
     const ask1 = find(r.events, "ask")?.request_path as string;
@@ -589,7 +592,7 @@ describe("final review nits", () => {
     const path = skill(
       "- **run** `df` as used\n- **ask** Given {used}, which? · sure 80%\n  - [Other]\n  - [Third]\n\n## Other\nElse.\n\n- **stop**\n\n## Third\nOr this.\n\n- **stop**",
     );
-    const answers = file("a.yaml", '{"line:11": {"s:other": 0.5, "s:third": 0.9}}');
+    const answers = file("a.yaml", '{"line:14": {"s:other": 0.5, "s:third": 0.9}}');
     const r = await runSkope([path, "--apply", "--no-page", "--fake", answers]);
     expect(r.code).toBe(20);
     expect(find(r.events, "ask")).toMatchObject({ detail: "unavailable" });

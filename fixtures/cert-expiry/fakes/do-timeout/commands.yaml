@@ -1,24 +1,24 @@
 {
-  "line:23": {
+  "line:29": {
     "exit": 1,
     "stdout": "Certificate will expire\n"
   },
-  "line:24": {
+  "line:30": {
     "exit": 1,
     "stdout": "Certificate will expire\n"
   },
-  "line:25": {
+  "line:31": {
     "exit": 0,
     "stdout": "certbot.timer active\n"
   },
-  "line:26": {
+  "line:32": {
     "exit": 0,
     "stdout": "no recent failures\n"
   },
-  "line:37": {
+  "line:43": {
     "exit": 0
   },
-  "line:38": {
+  "line:44": {
     "exit": null,
     "timed_out": true
   }
