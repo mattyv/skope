@@ -5,8 +5,8 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { WRITE_SKOPE_SKILL } from "../embedded.gen.js";
 import { plainText } from "../runner/events.js";
-import { WRITE_SKOPE_SKILL } from "../skill.gen.js";
 
 /** Claude Code's skills directory: $CLAUDE_CONFIG_DIR/skills, else ~/.claude/skills. */
 export const defaultSkillsDir = () => join(process.env.CLAUDE_CONFIG_DIR || join(homedir(), ".claude"), "skills");

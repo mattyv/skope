@@ -1,0 +1,5 @@
+# What the commands "print" in the demo dry run. Nothing real runs.
+Triage.used: "93%\n"
+Triage.errors: "myapp-worker OOM\n"
+Triage.biggest: "40G\t/var\n"
+Restart.used: "61%\n"

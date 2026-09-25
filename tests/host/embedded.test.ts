@@ -1,5 +1,5 @@
-// `skope --install-skill` and the npm postinstall that runs it (SPEC §5.5, §7), and the shipped
-// write-skope-skill itself: its example skill and tests.yaml must pass, or the skill teaches
+// What ships inside skope: `skope --demo`, `skope --install-skill` and the npm postinstall that
+// runs it (SPEC §5.5, §7), and the shipped write-skope-skill itself: its example skill and tests.yaml must pass, or the skill teaches
 // something skope rejects.
 
 import { spawnSync } from "node:child_process";
@@ -18,9 +18,9 @@ function skope(args: string[], env: Record<string, string> = {}) {
 }
 
 describe("skope --install-skill", () => {
-  test("src/skill.gen.ts is up to date with the skill (run: node scripts/gen-skill.mjs)", async () => {
-    const { generate } = await import(join(ROOT, "scripts", "gen-skill.mjs"));
-    expect(readFileSync(join(ROOT, "src", "skill.gen.ts"), "utf8")).toBe(generate());
+  test("src/embedded.gen.ts is up to date with the skill (run: node scripts/gen-embedded.mjs)", async () => {
+    const { generate } = await import(join(ROOT, "scripts", "gen-embedded.mjs"));
+    expect(readFileSync(join(ROOT, "src", "embedded.gen.ts"), "utf8")).toBe(generate());
   });
 
   test("writes the skill into the directory given", () => {
@@ -51,6 +51,44 @@ describe("skope --install-skill", () => {
     const r = skope(["--install-skill", file]);
     expect(r.status).toBe(50);
     expect(r.stderr).toContain("couldn't install the write-skope-skill skill");
+  });
+});
+
+describe("skope --demo", () => {
+  test("writes a skill whose tests pass and whose fake run works, with no config or key", () => {
+    const dir = join(mkdtempSync(join(tmpdir(), "skope-demo-")), "demo");
+    const home = mkdtempSync(join(tmpdir(), "skope-home-"));
+    const env = { HOME: home, XDG_CONFIG_HOME: join(home, "config"), XDG_STATE_HOME: join(home, "state") };
+    const r = skope(["--demo", dir], env);
+    expect(r.status).toBe(0);
+    expect(r.stdout).toBe("");
+    expect(r.stderr).toContain(`cd ${dir}\n  skope SKILL.md --verify`);
+    expect(readFileSync(join(dir, "SKILL.md"), "utf8")).toBe(readFileSync(join(ROOT, "fixtures", "disk-full", "SKILL.md"), "utf8"));
+
+    const test = skope([join(dir, "SKILL.md"), "--test"], env);
+    expect(test.stderr).toMatch(/\d+ passed, 0 failed, 0 invalid/);
+    expect(test.status).toBe(0);
+    expect(skope([join(dir, "SKILL.md"), "--verify"], env).status).toBe(0);
+
+    const run = skope(
+      [join(dir, "SKILL.md"), "--dry-run", "--fake", join(dir, "answers.yaml"), "--fake-exec", join(dir, "commands.yaml")],
+      env,
+    );
+    expect(run.status).toBe(0);
+    const events = run.stdout
+      .trim()
+      .split("\n")
+      .map((l) => JSON.parse(l));
+    expect(events.find((e) => e.event === "would_do")?.cmd).toBe("systemctl restart myapp-worker");
+    expect(events.at(-1)).toMatchObject({ event: "outcome", outcome: "stopped" });
+    expect(events.some((e) => e.event === "warning")).toBe(false);
+  });
+
+  test("never overwrites: an existing directory is a usage error", () => {
+    const dir = mkdtempSync(join(tmpdir(), "skope-demo-"));
+    const r = skope(["--demo", dir]);
+    expect(r.status).toBe(40);
+    expect(r.stderr).toContain("already exists");
   });
 });
 

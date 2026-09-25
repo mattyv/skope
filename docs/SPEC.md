@@ -1127,6 +1127,10 @@ skope <path/to/SKILL.md> [options]
   --version               print the release version and build identity (§7.2)
   --help                  print these options to stdout and exit 0
 
+skope --demo [DIR]        write the disk-full skill (fixtures/disk-full/SKILL.md)
+                          with a tests.yaml and fake answers and commands into DIR (default:
+                          ./skope-demo), and print what to try; never overwrites, needs no config
+                          or API key; takes no skill file or other option
 skope --install-skill [DIR]
                           write the write-skope-skill agent skill into DIR/write-skope-skill/
                           (default: $CLAUDE_CONFIG_DIR/skills, else ~/.claude/skills), replacing

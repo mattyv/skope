@@ -1,0 +1,46 @@
+# Scenarios for SKILL.md: run them with `skope SKILL.md --test`. Nothing real
+# runs and no API key is needed: commands are faked, and naming an ask's
+# expected choice in `asks` is enough for skope to script the answer.
+defaults:
+  commands:
+    Triage.used: "93%\n"              # a string is shorthand for {exit: 0, stdout: "..."}
+    Triage.errors: "myapp-worker OOM\n"
+    Triage.biggest: "40G\t/var\n"
+    systemctl restart myapp-worker: { exit: 0 }
+scenarios:
+  false-alarm:
+    commands: { Triage.used: "40%\n" }
+    outcome: stopped
+    path: [Triage]
+  restart-fixes-it:
+    commands: { Restart.used: "61%\n" }
+    outcome: stopped
+    path: [Triage, Restart]
+    asks:
+      Triage: { chosen: Restart }
+      Restart.service: { chosen: myapp-worker }
+  restart-not-enough:
+    commands: { Restart.used: "91%\n" }
+    outcome: paged
+    path: [Triage, Restart, Page]
+    asks:
+      Triage: { chosen: Restart }
+      Restart.service: { chosen: myapp-worker }
+    page_contains: "at 91%"
+  restart-hangs:
+    commands:
+      systemctl restart myapp-worker: { exit: null, timed_out: true }
+    outcome: handoff
+    handoff_reason: command_failed
+    asks:
+      Triage: { chosen: Restart }
+      Restart.service: { chosen: myapp-worker }
+  nothing-fits:
+    outcome: handoff
+    path: [Triage, Investigate]
+    asks:
+      Triage: { chosen: Investigate }
+  model-unsure:
+    answers: { Triage.ask: unsure }   # the model can't decide: skope hands off instead of guessing
+    outcome: handoff
+    handoff_reason: gate_failed
