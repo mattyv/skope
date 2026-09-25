@@ -3,20 +3,20 @@
   "format": 1,
   "entry": {
     "section": "s:triage",
-    "src": 20
+    "src": 26
   },
   "params": {
     "mount": {
       "str": "/",
-      "src": 6
+      "src": 14
     },
     "threshold": {
       "int": 85,
-      "src": 7
+      "src": 15
     },
     "target": {
       "int": 80,
-      "src": 8
+      "src": 16
     }
   },
   "limits": {
@@ -28,11 +28,11 @@
   "sections": {
     "s:triage": {
       "name": "Triage",
-      "src": 20,
+      "src": 26,
       "guidance": "Look at usage, recent errors and what's biggest on disk.",
       "body": [
         {
-          "src": 23,
+          "src": 29,
           "run": {
             "cmd": [
               {
@@ -50,7 +50,7 @@
           "else": null
         },
         {
-          "src": 24,
+          "src": 30,
           "check": {
             "cond": {
               "cmp": {
@@ -70,7 +70,7 @@
           }
         },
         {
-          "src": 25,
+          "src": 31,
           "run": {
             "cmd": [
               {
@@ -82,7 +82,7 @@
           "else": null
         },
         {
-          "src": 26,
+          "src": 32,
           "run": {
             "cmd": [
               {
@@ -96,7 +96,7 @@
           }
         },
         {
-          "src": 27,
+          "src": 33,
           "ask": {
             "question": [
               {
@@ -125,19 +125,19 @@
             "else": null,
             "sections": [
               {
-                "src": 28,
+                "src": 34,
                 "section": "s:clean_up"
               },
               {
-                "src": 29,
+                "src": 35,
                 "section": "s:restart"
               },
               {
-                "src": 30,
+                "src": 36,
                 "section": "s:page"
               },
               {
-                "src": 31,
+                "src": 37,
                 "section": "s:investigate"
               }
             ]
@@ -147,11 +147,11 @@
     },
     "s:clean_up": {
       "name": "Clean up",
-      "src": 33,
+      "src": 39,
       "guidance": "Run cleanups least risky first. Stop as soon as usage is under target.",
       "body": [
         {
-          "src": 36,
+          "src": 42,
           "for_each": {
             "var": "step",
             "list": {
@@ -159,7 +159,7 @@
             },
             "body": [
               {
-                "src": 37,
+                "src": 43,
                 "ask": {
                   "question": [
                     {
@@ -194,7 +194,7 @@
                 }
               },
               {
-                "src": 38,
+                "src": 44,
                 "if_yes": {
                   "do": {
                     "item": "step"
@@ -205,7 +205,7 @@
                 }
               },
               {
-                "src": 39,
+                "src": 45,
                 "run": {
                   "cmd": [
                     {
@@ -223,7 +223,7 @@
                 "else": null
               },
               {
-                "src": 40,
+                "src": 46,
                 "check": {
                   "cond": {
                     "cmp": {
@@ -246,7 +246,7 @@
           }
         },
         {
-          "src": 41,
+          "src": 47,
           "then": {
             "section": "s:page"
           }
@@ -255,11 +255,11 @@
     },
     "s:restart": {
       "name": "Restart",
-      "src": 43,
+      "src": 49,
       "guidance": "Restart the one service most likely behind the growth. Never more than one.",
       "body": [
         {
-          "src": 46,
+          "src": 52,
           "ask": {
             "question": [
               {
@@ -289,7 +289,7 @@
           }
         },
         {
-          "src": 47,
+          "src": 53,
           "do": {
             "cmd": [
               {
@@ -303,7 +303,7 @@
           "else": null
         },
         {
-          "src": 48,
+          "src": 54,
           "run": {
             "cmd": [
               {
@@ -321,7 +321,7 @@
           "else": null
         },
         {
-          "src": 49,
+          "src": 55,
           "check": {
             "cond": {
               "cmp": {
@@ -341,7 +341,7 @@
           }
         },
         {
-          "src": 50,
+          "src": 56,
           "then": {
             "section": "s:page"
           }
@@ -350,11 +350,11 @@
     },
     "s:page": {
       "name": "Page",
-      "src": 52,
+      "src": 58,
       "guidance": "Nothing here is safe to try automatically. Tell a human.",
       "body": [
         {
-          "src": 55,
+          "src": 61,
           "page": [
             {
               "var": "host"
@@ -386,24 +386,24 @@
     },
     "s:investigate": {
       "name": "Investigate",
-      "src": 57,
+      "src": 63,
       "guidance": "Nothing in the lists fits. Work out what's filling the disk from the errors and sizes gathered in Triage. Don't run anything outside Cleanups or Services without asking a human first.",
       "body": [
         {
-          "src": 58,
+          "src": 64,
           "hand_off": {}
         }
       ]
     },
     "s:cleanups": {
       "name": "Cleanups",
-      "src": 67,
+      "src": 73,
       "lists": [
         {
-          "src": 70,
+          "src": 76,
           "items": [
             {
-              "src": 70,
+              "src": 76,
               "action": {
                 "label": "Vacuum the journal to 500MB",
                 "cmd": [
@@ -414,7 +414,7 @@
               }
             },
             {
-              "src": 71,
+              "src": 77,
               "action": {
                 "label": "Clear the apt cache",
                 "cmd": [
@@ -425,7 +425,7 @@
               }
             },
             {
-              "src": 72,
+              "src": 78,
               "action": {
                 "label": "Delete rotated logs older than 7 days",
                 "cmd": [
@@ -436,7 +436,7 @@
               }
             },
             {
-              "src": 73,
+              "src": 79,
               "action": {
                 "label": "Delete /tmp files older than 7 days",
                 "cmd": [
@@ -447,7 +447,7 @@
               }
             },
             {
-              "src": 74,
+              "src": 80,
               "action": {
                 "label": "Prune unused docker images",
                 "cmd": [
@@ -463,25 +463,25 @@
     },
     "s:services": {
       "name": "Services",
-      "src": 76,
+      "src": 82,
       "lists": [
         {
-          "src": 77,
+          "src": 83,
           "items": [
             {
-              "src": 77,
+              "src": 83,
               "value": "nginx"
             },
             {
-              "src": 78,
+              "src": 84,
               "value": "rsyslog"
             },
             {
-              "src": 79,
+              "src": 85,
               "value": "myapp-worker"
             },
             {
-              "src": 80,
+              "src": 86,
               "value": "myapp-api"
             }
           ]

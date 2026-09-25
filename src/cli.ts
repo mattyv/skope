@@ -20,7 +20,7 @@ const HELP = `usage: skope <path/to/SKILL.md> [options]
   --apply                 execute \`do\` commands and invoke the pager
   --dry-run               don't; a run needs exactly one of these two
   --no-page               with --apply: don't page on handoff
-  --param k=v             override a frontmatter param (repeatable, typed, safe-value checked)
+  --param k=v             override a param from the skope block (repeatable, typed, safe-value checked)
   --explain               print sections, transfer graph, and worst-case cost; run nothing
   --verify                run the explore handler and print the verify report; run nothing
   --trace events.jsonl    with --verify: check that one run's path is one the explorer can take
@@ -34,8 +34,9 @@ const HELP = `usage: skope <path/to/SKILL.md> [options]
   --config path           default: $XDG_CONFIG_HOME/skope/config.yaml
   --demo [DIR]            write a demo skill with tests and fakes into DIR (default: ./skope-demo) and
                           say what to try; needs no API key; nothing else goes with it
-  --install-skill [DIR]   install the write-skope-skill agent skill, which has an agent write skope
-                          skills test first, into DIR (default: ~/.claude/skills); nothing else goes with it
+  --install-skill [DIR]   install the agent skills write-skope-skill (write skills test first) and
+                          run-skope-skill (run one, or take over a handoff) into DIR (default:
+                          ~/.claude/skills); nothing else goes with it
   --version               print the release version and build identity
   --help                  print this`;
 

@@ -87,17 +87,23 @@ isn't testing the change: fix the scenario.
 
 ## 4. Write the skill
 
-```markdown
+````markdown
 ---
 name: disk-full
 description: Free disk space safely when a volume fills up. Use when a disk alert fires.
+---
+
+# Disk full
+
+*A [skope](https://github.com/mattyv/skope) skill. Run it with the run-skope-skill skill if you have
+it; if not, the bold steps are the procedure, and `{names}` are params set in the skope block below.*
+
+```skope
 format: 1
 params:
   mount: /
   threshold: 85
----
-
-# Disk full
+```
 
 One paragraph of intent: what "safe" means, what never to do.
 
@@ -129,7 +135,13 @@ takes over.
 ## Services
 - nginx
 - myapp-worker
-```
+````
+
+Layout: the frontmatter holds only `name` and `description` (and other
+Agent Skills keys). `format: 1`, params and limits go in the `skope` block,
+because agents never see frontmatter and claude.ai rejects unknown keys
+there. Keep the note line under the title: it tells an agent that loads the
+skill what the bold steps are.
 
 Keywords: **run**, **do**, **check**, **ask**, **for each**, **if yes**,
 **then**, **page**, **hand off**, **stop**. A bold word that isn't a

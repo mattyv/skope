@@ -120,16 +120,18 @@ image, `ghcr.io/mattyv/skope`.
 beta by name:
 
 ```console
-$ curl -fsSL https://github.com/mattyv/skope/releases/download/v0.1.0-beta.1/install.sh | SKOPE_VERSION=0.1.0-beta.1 sh
+$ curl -fsSL https://github.com/mattyv/skope/releases/download/v0.1.0-beta.2/install.sh | SKOPE_VERSION=0.1.0-beta.2 sh
 ```
 
-or `npm install -g skope@beta`, or `ghcr.io/mattyv/skope:0.1.0-beta.1`.
+or `npm install -g skope@beta`, or `ghcr.io/mattyv/skope:0.1.0-beta.2`.
 
 If you use Claude Code (`~/.claude` exists), both the installer and
-`npm install -g` also install the
-[`write-skope-skill`](skills/write-skope-skill/SKILL.md) agent skill, which
-has an agent write skope skills test first. Set `SKOPE_NO_SKILL=1` to skip
-it.
+`npm install -g` also install two agent skills:
+[`write-skope-skill`](skills/write-skope-skill/SKILL.md) has an agent write
+skope skills test first, and
+[`run-skope-skill`](skills/run-skope-skill/SKILL.md) has one run a skope
+skill (with skope if it's there, by hand if not) and take over when skope
+hands off. Set `SKOPE_NO_SKILL=1` to skip them.
 
 ### Try it
 
@@ -311,8 +313,9 @@ will make before it starts.
 that makes the agent write `tests.yaml` first, watch it fail, then write
 the skill until `--lint`, `--verify` and `--test` are clean, and finally
 check the questions with `--live`. Installing skope puts it in Claude
-Code's skills directory if you have one; `skope --install-skill [DIR]`
-installs it anywhere else, such as `.claude/skills` in your repo.
+Code's skills directory if you have one, along with `run-skope-skill`;
+`skope --install-skill [DIR]` installs them anywhere else, such as
+`.claude/skills` in your repo.
 
 ### Run
 
@@ -329,13 +332,18 @@ $ skope disk-full/SKILL.md --apply --param mount=/var # do it
 Every step is one line of JSON on stdout:
 
 ```json
-{"ts":"2026-09-23T03:12:44Z","run_id":"r-8f2c","skill":"disk-full","skill_hash":"sha256:…","host":"hk-app-03","event":"would_do","section":"Clean up","line":38,"cmd":"journalctl --vacuum-size=500M"}
+{"ts":"2026-09-23T03:12:44Z","run_id":"r-8f2c","skill":"disk-full","skill_hash":"sha256:…","host":"hk-app-03","event":"would_do","section":"Clean up","line":44,"cmd":"journalctl --vacuum-size=500M"}
 ```
 
 ## The language
 
-A skill is Markdown with YAML frontmatter and `format: 1`. Each `##` heading
-is a section, and a run moves from section to section until it ends.
+A skill is an ordinary agent skill, with `name` and `description` in its
+frontmatter, plus a `skope` code block after the title that holds
+`format: 1`, the params and the limits. The block is in the body, not the
+frontmatter, so an agent following the skill can see the params' defaults,
+and the frontmatter stays valid for uploading to claude.ai. A line under the
+title tells agents it's a skope skill. Each `##` heading is a section, and a
+run moves from section to section until it ends.
 
 | Keyword | Does |
 |---|---|
@@ -510,8 +518,10 @@ $ DAFNY=/path/to/dafny npm run core   # verify the proofs and rebuild core/gener
   test-first streams, reviews and releases.
 - [`docs/design/`](docs/design/) holds designs for work in progress, such
   as [skill tests](docs/design/skill-tests.md).
-- [`skills/write-skope-skill`](skills/write-skope-skill/SKILL.md) teaches
-  an agent to write skope skills test first.
+- [`skills/`](skills/) holds the agent skills skope installs:
+  [`write-skope-skill`](skills/write-skope-skill/SKILL.md) (write skope
+  skills test first) and [`run-skope-skill`](skills/run-skope-skill/SKILL.md)
+  (run one, or take over a handoff).
 - [`contracts/`](contracts/) holds the shapes the parts of skope agree on,
   with worked examples.
 

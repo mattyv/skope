@@ -106,7 +106,7 @@ describe("skope --test --live", () => {
     expect(r.scenario.asks).toEqual([
       {
         ask: "Triage",
-        line: 27,
+        line: 33,
         reached: 3,
         chosen: { Restart: 3 },
         confidence_min: 0.875,

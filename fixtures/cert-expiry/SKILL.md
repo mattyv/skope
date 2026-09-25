@@ -1,6 +1,14 @@
 ---
 name: cert-expiry
 description: Check and renew TLS certificates before they expire. Use when a cert expiry alert fires or a site shows an expiring certificate.
+---
+
+# Cert expiry
+
+*A [skope](https://github.com/mattyv/skope) skill. Run it with the run-skope-skill skill if you have
+it; if not, the bold steps are the procedure, and `{names}` are params set in the skope block below.*
+
+```skope
 format: 1
 params:
   domain: example.com
@@ -9,9 +17,7 @@ limits:
   run_timeout: 60s
   do_timeout: 5m
   ask_context: 2k tokens
----
-
-# Cert expiry
+```
 
 Keep TLS certificates renewed. **Never** issue a cert with a new key
 unless a human asks. Renewal should be boring: dry run first, then renew,

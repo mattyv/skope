@@ -3,16 +3,16 @@
   "format": 1,
   "entry": {
     "section": "s:triage",
-    "src": 20
+    "src": 26
   },
   "params": {
     "domain": {
       "str": "example.com",
-      "src": 6
+      "src": 14
     },
     "warn_seconds": {
       "int": 1209600,
-      "src": 7
+      "src": 15
     }
   },
   "limits": {
@@ -24,11 +24,11 @@
   "sections": {
     "s:triage": {
       "name": "Triage",
-      "src": 20,
+      "src": 26,
       "guidance": "Check what's actually being served, then what's on disk.",
       "body": [
         {
-          "src": 23,
+          "src": 29,
           "check": {
             "cond": {
               "succeeds": [
@@ -62,7 +62,7 @@
           }
         },
         {
-          "src": 24,
+          "src": 30,
           "check": {
             "cond": {
               "succeeds": [
@@ -90,7 +90,7 @@
           }
         },
         {
-          "src": 25,
+          "src": 31,
           "run": {
             "cmd": [
               {
@@ -102,7 +102,7 @@
           "else": null
         },
         {
-          "src": 26,
+          "src": 32,
           "run": {
             "cmd": [
               {
@@ -114,7 +114,7 @@
           "else": null
         },
         {
-          "src": 28,
+          "src": 34,
           "ask": {
             "question": [
               {
@@ -137,15 +137,15 @@
             "else": null,
             "sections": [
               {
-                "src": 29,
+                "src": 35,
                 "section": "s:renew"
               },
               {
-                "src": 30,
+                "src": 36,
                 "section": "s:page"
               },
               {
-                "src": 31,
+                "src": 37,
                 "section": "s:investigate"
               }
             ]
@@ -155,11 +155,11 @@
     },
     "s:renew": {
       "name": "Renew",
-      "src": 33,
+      "src": 39,
       "guidance": "Dry run first, so nothing changes if the real renewal would fail. Always keep the existing key.",
       "body": [
         {
-          "src": 37,
+          "src": 43,
           "do": {
             "cmd": [
               {
@@ -175,7 +175,7 @@
           }
         },
         {
-          "src": 38,
+          "src": 44,
           "do": {
             "cmd": [
               {
@@ -189,7 +189,7 @@
           "else": null
         },
         {
-          "src": 39,
+          "src": 45,
           "then": {
             "section": "s:reload"
           }
@@ -198,11 +198,11 @@
     },
     "s:reload": {
       "name": "Reload",
-      "src": 41,
+      "src": 47,
       "guidance": "The cert on disk is fresh, so the server just needs to pick it up.",
       "body": [
         {
-          "src": 44,
+          "src": 50,
           "run": {
             "cmd": [
               {
@@ -214,7 +214,7 @@
           "else": null
         },
         {
-          "src": 45,
+          "src": 51,
           "ask": {
             "question": [
               {
@@ -244,7 +244,7 @@
           }
         },
         {
-          "src": 46,
+          "src": 52,
           "do": {
             "cmd": [
               {
@@ -258,7 +258,7 @@
           "else": null
         },
         {
-          "src": 47,
+          "src": 53,
           "check": {
             "cond": {
               "succeeds": [
@@ -292,7 +292,7 @@
           }
         },
         {
-          "src": 48,
+          "src": 54,
           "then": {
             "section": "s:page"
           }
@@ -301,11 +301,11 @@
     },
     "s:page": {
       "name": "Page",
-      "src": 50,
+      "src": 56,
       "guidance": "The cert can't be fixed automatically. Tell a human.",
       "body": [
         {
-          "src": 53,
+          "src": 59,
           "page": [
             {
               "var": "host"
@@ -325,28 +325,28 @@
     },
     "s:investigate": {
       "name": "Investigate",
-      "src": 55,
+      "src": 61,
       "guidance": "Renewal is failing and the reason isn't obvious. Read the certbot log from Triage. Common causes: DNS moved, port 80 blocked, a redirect breaking the HTTP challenge. Don't change DNS or firewall rules without asking a human.",
       "body": [
         {
-          "src": 56,
+          "src": 62,
           "hand_off": {}
         }
       ]
     },
     "s:servers": {
       "name": "Servers",
-      "src": 64,
+      "src": 70,
       "lists": [
         {
-          "src": 65,
+          "src": 71,
           "items": [
             {
-              "src": 65,
+              "src": 71,
               "value": "nginx"
             },
             {
-              "src": 66,
+              "src": 72,
               "value": "haproxy"
             }
           ]

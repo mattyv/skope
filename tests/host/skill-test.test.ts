@@ -81,8 +81,11 @@ describe("skope --test", () => {
     "---",
     "name: pagetext",
     "description: pages text the pager escapes",
-    "format: 1",
     "---",
+    "A skope skill.",
+    "```skope",
+    "format: 1",
+    "```",
     "# Page text",
     "",
     "## Start",
@@ -204,7 +207,7 @@ describe("skope --test", () => {
 
   test("a list item that looks like a section id is compared as the item it is", async () => {
     const text =
-      "---\nname: envs\ndescription: t\nformat: 1\n---\n\n## Main\nPick one.\n\n- **ask** Which env? → one of [Envs] as env · sure 80%\n- **stop**\n\n## Envs\n- s:prod\n- dev\n";
+      "---\nname: envs\ndescription: t\n---\nA skope skill.\n```skope\nformat: 1\n```\n\n## Main\nPick one.\n\n- **ask** Which env? → one of [Envs] as env · sure 80%\n- **stop**\n\n## Envs\n- s:prod\n- dev\n";
     const r = await test_(
       skill(
         {
@@ -256,9 +259,9 @@ describe("skope --test", () => {
         { expect: { outcome: "paged", asks: { Page: { chosen: "x" } } } },
         "asks.Page doesn't name exactly one ask",
       ],
-      ["E-FAKE-UNUSED: an unused key", { commands: { ...RESTART_COMMANDS, "line:21": { exit: 0 } } }, "E-FAKE-UNUSED"],
-      ["E-FAKE-AMBIGUOUS: a stable and a line key", { commands: { ...RESTART_COMMANDS, "line:23": { exit: 0 } } }, "E-FAKE-AMBIGUOUS"],
-      ["E-FAKE-AMBIGUOUS: a line key and the text", { commands: { ...RESTART_COMMANDS, "line:47": { exit: 0 } } }, "E-FAKE-AMBIGUOUS"],
+      ["E-FAKE-UNUSED: an unused key", { commands: { ...RESTART_COMMANDS, "line:27": { exit: 0 } } }, "E-FAKE-UNUSED"],
+      ["E-FAKE-AMBIGUOUS: a stable and a line key", { commands: { ...RESTART_COMMANDS, "line:29": { exit: 0 } } }, "E-FAKE-AMBIGUOUS"],
+      ["E-FAKE-AMBIGUOUS: a line key and the text", { commands: { ...RESTART_COMMANDS, "line:53": { exit: 0 } } }, "E-FAKE-AMBIGUOUS"],
     ])("%s", async (_, over, why) => {
       const files = restart(over as Partial<Files>);
       if ("expect" in over && over.expect === undefined) delete files.expect;
@@ -423,14 +426,17 @@ describe("the fixtures' scenarios pass under --test", () => {
 });
 
 describe("tests.yaml: what a user writes first", () => {
-  // Line 11 is the run; Big's ask is on line 18.
+  // Line 14 is the run; Big's ask is on line 21.
   const probe = (sure: number) =>
     [
       "---",
       "name: probe",
       "description: a run, a check and one ask",
-      "format: 1",
       "---",
+      "A skope skill.",
+      "```skope",
+      "format: 1",
+      "```",
       "# Probe",
       "",
       "## Start",
@@ -468,7 +474,7 @@ describe("tests.yaml: what a user writes first", () => {
   });
 
   test("a scenario overrides a default by any key for the same statement", async () => {
-    const r = await run(80, { byLine: { commands: { "line:11": "7" }, ...big }, byText: { commands: { "echo n": "7" }, ...big } });
+    const r = await run(80, { byLine: { commands: { "line:14": "7" }, ...big }, byText: { commands: { "echo n": "7" }, ...big } });
     expect(
       r.scenarios.map((x: { scenario: string; pass: boolean }) => [x.scenario, x.pass]),
       r.stderr,

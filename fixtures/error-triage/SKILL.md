@@ -1,13 +1,19 @@
 ---
 name: error-triage
 description: Decide what to do about a burst of system errors. Use when an error-rate alert fires.
+---
+
+# Error triage
+
+*A [skope](https://github.com/mattyv/skope) skill. Run it with the run-skope-skill skill if you have
+it; if not, the bold steps are the procedure, and `{names}` are params set in the skope block below.*
+
+```skope
 format: 1
 limits:
   run_timeout: 30s
   ask_context: 4k tokens
----
-
-# Error triage
+```
 
 Work out how bad a burst of errors is, then either leave it, hand it to
 someone to look at, or page.

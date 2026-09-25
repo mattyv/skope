@@ -21,7 +21,11 @@ function errs(md: string): { code: string; line: number }[] {
 }
 const body = (md: string, id = "s:triage") => (program(md).sections[id] as Section).body;
 const stmtKinds = (md: string, id = "s:triage") => body(md, id).map((s) => Object.keys(s).find((k) => k !== "src" && k !== "else"));
-const withFm = (fm: string[], ...lines: string[]) => ["---", ...fm, "---", ...lines].join("\n");
+// Agent Skills keys stay in the frontmatter; skope's own go in the skope block, after a note line.
+const withFm = (fm: string[], ...lines: string[]) => {
+  const spec = (l: string) => /^(name|description):/.test(l);
+  return ["---", ...fm.filter(spec), "---", "A skope skill.", "```skope", ...fm.filter((l) => !spec(l)), "```", ...lines].join("\n");
+};
 
 describe("P1-1: a keyword with a colon is still a keyword (instruction or E-GRAMMAR, never prose)", () => {
   for (const item of ["- **run**: df", "- **run**:do", "- **run:** `df`", "- **Stop**:", "- **stop:**", "- **run**: `df -h`"]) {
@@ -193,7 +197,7 @@ describe("P2-1: slugs, limits, params and big integers", () => {
   });
   test("entry with no slug is E-FRONTMATTER at its line", () => {
     const md = withFm(["name: t", "description: d", "format: 1", "entry: '🔥'"], "## Triage", "- **stop**");
-    expect(errs(md)).toEqual([{ code: "E-FRONTMATTER", line: 5 }]);
+    expect(errs(md)).toEqual([{ code: "E-FRONTMATTER", line: 8 }]);
   });
   for (const [key, value] of [
     ["run_timeout", "0s"],
@@ -204,7 +208,7 @@ describe("P2-1: slugs, limits, params and big integers", () => {
   ]) {
     test(`${key}: ${value} is E-FRONTMATTER`, () => {
       const md = withFm(["name: t", "description: d", "format: 1", "limits:", `  ${key}: ${value}`], "## Triage", "- **stop**");
-      expect(errs(md)).toEqual([{ code: "E-FRONTMATTER", line: 6 }]);
+      expect(errs(md)).toEqual([{ code: "E-FRONTMATTER", line: 9 }]);
     });
   }
   test("an unknown limits key is E-FRONTMATTER at its line", () => {
@@ -213,7 +217,7 @@ describe("P2-1: slugs, limits, params and big integers", () => {
       "## Triage",
       "- **stop**",
     );
-    expect(errs(md)).toEqual([{ code: "E-FRONTMATTER", line: 7 }]);
+    expect(errs(md)).toEqual([{ code: "E-FRONTMATTER", line: 10 }]);
   });
   test("a param named __proto__ is kept as an ordinary param", () => {
     const md = withFm(
@@ -223,12 +227,12 @@ describe("P2-1: slugs, limits, params and big integers", () => {
     );
     const params = program(md).params;
     expect(Object.keys(params)).toEqual(["__proto__", "constructor"]);
-    expect(Object.getOwnPropertyDescriptor(params, "__proto__")?.value).toEqual({ int: 5, src: 6 });
-    expect(JSON.parse(JSON.stringify(params))).toEqual(JSON.parse('{"__proto__":{"int":5,"src":6},"constructor":{"str":"x","src":7}}'));
+    expect(Object.getOwnPropertyDescriptor(params, "__proto__")?.value).toEqual({ int: 5, src: 9 });
+    expect(JSON.parse(JSON.stringify(params))).toEqual(JSON.parse('{"__proto__":{"int":5,"src":9},"constructor":{"str":"x","src":10}}'));
   });
   test("an integer param beyond 2^53 is E-FRONTMATTER", () => {
     const md = withFm(["name: t", "description: d", "format: 1", "params:", "  n: 9007199254740993"], "## Triage", "- **stop**");
-    expect(errs(md)).toEqual([{ code: "E-FRONTMATTER", line: 6 }]);
+    expect(errs(md)).toEqual([{ code: "E-FRONTMATTER", line: 9 }]);
   });
   test("Score bounds beyond 2^53 are E-GRAMMAR, a rubric level beyond it E-RUBRIC-ITEM", () => {
     const md = skillMd("## Triage", "- **ask** How bad? → 1 to 99999999999999999999 as x · sure 75%", "  - 1: a", "- **stop**");
@@ -457,13 +461,13 @@ describe("P2-11: grammar cases the mutants survived", () => {
 
 describe("nits", () => {
   test("E-FRONTMATTER points at the field's line", () => {
-    expect(errs(withFm(["format: 1", "description: d", "name: Bad_Name"], "## T", "- **stop**"))).toEqual([
-      { code: "E-FRONTMATTER", line: 4 },
+    expect(errs(withFm(["description: d", "name: Bad_Name", "format: 1"], "## T", "- **stop**"))).toEqual([
+      { code: "E-FRONTMATTER", line: 3 },
     ]);
   });
   test("a YAML syntax error points at its line", () => {
     expect(errs(withFm(["name: t", "description: d", "format: 1", "params:", "  a: 1", "  a: 2"], "## T", "- **stop**"))).toEqual([
-      { code: "E-FRONTMATTER", line: 7 },
+      { code: "E-FRONTMATTER", line: 10 },
     ]);
   });
   test("param src is right at any YAML indentation", () => {
@@ -472,7 +476,7 @@ describe("nits", () => {
       "## T",
       "- **stop**",
     );
-    expect(program(md).params).toEqual({ mount: { str: "/", src: 7 }, n: { int: 3, src: 8 } });
+    expect(program(md).params).toEqual({ mount: { str: "/", src: 10 }, n: { int: 3, src: 11 } });
   });
   test("a nested key with the same name as a param doesn't steal its line", () => {
     const md = withFm(
@@ -480,11 +484,11 @@ describe("nits", () => {
       "## T",
       "- **stop**",
     );
-    expect(program(md).params).toEqual({ deadline: { int: 1, src: 8 } });
+    expect(program(md).params).toEqual({ deadline: { int: 1, src: 11 } });
   });
   test("a key-like line inside a block scalar doesn't steal a param's line", () => {
     const md = withFm(["name: t", "description: d", "format: 1", "params:", "  m: |", "    n: x", "  n: 3"], "## T", "- **stop**");
-    expect(program(md).params).toEqual({ m: { str: "n: x\n", src: 6 }, n: { int: 3, src: 8 } });
+    expect(program(md).params).toEqual({ m: { str: "n: x\n", src: 9 }, n: { int: 3, src: 11 } });
   });
   test("guidance strips emphasis, escapes and references", () => {
     const md = skillMd(

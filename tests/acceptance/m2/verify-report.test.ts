@@ -65,9 +65,9 @@ describe("M2: --verify (SPEC §5.4, §5.6)", () => {
     const r = await runSkope([DISK_FULL, "--verify"]);
     const report = JSON.parse(r.stdout.trim().split("\n").at(-1) as string) as { asks: object[] };
     expect(report.asks).toEqual([
-      { section: "Triage", line: 27, kind: "choice", branches: { options: 4, unsure: 1, unavailable: 1 } },
-      { section: "Clean up", line: 37, kind: "yesno", branches: { options: 2, unsure: 1, unavailable: 1 } },
-      { section: "Restart", line: 46, kind: "choice", branches: { options: 4, unsure: 1, unavailable: 1 } },
+      { section: "Triage", line: 33, kind: "choice", branches: { options: 4, unsure: 1, unavailable: 1 } },
+      { section: "Clean up", line: 43, kind: "yesno", branches: { options: 2, unsure: 1, unavailable: 1 } },
+      { section: "Restart", line: 52, kind: "choice", branches: { options: 4, unsure: 1, unavailable: 1 } },
     ]);
   });
 

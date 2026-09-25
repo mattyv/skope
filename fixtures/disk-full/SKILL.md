@@ -1,6 +1,14 @@
 ---
 name: disk-full
 description: Free disk space safely when a Linux volume fills up. Use when a disk usage alert fires or a host is close to full.
+---
+
+# Disk full
+
+*A [skope](https://github.com/mattyv/skope) skill. Run it with the run-skope-skill skill if you have
+it; if not, the bold steps are the procedure, and `{names}` are params set in the skope block below.*
+
+```skope
 format: 1
 params:
   mount: /
@@ -10,9 +18,7 @@ limits:
   run_timeout: 30s
   do_timeout: 10m
   ask_context: 4k tokens
----
-
-# Disk full
+```
 
 Free space safely when a volume fills up. Never delete anything you're
 unsure about. Prefer reversible actions, and page a human rather than guess.

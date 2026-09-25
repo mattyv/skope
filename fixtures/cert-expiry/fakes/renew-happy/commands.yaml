@@ -1,5 +1,5 @@
 {
-  "line:23": [
+  "line:29": [
     {
       "exit": 1,
       "stdout": "Certificate will expire\n"
@@ -9,32 +9,32 @@
       "stdout": "Certificate will not expire\n"
     }
   ],
-  "line:24": {
+  "line:30": {
     "exit": 1,
     "stdout": "Certificate will expire\n"
   },
-  "line:25": {
+  "line:31": {
     "exit": 0,
     "stdout": "certbot.timer active\n"
   },
-  "line:26": {
+  "line:32": {
     "exit": 0,
     "stdout": "no recent failures\n"
   },
-  "line:37": {
-    "exit": 0
-  },
-  "line:38": {
+  "line:43": {
     "exit": 0
   },
   "line:44": {
+    "exit": 0
+  },
+  "line:50": {
     "exit": 0,
     "stdout": "nginx listening\n"
   },
-  "line:46": {
+  "line:52": {
     "exit": 0
   },
-  "line:47": {
+  "line:53": {
     "exit": 0,
     "stdout": "Certificate will not expire\n"
   }

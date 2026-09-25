@@ -25,7 +25,7 @@ describe("deriveAnswers", () => {
 
   test("an ask named in asks with no existing answer gets a confident, valid answer", () => {
     const out = deriveAnswers(diskFull, { Triage: { chosen: "Restart" } }, {});
-    const probs = out["line:27"] as Record<string, number>;
+    const probs = out["line:33"] as Record<string, number>;
     expect(probs).toBeDefined();
     // Certain, so it clears any sure, 100% included; every other option is named, at 0.
     expect(probs).toEqual({ "s:clean_up": 0, "s:restart": 1, "s:page": 0, "s:investigate": 0 });
@@ -34,13 +34,13 @@ describe("deriveAnswers", () => {
 
   test("a one-of ask's derived answer is keyed by the item's value", () => {
     const out = deriveAnswers(diskFull, { "Restart.service": { chosen: "myapp-worker" } }, {});
-    const probs = out["line:46"] as Record<string, number>;
+    const probs = out["line:52"] as Record<string, number>;
     expect(probs["myapp-worker"]).toBeGreaterThan(0.99);
     expect(sum(probs)).toBeCloseTo(1, 6);
   });
 
   test("an existing line:N answer for that ask is left alone", () => {
-    const answers = { "line:27": { "s:clean_up": 1 } };
+    const answers = { "line:33": { "s:clean_up": 1 } };
     expect(deriveAnswers(diskFull, { Triage: { chosen: "Restart" } }, answers)).toEqual(answers);
   });
 
@@ -51,7 +51,7 @@ describe("deriveAnswers", () => {
 
   test("an existing exact-text answer for that ask is left alone", () => {
     const p = program(
-      "---\nname: tiny\ndescription: t\nformat: 1\n---\n\n## Main\nDo it.\n\n- **ask** Is this ok? → yes | no · sure 80%\n- **stop**\n",
+      "---\nname: tiny\ndescription: t\n---\nA skope skill.\n```skope\nformat: 1\n```\n\n## Main\nDo it.\n\n- **ask** Is this ok? → yes | no · sure 80%\n- **stop**\n",
     );
     const answers = { "Is this ok?": { yes: 1 } };
     expect(deriveAnswers(p, { Main: { chosen: "yes" } }, answers)).toEqual(answers);
@@ -64,6 +64,6 @@ describe("deriveAnswers", () => {
   test("existing answers for other asks are kept alongside the derived one", () => {
     const out = deriveAnswers(diskFull, { Triage: { chosen: "Restart" } }, { "Restart.service": "unsure" });
     expect(out["Restart.service"]).toBe("unsure");
-    expect(out["line:27"]).toBeDefined();
+    expect(out["line:33"]).toBeDefined();
   });
 });

@@ -18,7 +18,7 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["section", "src"],
-      "description": "The `entry:` frontmatter value and its line; when defaulted, the first instruction section and its heading line.",
+      "description": "The skope block's `entry:` value and its line; when defaulted, the first instruction section and its heading line.",
       "properties": {
         "section": {
           "$ref": "#/$defs/sectionId"

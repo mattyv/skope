@@ -2,8 +2,10 @@ import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import type { CoreProgram, Stmt } from "../../src/contracts.gen.js";
 
-export const FRONTMATTER = ["---", "name: test", "description: a test skill", "format: 1", "---"].join("\n");
-export const BODY_START = FRONTMATTER.split("\n").length + 1; // 6: first body line
+export const FRONTMATTER = ["---", "name: test", "description: a test skill", "---", "A skope skill.", "```skope", "format: 1", "```"].join(
+  "\n",
+);
+export const BODY_START = FRONTMATTER.split("\n").length + 1; // 9: first body line
 
 /** Builds a full SKILL.md from body lines (joined with the standard frontmatter). */
 export function skillMd(...bodyLines: string[]): string {

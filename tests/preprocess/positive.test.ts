@@ -32,7 +32,7 @@ describe("prose-only sections are fine", () => {
   test("## Background with only paragraphs lints as an other-section with no lists", () => {
     const md = skillMd("## Background", "Just some context for a human reader.", "", "## Triage", "- **stop**");
     const p = program(md);
-    expect(p.sections["s:background"]).toEqual({ name: "Background", src: 6, lists: [] });
+    expect(p.sections["s:background"]).toEqual({ name: "Background", src: 9, lists: [] });
   });
 });
 
@@ -87,8 +87,8 @@ describe("a numbered data list works", () => {
     const cleanups = p.sections["s:cleanups"] as any;
     expect(cleanups.lists).toHaveLength(1);
     expect(cleanups.lists[0].items).toEqual([
-      { src: 7, action: { label: "Vacuum", cmd: [{ lit: "vacuum" }] } },
-      { src: 8, action: { label: "Clear cache", cmd: [{ lit: "clean" }] } },
+      { src: 10, action: { label: "Vacuum", cmd: [{ lit: "vacuum" }] } },
+      { src: 11, action: { label: "Clear cache", cmd: [{ lit: "clean" }] } },
     ]);
   });
 });
@@ -97,7 +97,7 @@ describe("a section ending in **stop** lints", () => {
   test("stop needs no target and parses cleanly", () => {
     const md = skillMd("## Triage", "- **run** `df -h` as used", "- **stop**");
     const p = program(md);
-    expect((p.sections["s:triage"] as Section).body.at(-1)).toEqual({ src: 8, stop: {} });
+    expect((p.sections["s:triage"] as Section).body.at(-1)).toEqual({ src: 11, stop: {} });
   });
 });
 
@@ -113,7 +113,7 @@ describe("default entry", () => {
   test("defaults to the first instruction section, at its heading line", () => {
     const md = skillMd("## Background", "Just prose.", "", "## Triage", "- **stop**");
     const p = program(md);
-    expect(p.entry).toEqual({ section: "s:triage", src: 9 });
+    expect(p.entry).toEqual({ section: "s:triage", src: 12 });
   });
 });
 

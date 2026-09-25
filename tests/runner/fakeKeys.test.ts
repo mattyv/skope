@@ -14,41 +14,42 @@ function program(md: string): CoreProgram {
   return r.program;
 }
 const diskFull = program(readFileSync(`${ROOT}/fixtures/disk-full/SKILL.md`, "utf8"));
-const skill = (body: string) => program(`---\nname: tiny\ndescription: t\nformat: 1\n---\n\n## Main\nDo it.\n\n${body}\n`);
+const skill = (body: string) =>
+  program(`---\nname: tiny\ndescription: t\n---\nA skope skill.\n\`\`\`skope\nformat: 1\n\`\`\`\n\n## Main\nDo it.\n\n${body}\n`);
 
 describe("resolveFakeKeys", () => {
   test("Section.var names the run that binds var, in --fake-exec files", () => {
     const { doc, issues } = resolveFakeKeys(diskFull, { "Triage.used": 1, "Triage.errors": 2, "Restart.used": 3 }, "commands");
-    expect(doc).toEqual({ "line:23": 1, "line:25": 2, "line:48": 3 });
+    expect(doc).toEqual({ "line:29": 1, "line:31": 2, "line:54": 3 });
     expect(issues).toEqual([]);
   });
 
   test("Section.var and Section.ask name asks in --fake files, loops included", () => {
     const { doc, issues } = resolveFakeKeys(diskFull, { "Triage.ask": 1, "Restart.service": 2, "Clean up.ask": 3 }, "answers");
-    expect(doc).toEqual({ "line:27": 1, "line:46": 2, "line:37": 3 });
+    expect(doc).toEqual({ "line:33": 1, "line:52": 2, "line:43": 3 });
     expect(issues).toEqual([]);
   });
 
   test("the section part resolves by slug", () => {
     const { doc } = resolveFakeKeys(diskFull, { "clean_up.ask": 1 }, "answers");
-    expect(doc).toEqual({ "line:37": 1 });
+    expect(doc).toEqual({ "line:43": 1 });
   });
 
   test("a stable key wins over line:N for the same statement", () => {
-    const { doc } = resolveFakeKeys(diskFull, { "Triage.used": "stable", "line:23": "line" }, "commands");
-    expect(doc).toEqual({ "line:23": "stable" });
+    const { doc } = resolveFakeKeys(diskFull, { "Triage.used": "stable", "line:29": "line" }, "commands");
+    expect(doc).toEqual({ "line:29": "stable" });
   });
 
   test("keys that aren't stable keys stay as they are", () => {
-    const keys = { "df -h": 1, "./fix.sh": 2, "line:25": 3, "Nowhere.used": 4 };
+    const keys = { "df -h": 1, "./fix.sh": 2, "line:31": 3, "Nowhere.used": 4 };
     expect(resolveFakeKeys(diskFull, keys, "commands")).toEqual({ doc: keys, issues: [] });
   });
 
   test("W-FAKE-UNUSED: a stable or line:N key that names no statement", () => {
-    const { issues } = resolveFakeKeys(diskFull, { "Triage.nope": 1, "line:21": 2, "Page.ask": 3, "Triage.ask": 4 }, "commands");
+    const { issues } = resolveFakeKeys(diskFull, { "Triage.nope": 1, "line:27": 2, "Page.ask": 3, "Triage.ask": 4 }, "commands");
     expect(issues.map((i) => [i.code, i.key])).toEqual([
       ["W-FAKE-UNUSED", "Triage.nope"],
-      ["W-FAKE-UNUSED", "line:21"],
+      ["W-FAKE-UNUSED", "line:27"],
       ["W-FAKE-UNUSED", "Page.ask"],
       ["W-FAKE-UNUSED", "Triage.ask"], // an ask isn't a command
     ]);
@@ -69,8 +70,8 @@ describe("resolveFakeKeys", () => {
 
   test("in a command file, Section.ask is a variable named ask, not the section's ask", () => {
     const p = skill("- **run** `echo hi` as ask\n- **ask** Is {ask} ok? → yes | no · sure 80%\n- **stop**");
-    expect(resolveFakeKeys(p, { "Main.ask": 1 }, "commands")).toEqual({ doc: { "line:10": 1 }, issues: [] });
-    expect(resolveFakeKeys(p, { "Main.ask": 2 }, "answers")).toEqual({ doc: { "line:11": 2 }, issues: [] });
+    expect(resolveFakeKeys(p, { "Main.ask": 1 }, "commands")).toEqual({ doc: { "line:13": 1 }, issues: [] });
+    expect(resolveFakeKeys(p, { "Main.ask": 2 }, "answers")).toEqual({ doc: { "line:14": 2 }, issues: [] });
   });
 
   test("E-FAKE-AMBIGUOUS: a stable key that names more than one statement", () => {
@@ -79,12 +80,12 @@ describe("resolveFakeKeys", () => {
     );
     expect(resolveFakeKeys(p, { "Main.n": 1 }, "commands").issues).toMatchObject([{ code: "E-FAKE-AMBIGUOUS", key: "Main.n" }]);
     expect(resolveFakeKeys(p, { "Main.ask": 1 }, "answers").issues).toMatchObject([{ code: "E-FAKE-AMBIGUOUS", key: "Main.ask" }]);
-    expect(resolveFakeKeys(p, { "Main.again": 1 }, "answers")).toEqual({ doc: { "line:13": 1 }, issues: [] });
+    expect(resolveFakeKeys(p, { "Main.again": 1 }, "answers")).toEqual({ doc: { "line:16": 1 }, issues: [] });
   });
 
   describe("strict, under --test", () => {
     test("E-FAKE-UNUSED: an unused stable or line:N key is an error", () => {
-      const { issues } = resolveFakeKeys(diskFull, { "Triage.nope": 1, "line:21": 2 }, "commands", true);
+      const { issues } = resolveFakeKeys(diskFull, { "Triage.nope": 1, "line:27": 2 }, "commands", true);
       expect(issues.map((i) => i.code)).toEqual(["E-FAKE-UNUSED", "E-FAKE-UNUSED"]);
     });
 
@@ -95,7 +96,7 @@ describe("resolveFakeKeys", () => {
 
     test("a key an interpolated command could produce stays a warning", () => {
       const p = program(
-        "---\nname: tiny\ndescription: t\nformat: 1\nparams:\n  ext: sh\n---\n\n## Main\nDo it.\n\n- **run** `fix.{ext}`\n- **stop**\n\n## Fix\nFix it.\n\n- **stop**\n",
+        "---\nname: tiny\ndescription: t\n---\nA skope skill.\n```skope\nformat: 1\nparams:\n  ext: sh\n```\n\n## Main\nDo it.\n\n- **run** `fix.{ext}`\n- **stop**\n\n## Fix\nFix it.\n\n- **stop**\n",
       );
       expect(resolveFakeKeys(p, { "fix.sh": 1 }, "commands", true).issues).toMatchObject([{ code: "W-FAKE-UNUSED" }]);
       expect(resolveFakeKeys(p, { "Fix.nope": 1 }, "commands", true).issues).toMatchObject([{ code: "E-FAKE-UNUSED" }]);
@@ -103,13 +104,13 @@ describe("resolveFakeKeys", () => {
 
     test("a key that's an action item's command stays a warning: do step can run it", () => {
       const p = program(
-        "---\nname: tiny\ndescription: t\nformat: 1\n---\n\n## Main\nDo it.\n\n- **for each** step in [Steps]\n  - **do** step\n- **stop**\n\n## Steps\n- Clean — `clean.sh`\n\n## Clean\nIt.\n\n- **stop**\n",
+        "---\nname: tiny\ndescription: t\n---\nA skope skill.\n```skope\nformat: 1\n```\n\n## Main\nDo it.\n\n- **for each** step in [Steps]\n  - **do** step\n- **stop**\n\n## Steps\n- Clean — `clean.sh`\n\n## Clean\nIt.\n\n- **stop**\n",
       );
       expect(resolveFakeKeys(p, { "clean.sh": 1 }, "commands", true).issues).toMatchObject([{ code: "W-FAKE-UNUSED" }]);
     });
 
     test("E-FAKE-AMBIGUOUS: a stable key and a line:N key for the same statement", () => {
-      const { issues } = resolveFakeKeys(diskFull, { "line:23": 1, "Triage.used": 2 }, "commands", true);
+      const { issues } = resolveFakeKeys(diskFull, { "line:29": 1, "Triage.used": 2 }, "commands", true);
       expect(issues).toMatchObject([{ code: "E-FAKE-AMBIGUOUS", key: "Triage.used" }]);
     });
   });
@@ -117,11 +118,11 @@ describe("resolveFakeKeys", () => {
 
 describe("askLine", () => {
   test("a Section with one ask resolves to its line", () => {
-    expect(askLine(diskFull, "Triage")).toBe(27);
+    expect(askLine(diskFull, "Triage")).toBe(33);
   });
 
   test("Section.var resolves to the ask that binds var", () => {
-    expect(askLine(diskFull, "Restart.service")).toBe(46);
+    expect(askLine(diskFull, "Restart.service")).toBe(52);
   });
 
   test("a key that names no ask is null", () => {
