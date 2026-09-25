@@ -75,7 +75,10 @@ describe("skope --demo", () => {
       env,
     );
     expect(run.status).toBe(0);
-    const events = run.stdout.trim().split("\n").map((l) => JSON.parse(l));
+    const events = run.stdout
+      .trim()
+      .split("\n")
+      .map((l) => JSON.parse(l));
     expect(events.find((e) => e.event === "would_do")?.cmd).toBe("systemctl restart myapp-worker");
     expect(events.at(-1)).toMatchObject({ event: "outcome", outcome: "stopped" });
     expect(events.some((e) => e.event === "warning")).toBe(false);
