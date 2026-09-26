@@ -215,11 +215,13 @@ class Preprocessor {
       }
       case "ask": {
         const r = parseAsk(rest, this.resolve);
+        // Score asks (`→ 1 to 4 as x`) were removed: their confidence ran too high to gate on.
+        if (r === GRAMMAR_ERROR && /(→|->) *\d+ +to +\d+/.test(rest))
+          return grammarError("an ask form other than a Score range, which was removed; use `→ one of [List] as x` or `→ yes | no`");
         if (r === GRAMMAR_ERROR) return grammarError("one of the §3.4 ask forms, ending `· sure N%`");
         const ask = { question: r.question, sure: r.sure, else: r.else };
         const children = nested.flatMap((l) => l.items);
         if ("sections" in r.form) return { src, ask: { ...ask, sections: this.options(children) } };
-        if ("score" in r.form) return { src, ask: { ...ask, score: { ...r.form.score, rubric: this.rubric(children) } } };
         noNested();
         if ("yesno" in r.form) return { src, ask: { ...ask, yesno: r.form.yesno } };
         return { src, ask: { ...ask, one_of: { list: this.resolveList(r.form.one_of.list), as: r.form.one_of.as } } };
@@ -257,7 +259,7 @@ class Preprocessor {
     }
   }
 
-  /** Items of a strict nested list (options, rubric): each must match `form`
+  /** Items of a strict nested list (options): each must match `form`
    * exactly and have nothing nested; anything nested is still scanned. */
   strictItems<T>(items: Item[], code: string, message: string, form: (item: Item) => T | null): T[] {
     return items.flatMap((item) => {
@@ -273,14 +275,6 @@ class Preprocessor {
       const cur = new Cursor(item.text);
       const br = cur.bracketRef();
       return br && cur.atEnd() ? { src: item.line, ...this.resolve(br) } : null;
-    });
-  }
-
-  rubric(items: Item[]) {
-    return this.strictItems(items, "E-RUBRIC-ITEM", "a rubric line must be `INT: text`", (item) => {
-      const m = /^(\d+): +(.+)$/s.exec(item.text);
-      const level = Number(m?.[1]);
-      return m && Number.isSafeInteger(level) ? { src: item.line, level, text: m[2] as string } : null;
     });
   }
 

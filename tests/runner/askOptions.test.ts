@@ -16,7 +16,6 @@ function program(md: string): CoreProgram {
   return r.program;
 }
 const diskFull = program(readFileSync(`${ROOT}/fixtures/disk-full/SKILL.md`, "utf8"));
-const errorTriage = program(readFileSync(`${ROOT}/fixtures/error-triage/SKILL.md`, "utf8"));
 
 const askOn = (p: CoreProgram, key: string) => {
   const line = askLine(p, key);
@@ -53,10 +52,6 @@ describe("askOptionIds", () => {
   test("a yes/no ask: yes and no", () => {
     expect(askOptionIds(diskFull, askOn(diskFull, "Clean up"))).toEqual(["yes", "no"]);
   });
-
-  test("a Score ask: each level id, low to high", () => {
-    expect(askOptionIds(errorTriage, askOn(errorTriage, "Triage"))).toEqual(["1", "2", "3", "4"]);
-  });
 });
 
 describe("chosenOptionId", () => {
@@ -70,10 +65,6 @@ describe("chosenOptionId", () => {
 
   test("a yes/no answer: as written", () => {
     expect(chosenOptionId(askOn(diskFull, "Clean up"), "yes")).toBe("yes");
-  });
-
-  test("a Score level: as a string", () => {
-    expect(chosenOptionId(askOn(errorTriage, "Triage"), 3)).toBe("3");
   });
 });
 

@@ -23,7 +23,6 @@ export function isFailure(output: AskOutput): output is AskFailure {
 /** A backend's declared limits (SPEC §6.2 table). `contextTokens: null` means no limit. */
 export interface BackendLimits {
   maxOptions: number;
-  maxScoreLevels: number;
   contextTokens: number | null;
 }
 
@@ -31,24 +30,23 @@ export type LimitCheck = { ok: true } | { ok: false; code: "E-BACKEND-LIMIT"; de
 
 /**
  * What's checked against a backend's limits before a run starts (SPEC
- * §6.2): an `ask`'s option (or Score level) count, and the skill's
+ * §6.2): an `ask`'s option count, and the skill's
  * declared `limits.ask_context_tokens` (core-program.schema.json), a
  * best-effort budget rather than the request's actual size.
  */
 export interface AskLimitInput {
-  kind: "choice" | "yesno" | "score";
+  kind: "choice" | "yesno";
   optionCount: number;
   declaredContextTokens: number | null;
 }
 
 export function checkAskLimits(input: AskLimitInput, limits: BackendLimits): LimitCheck {
-  const max = input.kind === "score" ? limits.maxScoreLevels : limits.maxOptions;
+  const max = limits.maxOptions;
   if (input.optionCount > max) {
-    const what = input.kind === "score" ? "levels" : "options";
     return {
       ok: false,
       code: "E-BACKEND-LIMIT",
-      detail: `${input.optionCount} ${what} exceeds the backend's limit of ${max}`,
+      detail: `${input.optionCount} options exceeds the backend's limit of ${max}`,
     };
   }
   if (limits.contextTokens !== null && input.declaredContextTokens !== null && input.declaredContextTokens > limits.contextTokens) {

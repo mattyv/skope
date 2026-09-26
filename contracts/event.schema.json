@@ -411,7 +411,7 @@
           "type": "string"
         },
         "kind": {
-          "enum": ["choice", "yesno", "score"]
+          "enum": ["choice", "yesno"]
         },
         "probs": {
           "type": ["object", "null"],
@@ -456,15 +456,6 @@
         },
         "after_would_do": {
           "type": "boolean"
-        },
-        "range": {
-          "type": "array",
-          "items": {
-            "type": "integer"
-          },
-          "minItems": 2,
-          "maxItems": 2,
-          "description": "Score asks only."
         },
         "detail": {
           "enum": ["unavailable", "request_too_large"],

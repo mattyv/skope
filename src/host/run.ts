@@ -581,10 +581,8 @@ async function checkBackend(
     });
   }
   for (const a of asks) {
-    const n =
-      a.ask.sections?.length ??
-      (a.ask.yesno ? 2 : a.ask.score ? a.ask.score.high - a.ask.score.low + 1 : listSize(program, a.ask.one_of?.list.section));
-    const kind = a.ask.score ? "score" : a.ask.yesno ? "yesno" : "choice";
+    const n = a.ask.sections?.length ?? (a.ask.yesno ? 2 : listSize(program, a.ask.one_of?.list.section));
+    const kind = a.ask.yesno ? "yesno" : "choice";
     const c = checkAskLimits(
       { kind, optionCount: n, declaredContextTokens: program.limits.ask_context_tokens },
       { ...limits, contextTokens },

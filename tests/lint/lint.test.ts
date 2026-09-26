@@ -2,7 +2,7 @@
 // warning, from hand-written core JSON, with the line it points at.
 //
 // Lines: an error about a statement points at the statement; about a
-// section option or rubric line, at that line; about a param default or
+// section option, at that line; about a param default or
 // list item, at the default or item; about the entry, at its frontmatter
 // line; about a section as a whole, at its heading.
 
@@ -34,9 +34,6 @@ const ask = (src: number, question: J[], form: J, els: J = null) => ({ src, ask:
 const options = (...opts: [number, string][]) => ({ sections: opts.map(([src, id]) => ({ src, section: id })) });
 const yesno = (as = "_yn") => ({ yesno: { as } });
 const oneOf = (list: string, as: string) => ({ one_of: { list: ref(list), as } });
-const score = (low: number, high: number, rubric: [number, number][], as = "sev") => ({
-  score: { low, high, rubric: rubric.map(([src, level]) => ({ src, level, text: `level ${level}` })), as },
-});
 const forEach = (src: number, name: string, list: string, body: J[]) => ({ src, for_each: { var: name, list: ref(list), body } });
 const ifYesRun = (src: number, c: J[], els: J = null) => ({ src, if_yes: { run: { cmd: c }, else: els } });
 const ifYesDo = (src: number, item: string, els: J = null) => ({ src, if_yes: { do: { item }, else: els } });
@@ -362,79 +359,8 @@ describe("ask forms (SPEC §3.4, §4.2)", () => {
     expect(errors(prog([ask(11, [lit("Which?")], oneOf("s:services", "svc"), skip), stop(12)], SERVICES))).toEqual([E("E-ELSE-SKIP", 11)]);
   });
 
-  test("E-ELSE-SKIP: else skip on a Score ask", () => {
-    const s = score(1, 2, [
-      [12, 1],
-      [13, 2],
-    ]);
-    expect(errors(prog([ask(11, [lit("How bad?")], s, skip), stop(14)]))).toEqual([E("E-ELSE-SKIP", 11)]);
-  });
-
   test("else skip on a yes | no ask lints", () => {
     expect(errors(prog([ask(11, [lit("Ok?")], yesno(), skip), stop(12)]))).toEqual([]);
-  });
-});
-
-describe("Score asks (SPEC §3.4, v1.1)", () => {
-  const scoreAsk = (low: number, high: number, rubric: [number, number][]) =>
-    prog([ask(11, [lit("How bad?")], score(low, high, rubric)), cmp(30, v("sev"), "==", { num: "2" }), stop(31)]);
-  const full = (low: number, high: number) => Array.from({ length: high - low + 1 }, (_, i) => [12 + i, low + i] as [number, number]);
-
-  test("E-SCORE-RANGE: → 5 to 1", () => {
-    expect(errors(scoreAsk(5, 1, []))).toEqual([E("E-SCORE-RANGE", 11)]);
-  });
-
-  test("E-SCORE-RANGE: → 1 to 1, one level", () => {
-    expect(errors(scoreAsk(1, 1, full(1, 1)))).toEqual([E("E-SCORE-RANGE", 11)]);
-  });
-
-  test("E-SCORE-RANGE: → 1 to 11, too many levels", () => {
-    expect(errors(scoreAsk(1, 11, full(1, 11)))).toEqual([E("E-SCORE-RANGE", 11)]);
-  });
-
-  test("→ 0 to 9, ten levels, lints", () => {
-    expect(errors(scoreAsk(0, 9, full(0, 9)))).toEqual([]);
-  });
-
-  test("E-SCORE-RUBRIC: rubric item 6 on a 1 to 5 ask, at the item", () => {
-    expect(errors(scoreAsk(1, 5, [...full(1, 5), [17, 6]]))).toEqual([E("E-SCORE-RUBRIC", 17)]);
-  });
-
-  test("E-SCORE-RUBRIC: two rubric items for level 3, at the second", () => {
-    expect(errors(scoreAsk(1, 4, [...full(1, 4), [16, 3]]))).toEqual([E("E-SCORE-RUBRIC", 16)]);
-  });
-
-  test("E-SCORE-RUBRIC: a 1 to 4 ask with no rubric, at the ask", () => {
-    expect(errors(scoreAsk(1, 4, []))).toEqual([E("E-SCORE-RUBRIC", 11)]);
-  });
-
-  test("E-SCORE-RUBRIC: a 1 to 4 ask with no line for level 2, at the ask", () => {
-    expect(
-      errors(
-        scoreAsk(1, 4, [
-          [12, 1],
-          [13, 3],
-          [14, 4],
-        ]),
-      ),
-    ).toEqual([E("E-SCORE-RUBRIC", 11)]);
-  });
-
-  test("check {severity} == 2 after a Score ask lints, and a Score answer can go in a command", () => {
-    const p = prog([
-      ask(11, [lit("How bad?")], score(1, 2, full(1, 2))),
-      run(14, cmd("notify --level ", v("sev"))),
-      cmp(15, v("sev"), "==", { num: "2" }),
-      stop(16),
-    ]);
-    expect(errors(p)).toEqual([]);
-  });
-
-  test("a Score answer is unbound on the path where its gate failed", () => {
-    const p = prog([ask(11, [lit("How bad?")], score(1, 2, full(1, 2)), ref("s:b")), stop(14)], {
-      "s:b": section(20, [run(21, cmd("notify ", v("sev"))), stop(22)]),
-    });
-    expect(errors(p)).toEqual([E("E-UNBOUND", 21)]);
   });
 });
 
@@ -764,45 +690,5 @@ describe("warnings (SPEC §7.1)", () => {
 
   test("a section without guidance that isn't an option is fine", () => {
     expect(warnings(prog([then(11, "s:b")], { "s:b": section(20, [stop(21)], null) }))).toEqual([]);
-  });
-
-  const sev = (after: J[], more: Record<string, J> = {}) =>
-    prog(
-      [
-        run(11, DF, "errors"),
-        ask(
-          12,
-          [v("errors")],
-          score(1, 3, [
-            [13, 1],
-            [14, 2],
-            [15, 3],
-          ]),
-        ),
-        ...after,
-      ],
-      more,
-    );
-
-  test("W-SCORE-UNUSED: a Score variable never used after it's bound", () => {
-    expect(warnings(sev([stop(16)]))).toEqual([E("W-SCORE-UNUSED", 12)]);
-  });
-
-  test("W-SCORE-THRESHOLD: a Score used in one >= check", () => {
-    expect(
-      warnings(sev([cmp(16, v("sev"), ">=", { num: "3" }, ref("s:page")), stop(17)], { "s:page": section(20, [page(21, [lit("!")])]) })),
-    ).toEqual([E("W-SCORE-THRESHOLD", 12)]);
-  });
-
-  test("a Score used in a later section counts as used", () => {
-    const more = { "s:page": section(20, [page(21, [lit("rated "), v("sev")])]) };
-    expect(warnings(sev([then(16, "s:page")], more))).toEqual([]);
-  });
-
-  test("a Score used in two checks gets no warning", () => {
-    const more = { "s:page": section(20, [page(21, [lit("!")])]) };
-    expect(
-      warnings(sev([cmp(16, v("sev"), "<=", { num: "1" }), cmp(17, v("sev"), "==", { num: "2" }, ref("s:page")), stop(18)], more)),
-    ).toEqual([]);
   });
 });

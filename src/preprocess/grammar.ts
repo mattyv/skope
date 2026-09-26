@@ -108,7 +108,6 @@ export const T = {
   in: / +in +/y,
   succeeds: / +succeeds/y,
   oneOf: /one +of +/y,
-  score: /(\d+) +to +(\d+)/y,
   yesNo: /yes \| no/y,
   op: /<=|>=|==|!=|<|>/y,
   varOperand: /\{([a-z_][a-z0-9_]*)\}%?/y,

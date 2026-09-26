@@ -148,7 +148,7 @@ describe("P1-7: code and HTML blocks are opaque", () => {
   });
 });
 
-describe("P1-8: nested lists under option and rubric items", () => {
+describe("P1-8: nested lists under option items", () => {
   test("under an option item: E-OPTION-ITEM, and the keyword inside is E-MISPLACED", () => {
     const md = skillMd(
       "## Triage",
@@ -162,20 +162,6 @@ describe("P1-8: nested lists under option and rubric items", () => {
     );
     expect(errs(md)).toEqual([
       { code: "E-OPTION-ITEM", line: B + 2 },
-      { code: "E-MISPLACED", line: B + 3 },
-    ]);
-  });
-  test("under a rubric item: E-RUBRIC-ITEM, and the keyword inside is E-MISPLACED", () => {
-    const md = skillMd(
-      "## Triage",
-      "- **ask** How bad? → 1 to 2 as x · sure 75%",
-      "  - 1: fine",
-      "    - **stop**",
-      "  - 2: bad",
-      "- **stop**",
-    );
-    expect(errs(md)).toEqual([
-      { code: "E-RUBRIC-ITEM", line: B + 2 },
       { code: "E-MISPLACED", line: B + 3 },
     ]);
   });
@@ -233,12 +219,6 @@ describe("P2-1: slugs, limits, params and big integers", () => {
   test("an integer param beyond 2^53 is E-FRONTMATTER", () => {
     const md = withFm(["name: t", "description: d", "format: 1", "params:", "  n: 9007199254740993"], "## Triage", "- **stop**");
     expect(errs(md)).toEqual([{ code: "E-FRONTMATTER", line: 9 }]);
-  });
-  test("Score bounds beyond 2^53 are E-GRAMMAR, a rubric level beyond it E-RUBRIC-ITEM", () => {
-    const md = skillMd("## Triage", "- **ask** How bad? → 1 to 99999999999999999999 as x · sure 75%", "  - 1: a", "- **stop**");
-    expect(errs(md)).toEqual([{ code: "E-GRAMMAR", line: B + 1 }]);
-    const md2 = skillMd("## Triage", "- **ask** How bad? → 1 to 2 as x · sure 75%", "  - 99999999999999999999: a", "- **stop**");
-    expect(errs(md2)).toEqual([{ code: "E-RUBRIC-ITEM", line: B + 2 }]);
   });
 });
 

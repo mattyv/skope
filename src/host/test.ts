@@ -470,7 +470,7 @@ export function check(expect: Expect, code: number, events: Event[], program: Co
   return null;
 }
 
-/** Whether the ask on `line` offers sections as its options, rather than a list, yes/no or a Score. */
+/** Whether the ask on `line` offers sections as its options, rather than a list or yes/no. */
 function sectionOptions(program: CoreProgram, line: number): boolean {
   return findAsk(program, line)?.sections !== undefined;
 }
