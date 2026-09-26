@@ -203,8 +203,8 @@ describe("run flow", () => {
     const pagerOnly = () => file("config.yaml", "pager:\n  command: 'cat > /dev/null'\n");
     const noConfig = () => ({ env: { XDG_CONFIG_HOME: mkdtempSync(join(tmpdir(), "skope-noconfig-")) } });
 
-    test("--lint, --explain and --verify don't need a backend block", async () => {
-      for (const mode of ["--lint", "--explain", "--verify"]) {
+    test("--lint, --verify and --effects don't need a backend block", async () => {
+      for (const mode of ["--lint", "--verify", "--effects"]) {
         const r = await runSkope([asks(), mode, "--config", pagerOnly()]);
         expect(r.code, mode).toBe(0);
         expect(find(r.events, "error"), mode).toBeUndefined();
@@ -432,7 +432,8 @@ describe("review fixes", () => {
       [path, "--apply", "--param", "n"],
       [path, "--lint", "--verify"],
       [path, "--apply", "--verify"],
-      [path, "--dry-run", "--explain"],
+      [path, "--dry-run", "--effects"],
+      [path, "--explain"], // folded into --verify
     ]) {
       const r = await runSkope(args);
       expect(r.code, args.join(" ")).toBe(40);
@@ -547,8 +548,9 @@ describe("final review nits", () => {
       "--dry-run",
       "--no-page",
       "--param",
-      "--explain",
       "--verify",
+      "--effects",
+      "--approve",
       "--trace",
       "--lint",
       "--fake",
@@ -569,12 +571,19 @@ describe("final review nits", () => {
     expect(r.stderr).toBe(`skope: ${path}: ok\n`);
   });
 
-  test("--explain prints its JSON on stdout and a short summary on stderr", async () => {
-    const r = await runSkope([skill("- **do** `x`\n- **stop**"), "--explain"]);
+  test("--verify prints its JSON on stdout and a readable summary on stderr", async () => {
+    const r = await runSkope([skill("- **do** `x`\n- **stop**"), "--verify"]);
     expect(r.code).toBe(0);
     expect(r.stdout.trim().split("\n")).toHaveLength(1);
-    expect(JSON.parse(r.stdout)).toMatchObject({ entry: "Main", max_effects: 1 });
-    expect(r.stderr).toMatch(/^skope: 1 section, entry Main; at most 0 asks and 1 effect; worst case \d+(\.\d+)?s\n$/);
+    expect(JSON.parse(r.stdout)).toMatchObject({
+      entry: "Main",
+      sections: [{ name: "Main", kind: "instructions" }],
+      paths: 3,
+      max_effects: 1,
+    });
+    expect(r.stderr).toMatch(
+      /^skope: 1 section, entry Main; 3 paths, ending handoff:command_failed, stopped; at most 0 asks and 1 effect; worst case \d+(\.\d+)?s\n$/,
+    );
   });
 
   test("locked prints who holds the lock and where", async () => {

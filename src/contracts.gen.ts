@@ -407,6 +407,10 @@ export interface RunStartEvent {
    * Build identity, bare hex (SPEC §7.2).
    */
   skope_build: string;
+  /**
+   * The skill's scope, as --effects and approvals hash it (SPEC §7.4), so a run can be matched to what was approved.
+   */
+  effects_hash: string;
 }
 /**
  * A run command finished.

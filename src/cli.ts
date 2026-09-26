@@ -10,7 +10,7 @@ import { runTests } from "./host/test.js";
 import { plainText } from "./runner/events.js";
 
 const USAGE = `usage: skope <SKILL.md> (--apply | --dry-run) [--no-page] [--param k=v]... [--fake answers.yaml] [--fake-exec cmds.yaml] [--config path]
-       skope <SKILL.md> --lint | --explain | --verify [--trace events.jsonl] | --effects | --approve
+       skope <SKILL.md> --lint | --verify [--trace events.jsonl] | --effects | --approve
        skope <SKILL.md> --test [--scenario DIR or NAME] [--live] [--runs N] [--param k=v]... [--config path]
        skope --demo [DIR] | --install-skill [DIR]
        skope --version | --help`;
@@ -21,7 +21,6 @@ const HELP = `usage: skope <path/to/SKILL.md> [options]
   --dry-run               don't; a run needs exactly one of these two
   --no-page               with --apply: don't page on handoff
   --param k=v             override a param from the skope block (repeatable, typed, safe-value checked)
-  --explain               print sections, transfer graph, and worst-case cost; run nothing
   --verify                run the explore handler and print the verify report; run nothing
   --trace events.jsonl    with --verify: check that one run's path is one the explorer can take
   --lint                  parse + static checks only
@@ -69,13 +68,11 @@ async function main(argv: string[]): Promise<number> {
       console.log(HELP);
       return 0;
     }
-    const modes = [values.lint, values.verify, values.explain, values.effects, values.approve, values.apply || values["dry-run"]].filter(
-      Boolean,
-    ).length;
+    const modes = [values.lint, values.verify, values.effects, values.approve, values.apply || values["dry-run"]].filter(Boolean).length;
     if (positionals.length !== 1) usage = "give exactly one skill file";
     else if (values.trace !== undefined && !values.verify) usage = "--trace goes with --verify";
     else if (modes > 1 || (values.test && modes > 0))
-      usage = "--lint, --verify, --explain, --effects, --approve, --test and a run (--apply or --dry-run) don't combine";
+      usage = "--lint, --verify, --effects, --approve, --test and a run (--apply or --dry-run) don't combine";
     else if (values.scenario !== undefined && !values.test) usage = "--scenario goes with --test";
     else if (values.live && !values.test) usage = "--live goes with --test";
     else if (values.runs !== undefined && !values.live) usage = "--runs goes with --live";
@@ -99,17 +96,7 @@ async function main(argv: string[]): Promise<number> {
   return runSkill({
     usage,
     file: positionals[0] ?? "",
-    mode: values.lint
-      ? "lint"
-      : values.verify
-        ? "verify"
-        : values.explain
-          ? "explain"
-          : values.effects
-            ? "effects"
-            : values.approve
-              ? "approve"
-              : "run",
+    mode: values.lint ? "lint" : values.verify ? "verify" : values.effects ? "effects" : values.approve ? "approve" : "run",
     trace: values.trace,
     apply: values.apply ?? false,
     dryRun: values["dry-run"] ?? false,
@@ -130,7 +117,6 @@ function parse(argv: string[]) {
       "dry-run": { type: "boolean" },
       "no-page": { type: "boolean" },
       param: { type: "string", multiple: true },
-      explain: { type: "boolean" },
       verify: { type: "boolean" },
       trace: { type: "string" },
       lint: { type: "boolean" },

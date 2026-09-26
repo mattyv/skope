@@ -37,7 +37,7 @@ export interface RunOptions {
   /** Why the command line can't be used (E-USAGE), if it can't. */
   usage?: string;
   file: string;
-  mode: "run" | "lint" | "verify" | "explain" | "effects" | "approve";
+  mode: "run" | "lint" | "verify" | "effects" | "approve";
   /** With --verify: a run's events.jsonl to replay (SPEC §12.4). */
   trace?: string;
   apply: boolean;
@@ -231,16 +231,19 @@ export async function runSkill(o: RunOptions): Promise<number> {
             : `${program.skill} has no approval in ${config.approvals}. Review its commands with --effects, then approve with --approve`,
         );
     }
-    if (o.mode === "verify" || o.mode === "explain") {
+    if (o.mode === "verify") {
       const trace = o.trace === undefined ? undefined : readTrace(o.trace, fail);
-      return readOnly(o.mode === "verify" ? { verify: true, trace } : { explain: true }, {
-        program,
-        config,
-        params: params(program, o.params, fail),
-        start: (c) => new Interp(program, c),
-        emit: (e) => toOut(`${JSON.stringify(redactDeep(redactor, e))}\n`),
-        say: (line) => say(`${line}\n`),
-      });
+      return readOnly(
+        { verify: true, trace },
+        {
+          program,
+          config,
+          params: params(program, o.params, fail),
+          start: (c) => new Interp(program, c),
+          emit: (e) => toOut(`${JSON.stringify(redactDeep(redactor, e))}\n`),
+          say: (line) => say(`${line}\n`),
+        },
+      );
     }
 
     // Step 2: params and built-ins (SPEC §3.5, §7).
@@ -355,6 +358,7 @@ export async function runSkill(o: RunOptions): Promise<number> {
       run_dir: runDir,
       skope_version: version,
       skope_build: build,
+      effects_hash: effects.hash,
     });
     flush();
 

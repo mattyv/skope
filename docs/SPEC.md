@@ -119,8 +119,8 @@ description: ...                # required, one line (used by agents)
 
 # Disk full
 
-*A skope skill. Run it with the run-skope-skill skill if you have it; if
-not, the bold steps are the procedure, and {names} are params set below.*
+*A skope skill. Run it with `skope`, never by hand: its commands are
+reviewed as a set. {names} are params, set in the skope block below.*
 
 ```skope
 format: 1                       # required for runnable skills
@@ -822,7 +822,7 @@ Shipped Dafny code MUST NOT contain `assume`, `{:axiom}` or
   that names more than one statement is `E-FAKE-AMBIGUOUS`. A `line:N` key
   that names no statement is `W-FAKE-UNUSED`, and so is a stable key that
   names a section but nothing in it, which is still matched as exact text. Statements inside a `for each` are matched once per item.
-- **explore**: used by `--verify` and `--explain`. It must reach every path
+- **explore**: used by `--verify`. It must reach every path
   a real run could take.
   - Values from `run` are unknown. A comparison on an unknown value has three
     results: true, false, or not a number (failure handling). The core
@@ -897,6 +897,8 @@ Shipped Dafny code MUST NOT contain `assume`, `{:axiom}` or
 ### 5.6 Verify report (`skope --verify`)
 From the explore handler, report the skope release version and build
 identity (§7.2), then:
+- the entry section; each section's name, line and kind (instructions,
+  data or prose); and every transfer between sections
 - total abstract paths; outcomes reachable (`stopped` / `paged` / `handoff`,
   with reasons)
 - **fail** if any path ends without an outcome, or in `error` (impossible by
@@ -907,6 +909,10 @@ identity (§7.2), then:
   timeout. The enforced limit is `limits.deadline` (§7).
 - sections never reached (warning `W-SECTION-UNREACHED`)
 - each ask reached, with its section, line, kind and the branches explored there: one per option (Score: per level), plus unsure and unavailable (§5.4)
+
+The report is one JSON line on stdout. A one-line summary on stderr gives
+the sections, paths, outcomes, most asks and effects, worst case, and any
+section never reached, for a person to read.
 
 ---
 
@@ -1141,7 +1147,6 @@ skope <path/to/SKILL.md> [options]
   --dry-run               don't (§4.5); a run needs exactly one of these two
   --no-page               with --apply: don't page on handoff (§8)
   --param k=v             override a param from the skope block (repeatable, typed, safe-value checked)
-  --explain               print sections, transfer graph, and worst-case cost; run nothing
   --verify                run the explore handler and print the verify report; run nothing.
                           The report is the last stdout line; warning events come before it
   --trace events.jsonl    with --verify: check that one run's path is one the explorer can take (§12.4)
@@ -1174,7 +1179,7 @@ with no events.
 Responsibilities, in order:
 0. Check the mode. A run needs exactly one of `--apply` and `--dry-run`.
    Neither or both → print why to stderr and exit 40 before anything runs.
-   Read-only modes (`--lint`, `--explain`, `--verify`) need neither.
+   Read-only modes (`--lint`, `--verify`, `--effects`, `--approve`) need neither.
 1. Preprocess + lint. Report every error found, not just the first (§7.1).
    Any error → exit 40.
 2. Validate params and built-ins: types, and the safe-value check for any
@@ -1471,7 +1476,7 @@ so 84.6% against sure 80 is +4.6, under a `min_margin` of 5. Without
 `min_margin`, a margin under 5 is a warning. The median confidence of an
 even number of runs is the mean of the middle two.
 Before running, skope prints the most backend calls the runs could make:
-the most asks any path can reach (from the explorer, as `--explain`
+the most asks any path can reach (from the explorer, as `--verify`
 counts), times each scenario's runs. It can't know the exact number, since a
 wrong answer can lead down a path with more asks. Answers are never cached.
 A live scenario's line adds `runs`, `hits`, `hit_rate`, `min_hit_rate`,
@@ -1514,7 +1519,7 @@ applied, needs `<dir>/<skill>.json` holding the current `effects_hash`,
 or it stops with `E-NOT-APPROVED` before anything runs, naming the commands
 added and removed since the approval. `--approve` writes that file (the
 hash, the commands, the time, `$USER`) after printing the scope and its
-changes. `--lint`, `--verify`, `--explain`, `--effects` and `--test` never
+changes. `--lint`, `--verify`, `--effects` and `--test` never
 need an approval: they run nothing real.
 
 - The hash pins *what* can run, not *where*. Rewording prose or questions,
@@ -1672,7 +1677,7 @@ defaults. Anything else is `E-CONFIG`: a file that can't be read, a
 level, or a wrong type or out-of-range value. A run whose skill asks
 needs a block for the selected backend, whether or not the file exists,
 and without one it's `E-CONFIG` before the run starts; `--lint`,
-`--explain`, `--verify` and runs that never ask don't. `state_dir`
+`--verify`, `--effects` and runs that never ask don't. `state_dir`
 expands a leading `$XDG_STATE_HOME` or `~`, and must then be absolute.
 
 ---
@@ -1689,7 +1694,7 @@ expands a leading `$XDG_STATE_HOME` or `~`, and must then be absolute.
 
 | `event` | Extra fields |
 |---|---|
-| `run_start` | `params`, `dry_run`, `caller`, `run_dir`, `skope_version`, `skope_build` (§7.2) |
+| `run_start` | `params`, `dry_run`, `caller`, `run_dir`, `skope_version`, `skope_build` (§7.2), `effects_hash` (§7.4) |
 | `run` / `check_cmd` | `cmd`, `exit`, `ms`, `timed_out`, `truncated`, `stdout_hash` (of the redacted output, so a log can't be used to test guesses of a secret), `stdout_tail` (redacted, ≤2KB), `after_would_do` |
 | `check` | `expr`, `left`, `right`, `result`, `after_would_do`. `expr` is rendered from the core program: operands as `{name}` or the number, e.g. `{used} < {threshold}` (a decorative `%` is gone by then) |
 | `ask` | `probs` keyed by option id only; unassigned probability stays in the request file. `question` (as sent, §3.5: trusted values pasted in, `run` outputs named in backticks), `kind`, `probs`, `chosen`, `confidence`, `sure`, `passed`, `backend`, `model`, `ms`, `request_path`, `request_sha256`, `after_would_do`; for `score`, `range`, and `chosen` is an integer. If the backend failed, `probs`, `chosen` and `confidence` are `null` and `detail` is `unavailable` or `request_too_large` |
@@ -1958,8 +1963,8 @@ description: Free disk space safely when a Linux volume fills up. Use when a dis
 
 # Disk full
 
-*A [skope](https://github.com/mattyv/skope) skill. Run it with the run-skope-skill skill if you have
-it; if not, the bold steps are the procedure, and `{names}` are params set in the skope block below.*
+*A [skope](https://github.com/mattyv/skope) skill. Run it with `skope` (see the run-skope-skill skill),
+never by hand: its commands are reviewed as a set. `{names}` are params, set in the skope block below.*
 
 ```skope
 format: 1
@@ -2077,8 +2082,8 @@ description: Check and renew TLS certificates before they expire. Use when a cer
 
 # Cert expiry
 
-*A [skope](https://github.com/mattyv/skope) skill. Run it with the run-skope-skill skill if you have
-it; if not, the bold steps are the procedure, and `{names}` are params set in the skope block below.*
+*A [skope](https://github.com/mattyv/skope) skill. Run it with `skope` (see the run-skope-skill skill),
+never by hand: its commands are reviewed as a set. `{names}` are params, set in the skope block below.*
 
 ```skope
 format: 1
@@ -2488,8 +2493,8 @@ description: Decide what to do about a burst of system errors. Use when an error
 
 # Error triage
 
-*A [skope](https://github.com/mattyv/skope) skill. Run it with the run-skope-skill skill if you have
-it; if not, the bold steps are the procedure, and `{names}` are params set in the skope block below.*
+*A [skope](https://github.com/mattyv/skope) skill. Run it with `skope` (see the run-skope-skill skill),
+never by hand: its commands are reviewed as a set. `{names}` are params, set in the skope block below.*
 
 ```skope
 format: 1

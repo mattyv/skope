@@ -9,9 +9,9 @@ the agent or a person when it isn't sure. Change a command and it won't run
 until you approve again. Skills are unit tested, and the part that decides
 what runs is mathematically proven.
 
-A skope skill is an ordinary Markdown file. A person or a language model can
-read it and follow it. skope can also *execute* it: it runs the commands,
-checks the results, and at the branch points asks
+A skope skill is an ordinary Markdown file that a person can read and
+review. skope executes it: it runs the commands, checks the results, and at
+the branch points asks
 **[Jev](https://docs.typesafe.ai)**, TypeSafe's fast decision model, small
 multiple-choice questions. When Jev isn't sure enough, skope stops and hands
 the incident to a human or an agent, with a record of everything it already
@@ -135,8 +135,7 @@ two agent skills:
 [`write-skope-skill`](skills/write-skope-skill/SKILL.md) has an agent write
 skope skills test first, and
 [`run-skope-skill`](skills/run-skope-skill/SKILL.md) has one run a skope
-skill (with skope if it's there, by hand if not) and take over when skope
-hands off. Set `SKOPE_NO_SKILL=1` to skip them.
+skill through skope, never by hand, and take over when skope hands off. Set `SKOPE_NO_SKILL=1` to skip them.
 
 ### Try it
 
@@ -175,7 +174,6 @@ links, and command output that could leak into a command:
 
 ```console
 $ skope disk-full/SKILL.md --lint
-$ skope disk-full/SKILL.md --explain    # sections, transfer graph, worst-case cost
 $ skope disk-full/SKILL.md --verify     # every path the run can take, and how each ends
 ```
 
