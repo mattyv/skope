@@ -160,6 +160,11 @@
     "meaning": "neither or both of `--apply` and `--dry-run` (§7 step 0)"
   },
   {
+    "code": "E-NOT-APPROVED",
+    "stage": "args",
+    "meaning": "the config has `approvals`, and the skill has no approval there, or its commands changed since (§7.4)"
+  },
+  {
     "code": "E-PARAM-UNKNOWN",
     "stage": "args",
     "meaning": "`--param` names a param the skill doesn't declare"

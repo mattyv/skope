@@ -29,6 +29,7 @@ import { acquireLock, LockError } from "../runner/lock.js";
 import { sendPage } from "../runner/pager.js";
 import { buildRedactor, type Redactor, redactDeep } from "../runner/redact.js";
 import type { AskRequest, Response, RunConfig, Val } from "../step.js";
+import { describe, diffEffects, effectsOf, readApproval, writeApproval } from "./effects.js";
 import { escapePage, type Handlers, type LoopResult, runLoop } from "./loop.js";
 import { readOnly } from "./verify.js";
 
@@ -36,7 +37,7 @@ export interface RunOptions {
   /** Why the command line can't be used (E-USAGE), if it can't. */
   usage?: string;
   file: string;
-  mode: "run" | "lint" | "verify" | "explain";
+  mode: "run" | "lint" | "verify" | "explain" | "effects" | "approve";
   /** With --verify: a run's events.jsonl to replay (SPEC §12.4). */
   trace?: string;
   apply: boolean;
@@ -175,6 +176,60 @@ export async function runSkill(o: RunOptions): Promise<number> {
     if (o.mode === "lint") {
       say(`skope: ${o.file}: ok\n`);
       return 0;
+    }
+
+    // The skill's scope: every command it could run, and whether that set is approved (SPEC §7.4).
+    const effects = effectsOf(program);
+    const approval = () => {
+      try {
+        return config.approvals === undefined ? null : readApproval(config.approvals, program.skill);
+      } catch (err) {
+        return fail("E-CONFIG", "args", `can't read the approval for ${program.skill}: ${(err as Error).message}`);
+      }
+    };
+    const { version: skopeVersion, build: skopeBuild } = IDENTITY;
+    if (o.mode === "effects") {
+      for (const line of describe(effects)) say(`${line}\n`);
+      toOut(
+        `${JSON.stringify({ skope_version: skopeVersion, skope_build: skopeBuild, skill: effects.skill, effects_hash: effects.hash, commands: effects.commands, params: effects.params })}\n`,
+      );
+      return 0;
+    }
+    if (o.mode === "approve") {
+      if (config.approvals === undefined)
+        fail("E-CONFIG", "args", "--approve needs an approvals directory in the config: approvals: <dir> (SPEC §9)");
+      const dir = config.approvals as string;
+      const before = approval();
+      const changes = diffEffects(before, effects);
+      for (const line of describe(effects)) say(`${line}\n`);
+      if (before?.effects_hash === effects.hash) {
+        say(`skope: ${program.skill} is already approved with these commands\n`);
+      } else {
+        let path: string;
+        try {
+          path = writeApproval(dir, effects);
+        } catch (err) {
+          return fail("E-IO", "args", `can't write the approval to ${dir}: ${(err as Error).message}`);
+        }
+        say(`skope: approved ${program.skill}: ${path}${before ? `; changes since the last approval: ${changes.join("; ")}` : ""}\n`);
+      }
+      toOut(
+        `${JSON.stringify({ skope_version: skopeVersion, skope_build: skopeBuild, skill: effects.skill, effects_hash: effects.hash, changes })}\n`,
+      );
+      return 0;
+    }
+    // With approvals configured, nothing runs until a person has approved exactly these commands.
+    // A dry run runs the `run` commands, so it needs the approval too. --test fakes every command.
+    if (o.mode === "run" && !o.test && config.approvals !== undefined) {
+      const approved = approval();
+      if (approved?.effects_hash !== effects.hash)
+        fail(
+          "E-NOT-APPROVED",
+          "args",
+          approved
+            ? `${program.skill}'s commands changed since it was approved (${diffEffects(approved, effects).join("; ")}). Review them with --effects, then approve with --approve`
+            : `${program.skill} has no approval in ${config.approvals}. Review its commands with --effects, then approve with --approve`,
+        );
     }
     if (o.mode === "verify" || o.mode === "explain") {
       const trace = o.trace === undefined ? undefined : readTrace(o.trace, fail);

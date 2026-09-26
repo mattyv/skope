@@ -1024,6 +1024,7 @@ export const CODE_MEANINGS: Record<string, string> = {
   "E-SCORE-RUBRIC": "Score rubric missing, incomplete, out of range or duplicated (v1.1)",
   "E-USAGE": "an unknown flag, a missing or malformed flag value, a missing or unreadable skill path, or an unreadable or malformed `--trace` file (§7)",
   "E-MODE": "neither or both of `--apply` and `--dry-run` (§7 step 0)",
+  "E-NOT-APPROVED": "the config has `approvals`, and the skill has no approval there, or its commands changed since (§7.4)",
   "E-PARAM-UNKNOWN": "`--param` names a param the skill doesn't declare",
   "E-PARAM-TYPE": "a `--param` value has the wrong type",
   "E-PARAM-UNSAFE": "a param override or built-in fails the safe-value check",

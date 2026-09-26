@@ -1146,6 +1146,8 @@ skope <path/to/SKILL.md> [options]
                           The report is the last stdout line; warning events come before it
   --trace events.jsonl    with --verify: check that one run's path is one the explorer can take (§12.4)
   --lint                  parse + static checks only
+  --effects               list every command the skill could ever run (§7.4); run nothing
+  --approve               approve that list into the config's approvals directory (§7.4, §9)
   --test                  run the scenarios in tests/ and tests.yaml next to the skill and check each (§7.3)
   --scenario DIR or NAME  with --test: run only this scenario directory, or this tests.yaml scenario by name
   --live                  with --test: ask the configured backend, and repeat each scenario (§7.3)
@@ -1290,6 +1292,7 @@ and have no codes.
 | `E-SCORE-RUBRIC` | lint | Score rubric missing, incomplete, out of range or duplicated (v1.1) | no line for level 2 |
 | `E-USAGE` | args | an unknown flag, a missing or malformed flag value, a missing or unreadable skill path, or an unreadable or malformed `--trace` file (§7) | `--aply`; `--param k` |
 | `E-MODE` | args | neither or both of `--apply` and `--dry-run` (§7 step 0) | |
+| `E-NOT-APPROVED` | args | the config has `approvals`, and the skill has no approval there, or its commands changed since (§7.4) | a new `do` the agent added |
 | `E-PARAM-UNKNOWN` | args | `--param` names a param the skill doesn't declare | |
 | `E-PARAM-TYPE` | args | a `--param` value has the wrong type | `threshold=high` |
 | `E-PARAM-UNSAFE` | args | a param override or built-in fails the safe-value check | `mount='/; rm -rf /'` |
@@ -1487,6 +1490,43 @@ when any failed, 40 when any is invalid or there are none.
 
 ---
 
+### 7.4 Scope: effects and approval
+A skill's **scope** is every command it could ever run. The taint rule
+(§3.5) makes it finite and knowable before any run: a command holds only
+literals, params, built-ins, and items from the skill's own lists, never
+command output.
+
+`--effects` lists the scope: one line per distinct command, `do` first, then
+`run` (which includes `check … succeeds`), with the sections each can run
+from. A variable bound from a list (a `one of` answer or a `for each` item)
+is expanded to every item in that list, skill-wide, since a variable lives
+for the whole run; `do step` is expanded to every action item's command. A
+param or built-in stays `{name}`: the caller can set a param, and the
+safe-value check bounds it. The report is the usual JSON line on stdout,
+with `effects_hash`, the sha256 of the sorted `(kind, command)` pairs, plus
+readable lines on stderr.
+
+`run` commands are meant to be read-only, but skope can't check that, and
+they run in a dry run. So the scope lists them too, and approval covers them.
+
+**Approval.** With `approvals: <dir>` in the config (§9), a run, dry or
+applied, needs `<dir>/<skill>.json` holding the current `effects_hash`,
+or it stops with `E-NOT-APPROVED` before anything runs, naming the commands
+added and removed since the approval. `--approve` writes that file (the
+hash, the commands, the time, `$USER`) after printing the scope and its
+changes. `--lint`, `--verify`, `--explain`, `--effects` and `--test` never
+need an approval: they run nothing real.
+
+- The hash pins *what* can run, not *where*. Rewording prose or questions,
+  changing `sure`, or moving a command to another section keeps the
+  approval; `--verify` shows the paths. Adding or changing a command, or a
+  list item that reaches one, needs a new approval.
+- Approval is only as strong as who can write `<dir>`. Keep it where the
+  agent or user that runs skope can't write, for example root-owned, or
+  in a repository where a person reviews every change to it.
+- It doesn't make an approved command safe: `do ./fix.sh` runs whatever the
+  script does. It makes sure nothing unapproved runs.
+
 ## 8. Handoff
 
 Skope never launches an agent in v1. On handoff it writes the record to
@@ -1595,6 +1635,7 @@ redact:
     - 'myco-[0-9a-f]{32}'
 on_handoff: page          # page | none (§8)
 state_dir: $XDG_STATE_HOME/skope   # run directories (§10.1)
+approvals: /etc/skope/approvals     # optional; absolute or ~/…. When set, runs need approval (§7.4)
 ```
 
 **Built-in redaction patterns** (on unless `redact.defaults: false`, which
