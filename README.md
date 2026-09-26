@@ -448,14 +448,13 @@ narrow decisions and to return a probability for every possible answer,
 which is exactly what skope's confidence thresholds need. It answers
 in about a tenth of a second.
 
-Each of skope's question forms maps onto one of Jev's three question types:
+Each of skope's question forms maps onto one of Jev's question types:
 
 | In a skill | Jev question type | What skope does with the answer |
 |---|---|---|
 | `ask` with a list of `[Section]` options | Choice | moves to the chosen section |
 | `→ one of [List] as x` | Choice | keeps the chosen item as `x` |
 | `→ yes \| no` | Noul | keeps yes or no, for `if yes` |
-| `→ 1 to 4 as x` | Score | keeps the level as `x`, for `check` |
 
 skope sends Jev only the evidence a question names. It pins a Jev version,
 because a threshold like `sure 85%` is tuned against a particular model, and
@@ -511,9 +510,8 @@ of 4,621 Jev calls found:
   Put the deciding fact in the question's evidence, and use
   `--test --live` to check.
 - **Calibration depends on the question type.** Yes/no answers were
-  under-confident, Choice answers slightly over-confident, and Score
-  answers badly over-confident. A yes/no gate errs towards handing off;
-  don't gate on a Score level alone (skope warns, `W-SCORE-THRESHOLD`).
+  under-confident and Choice answers slightly over-confident, so a yes/no
+  gate errs towards handing off.
 - **Use the probability, not the model's own confidence field.** skope
   already gates on the chosen option's probability.
 

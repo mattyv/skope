@@ -55,11 +55,6 @@
     "meaning": "an option item isn't exactly one `[Section]` link"
   },
   {
-    "code": "E-RUBRIC-ITEM",
-    "stage": "parse",
-    "meaning": "a rubric line isn't `INT: text` (v1.1)"
-  },
-  {
     "code": "E-UNRESOLVED",
     "stage": "lint",
     "meaning": "a `[Section]` or `[List]` reference doesn't resolve"
@@ -140,16 +135,6 @@
     "meaning": "two items in a data list have the same label, ignoring case (§3.6)"
   },
   {
-    "code": "E-SCORE-RANGE",
-    "stage": "lint",
-    "meaning": "Score bounds invalid, or not 2–10 levels (v1.1)"
-  },
-  {
-    "code": "E-SCORE-RUBRIC",
-    "stage": "lint",
-    "meaning": "Score rubric missing, incomplete, out of range or duplicated (v1.1)"
-  },
-  {
     "code": "E-USAGE",
     "stage": "args",
     "meaning": "an unknown flag, a missing or malformed flag value, a missing or unreadable skill path, or an unreadable or malformed `--trace` file (§7)"
@@ -197,7 +182,7 @@
   {
     "code": "E-BACKEND-LIMIT",
     "stage": "args",
-    "meaning": "the skill exceeds the configured backend's limits: options, Score levels or context (§6.2)"
+    "meaning": "the skill exceeds the configured backend's limits: options or context (§6.2)"
   },
   {
     "code": "E-FAKE-UNMATCHED",
@@ -228,16 +213,6 @@
     "code": "E-INTERNAL",
     "stage": "runtime",
     "meaning": "a runner bug. Unreachable by P6, so always a bug report"
-  },
-  {
-    "code": "W-SCORE-THRESHOLD",
-    "stage": "warning",
-    "meaning": "a Score variable is only used in one comparison against one threshold; a `yes | no` ask gates more reliably, since Score confidence runs high (§4.7) (v1.1)"
-  },
-  {
-    "code": "W-SCORE-UNUSED",
-    "stage": "warning",
-    "meaning": "a Score variable is never used after it's bound (v1.1)"
   },
   {
     "code": "W-SECTION-UNREACHED",
