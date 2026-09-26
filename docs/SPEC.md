@@ -1507,6 +1507,10 @@ human on handoff, unless one of these says not to:
 Skope decides from these flags and settings only, never from whether it has
 a terminal.
 
+Whether or not it pages, skope also writes one line to stderr, since exit
+20 reads like a failure to a person: `skope: handed off ({reason}) in
+{section}; a person or agent takes it from here. Record: {path}`.
+
 - An agent that runs skope SHOULD set `SKOPE_CALLER=agent`.
 - The handoff page says: `{host}: skope {skill} handed off ({reason}) in
   {section}. Record: {path}`. Only `{section}`, which the author wrote, is

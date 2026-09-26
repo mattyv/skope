@@ -19,7 +19,7 @@ import { CODE_MEANINGS } from "../contracts.gen.js";
 import { Interp, unsafeInputs } from "../interp.js";
 import { lint } from "../lint.js";
 import { preprocess } from "../preprocess/index.js";
-import { type Config, defaultConfig, loadConfig } from "../runner/config.js";
+import { type Config, defaultConfig, defaultConfigPath, loadConfig } from "../runner/config.js";
 import { type Diagnostic, diagnosticLine, plainText, type Stage } from "../runner/events.js";
 import { commandEnv, execCommand, stopAll } from "../runner/exec.js";
 import { createFakeClock, fakeExec } from "../runner/fakeExec.js";
@@ -397,6 +397,9 @@ export async function runSkill(o: RunOptions): Promise<number> {
         fail("E-IO", "runtime", `can't write ${path}: ${(err as Error).message}`);
       }
       emit({ event: "handoff_record", ...at, path, record });
+      // A handoff exits 20, which reads like a failure: say in words what happened and where the record is.
+      if (!o.test)
+        say(`skope: handed off (${result.outcome.reason}) in ${at.section}; a person or agent takes it from here. Record: ${path}\n`);
       const optedOut = o.noPage || process.env.SKOPE_CALLER === "agent" || config.on_handoff === "none";
       if (!optedOut) {
         // Only the section name is the author's; the host and record path stay copyable.
@@ -482,7 +485,13 @@ async function checkBackend(
     return none;
   }
   const block = name === "jev" ? config.jev : config.openrouter;
-  if (!block) return fail("E-CONFIG", "args", `ask.backend is ${name}, but the config has no ${name} block. ${BLOCK_HINT[name]}`);
+  if (!block)
+    return fail(
+      "E-CONFIG",
+      "args",
+      `ask.backend is ${name}, but the config (${o.config ?? defaultConfigPath()}) has no ${name} block. ${BLOCK_HINT[name]} ` +
+        "To run without a key, pass --fake answers.yaml.",
+    );
   const apiKey = process.env[block.key_env];
   if (!apiKey) return fail("E-CONFIG", "args", `${name}: no API key in $${block.key_env}`);
   const limits = name === "jev" ? JEV_LIMITS : OPENROUTER_LIMITS;

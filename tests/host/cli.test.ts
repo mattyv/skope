@@ -268,6 +268,19 @@ describe("run flow", () => {
     const r = await runSkope([skill("- **hand off**"), "--dry-run"]);
     expect(r.code).toBe(20);
     expect(find(r.events, "handoff_record")).toMatchObject({ record: { dry_run: true, reason: "explicit", detail: null } });
+    // Exit 20 reads like a failure, so stderr says what happened and where the record is (SPEC §8).
+    expect(r.stderr).toMatch(/^skope: handed off \(explicit\) in Main; a person or agent takes it from here\. Record: .*handoff\.json$/m);
+  });
+
+  test("no backend configured: the error names the config file and says --fake runs without a key", async () => {
+    const xdg = mkdtempSync(join(tmpdir(), "skope-xdg-"));
+    const config = join(xdg, "skope", "config.yaml");
+    const r = await runSkope([skill("- **ask** Is it ok? → yes | no · sure 80%\n- **stop**"), "--dry-run"], {
+      env: { XDG_CONFIG_HOME: xdg },
+    });
+    expect(r.code).toBe(40);
+    expect(r.stderr).toContain(`the config (${config}) has no jev block`);
+    expect(r.stderr).toContain("To run without a key, pass --fake answers.yaml.");
   });
 
   test("S3: a comparison that can't coerce hands off with detail {expr, left, right}, not the last command (SPEC §4.2, §8.1)", async () => {

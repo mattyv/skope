@@ -101,32 +101,27 @@ the shell, the pager and the backend, is ordinary tested TypeScript.
 
 ## Install
 
+skope is in beta. Install the beta by name:
+
 ```console
-$ curl -fsSL https://github.com/mattyv/skope/releases/latest/download/install.sh | sh
+$ curl -fsSL https://github.com/mattyv/skope/releases/download/v0.1.0-beta.2/install.sh | SKOPE_VERSION=0.1.0-beta.2 sh
 $ skope --version
-skope 0.1.0 (build identity 3f1c…)
+skope 0.1.0-beta.2 (build identity …)
 ```
 
 That installs a single self-contained binary for Linux (x64, arm64) or
 macOS (Apple silicon) into `~/.local/bin`. It doesn't need Node. The
 installer checks the download against the release's checksums before
-installing anything. Set `SKOPE_VERSION` to pin a version, or
-`SKOPE_INSTALL_DIR` to install elsewhere.
+installing anything. Set `SKOPE_INSTALL_DIR` to install elsewhere.
 
-Or, with Node 20 or newer, `npm install -g skope`. Or run the container
-image, `ghcr.io/mattyv/skope`.
+Or run the container image, `ghcr.io/mattyv/skope:0.1.0-beta.2`.
 
-**Beta.** Until 0.1.0 is out, `latest` has nothing to install. Install the
-beta by name:
+**Not on npm yet.** The `skope` name on npm belongs to an unrelated
+project, so don't `npm install skope`. A package under a different name
+will follow.
 
-```console
-$ curl -fsSL https://github.com/mattyv/skope/releases/download/v0.1.0-beta.2/install.sh | SKOPE_VERSION=0.1.0-beta.2 sh
-```
-
-or `npm install -g skope@beta`, or `ghcr.io/mattyv/skope:0.1.0-beta.2`.
-
-If you use Claude Code (`~/.claude` exists), both the installer and
-`npm install -g` also install two agent skills:
+If you use Claude Code (`~/.claude` exists), the installer also installs
+two agent skills:
 [`write-skope-skill`](skills/write-skope-skill/SKILL.md) has an agent write
 skope skills test first, and
 [`run-skope-skill`](skills/run-skope-skill/SKILL.md) has one run a skope
@@ -152,12 +147,14 @@ $ skope SKILL.md --verify   # every path it can take, and how each ends
 $ skope SKILL.md --dry-run --fake answers.yaml --fake-exec commands.yaml
 ```
 
-The dry run prints one JSON event per step. The faked model picks Restart
-and then `myapp-worker`, skope logs the restart it *would* do, and disk
-usage drops under target. Now make the model less sure: in `answers.yaml`,
+skope's output is JSON on stdout, one event per line, for scripts and
+agents; a person reads stderr (`--test`'s PASS lines, errors, and a
+one-line summary when a run hands off). In the dry run, the faked model
+picks Restart and then `myapp-worker`, skope logs the restart it *would*
+do, and disk usage drops under target. Now make the model less sure: in `answers.yaml`,
 move 0.2 from `s:restart` to `s:page` (each ask's probabilities add up to
 1), or replace the whole answer with `Triage.ask: unsure`. Run it again,
-and skope hands off instead of guessing.
+and skope hands off instead of guessing: it exits 20 and says where on stderr.
 
 ## Use
 
