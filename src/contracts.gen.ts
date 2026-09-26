@@ -1031,6 +1031,7 @@ export const CODE_MEANINGS: Record<string, string> = {
   "E-NOT-APPROVED": "the config has `approvals`, and the skill has no approval there, or its commands changed since (§7.4)",
   "E-PARAM-UNKNOWN": "`--param` names a param the skill doesn't declare",
   "E-PARAM-TYPE": "a `--param` value has the wrong type",
+  "E-PARAM-CHOICE": "a `--param` value isn't one of the param's `choices` (§3.1)",
   "E-PARAM-UNSAFE": "a param override or built-in fails the safe-value check",
   "E-CONFIG": "the config file, or a `--fake` or `--fake-exec` file, is unreadable or invalid (fake files are checked against `contracts/fakes.schema.json` before the run)",
   "E-BACKEND-MODEL": "the `openrouter` model doesn't support logprobs, or its reasoning can't be turned off (§6.2)",

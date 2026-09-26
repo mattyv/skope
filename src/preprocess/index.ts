@@ -25,7 +25,13 @@ import {
   type Ref,
 } from "./statements.js";
 
-export type PreprocessResult = { program: CoreProgram; warnings: ParseError[] } | { errors: ParseError[] };
+export type PreprocessResult =
+  | {
+      program: CoreProgram;
+      warnings: ParseError[] /** Params limited to fixed values (SPEC §3.1). */;
+      choices: Record<string, (string | number)[]>;
+    }
+  | { errors: ParseError[] };
 
 export function preprocess(markdown: string): PreprocessResult {
   try {
@@ -114,7 +120,7 @@ class Preprocessor {
     const warnings = fm.noted
       ? []
       : [mkErr("W-NO-SKOPE-NOTE", fm.blockLine, "the intro doesn't say this is a skope skill; agents reading it won't know (SPEC §3.1)")];
-    return { program, warnings };
+    return { program, warnings, choices: fm.choices };
   }
 
   resolve = (b: BracketRef): Ref => {

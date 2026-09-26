@@ -175,6 +175,11 @@
     "meaning": "a `--param` value has the wrong type"
   },
   {
+    "code": "E-PARAM-CHOICE",
+    "stage": "args",
+    "meaning": "a `--param` value isn't one of the param's `choices` (§3.1)"
+  },
+  {
     "code": "E-PARAM-UNSAFE",
     "stage": "args",
     "meaning": "a param override or built-in fails the safe-value check"

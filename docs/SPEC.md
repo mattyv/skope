@@ -137,6 +137,12 @@ limits:                         # optional; defaults shown
 ```
 ~~~
 
+- A param can be limited to fixed values: `svc: { default: web, choices:
+  [web, api] }`. The default must be one of the choices, and every choice the
+  same type as it. A `--param` outside them is `E-PARAM-CHOICE`. Choices make
+  the skill's scope finite (§7.4): a param with choices is listed as each of
+  its values, while one without stays `{name}`, any value that passes the
+  safe-value check.
 - A skill has one skope block. Any other key in it is `E-FRONTMATTER`.
 - The intro SHOULD say, outside the block, that the file is a skope skill,
   as the note line above does, so an agent that loads it knows what the
@@ -1300,6 +1306,7 @@ and have no codes.
 | `E-NOT-APPROVED` | args | the config has `approvals`, and the skill has no approval there, or its commands changed since (§7.4) | a new `do` the agent added |
 | `E-PARAM-UNKNOWN` | args | `--param` names a param the skill doesn't declare | |
 | `E-PARAM-TYPE` | args | a `--param` value has the wrong type | `threshold=high` |
+| `E-PARAM-CHOICE` | args | a `--param` value isn't one of the param's `choices` (§3.1) | `svc=db` when the choices are `[web, api]` |
 | `E-PARAM-UNSAFE` | args | a param override or built-in fails the safe-value check | `mount='/; rm -rf /'` |
 | `E-CONFIG` | args | the config file, or a `--fake` or `--fake-exec` file, is unreadable or invalid (fake files are checked against `contracts/fakes.schema.json` before the run) | |
 | `E-BACKEND-MODEL` | args | the `openrouter` model doesn't support logprobs, or its reasoning can't be turned off (§6.2) | |
@@ -1490,7 +1497,9 @@ Output: one JSON line per scenario on stdout,
 `{"scenario","pass","mismatch"}` (or `"invalid"` with the reason), with
 `events` naming the file that holds that run's own events; then a summary
 line, `{"skope_version","skope_build","scenarios","passed","failed","invalid"}`.
-stderr gets a readable line for each. Exit 0 when every scenario passed, 60
+stderr gets a readable line for each. When stdout is a terminal, the JSON
+lines are left out, so a person sees only the readable ones; piped or
+redirected, stdout gets them all. Exit 0 when every scenario passed, 60
 when any failed, 40 when any is invalid or there are none.
 
 ---
@@ -1506,8 +1515,10 @@ command output.
 from. A variable bound from a list (a `one of` answer or a `for each` item)
 is expanded to every item in that list, skill-wide, since a variable lives
 for the whole run; `do step` is expanded to every action item's command. A
-param or built-in stays `{name}`: the caller can set a param, and the
-safe-value check bounds it. The report is the usual JSON line on stdout,
+param with `choices` (§3.1) is expanded to each choice. Any other param, or
+a built-in, stays `{name}`: the caller sets it, and the safe-value check
+bounds it. The report names these open params, since the approval can't
+pin their values; give a param choices to pin it. The report is the usual JSON line on stdout,
 with `effects_hash`, the sha256 of the sorted `(kind, command)` pairs, plus
 readable lines on stderr.
 
@@ -1515,7 +1526,7 @@ readable lines on stderr.
 they run in a dry run. So the scope lists them too, and approval covers them.
 
 **Approval.** With `approvals: <dir>` in the config (§9), a run, dry or
-applied, needs `<dir>/<skill>.json` holding the current `effects_hash`,
+applied, needs `<dir>/<skill>.approval.json` holding the current `effects_hash`,
 or it stops with `E-NOT-APPROVED` before anything runs, naming the commands
 added and removed since the approval. `--approve` writes that file (the
 hash, the commands, the time, `$USER`) after printing the scope and its
@@ -1526,9 +1537,12 @@ need an approval: they run nothing real.
   changing `sure`, or moving a command to another section keeps the
   approval; `--verify` shows the paths. Adding or changing a command, or a
   list item that reaches one, needs a new approval.
-- Approval is only as strong as who can write `<dir>`. Keep it where the
-  agent or user that runs skope can't write, for example root-owned, or
-  in a repository where a person reviews every change to it.
+- `approvals: beside-skill` keeps each approval in its skill's folder, as
+  `<skill>.approval.json`, so it's reviewed with the skill in a pull request.
+- Approval is only as strong as who can write it. Keep `<dir>` where the
+  agent or user that runs skope can't write, for example root-owned; with
+  `beside-skill`, protect the file with code review (CODEOWNERS), so an
+  agent can't approve its own change.
 - It doesn't make an approved command safe: `do ./fix.sh` runs whatever the
   script does. It makes sure nothing unapproved runs.
 
@@ -1640,7 +1654,7 @@ redact:
     - 'myco-[0-9a-f]{32}'
 on_handoff: page          # page | none (§8)
 state_dir: $XDG_STATE_HOME/skope   # run directories (§10.1)
-approvals: /etc/skope/approvals     # optional; absolute or ~/…. When set, runs need approval (§7.4)
+approvals: /etc/skope/approvals     # optional; a directory (absolute or ~/…), or beside-skill. When set, runs need approval (§7.4)
 ```
 
 **Built-in redaction patterns** (on unless `redact.defaults: false`, which

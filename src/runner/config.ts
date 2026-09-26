@@ -193,7 +193,12 @@ export function loadConfig(path?: string, warn: (message: string) => void = () =
   if (doc.approvals !== undefined) {
     const v = typeof doc.approvals === "string" && doc.approvals.length > 0 ? doc.approvals : fail("approvals must be a non-empty string");
     const p = /^~(?=\/|$)/.test(v) ? join(homedir(), v.slice(1)) : v;
-    cfg.approvals = isAbsolute(p) ? p : fail(`approvals must be an absolute path, got ${v}`);
+    cfg.approvals =
+      v === "beside-skill" || isAbsolute(p)
+        ? v === "beside-skill"
+          ? v
+          : p
+        : fail(`approvals must be an absolute path or beside-skill, got ${v}`);
   }
   if (doc.state_dir !== undefined)
     cfg.state_dir = expandStateDir(typeof doc.state_dir === "string" ? doc.state_dir : fail("state_dir must be a string"));

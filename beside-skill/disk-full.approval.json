@@ -1,0 +1,94 @@
+{
+  "skill": "disk-full",
+  "effects_hash": "sha256:b03238161bae77597cc56c42449910da48c31dcb3e4da4f6c298e161528c729d",
+  "commands": [
+    {
+      "kind": "do",
+      "cmd": "apt-get clean",
+      "sections": [
+        "Clean up"
+      ]
+    },
+    {
+      "kind": "do",
+      "cmd": "docker image prune -af",
+      "sections": [
+        "Clean up"
+      ]
+    },
+    {
+      "kind": "do",
+      "cmd": "find /tmp -type f -mtime +7 -delete",
+      "sections": [
+        "Clean up"
+      ]
+    },
+    {
+      "kind": "do",
+      "cmd": "find /var/log -name '*.gz' -mtime +7 -delete",
+      "sections": [
+        "Clean up"
+      ]
+    },
+    {
+      "kind": "do",
+      "cmd": "journalctl --vacuum-size=500M",
+      "sections": [
+        "Clean up"
+      ]
+    },
+    {
+      "kind": "do",
+      "cmd": "systemctl restart myapp-api",
+      "sections": [
+        "Restart"
+      ]
+    },
+    {
+      "kind": "do",
+      "cmd": "systemctl restart myapp-worker",
+      "sections": [
+        "Restart"
+      ]
+    },
+    {
+      "kind": "do",
+      "cmd": "systemctl restart nginx",
+      "sections": [
+        "Restart"
+      ]
+    },
+    {
+      "kind": "do",
+      "cmd": "systemctl restart rsyslog",
+      "sections": [
+        "Restart"
+      ]
+    },
+    {
+      "kind": "run",
+      "cmd": "df --output=pcent {mount} | tail -1",
+      "sections": [
+        "Triage",
+        "Clean up",
+        "Restart"
+      ]
+    },
+    {
+      "kind": "run",
+      "cmd": "du -xh -d2 /var /tmp /home | sort -h",
+      "sections": [
+        "Triage"
+      ]
+    },
+    {
+      "kind": "run",
+      "cmd": "journalctl -p err -n 100 --no-pager",
+      "sections": [
+        "Triage"
+      ]
+    }
+  ],
+  "approved_at": "2026-09-26T06:20:37.303Z",
+  "approved_by": null
+}

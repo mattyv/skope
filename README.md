@@ -157,8 +157,9 @@ $ skope SKILL.md --dry-run --fake answers.yaml --fake-exec commands.yaml
 ```
 
 skope's output is JSON on stdout, one event per line, for scripts and
-agents; a person reads stderr (`--test`'s PASS lines, errors, and a
-one-line summary when a run hands off). In the dry run, the faked model
+agents; a person reads stderr: errors, `--verify`'s summary, and one line
+when a run hands off. `--test` prints its JSON only when stdout isn't a
+terminal, so at a terminal you see just the PASS lines. In the dry run, the faked model
 picks Restart and then `myapp-worker`, skope logs the restart it *would*
 do, and disk usage drops under target. Now make the model less sure: in `answers.yaml`,
 move 0.2 from `s:restart` to `s:page` (each ask's probabilities add up to
@@ -192,17 +193,26 @@ skope: disk-full can run 12 commands, 9 of them changing things (sha256:b0323816
 
 Every command is written out, with list items such as the services filled
 in. That works because command output can never reach a command (proven),
-so nothing is assembled at run time. Params stay as `{mount}`, since the
-caller sets them, within the safe-value check.
+so nothing is assembled at run time. A param stays `{mount}`, since the
+caller sets it, and `--effects` names it as open. To pin it, give it
+choices in the skope block, and it's listed as each one:
+
+```yaml
+params:
+  mount: { default: /, choices: [/, /var] }   # --param mount=/tmp is refused
+```
 
 Turn approvals on in the config with `approvals: /etc/skope/approvals`,
-somewhere the user or agent running skope can't write. Then no dry run or
+somewhere the user or agent running skope can't write. Or use
+`approvals: beside-skill` to keep each approval next to its skill, as
+`disk-full.approval.json`, reviewed in pull requests (protect it with
+CODEOWNERS, so an agent can't approve its own change). Then no dry run or
 apply happens until a person runs `--approve`, and any change to the command
 list stops it again:
 
 ```console
 $ skope disk-full/SKILL.md --approve
-skope: approved disk-full: /etc/skope/approvals/disk-full.json
+skope: approved disk-full: /etc/skope/approvals/disk-full.approval.json
 $ # the agent adds a command to the skill…
 $ skope disk-full/SKILL.md --apply
 E-NOT-APPROVED: disk-full's commands changed since it was approved (+ do   rm -rf /var/cache). Review them with --effects, then approve with --approve

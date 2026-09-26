@@ -220,7 +220,8 @@ describe("loadConfig (SPEC §9)", () => {
       expect(loadConfig(write(FAKE)).approvals).toBeUndefined();
       expect(loadConfig(write(`${FAKE}approvals: /etc/skope/approvals\n`)).approvals).toBe("/etc/skope/approvals");
       expect(loadConfig(write(`${FAKE}approvals: ~/approved\n`)).approvals).toBe(join(homedir(), "approved"));
-      expect(configError(write(`${FAKE}approvals: approved\n`)).message).toContain("approvals must be an absolute path");
+      expect(configError(write(`${FAKE}approvals: approved\n`)).message).toContain("approvals must be an absolute path or beside-skill");
+      expect(loadConfig(write(`${FAKE}approvals: beside-skill\n`)).approvals).toBe("beside-skill");
     });
   });
 

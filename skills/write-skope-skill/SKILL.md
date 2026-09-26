@@ -177,6 +177,9 @@ Rules that keep a skill safe and testable:
   outputs in a command (`$(( {a} - {b} ))` is `E-TAINT`): measure both in
   one command, or compare them with `check {after} < {before}`.
 - **Every section ends** in `stop`, `page`, `hand off` or `then [X]`.
+- **Give params that reach a `do` fixed choices** (`svc: { default: web,
+  choices: [web, api] }`), so `--effects` lists every value and the approval
+  pins them. A param without choices can be any safe value.
 
 ## 5. Check, then green
 

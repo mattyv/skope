@@ -24,8 +24,10 @@ export interface Effects {
   skill: string;
   hash: string;
   commands: Command[];
-  /** Param defaults, for reading: a param stays `{name}` in a command, since the caller can set it. */
+  /** Param defaults, for reading. */
   params: Record<string, string | number>;
+  /** Params that reach a command with no fixed choices: they stay `{name}`, any value that passes the safe-value check. */
+  open_params: string[];
 }
 
 /** Every value a list-bound variable can take: a list's items, or its action items' commands. */
@@ -48,7 +50,7 @@ function render(parts: Parts, lists: Map<string, string[]>): string[] {
   return out;
 }
 
-export function effectsOf(program: CoreProgram): Effects {
+export function effectsOf(program: CoreProgram, choices: Record<string, (string | number)[]> = {}): Effects {
   const found = new Map<string, Command>();
   const add = (kind: Command["kind"], cmd: string, section: string) => {
     const key = `${kind}\0${cmd}`;
@@ -66,7 +68,8 @@ export function effectsOf(program: CoreProgram): Effects {
 
   // Variables live for the whole run, so a list-bound one (a one-of answer, a for-each item) can
   // reach a command in any section. Collect every list each name is bound from, skill-wide.
-  const lists = new Map<string, string[]>();
+  // A param with fixed choices can only be one of them, so it expands like a list.
+  const lists = new Map<string, string[]>(Object.entries(choices).map(([k, v]) => [k, v.map(String)]));
   const loops = new Map<string, Parts[]>();
   const bind = <T>(m: Map<string, T[]>, name: string, values: T[]) => m.set(name, [...new Set([...(m.get(name) ?? []), ...values])]);
   for (const s of bodies)
@@ -101,7 +104,10 @@ export function effectsOf(program: CoreProgram): Effects {
     .update(JSON.stringify(commands.map((c) => [c.kind, c.cmd])))
     .digest("hex")}`;
   const params = Object.fromEntries(Object.entries(program.params).map(([k, v]) => [k, "int" in v ? v.int : v.str]));
-  return { skill: program.skill, hash, commands, params };
+  const open_params = Object.keys(program.params)
+    .filter((k) => !Object.hasOwn(choices, k) && commands.some((c) => c.cmd.includes(`{${k}}`)))
+    .sort();
+  return { skill: program.skill, hash, commands, params, open_params };
 }
 
 /** One line per command added (`+`) or removed (`-`) between two effect sets. */
@@ -120,7 +126,9 @@ export function describe(e: Effects): string[] {
   ];
   for (const c of e.commands) lines.push(`  ${c.kind.padEnd(3)}  ${c.cmd}    [${c.sections.join(", ")}]`);
   const params = Object.entries(e.params);
-  if (params.length > 0) lines.push(`  params (the caller can override): ${params.map(([k, v]) => `${k}=${v}`).join(" ")}`);
+  if (params.length > 0) lines.push(`  params (the caller can set): ${params.map(([k, v]) => `${k}=${v}`).join(" ")}`);
+  if (e.open_params.length > 0)
+    lines.push(`  open params in commands (any safe value; give them choices to pin them): ${e.open_params.join(", ")}`);
   return lines;
 }
 
@@ -132,7 +140,7 @@ export interface Approval {
   approved_by: string | null;
 }
 
-const approvalPath = (dir: string, skill: string) => join(dir, `${skill}.json`);
+const approvalPath = (dir: string, skill: string) => join(dir, `${skill}.approval.json`);
 
 /** The skill's approval in `dir`, or null if there's none. Throws on a file that isn't one. */
 export function readApproval(dir: string, skill: string): Approval | null {

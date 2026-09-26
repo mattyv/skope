@@ -66,6 +66,45 @@ describe("effectsOf", () => {
   });
 });
 
+describe("param choices (SPEC §3.1)", () => {
+  const withChoices = skill(
+    "- **do** `restart {svc} on {host}`\n- **run** `df {mount}`\n- **stop**",
+    "params:\n  svc:\n    default: web\n    choices: [web, api]\n  mount: /\n",
+  );
+
+  test("a param with choices expands like a list; one without stays open and is named", () => {
+    const r = preprocess(withChoices);
+    if (!("program" in r)) throw new Error(JSON.stringify(r.errors));
+    expect(r.choices).toEqual({ svc: ["web", "api"] });
+    expect(r.program.params.svc).toMatchObject({ str: "web" });
+    const e = effectsOf(r.program, r.choices);
+    expect(e.commands.map((c) => c.cmd)).toEqual(["restart api on {host}", "restart web on {host}", "df {mount}"]);
+    expect(e.open_params).toEqual(["mount"]);
+  });
+
+  test("a default outside its choices, mixed types, or an unknown key is E-FRONTMATTER", () => {
+    for (const block of [
+      "params:\n  svc:\n    default: db\n    choices: [web, api]\n",
+      "params:\n  n:\n    default: 1\n    choices: [1, two]\n",
+      "params:\n  svc:\n    default: web\n    choices: [web]\n    pick: 1\n",
+      "params:\n  svc:\n    default: web\n    choices: []\n",
+    ]) {
+      const r = preprocess(skill("- **stop**", block));
+      expect("errors" in r && r.errors.map((e) => e.code), block).toEqual(["E-FRONTMATTER"]);
+    }
+  });
+
+  test("--param outside the choices is E-PARAM-CHOICE; inside is fine", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "skope-choice-"));
+    const path = join(dir, "SKILL.md");
+    writeFileSync(path, skill("- **run** `echo {svc}`\n- **stop**", "params:\n  svc:\n    default: web\n    choices: [web, api]\n"));
+    const bad = await runSkope([path, "--dry-run", "--param", "svc=db"]);
+    expect(bad.code).toBe(40);
+    expect(bad.stderr).toContain("E-PARAM-CHOICE: svc must be one of web, api, got db");
+    expect((await runSkope([path, "--dry-run", "--param", "svc=api"])).code).toBe(0);
+  });
+});
+
 describe("--effects, --approve and E-NOT-APPROVED", () => {
   function setup() {
     const dir = mkdtempSync(join(tmpdir(), "skope-scope-"));
@@ -101,7 +140,7 @@ describe("--effects, --approve and E-NOT-APPROVED", () => {
 
     const ok = await runSkope([skillPath, "--approve"], { env });
     expect(ok.code).toBe(0);
-    const approval = JSON.parse(readFileSync(join(approvals, "disk-full.json"), "utf8"));
+    const approval = JSON.parse(readFileSync(join(approvals, "disk-full.approval.json"), "utf8"));
     expect(approval).toMatchObject({ skill: "disk-full", effects_hash: effectsOf(program(DISK_FULL)).hash });
     expect((await dry()).code).toBe(0);
 
@@ -123,12 +162,19 @@ describe("--effects, --approve and E-NOT-APPROVED", () => {
     expect(again.stderr).toContain("changes since the last approval: + do   rm -rf /var/cache");
   });
 
+  test("approvals: beside-skill keeps the approval in the skill's folder", async () => {
+    const { dir, skillPath, env } = setup();
+    writeFileSync(join(env.XDG_CONFIG_HOME, "skope", "config.yaml"), "approvals: beside-skill\n");
+    expect((await runSkope([skillPath, "--approve"], { env })).code).toBe(0);
+    expect(JSON.parse(readFileSync(join(dir, "disk-full.approval.json"), "utf8")).skill).toBe("disk-full");
+  });
+
   test("--approve with no approvals directory configured is E-CONFIG", async () => {
     const r = await runSkope([`${ROOT}/fixtures/disk-full/SKILL.md`, "--approve"], {
       env: { XDG_CONFIG_HOME: mkdtempSync(join(tmpdir(), "skope-xdg-")) },
     });
     expect(r.code).toBe(40);
-    expect(r.stderr).toContain("--approve needs an approvals directory in the config");
+    expect(r.stderr).toContain("--approve needs approvals in the config");
   });
 
   test("--test fakes every command, so it doesn't need an approval", async () => {
