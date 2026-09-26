@@ -35,7 +35,7 @@ applying. `--param name=value` overrides a param.
 | 10 | paged a human | tell the person who was paged and why |
 | 20 | handed off | take over: step 3 |
 | 30, 31 | another run holds the lock, or left a stale one | wait, or ask the person |
-| 40 | invalid: the skill, the arguments or skope's config; nothing ran | no backend configured: follow by hand (below). Anything else: report it, don't work around it |
+| 40 | invalid: the skill, the arguments or skope's config; nothing ran | `E-NOT-APPROVED`: show the person the commands it names (`--effects`) and stop. **Never run `--approve` yourself, and don't follow the skill by hand instead.** No backend configured: follow by hand (below). Anything else: report it, don't work around it |
 | 50 | skope failed | report it, then follow the skill by hand only if the person agrees |
 
 If skope has no model backend configured (`E-CONFIG` about `ask.backend`

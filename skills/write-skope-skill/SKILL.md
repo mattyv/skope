@@ -218,6 +218,9 @@ expects, its lowest and median confidence, and the margin over `sure`.
   reported to the person, including any thin margins.
 - Show the person the skill and `tests.yaml`, and say which cases are
   covered and what you assumed.
+- Show them `skope SKILL.md --effects`, the full list of commands the skill
+  could run, and point out any you added or changed. **Never run
+  `--approve` yourself:** approving the scope is the person's decision.
 - Changing an existing skill: add or change the scenario first (red), then
   the skill (green). Never change a scenario's expectations just to make
   it pass without saying why.

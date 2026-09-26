@@ -1,11 +1,13 @@
 # skope
 
-**Write the runbook once. An agent can follow it, or skope can run it in
-milliseconds.**
+**Let agents act on production without handing them a shell.**
 
-skope only acts when Jev is confident, and hands everything else to a
-person or an agent. Unlike a prompt, a skill can be unit tested, and the part
-that decides what runs is mathematically proven.
+An agent writes the automation as a skope skill. You approve its scope:
+every command it could ever run, in one list. skope then runs it in
+milliseconds, asks a small model only the judgement calls, and hands back to
+the agent or a person when it isn't sure. Change a command and it won't run
+until you approve again. Skills are unit tested, and the part that decides
+what runs is mathematically proven.
 
 A skope skill is an ordinary Markdown file. A person or a language model can
 read it and follow it. skope can also *execute* it: it runs the commands,
@@ -58,9 +60,17 @@ reads it, human or model. The whole skill is
 
 ## Why
 
-Runbooks are either prose, which only a person or an expensive agent can
-follow, or scripts, which can't use judgement. skope keeps one file for both,
-and decides who does each step:
+Agents are good at working out what to do, but slow and costly to run every
+time, and risky to leave alone with production access. Scripts are fast and
+predictable, but can't use judgement, and an agent-written script can do
+anything. To know what it might do, you have to read all of it.
+
+A skope skill sits between the two. **Everything it could ever do is
+visible before it runs:** a command can't be assembled from anything it
+reads at run time, so `skope --effects` lists every possible command, and
+with approvals on, skope refuses to run until a person has approved exactly
+that list (see [Approve](#approve)). Inside that scope, skope decides who
+does each step:
 
 - **Code does what's certain:** measurements, comparisons and commands.
 - **Jev makes the small judgement calls.** It only ever chooses between
@@ -168,6 +178,42 @@ $ skope disk-full/SKILL.md --lint
 $ skope disk-full/SKILL.md --explain    # sections, transfer graph, worst-case cost
 $ skope disk-full/SKILL.md --verify     # every path the run can take, and how each ends
 ```
+
+### Approve
+
+Before a skill runs anywhere real, see everything it could do:
+
+```console
+$ skope disk-full/SKILL.md --effects
+skope: disk-full can run 12 commands, 9 of them changing things (sha256:b03238161bae…)
+  do   apt-get clean    [Clean up]
+  do   systemctl restart myapp-worker    [Restart]
+  …
+  run  df --output=pcent {mount} | tail -1    [Triage, Clean up, Restart]
+```
+
+Every command is written out, with list items such as the services filled
+in. That works because command output can never reach a command (proven),
+so nothing is assembled at run time. Params stay as `{mount}`, since the
+caller sets them, within the safe-value check.
+
+Turn approvals on in the config with `approvals: /etc/skope/approvals`,
+somewhere the user or agent running skope can't write. Then no dry run or
+apply happens until a person runs `--approve`, and any change to the command
+list stops it again:
+
+```console
+$ skope disk-full/SKILL.md --approve
+skope: approved disk-full: /etc/skope/approvals/disk-full.json
+$ # the agent adds a command to the skill…
+$ skope disk-full/SKILL.md --apply
+E-NOT-APPROVED: disk-full's commands changed since it was approved (+ do   rm -rf /var/cache). Review them with --effects, then approve with --approve
+```
+
+Rewording guidance or questions, or changing `sure`, keeps the approval, and
+`--verify` shows the paths. Approval doesn't make an approved command safe:
+`do ./fix.sh` runs whatever the script does. What it guarantees is that
+nothing outside the approved list runs.
 
 ### Rehearse
 
@@ -479,6 +525,7 @@ these wouldn't get through CI, even if every test still passed.
 | A dry run never executes a `do`. | Proven over every possible run. |
 | Every run ends, with exactly one outcome. | Proven. |
 | Every skill is checked before it runs. | Lint, proven sound: a skill that passes can't hit an internal error. |
+| With approvals on, only the approved commands can run. | The list is complete because of the taint rule, which is proven; the check against the approval before any run is tested TypeScript. |
 | Confidence is measured, never self-reported. | The probability Jev gives each option, or a model's token probabilities; never a confidence the model writes about itself. |
 
 ## How it works
