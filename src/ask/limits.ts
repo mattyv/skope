@@ -1,11 +1,10 @@
 // The declared backend limits (SPEC §6.2 table). A backend can only lower
-// the language's maximums (255 options, 10 Score levels, no context cap).
+// the language's maximums (255 options, no context cap).
 
 import type { BackendLimits } from "./types.js";
 
 export const JEV_LIMITS: BackendLimits = {
   maxOptions: 255,
-  maxScoreLevels: 10,
   contextTokens: 30_000,
 };
 
@@ -14,12 +13,10 @@ export const JEV_LIMITS: BackendLimits = {
 // which needs a live model lookup (see openrouter.ts's checkModel).
 export const OPENROUTER_LIMITS: BackendLimits = {
   maxOptions: 20,
-  maxScoreLevels: 10,
   contextTokens: null,
 };
 
 export const FAKE_LIMITS: BackendLimits = {
   maxOptions: 255,
-  maxScoreLevels: 10,
   contextTokens: null,
 };

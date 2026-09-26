@@ -4,9 +4,7 @@
 // Wire format per TypeSafe's docs (docs.typesafe.ai/api, /primitives):
 // choice sends criteria as label → description and answers with
 // `probabilities` keyed by label; yesno is a Noul, sent without criteria,
-// answering a single `noul` = P(yes); score sends the rubric as an array,
-// lowest level first, and answers with `probabilities` keyed "0", "1", …
-// by array position.
+// answering a single `noul` = P(yes).
 
 import type { HttpDeps, RetryConfig } from "./retry.js";
 import { fetchWithRetry } from "./retry.js";
@@ -31,22 +29,14 @@ export function isModelAlias(model: string): boolean {
 }
 
 interface JevQuestion {
-  type: "choice" | "noul" | "score";
+  type: "choice" | "noul";
   instructions: { question: string; guidance?: string };
-  criteria?: Record<string, string | null> | string[];
+  criteria?: Record<string, string | null>;
 }
 
 function buildQuestion(request: AskRequest): JevQuestion {
   const instructions =
     request.guidance === null ? { question: request.question } : { question: request.question, guidance: request.guidance };
-  if (request.kind === "score") {
-    // Lowest level first, per SPEC §6.2. Options already arrive LOW..HIGH.
-    return {
-      type: "score",
-      instructions,
-      criteria: request.options.map((o) => o.description ?? ""),
-    };
-  }
   if (request.kind === "yesno") return { type: "noul", instructions };
   const criteria: Record<string, string | null> = {};
   for (const o of request.options) criteria[o.label] = o.description;
@@ -168,32 +158,16 @@ export async function askJev(request: AskRequest, config: JevConfig, retryCfg: R
   const probabilities = Object.fromEntries(Object.entries(rawProbabilities));
 
   const probs: Record<string, number> = {};
-  if (request.kind === "score") {
-    for (let i = 0; i < request.options.length; i++) {
-      const option = request.options[i];
-      const key = String(i);
-      if (option === undefined || !Object.hasOwn(probabilities, key)) {
-        return {
-          error: "unavailable",
-          detail: `jev: missing probability for level ${i}`,
-          backend: "jev",
-          model: config.model,
-        };
-      }
-      probs[option.id] = probabilities[key] as number;
+  for (const o of request.options) {
+    if (!Object.hasOwn(probabilities, o.label)) {
+      return {
+        error: "unavailable",
+        detail: `jev: missing probability for "${o.label}"`,
+        backend: "jev",
+        model: config.model,
+      };
     }
-  } else {
-    for (const o of request.options) {
-      if (!Object.hasOwn(probabilities, o.label)) {
-        return {
-          error: "unavailable",
-          detail: `jev: missing probability for "${o.label}"`,
-          backend: "jev",
-          model: config.model,
-        };
-      }
-      probs[o.id] = probabilities[o.label] as number;
-    }
+    probs[o.id] = probabilities[o.label] as number;
   }
 
   // Jev always reports 0 unassigned probability (SPEC §6.2): omitted, so

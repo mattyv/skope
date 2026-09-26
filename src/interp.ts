@@ -120,7 +120,7 @@ function oneOf<T extends string>(d: D, names: readonly T[], ctors: string[]): T 
   return names[i] as T;
 }
 const reason = (d: D) => oneOf(d, REASONS, ["Explicit", "GateFailed", "CommandFailed", "AskUnavailable", "Deadline"]);
-const askKind = (d: D) => oneOf(d, ["choice", "yesno", "score"] as const, ["Choice", "YesNoKind", "ScoreKind"]);
+const askKind = (d: D) => oneOf(d, ["choice", "yesno"] as const, ["Choice", "YesNoKind"]);
 const failure = (d: D) => oneOf(d, ["unavailable", "request_too_large"] as const, ["Unavailable", "RequestTooLarge"]);
 
 function outcome(d: D): Outcome {
@@ -187,18 +187,16 @@ function body(b: D): Record<string, unknown> {
       for (const k of m.Keys.Elements) r[unstr(k)] = unreal(m.get(k));
       return r;
     });
-    const range = opt(b.dtor_range, (t) => [t[0].toNumber(), t[1].toNumber()] as [number, number]);
     const detail = opt(b.dtor_detail, failure);
     return {
       event: "ask",
       question: unstr(b.dtor_question),
       kind: askKind(b.dtor_kind),
       probs,
-      chosen: opt(b.dtor_chosen, (c) => (c.is_ChosenId ? unstr(c.dtor_id) : c.dtor_level.toNumber())),
+      chosen: opt(b.dtor_chosen, (c) => unstr(c.dtor_id)),
       confidence: opt(b.dtor_confidence, unreal),
       sure: b.dtor_sure.toNumber(),
       passed: b.dtor_passed,
-      ...(range ? { range } : {}),
       ...(detail ? { detail } : {}),
       after_would_do: b.dtor_afterWouldDo,
     };

@@ -3,11 +3,8 @@
 // lines." The core-JSON goldens and their negative-parse coverage are owned
 // by stream A (tests/examples.test.ts, tests/contracts.test.ts at the repo
 // root — not tests/acceptance/, so not duplicated here). This file is F's
-// M1 slice: the CLI's own `--lint` entry point, read-only, over the v1
-// fixtures (disk-full, cert-expiry). error-triage is Appendix D, a v1.1
-// (M7, Score-ask) fixture (SPEC §12.3 "M7 Score asks"), so its `--lint`
-// coverage lives in tests/acceptance/m7/, not here. Expected failure until
-// the CLI does more than --version.
+// M1 slice: the CLI's own `--lint` entry point, read-only, over the example
+// fixtures (disk-full, cert-expiry, error-triage).
 
 import { describe, expect, test } from "vitest";
 import { runSkope } from "../lib/cli.js";
@@ -15,6 +12,7 @@ import { runSkope } from "../lib/cli.js";
 const SKILLS = [
   new URL("../../../fixtures/disk-full/SKILL.md", import.meta.url).pathname,
   new URL("../../../fixtures/cert-expiry/SKILL.md", import.meta.url).pathname,
+  new URL("../../../fixtures/error-triage/SKILL.md", import.meta.url).pathname,
 ];
 
 describe("M1: --lint on every example skill (SPEC §7)", () => {

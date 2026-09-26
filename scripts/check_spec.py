@@ -150,8 +150,6 @@ LINT_WARNINGS = {"W-ASK-NO-CONTEXT", "W-NO-GUIDANCE", "W-SECTION-UNREACHED"}
 def due_at(row: dict) -> str:
     """The milestone by which a code must have a test (SPEC §12.3)."""
     c = row["code"]
-    if "SCORE" in c or "RUBRIC" in c:
-        return "M7"
     if row["stage"] in ("parse", "lint") or c in LINT_WARNINGS:
         return "M2"
     return "M4"

@@ -119,7 +119,7 @@ export async function runLoop(interp: Interp, ctx: LoopContext): Promise<LoopRes
       }
       if (body.event === "would_do") effects.push({ cmd: body.cmd, status: "would_do" });
       if (body.event === "ask") {
-        lastAsk = { question: body.question, probs: body.probs, sure: body.sure, ...(body.range ? { range: body.range } : {}) };
+        lastAsk = { question: body.question, probs: body.probs, sure: body.sure };
       }
       ctx.emit(out);
     }

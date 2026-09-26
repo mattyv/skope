@@ -39,7 +39,7 @@ This pass (post external-review, SPEC rev 18) fixed:
   quarters, eighths, sixteenths, thirty-seconds), so `probs` sums to
   exactly 1 in IEEE doubles and the golden helper's normalisation is exact.
   A passing ask uses `0.875/0.0625/.../` (7/8 for the chosen option); a
-  failing one uses `0.5/0.25/0.125/0.125` (disk-full/error-triage) or
+  failing one uses `0.5/0.25/0.125/0.125` (disk-full) or
   `0.5/0.3125/0.1875` (cert-expiry, 3 options) — well under `sure`.
 - **error-triage `unavailable`**: previously routed through the ask's own
   `else [Unsure]` and paged (exit 10). Fixed: the backend being unavailable
@@ -49,14 +49,11 @@ This pass (post external-review, SPEC rev 18) fixed:
   unavailable hands off." The scenario now hands off, exit 20, with
   `probs`/`chosen`/`confidence` null and `detail: "unavailable"` on the
   `ask` event, and `reason: "ask_unavailable"` on the handoff record.
-- **M1/M7 split**: error-triage (Appendix D, v1.1) is no longer linted in
-  `tests/acceptance/m1/lint-cli.test.ts`'s M1 loop (that's the v1 fixture
-  pair only); its `--lint` coverage moved into
-  `tests/acceptance/m7/score-fixture-coverage.test.ts`.
-- **M7 severity coverage**: added `severity-3-page` (error-triage has no
-  explicit `check` for level 3; it falls through the same as level 4, to
-  `[Page]`) so all four Score levels have a scenario, per SPEC §12.1
-  ("Its fakes cover each level").
+- **Score removed (0.1.0-beta.3)**: the Score ask form is gone. error-triage
+  is now a three-option choice ask with `else [Unsure]`, and its five
+  goldens were generated from real `--fake` runs through the golden
+  normaliser, then reviewed, not from `build-fixtures.mjs`. M7 (the Score
+  fixture) is retired.
 - **M3 dry run**: `exec.test.ts` now asserts no `effect_start`/`effect_end`
   and no `page`/`handoff_page` on dry-run scenarios (there is no `do` event
   kind in SPEC §10 — dry run suppresses a `do` as `would_do`), and every
@@ -87,7 +84,7 @@ Known caveats still open:
 - **`stdout_hash` values are real** — sha256 of the exact fake `stdout`
   string in the matching `commands.yaml` entry.
 - **`transfer`/`handoff_record`/`handoff_page` line numbers on gate
-  failure and Score-gate-failure-via-`else`** point at the `ask`
+  failure and gate-failure-via-`else`** point at the `ask`
   statement's own `src` line, matching `contracts/examples/events.jsonl`.
 - **New scenarios flagged in the task are now added** (this pass, on top of
   the earlier `error-triage/severity-3-page`): per-fixture
@@ -141,7 +138,7 @@ redaction replaces each match with `[REDACTED]` (SPEC §9).
 
 - **Goldens:** all 33 scenarios reviewed before 0.1.0-beta.1. Approved,
   no release blockers.
-- **Live backends:** Jev passed choice, yes/no and Score. OpenRouter
+- **Live backends:** Jev passed choice and yes/no. OpenRouter
   hasn't been run live yet.
 
 ## Scenario index
@@ -175,9 +172,8 @@ redaction replaces each match with `[REDACTED]` (SPEC §9).
 | cert-expiry | `tie-unassigned` | Triage ask ties via `unassigned` (0.5/0.25/0/0.25) → handoff (gate_failed) |
 | cert-expiry | `page-direct` | Triage → Page directly |
 | cert-expiry | `investigate-handoff` | Triage → Investigate → hand off (explicit) |
-| error-triage | `severity-1-stop` | Score level 1 → stop |
-| error-triage | `severity-2-investigate` | Score level 2 → Investigate → hand off |
-| error-triage | `severity-3-page` | Score level 3 → Page (falls through, same as level 4) |
-| error-triage | `severity-4-page` | Score level 4 → Page |
-| error-triage | `unsure` | Score gate fails (0.375 top, below 75% sure) → Unsure → Page |
-| error-triage | `unavailable` | Backend unavailable on the Score ask → handoff (ask_unavailable), exit 20 |
+| error-triage | `noise-stop` | Triage → Noise → stop |
+| error-triage | `investigate` | Triage → Investigate → hand off (explicit) |
+| error-triage | `page` | Triage → Page |
+| error-triage | `unsure` | Gate fails (0.375 top, below 75% sure) → Unsure (the `else`) → Page |
+| error-triage | `unavailable` | Backend unavailable → handoff (ask_unavailable), exit 20 |

@@ -218,10 +218,7 @@ module SkopeRun {
 
   function RunSlot(stdout: string): Slot { Slot(Bound(Str(Trim(stdout)), FromRunOutput), None, KRun) }
 
-  function Range(form: AskForm): Option<(int, int)> { if form.Score? then Some((form.low, form.high)) else None }
-  function ChosenOf(form: AskForm, ids: seq<string>, c: nat): Chosen requires c < |ids| {
-    if form.Score? then ChosenLevel(form.low + c) else ChosenId(ids[c])
-  }
+  function ChosenOf(form: AskForm, ids: seq<string>, c: nat): Chosen requires c < |ids| { ChosenId(ids[c]) }
   function FailureText(f: AskFailure): string { match f case Unavailable => "unavailable" case RequestTooLarge => "request_too_large" }
 
   // The gate failed (SPEC §4.2).
@@ -262,10 +259,6 @@ module SkopeRun {
       ValueSlotOk(s, l.id, it);
       BindingOk(s, sl);
       Continue(s, s.vars[x := sl])
-    case Score(lo, _, _, x) =>
-      var sl := Slot(Bound(Int(lo + c), FromScore), None, KScore);
-      BindingOk(s, sl);
-      Continue(s, s.vars[x := sl])
   }
 
   function Answered(s: State, st: Stmt, req: AskRequest, r: Response): (res: (State, seq<CoreEvent>, Next))
@@ -278,7 +271,7 @@ module SkopeRun {
     GateSound(ids, r.probs, r.unassigned, st.sure);
     match v
     case Invalid =>
-      var e := Ev(s, AskEv(req.question, req.kind, None, None, None, st.sure, false, Range(st.form), Some(Unavailable), s.afterWouldDo));
+      var e := Ev(s, AskEv(req.question, req.kind, None, None, None, st.sure, false, Some(Unavailable), s.afterWouldDo));
       Then(e, Finish(Log(s, e), Handoff(AskUnavailable, Some(FailureText(Unavailable)))))
     case Unsure(c, conf) => GateMissed(s, st, req, r, c, conf)
     case Sure(c, conf) => GatePassed(s, st, req, r, c, conf)
@@ -288,7 +281,7 @@ module SkopeRun {
     requires Idle(s) && s.tasks[0].op.S? && Stmt0(s) == st && st.Ask? && r.AskAnswer? && c < |req.options|
     ensures Post(s, res, Busy(s))
   {
-    var e := Ev(s, AskEv(req.question, req.kind, Some(r.probs), Some(ChosenOf(st.form, Ids(req.options), c)), Some(conf), st.sure, false, Range(st.form), None, s.afterWouldDo));
+    var e := Ev(s, AskEv(req.question, req.kind, Some(r.probs), Some(ChosenOf(st.form, Ids(req.options), c)), Some(conf), st.sure, false, None, s.afterWouldDo));
     Then(e, GateMiss(Log(s, e)))
   }
 
@@ -297,7 +290,7 @@ module SkopeRun {
     requires FormOk(s.prog, st.form) && req.options == Options(s.prog, st.form) && c < |req.options|
     ensures Post(s, res, Busy(s))
   {
-    var e := Ev(s, AskEv(req.question, req.kind, Some(r.probs), Some(ChosenOf(st.form, Ids(req.options), c)), Some(conf), st.sure, true, Range(st.form), None, s.afterWouldDo));
+    var e := Ev(s, AskEv(req.question, req.kind, Some(r.probs), Some(ChosenOf(st.form, Ids(req.options), c)), Some(conf), st.sure, true, None, s.afterWouldDo));
     Then(e, Accept(Log(s, e), c))
   }
 
@@ -360,7 +353,7 @@ module SkopeRun {
     var s1 := s0.(askCalls := s0.askCalls + 1);
     CountOk(s0, s1);
     if r.AskFailed? then
-      var e := Ev(s1, AskEv(req.question, req.kind, None, None, None, st.sure, false, Range(st.form), Some(r.error), s0.afterWouldDo));
+      var e := Ev(s1, AskEv(req.question, req.kind, None, None, None, st.sure, false, Some(r.error), s0.afterWouldDo));
       Then(e, Finish(Log(s1, e), Handoff(AskUnavailable, Some(FailureText(r.error)))))
     else Answered(s1, st, req, r)
   }

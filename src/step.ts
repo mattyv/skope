@@ -47,13 +47,12 @@ export type CoreEvent = { at: Where | null } & (
   | {
       event: "ask";
       question: string;
-      kind: "choice" | "yesno" | "score";
+      kind: "choice" | "yesno";
       probs: Record<string, number> | null;
-      chosen: string | number | null;
+      chosen: string | null;
       confidence: number | null;
       sure: number;
       passed: boolean;
-      range?: [number, number];
       detail?: "unavailable" | "request_too_large";
       after_would_do: boolean;
     }
@@ -84,7 +83,7 @@ export const EVENT_FIELDS: Record<string, { core: string[]; host: string[] }> = 
   check_cmd: { core: ["cmd", "exit", "timed_out", "after_would_do"], host: ["ms", "truncated", "stdout_hash", "stdout_tail"] },
   check: { core: ["expr", "left", "right", "result", "after_would_do"], host: [] },
   ask: {
-    core: ["question", "kind", "probs", "chosen", "confidence", "sure", "passed", "range", "detail", "after_would_do"],
+    core: ["question", "kind", "probs", "chosen", "confidence", "sure", "passed", "detail", "after_would_do"],
     host: ["backend", "model", "ms", "request_path", "request_sha256"],
   },
   effect_start: { core: ["cmd"], host: [] },
@@ -97,7 +96,7 @@ export const EVENT_FIELDS: Record<string, { core: string[]; host: string[] }> = 
   // commands started, which a dry run's would_do isn't, and a run that ends in error still needs them.
   outcome: { core: ["outcome", "reason", "dry_run"], host: ["ask_calls", "effects"] },
   // Host-only events: the core never emits these.
-  run_start: { core: [], host: ["params", "dry_run", "caller", "run_dir", "skope_version", "skope_build"] },
+  run_start: { core: [], host: ["params", "dry_run", "caller", "run_dir", "skope_version", "skope_build", "effects_hash"] },
   handoff_page: { core: [], host: ["text", "ok"] },
   handoff_record: { core: [], host: ["path", "record"] },
   error: { core: [], host: ["code", "stage", "file", "message"] },

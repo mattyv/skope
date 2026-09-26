@@ -80,22 +80,6 @@ describe("core program schema (SPEC §5.1)", () => {
   }
 });
 
-describe("ask.score fragment (SPEC §3.4, §4.7 v1.1)", () => {
-  const askSchema = schema("core-program", "#/$defs/ask");
-  // A valid score-kind ask, lifted from the error-triage example (question/sure/else/score).
-  const scoreAsk = () => structuredClone(read("examples/error-triage.core.json").sections["s:triage"].body[1].ask);
-
-  test("the score ask is valid as-is", () => {
-    expect(askSchema(scoreAsk()), JSON.stringify(askSchema.errors)).toBe(true);
-  });
-
-  test("rejects a score.low below zero", () => {
-    const a = scoreAsk();
-    a.score.low = -1;
-    expect(askSchema(a)).toBe(false);
-  });
-});
-
 describe("the standalone stop statement (SPEC §4.x)", () => {
   const stmtStop = schema("core-program", "#/$defs/stmtStop");
 

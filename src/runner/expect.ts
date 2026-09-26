@@ -44,7 +44,7 @@ export function expectError(doc: unknown): string | null {
     for (const [key, a] of Object.entries(doc.asks)) {
       if (key === "") return "an asks key must not be empty";
       if (!isObj(a) || !("chosen" in a) || Object.keys(a).length !== 1) return `asks.${key} must have exactly chosen`;
-      if (typeof a.chosen !== "string" && !isInt(a.chosen)) return `asks.${key}.chosen must be a label or a Score level`;
+      if (typeof a.chosen !== "string" && !isInt(a.chosen)) return `asks.${key}.chosen must be an option's label`;
     }
   }
   if ("page_contains" in doc && !nonEmpty(doc.page_contains)) return "page_contains must be text";

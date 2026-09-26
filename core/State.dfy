@@ -150,11 +150,6 @@ module SkopeState {
       IsData(p, l) && sl.b.origin == FromListItem && sl.item.Some? && sl.item.value.Action?
       && sl.item.value in DataList(p, l).items && sl.b.value == Str(sl.item.value.text)
     case KYesNo => sl.b == Bound(Str("yes"), FromYesNo) || sl.b == Bound(Str("no"), FromYesNo)
-    // P5: a Score variable holds a level of its ask, LOW..HIGH.
-    case KScore =>
-      sl.b.origin == FromScore && sl.b.value.Int?
-      && exists st <- Stmts(p) :: st.Ask? && st.form.Score? && st.form.binding == x
-                                  && st.form.low <= sl.b.value.i <= st.form.high
   }
   ghost predicate VarsOk(p: Program, cfg: RunConfig, vars: Vars) {
     forall x | x in vars :: SlotOk(p, cfg, x, vars[x])
@@ -278,11 +273,6 @@ module SkopeState {
     case Sections(opts) => forall o <- opts :: IsInstr(p, o.ref.id)
     case YesNo(_) => true
     case OneOf(l, _) => IsData(p, l.id) && forall it <- DataList(p, l.id).items :: it.Value?
-    case Score(lo, hi, _, _) => 0 <= lo < hi
-  }
-
-  function RubricText(rubric: seq<RubricLine>, n: int): Option<string> {
-    if |rubric| == 0 then None else if rubric[0].level == n then Some(rubric[0].text) else RubricText(rubric[1..], n)
   }
 
   function SectionOpts(p: Program, opts: seq<AskOption>): (r: seq<AskOpt>)
@@ -295,9 +285,6 @@ module SkopeState {
   function ValueOpts(items: seq<Item>): (r: seq<AskOpt>) requires forall it <- items :: it.Value? ensures |r| == |items| {
     if |items| == 0 then [] else [AskOpt(items[0].value, items[0].value, None)] + ValueOpts(items[1..])
   }
-  function LevelOpts(rubric: seq<RubricLine>, lo: int, n: nat): (r: seq<AskOpt>) ensures |r| == n decreases n {
-    if n == 0 then [] else [AskOpt(IntToString(lo), IntToString(lo), RubricText(rubric, lo))] + LevelOpts(rubric, lo + 1, n - 1)
-  }
 
   // The author's options, in order.
   function Options(p: Program, form: AskForm): seq<AskOpt> requires FormOk(p, form) {
@@ -305,11 +292,10 @@ module SkopeState {
     case Sections(opts) => SectionOpts(p, opts)
     case YesNo(_) => [AskOpt("yes", "yes", None), AskOpt("no", "no", None)]
     case OneOf(l, _) => ValueOpts(DataList(p, l.id).items)
-    case Score(lo, hi, rubric, _) => LevelOpts(rubric, lo, hi - lo + 1)
   }
 
   function KindOf(form: AskForm): AskKind {
-    match form case Sections(_) => Choice case YesNo(_) => YesNoKind case OneOf(_, _) => Choice case Score(_, _, _, _) => ScoreKind
+    match form case Sections(_) => Choice case YesNo(_) => YesNoKind case OneOf(_, _) => Choice
   }
 
   // timeoutMs is ask.timeout_ms from config, which the core doesn't see:
@@ -414,7 +400,7 @@ module SkopeState {
     exists id | IsData(p, id) :: exists it <- DataList(p, id).items :: it.Action? && it.cmd == c
   }
 
-  // A value from a param, a built-in, a data list, a yes/no or Score answer: never run output.
+  // A value from a param, a built-in, a data list or a yes/no answer: never run output.
   ghost predicate TrustedValue(p: Program, cfg: RunConfig, v: string) {
     (exists x | x in cfg.params :: Show(cfg.params[x]) == v)
     || (exists x | x in cfg.builtins :: Show(cfg.builtins[x]) == v)
@@ -531,9 +517,6 @@ module SkopeState {
       }
       if st.Ask? && st.form.OneOf? {
         assert st.form.list in ListRefs(st);
-      }
-      if st.Ask? && st.form.Score? {
-        assert AskOk(st);
       }
       if st.ForEach? {
         assert st.list in ListRefs(st);

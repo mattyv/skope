@@ -10,7 +10,7 @@ module SkopeStep {
   // Where a bound value came from (SPEC §3.5). Decides at run time how a
   // name is shown in a question: trusted values are pasted in, run output
   // is named in backticks and sent as context.
-  datatype Origin = FromParam | FromBuiltin | FromListItem | FromYesNo | FromScore | FromRunOutput
+  datatype Origin = FromParam | FromBuiltin | FromListItem | FromYesNo | FromRunOutput
 
   datatype Val = Str(s: string) | Int(i: int)
   datatype Bound = Bound(value: Val, origin: Origin)
@@ -22,7 +22,7 @@ module SkopeStep {
 
   datatype ExecKind = RunExec | DoExec | CheckExec
 
-  datatype AskKind = Choice | YesNoKind | ScoreKind
+  datatype AskKind = Choice | YesNoKind
   // `text` is the option's label (label is a Dafny keyword).
   datatype AskOpt = AskOpt(id: string, text: string, description: Option<string>)
   // contracts/ask.schema.json#/$defs/request. `question` is rendered;
@@ -67,7 +67,7 @@ module SkopeStep {
   // handoff_page, handoff_record, error, warning, locked, stale_lock) never
   // come from the core.
   datatype Where = Where(section: string, line: Src) // display name, SKILL.md line
-  datatype Chosen = ChosenId(id: string) | ChosenLevel(level: int)
+  datatype Chosen = ChosenId(id: string)
   datatype EventBody =
     | RunEv(cmd: string, exit: Option<int>, timedOut: bool, afterWouldDo: bool)
     | CheckCmdEv(cmd: string, exit: Option<int>, timedOut: bool, afterWouldDo: bool)
@@ -75,9 +75,9 @@ module SkopeStep {
     // a number; result is None when the comparison couldn't be made.
     | CheckEv(expr: string, left: Option<string>, right: Option<string>, result: Option<bool>, afterWouldDo: bool)
     // probs, chosen and confidence are None when the backend failed; detail
-    // then says why. range is Some((low, high)) for a Score ask.
+    // then says why.
     | AskEv(question: string, kind: AskKind, probs: Option<map<string, real>>, chosen: Option<Chosen>,
-            confidence: Option<real>, sure: nat, passed: bool, range: Option<(int, int)>,
+            confidence: Option<real>, sure: nat, passed: bool,
             detail: Option<AskFailure>, afterWouldDo: bool)
     | EffectStartEv(cmd: string)
     | EffectEndEv(cmd: string, exit: Option<int>, timedOut: bool)

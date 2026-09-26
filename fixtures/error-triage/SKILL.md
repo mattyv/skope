@@ -5,8 +5,8 @@ description: Decide what to do about a burst of system errors. Use when an error
 
 # Error triage
 
-*A [skope](https://github.com/mattyv/skope) skill. Run it with the run-skope-skill skill if you have
-it; if not, the bold steps are the procedure, and `{names}` are params set in the skope block below.*
+*A [skope](https://github.com/mattyv/skope) skill. Run it with `skope` (see the run-skope-skill skill),
+never by hand: its commands are reviewed as a set. `{names}` are params, set in the skope block below.*
 
 ```skope
 format: 1
@@ -19,29 +19,34 @@ Work out how bad a burst of errors is, then either leave it, hand it to
 someone to look at, or page.
 
 ## Triage
-Read the recent errors and rate how severe they are.
+Read the recent errors and decide how to handle them.
 
 - **run** `journalctl -p err --since -15min --no-pager` as errors
-- **ask** How severe are the errors in {errors}? → 1 to 4 as severity · sure 75% · else [Unsure]
-  - 1: known noise, nothing to do
-  - 2: worth a human look, not urgent
-  - 3: degraded service
-  - 4: outage or data at risk
-- **check** {severity} <= 1 → stop
-- **check** {severity} == 2 → [Investigate]
-- **then** [Page]
+- **ask** Given {errors}, how should this burst be handled? · sure 75% · else [Unsure]
+  - [Noise]
+  - [Investigate]
+  - [Page]
 
-## Page
-- **page** "{host}: error burst rated {severity}/4. Run {run_id} has the details."
+## Noise
+Known noise: nothing is wrong and there's nothing to do.
 
-## Unsure
-An unwatched alert shouldn't end in a handoff nobody reads. If the rating is
-unclear, page.
-
-- **page** "{host}: error burst, severity unclear. Run {run_id} has the details."
+- **stop**
 
 ## Investigate
+Worth a human look, but not urgent: nothing is degraded yet.
+
 - **hand off**
 
 The errors look real but not urgent. Find the cause from the errors gathered
 in Triage and suggest a fix or a change to this skill as a diff.
+
+## Page
+Degraded service, an outage, or data at risk.
+
+- **page** "{host}: error burst needs attention. Run {run_id} has the details."
+
+## Unsure
+An unwatched alert shouldn't end in a handoff nobody reads. If the call is
+unclear, page.
+
+- **page** "{host}: error burst, handling unclear. Run {run_id} has the details."

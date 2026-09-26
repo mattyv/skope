@@ -120,6 +120,11 @@
           "type": "string",
           "pattern": "^[0-9a-f]{64}$",
           "description": "Build identity, bare hex (SPEC §7.2)."
+        },
+        "effects_hash": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "description": "The skill's scope, as --effects and approvals hash it (SPEC §7.4), so a run can be matched to what was approved."
         }
       },
       "required": [
@@ -133,6 +138,7 @@
         "dry_run",
         "caller",
         "run_dir",
+        "effects_hash",
         "skope_version",
         "skope_build"
       ],
@@ -405,7 +411,7 @@
           "type": "string"
         },
         "kind": {
-          "enum": ["choice", "yesno", "score"]
+          "enum": ["choice", "yesno"]
         },
         "probs": {
           "type": ["object", "null"],
@@ -450,15 +456,6 @@
         },
         "after_would_do": {
           "type": "boolean"
-        },
-        "range": {
-          "type": "array",
-          "items": {
-            "type": "integer"
-          },
-          "minItems": 2,
-          "maxItems": 2,
-          "description": "Score asks only."
         },
         "detail": {
           "enum": ["unavailable", "request_too_large"],

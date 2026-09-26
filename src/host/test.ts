@@ -58,7 +58,11 @@ type Result = { pass: true } | { pass: false; mismatch: string } | { invalid: st
 type Run = { code: number; events: Event[] } | { invalid: string };
 
 export async function runTests(o: TestOptions): Promise<number> {
-  const out = (e: Record<string, unknown>) => process.stdout.write(`${JSON.stringify(e)}\n`);
+  // The JSON results are for scripts and CI. A person at a terminal gets the PASS/FAIL lines on
+  // stderr alone, instead of both interleaved (SPEC §7.3).
+  const out = (e: Record<string, unknown>) => {
+    if (!process.stdout.isTTY) process.stdout.write(`${JSON.stringify(e)}\n`);
+  };
   const say = (s: string) => process.stderr.write(plainText(`${s}\n`));
 
   const testsDir = join(dirname(resolve(o.file)), "tests");
@@ -466,7 +470,7 @@ export function check(expect: Expect, code: number, events: Event[], program: Co
   return null;
 }
 
-/** Whether the ask on `line` offers sections as its options, rather than a list, yes/no or a Score. */
+/** Whether the ask on `line` offers sections as its options, rather than a list or yes/no. */
 function sectionOptions(program: CoreProgram, line: number): boolean {
   return findAsk(program, line)?.sections !== undefined;
 }

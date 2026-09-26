@@ -156,7 +156,7 @@ export interface StmtAsk {
   ask: Ask;
 }
 /**
- * Exactly one of sections, yesno, one_of or score (SPEC §3.4, §4.7).
+ * Exactly one of sections, yesno or one_of (SPEC §3.4, §4.7).
  */
 export interface Ask {
   question: Parts;
@@ -175,19 +175,6 @@ export interface Ask {
   };
   one_of?: {
     list: SectionRef;
-    as: Name;
-  };
-  /**
-   * v1.1.
-   */
-  score?: {
-    low: number;
-    high: number;
-    rubric: {
-      src: Src;
-      level: number;
-      text: string;
-    }[];
     as: Name;
   };
 }
@@ -263,7 +250,7 @@ export interface List {
 }
 
 export interface AskRequest {
-  kind: "choice" | "yesno" | "score";
+  kind: "choice" | "yesno";
   /**
    * Rendered: trusted values pasted in, run outputs named in backticks (SPEC §3.5).
    */
@@ -407,6 +394,10 @@ export interface RunStartEvent {
    * Build identity, bare hex (SPEC §7.2).
    */
   skope_build: string;
+  /**
+   * The skill's scope, as --effects and approvals hash it (SPEC §7.4), so a run can be matched to what was approved.
+   */
+  effects_hash: string;
 }
 /**
  * A run command finished.
@@ -553,7 +544,7 @@ export interface AskEvent {
   line?: number;
   event: "ask";
   question: string;
-  kind: "choice" | "yesno" | "score";
+  kind: "choice" | "yesno";
   probs: {
     [k: string]: number;
   } | null;
@@ -567,13 +558,6 @@ export interface AskEvent {
   request_path: string;
   request_sha256: string;
   after_would_do: boolean;
-  /**
-   * Score asks only.
-   *
-   * @minItems 2
-   * @maxItems 2
-   */
-  range?: [number, number];
   /**
    * Failed asks only.
    */
@@ -1003,7 +987,6 @@ export const CODE_MEANINGS: Record<string, string> = {
   "E-GRAMMAR": "a keyword item doesn't match §3.4",
   "E-NESTED-LIST": "a nested list under an instruction that doesn't take one",
   "E-OPTION-ITEM": "an option item isn't exactly one `[Section]` link",
-  "E-RUBRIC-ITEM": "a rubric line isn't `INT: text` (v1.1)",
   "E-UNRESOLVED": "a `[Section]` or `[List]` reference doesn't resolve",
   "E-REF-KIND": "a data section used as a target, or an instruction section used as a list",
   "E-CYCLE": "the transfer graph has a cycle (§4.6)",
@@ -1020,24 +1003,22 @@ export const CODE_MEANINGS: Record<string, string> = {
   "E-LIST-EMPTY": "a data list has no items",
   "E-LIST-MIXED": "a data list mixes action and value items",
   "E-LIST-DUP": "two items in a data list have the same label, ignoring case (§3.6)",
-  "E-SCORE-RANGE": "Score bounds invalid, or not 2–10 levels (v1.1)",
-  "E-SCORE-RUBRIC": "Score rubric missing, incomplete, out of range or duplicated (v1.1)",
   "E-USAGE": "an unknown flag, a missing or malformed flag value, a missing or unreadable skill path, or an unreadable or malformed `--trace` file (§7)",
   "E-MODE": "neither or both of `--apply` and `--dry-run` (§7 step 0)",
+  "E-NOT-APPROVED": "the config has `approvals`, and the skill has no approval there, or its commands changed since (§7.4)",
   "E-PARAM-UNKNOWN": "`--param` names a param the skill doesn't declare",
   "E-PARAM-TYPE": "a `--param` value has the wrong type",
+  "E-PARAM-CHOICE": "a `--param` value isn't one of the param's `choices` (§3.1)",
   "E-PARAM-UNSAFE": "a param override or built-in fails the safe-value check",
   "E-CONFIG": "the config file, or a `--fake` or `--fake-exec` file, is unreadable or invalid (fake files are checked against `contracts/fakes.schema.json` before the run)",
   "E-BACKEND-MODEL": "the `openrouter` model doesn't support logprobs, or its reasoning can't be turned off (§6.2)",
-  "E-BACKEND-LIMIT": "the skill exceeds the configured backend's limits: options, Score levels or context (§6.2)",
+  "E-BACKEND-LIMIT": "the skill exceeds the configured backend's limits: options or context (§6.2)",
   "E-FAKE-UNMATCHED": "`--fake-exec` has no answer for a command, or `--fake` has none for a question (§5.4)",
   "E-FAKE-UNUSED": "under `--test`, a fake key names no statement: a `line:N` with nothing on that line, or a `Section.var` / `Section.ask` the section doesn't have (§7.3)",
   "E-FAKE-AMBIGUOUS": "a `Section.var` or `Section.ask` fake key names more than one statement (§5.4)",
   "E-IO": "skope can't write its run directory or lock file",
   "E-INTERRUPTED": "skope was interrupted (SIGINT or SIGTERM); it stopped the running command and released the lock (§4.4)",
   "E-INTERNAL": "a runner bug. Unreachable by P6, so always a bug report",
-  "W-SCORE-THRESHOLD": "a Score variable is only used in one comparison against one threshold; a `yes | no` ask gates more reliably, since Score confidence runs high (§4.7) (v1.1)",
-  "W-SCORE-UNUSED": "a Score variable is never used after it's bound (v1.1)",
   "W-SECTION-UNREACHED": "no path reaches a section (§5.6)",
   "W-ASK-NO-CONTEXT": "an `ask` question names nothing that could hold `run` output, so the model gets no evidence (§6.3)",
   "W-MODEL-ALIAS": "`jev.model` is an alias, or a response came from a different model than configured (§6.2)",
