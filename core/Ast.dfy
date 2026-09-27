@@ -43,6 +43,9 @@ module SkopeAst {
     | Check(src: Src, cond: Cond, onTrue: Option<Target>, els: Else)
     | Ask(src: Src, question: Parts, sure: nat, form: AskForm, els: Else)
     | ForEach(src: Src, loopVar: Name, list: SectionRef, body: seq<Stmt>)
+    // `ask each ITEM of `CMD`: QUESTION → yes | no` (SPEC §4.8): to the core, a `run` of cmd that binds
+    // nothing. The host asks the question once per output line; the core only checks it.
+    | Sweep(src: Src, cmd: Parts, item: Name, question: Parts, sure: nat, els: Else)
     | IfYesRun(src: Src, cmd: Parts, els: Else) // INLINE has no `as` (SPEC §3.4)
     | IfYesDo(src: Src, action: DoBody, els: Else)
     | Then(src: Src, ref: SectionRef)

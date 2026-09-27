@@ -103,6 +103,26 @@ export const EVENT_FIELDS: Record<string, { core: string[]; host: string[] }> = 
   warning: { core: [], host: ["code", "stage", "file", "message"] },
   locked: { core: [], host: ["holder_pid"] },
   stale_lock: { core: [], host: ["path", "holder_pid"] },
+  // An `ask each` (SPEC §4.8): the host asks per item, gating each answer with the core's Gate.
+  sweep_item: {
+    core: [],
+    host: [
+      "index",
+      "item",
+      "question",
+      "sure",
+      "probs",
+      "answer",
+      "confidence",
+      "backend",
+      "model",
+      "ms",
+      "request_path",
+      "request_sha256",
+      "detail",
+    ],
+  },
+  sweep: { core: [], host: ["cmd", "question", "yes", "no", "unsure", "skipped", "stopped", "path"] },
 };
 export const COMMON_FIELDS = { core: ["section", "line"], host: ["ts", "run_id", "skill", "skill_hash", "host"] };
 

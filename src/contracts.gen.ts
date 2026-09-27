@@ -14,7 +14,8 @@ export type ParamValue =
       int: number;
       src: Src;
     };
-export type Stmt = StmtRun | StmtDo | StmtCheck | StmtAsk | StmtForEach | StmtIfYes | StmtThen | StmtPage | StmtHandOff | StmtStop;
+export type Stmt =
+  StmtRun | StmtDo | StmtCheck | StmtAsk | StmtForEach | StmtAskEach | StmtIfYes | StmtThen | StmtPage | StmtHandOff | StmtStop;
 export type Name = string;
 /**
  * Text split into literal and variable parts, so the core never scans for `{`. How a variable is shown in a question is decided by the core from its value's origin (SPEC §3.5).
@@ -186,6 +187,18 @@ export interface StmtForEach {
     body: Body;
   };
 }
+/**
+ * `**ask each** ITEM of `CMD`: QUESTION → yes | no · sure N%` (SPEC §4.8). To the core, a run of cmd that binds nothing; the host asks the question once per output line.
+ */
+export interface StmtAskEach {
+  src: Src;
+  ask_each: {
+    item: Name;
+    cmd: Parts;
+    question: Parts;
+    sure: number;
+  };
+}
 export interface StmtIfYes {
   src: Src;
   /**
@@ -295,15 +308,17 @@ export interface AskAnswer {
   ms: number;
 }
 
+export type Answer =
+  | ("unsure" | "unavailable")
+  | {
+      [k: string]: number;
+    };
+
 /**
- * answers.yaml. A probs object keyed by option id, with optional `unassigned`, is passed to the core as the backend's answer, valid or not. `unsure` is a uniform answer over the options, which is always a tie, so the gate fails. `unavailable` is a backend failure (ask_unavailable).
+ * answers.yaml. A probs object keyed by option id, with optional `unassigned`, is passed to the core as the backend's answer, valid or not. `unsure` is a uniform answer over the options, which is always a tie, so the gate fails. `unavailable` is a backend failure (ask_unavailable). For an `ask each` (SPEC §4.8), a list gives one answer per item, in order; a single answer answers every item.
  */
 export interface FakesAnswers {
-  [k: string]:
-    | ("unsure" | "unavailable")
-    | {
-        [k: string]: number;
-      };
+  [k: string]: Answer | [Answer, ...Answer[]];
 }
 
 /**
@@ -342,6 +357,8 @@ export type Event =
   | CheckCmdEvent
   | CheckEvent
   | AskEvent
+  | SweepItemEvent
+  | SweepEvent
   | EffectStartEvent
   | EffectEndEvent
   | WouldDoEvent
@@ -562,6 +579,106 @@ export interface AskEvent {
    * Failed asks only.
    */
   detail?: "unavailable" | "request_too_large";
+}
+/**
+ * One line of an `ask each` command's output and what the backend said about it (SPEC §4.8). Emitted after the command's run event. Nothing acts on it.
+ */
+export interface SweepItemEvent {
+  /**
+   * UTC, ISO 8601.
+   */
+  ts: string;
+  /**
+   * null before a run exists.
+   */
+  run_id: string | null;
+  /**
+   * null before a run exists.
+   */
+  skill: string | null;
+  /**
+   * null before a run exists.
+   */
+  skill_hash: string | null;
+  host: string;
+  /**
+   * The section's display name.
+   */
+  section: string;
+  line: number;
+  event: "sweep_item";
+  /**
+   * The item's position among the command's non-empty output lines.
+   */
+  index: number;
+  /**
+   * The output line, redacted.
+   */
+  item: string;
+  question: string;
+  sure: number;
+  probs: {
+    [k: string]: number;
+  } | null;
+  /**
+   * yes or no when the gate passed, unsure when it didn't; null when the backend was unavailable.
+   */
+  answer: "yes" | "no" | "unsure" | null;
+  confidence: number | null;
+  backend: string;
+  model: string;
+  ms: number;
+  request_path: string;
+  request_sha256: string;
+  /**
+   * The backend failed or its answer was invalid; the sweep stops.
+   */
+  detail?: "unavailable";
+}
+/**
+ * An `ask each` finished (SPEC §4.8): counts of each answer, and the report file listing every item.
+ */
+export interface SweepEvent {
+  /**
+   * UTC, ISO 8601.
+   */
+  ts: string;
+  /**
+   * null before a run exists.
+   */
+  run_id: string | null;
+  /**
+   * null before a run exists.
+   */
+  skill: string | null;
+  /**
+   * null before a run exists.
+   */
+  skill_hash: string | null;
+  host: string;
+  /**
+   * The section's display name.
+   */
+  section: string;
+  line: number;
+  event: "sweep";
+  cmd: string;
+  question: string;
+  yes: number;
+  no: number;
+  unsure: number;
+  /**
+   * Lines never asked about: past the 200-line cap, after the deadline, or after the backend failed.
+   */
+  skipped: number;
+  /**
+   * Why the sweep stopped early, if it did.
+   */
+  stopped: "deadline" | "ask_unavailable" | null;
+  /**
+   * The report file in the run directory.
+   */
+  path: string | null;
 }
 /**
  * A do command is about to run.

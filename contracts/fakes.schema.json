@@ -9,7 +9,7 @@
       "minLength": 1
     },
     "answers": {
-      "description": "answers.yaml. A probs object keyed by option id, with optional `unassigned`, is passed to the core as the backend's answer, valid or not. `unsure` is a uniform answer over the options, which is always a tie, so the gate fails. `unavailable` is a backend failure (ask_unavailable).",
+      "description": "answers.yaml. A probs object keyed by option id, with optional `unassigned`, is passed to the core as the backend's answer, valid or not. `unsure` is a uniform answer over the options, which is always a tie, so the gate fails. `unavailable` is a backend failure (ask_unavailable). For an `ask each` (SPEC \u00a74.8), a list gives one answer per item, in order; a single answer answers every item.",
       "type": "object",
       "propertyNames": {
         "$ref": "#/$defs/key"
@@ -17,17 +17,31 @@
       "additionalProperties": {
         "oneOf": [
           {
-            "enum": ["unsure", "unavailable"]
+            "$ref": "#/$defs/answer"
           },
           {
-            "type": "object",
-            "minProperties": 1,
-            "additionalProperties": {
-              "type": "number"
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "$ref": "#/$defs/answer"
             }
           }
         ]
       }
+    },
+    "answer": {
+      "oneOf": [
+        {
+          "enum": ["unsure", "unavailable"]
+        },
+        {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "number"
+          }
+        }
+      ]
     },
     "commands": {
       "description": "commands.yaml: how each command ends. A list is used in order, one result per run of the command, with the last repeating: a loop that re-reads usage can see it fall. An unmatched command is E-FAKE-UNMATCHED; no real command ever runs.",

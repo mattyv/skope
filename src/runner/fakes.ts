@@ -24,6 +24,13 @@ function resultError(r: unknown): string | null {
 }
 
 function answerError(a: unknown): string | null {
+  // A list answers an `ask each` item by item (SPEC §4.8).
+  if (Array.isArray(a))
+    return a.length === 0 ? "a list of answers must not be empty" : (a.map(oneAnswerError).find((x) => x !== null) ?? null);
+  return oneAnswerError(a);
+}
+
+function oneAnswerError(a: unknown): string | null {
   if (a === "unsure" || a === "unavailable") return null;
   if (!isObj(a) || Object.keys(a).length === 0) return 'an answer must be "unsure", "unavailable" or probabilities by option id';
   return Object.values(a).every((p) => typeof p === "number") ? null : "every probability must be a number";

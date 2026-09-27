@@ -12,6 +12,14 @@ import { type AskRequest, type CoreEvent, EVENT_FIELDS, type Next, type Outcome,
 export interface Interp {
   step(r: Response): { events: CoreEvent[]; next: Next };
   variables(): Record<string, Val>;
+  /** A sweep's question for one output line, while its command is pending (SPEC §4.8). */
+  sweepAsk?(item: string): { request: AskRequest; sure: number; section: string } | null;
+  /** The proven gate on a yes/no answer; null if the answer is invalid. */
+  gateYesNo?(
+    probs: Record<string, number>,
+    unassigned: number,
+    sure: number,
+  ): { chosen: string; confidence: number; passed: boolean } | null;
 }
 
 export type ExecNext = Extract<Next, { kind: "exec" }>;
@@ -26,7 +34,10 @@ export interface AskFields {
 
 export interface Handlers {
   exec(next: ExecNext): Promise<ExecResult>;
-  ask(request: AskRequest, src: number): Promise<{ response: Response; fields: AskFields }>;
+  /** `item` is a sweep item's index (SPEC §4.8), for fakes that answer per item. */
+  ask(request: AskRequest, src: number, item?: number): Promise<{ response: Response; fields: AskFields }>;
+  /** Saves a sweep's report in the run directory and returns its path. */
+  sweepReport?(report: SweepReport): string;
   /** Sends an already-escaped page; true if the pager succeeded. */
   page(text: string): Promise<boolean>;
 }
@@ -35,6 +46,25 @@ export interface Effect {
   cmd: string;
   status: "done" | "failed" | "would_do" | "unknown";
 }
+
+/** One `ask each` (SPEC §4.8): what Jev said about each line. Nothing acts on it. */
+export interface SweepReport {
+  section: string | null;
+  line: number;
+  cmd: string;
+  question: string;
+  sure: number;
+  items: { item: string; answer: "yes" | "no" | "unsure"; confidence: number | null }[];
+  yes: number;
+  no: number;
+  unsure: number;
+  /** Lines never asked about: past the cap, after the deadline, or after the backend failed. */
+  skipped: number;
+  /** Why the sweep stopped early, if it did. */
+  stopped: "deadline" | "ask_unavailable" | null;
+}
+
+export const SWEEP_MAX_ITEMS = 200;
 
 export interface LoopResult {
   outcome: Outcome;
@@ -45,6 +75,8 @@ export interface LoopResult {
   lastAsk: Record<string, unknown> | null;
   lastExec: { cmd: string; exit: number | null; timed_out: boolean; stderr_tail: string } | null;
   variables: Record<string, Val>;
+  /** Summaries of the sweeps that ran, for the handoff record. */
+  sweeps: Record<string, unknown>[];
 }
 
 export interface LoopContext {
@@ -89,6 +121,9 @@ export async function runLoop(interp: Interp, ctx: LoopContext): Promise<LoopRes
   // Host fields for the core event that reports the request just answered.
   let pending: Record<string, unknown> = {};
   let response: Response = { kind: "none" };
+  // A sweep's events wait for the core's `run` event, which reports its command first.
+  const afterRun: Record<string, unknown>[] = [];
+  const sweeps: Record<string, unknown>[] = [];
 
   for (;;) {
     const step = interp.step(response);
@@ -104,7 +139,8 @@ export async function runLoop(interp: Interp, ctx: LoopContext): Promise<LoopRes
       if (body.event === "outcome") {
         if (next.kind !== "done") throw new Error("the core reported an outcome but didn't finish");
         // The caller emits the outcome last, after any handoff events (SPEC §8).
-        return { outcome: next.outcome, at, effects, lastAsk, lastExec, variables: interp.variables() };
+        for (const x of afterRun.splice(0)) ctx.emit(x);
+        return { outcome: next.outcome, at, effects, lastAsk, lastExec, variables: interp.variables(), sweeps };
       }
       const out: Record<string, unknown> = { ...(at ?? {}), ...body };
       const hostFields = EVENT_FIELDS[body.event]?.host ?? [];
@@ -122,6 +158,7 @@ export async function runLoop(interp: Interp, ctx: LoopContext): Promise<LoopRes
         lastAsk = { question: body.question, probs: body.probs, sure: body.sure };
       }
       ctx.emit(out);
+      if (body.event === "run") for (const x of afterRun.splice(0)) ctx.emit(x);
     }
     if (next.kind === "done") throw new Error("the core finished without an outcome event");
     if (late) {
@@ -129,6 +166,69 @@ export async function runLoop(interp: Interp, ctx: LoopContext): Promise<LoopRes
       continue;
     }
     response = await answer(next);
+  }
+
+  /** SPEC §4.8: one yes/no ask per non-empty output line, gated by the core; the report acts on nothing. */
+  async function sweep(next: ExecNext, stdout: string, truncated: boolean) {
+    let lines = stdout.split("\n").filter((l) => l.trim() !== "");
+    // The last line of cut-off output may be cut off too.
+    if (truncated && !stdout.endsWith("\n")) lines = lines.slice(0, -1);
+    // The item is named in backticks, so the rendered question is the same for every line.
+    const probe = interp.sweepAsk?.("");
+    if (!probe) return;
+    const { sure, section } = probe;
+    const at = { section, line: next.src };
+    const report: SweepReport = {
+      section,
+      line: next.src,
+      cmd: next.cmd,
+      question: probe.request.question,
+      sure,
+      items: [],
+      yes: 0,
+      no: 0,
+      unsure: 0,
+      skipped: Math.max(0, lines.length - SWEEP_MAX_ITEMS),
+      stopped: null,
+    };
+    const todo = lines.slice(0, SWEEP_MAX_ITEMS);
+    for (const [i, item] of todo.entries()) {
+      if (ctx.now() >= ctx.deadlineMs) {
+        report.stopped = "deadline";
+        report.skipped += todo.length - i;
+        break;
+      }
+      const q = interp.sweepAsk?.(item);
+      if (!q) throw new Error("a sweep's question went away mid-sweep");
+      const { response: a, fields } = await handlers.ask(q.request, next.src, i);
+      const verdict = a.kind === "answer" ? (interp.gateYesNo?.(a.probs, a.unassigned, sure) ?? null) : null;
+      const base = { ...at, event: "sweep_item", index: i, item, question: q.request.question, sure, ...fields };
+      if (a.kind !== "answer" || verdict === null) {
+        // A failed call, or an answer the gate calls invalid, counts as the backend being unavailable (SPEC §6.1).
+        afterRun.push({ ...base, probs: a.kind === "answer" ? a.probs : null, answer: null, confidence: null, detail: "unavailable" });
+        report.stopped = "ask_unavailable";
+        report.skipped += todo.length - i;
+        break;
+      }
+      const answer = verdict.passed ? (verdict.chosen as "yes" | "no") : "unsure";
+      report[answer]++;
+      report.items.push({ item, answer, confidence: verdict.confidence });
+      afterRun.push({ ...base, probs: a.probs, answer, confidence: verdict.confidence });
+    }
+    const path = handlers.sweepReport ? handlers.sweepReport(report) : null;
+    const summary = {
+      ...at,
+      cmd: next.cmd,
+      question: report.question,
+      yes: report.yes,
+      no: report.no,
+      unsure: report.unsure,
+      skipped: report.skipped,
+      stopped: report.stopped,
+      path,
+    };
+    sweeps.push(summary);
+    afterRun.push({ ...at, event: "sweep", ...summary });
   }
 
   async function answer(next: Exclude<Next, { kind: "done" }>): Promise<Response> {
@@ -147,6 +247,8 @@ export async function runLoop(interp: Interp, ctx: LoopContext): Promise<LoopRes
           stdout_tail: tailBytes(stdout, TAIL_BYTES),
         };
         lastExec = { cmd: next.cmd, exit: r.exit, timed_out: r.timedOut, stderr_tail: stderrTail };
+        // A sweep asks about each line only when its command succeeded; otherwise the core fails it as a run.
+        if (next.exec === "run" && r.exit === 0 && !r.timedOut) await sweep(next, stdout, r.truncated);
         return { kind: "exec", exit: r.exit, stdout, stderrTail, timedOut: r.timedOut };
       }
       case "ask": {

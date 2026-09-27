@@ -14,6 +14,7 @@ import { type BracketRef, Cursor, classifyLead, GRAMMAR_ERROR, KEYWORDS, leading
 import { githubSlug, sectionId } from "./slug.js";
 import {
   parseAsk,
+  parseAskEach,
   parseCheck,
   parseDo,
   parseForEach,
@@ -225,6 +226,12 @@ class Preprocessor {
         noNested();
         if ("yesno" in r.form) return { src, ask: { ...ask, yesno: r.form.yesno } };
         return { src, ask: { ...ask, one_of: { list: this.resolveList(r.form.one_of.list), as: r.form.one_of.as } } };
+      }
+      case "ask each": {
+        const r = parseAskEach(rest);
+        if (r === GRAMMAR_ERROR) return grammarError("`**ask each** ITEM of `CMD`: QUESTION → yes | no · sure N%`");
+        noNested();
+        return { src, ask_each: r };
       }
       case "for each": {
         const r = parseForEach(rest);

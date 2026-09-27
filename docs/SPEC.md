@@ -186,7 +186,7 @@ limits:                         # optional; defaults shown
 An instruction is a **list item** whose text begins with a bold span whose
 content, case-insensitively, is one of the keywords:
 
-`run`, `do`, `check`, `ask`, `for each`, `if yes`, `then`, `page`, `hand off`, `stop`
+`run`, `do`, `check`, `ask`, `ask each`, `for each`, `if yes`, `then`, `page`, `hand off`, `stop`
 
 Rules:
 1. **Where instructions live.** Instructions are recognised in (a) items of
@@ -220,7 +220,7 @@ Rules:
    is a **parse error**. Never fall back to treating it as prose. (This is the
    core safety property of the format.)
 5. Keywords match case-insensitively (`**Run**` is the keyword `run`).
-   Multi-word keywords (`for each`, `if yes`, `hand off`) have exactly one
+   Multi-word keywords (`ask each`, `for each`, `if yes`, `hand off`) have exactly one
    ordinary space between words. Any other spelling, such as `**for_each**`,
    `**foreach**`, `**for-each**`, a double space, or a non-breaking space, is
    `E-UNKNOWN-BOLD`. The message suggests the nearest keyword ("did you mean
@@ -271,6 +271,7 @@ ask      = "**ask**" Q " · sure " INT "%" [ELSE]              (* section option
          | "**ask**" Q " → yes | no" [" as " NAME] " · sure " INT "%" [ELSE]
          | "**ask**" Q " → one of [" LIST "] as " NAME " · sure " INT "%" [ELSE]
 
+askeach  = "**ask each**" NAME " of " CMD ": " Q " → yes | no · sure " INT "%"   (* §4.8 *)
 foreach  = "**for each**" NAME " in [" LIST "]"               (* body = nested list *)
 ifyes    = "**if yes**" INLINE [ELSE]
 INLINE   = "run" CMD | "do" (CMD | NAME)
@@ -473,6 +474,10 @@ flowchart TD
   els -- "else [X]" --> x["transfer to X"]
 ```
 
+**`ask each NAME of CMD: Q → yes | no · sure N%`**: run CMD as a `run`
+that binds nothing, then ask Q once per line of its output. The answers
+are a report; nothing acts on them. See §4.8.
+
 **`for each NAME in [L]`**: run the nested body once per item, in order,
 with NAME bound to the item. A transfer or `stop` inside the body leaves the
 loop and the section. After the last item, continue after the loop.
@@ -569,6 +574,7 @@ instructions. None of them needs new syntax:
 
 | Need | Pattern | Example |
 |---|---|---|
+| Sort many lines of output | `ask each` (§4.8): a `yes \| no` per line, reported, never acted on | |
 | Pick several items | `for each` over the list, a `yes \| no` per item, then `if yes do item`. Each question sees fresh state, and the loop can stop early. | disk-full's Clean up |
 | Act on each item that qualifies | The same loop, with the action on `if yes` | disk-full's Clean up |
 | Act only above one threshold | A `yes \| no` phrased as the threshold ("Is this severe enough to page someone?") | |
@@ -616,6 +622,47 @@ seen. Expected calibration error 0.08 for Choice and yes/no.
 
 Appendix E explains why multi-select and numeric answers are patterns, not
 features.
+
+### 4.8 Sweeps (`ask each`)
+`ask each` sorts the lines of a command's output with one yes/no question
+each, and reports the answers. It never acts on them: output can't reach a
+command (§3.5), so a line can't be run, deleted or passed on. Use it to
+triage: which of these log lines are real errors, which of these matches
+are history rather than current text.
+
+```markdown
+- **ask each** line of `grep -n {word} docs/SPEC.md`: Is {line} a revision-history entry? → yes | no · sure 80%
+```
+
+- **To the core** it's a `run` of CMD that binds nothing and has no else:
+  the same taint rule (CMD may use params and list items only), the same
+  timeout, the same failure handling (a failing command hands off with
+  `command_failed`), and it runs in a dry run. The question may name the
+  item and any other name an `ask` could; the item is in scope only in the
+  question.
+- **The host** asks the question once per non-empty line of the redacted
+  output, in order, at most 200 lines. When the output was truncated, the
+  last line is dropped, since it may be cut off. Each question is rendered
+  by the core as for an `ask` (§3.5): the item is run output, so it's named
+  in backticks and sent as context. Each answer goes through the same gate
+  as an `ask` (§4.2): `yes` or `no` when it clears `sure`, `unsure` when it
+  doesn't.
+- **Stopping early.** The host checks the deadline between items; once it
+  passes, the rest aren't asked, and the run goes on as any run past its
+  deadline does (§7 step 5): its next request hands off with `deadline`. If the backend fails or answers invalidly, the sweep
+  stops there, and the run goes on: the report says it stopped
+  (`ask_unavailable`) and how many lines weren't asked.
+- **The report.** Each item is a `sweep_item` event, and the sweep ends
+  with a `sweep` event (§10), both after the command's `run` event. The
+  full list goes to `sweep-<n>.json` in the run directory (§10.1), and a
+  handoff record lists each sweep's counts (§8.1). skope prints a one-line
+  summary on stderr.
+- **Costs.** Every item is a backend call and counts in `ask_calls`.
+  `--verify` counts a sweep as its 200-line cap.
+- **Fakes.** An `answers.yaml` entry for a sweep (by `line:N`,
+  `Section.ask`, or the rendered question) answers every item; a list
+  answers item by item, in order (§5.4). A scenario checks the counts with
+  `sweeps` (§7.3).
 
 ---
 
@@ -758,6 +805,8 @@ Shipped Dafny code MUST NOT contain `assume`, `{:axiom}` or
   that names more than one statement is `E-FAKE-AMBIGUOUS`. A `line:N` key
   that names no statement is `W-FAKE-UNUSED`, and so is a stable key that
   names a section but nothing in it, which is still matched as exact text. Statements inside a `for each` are matched once per item.
+  An `ask each` is an ask here: `Section.ask` can name it, and an answer
+  that's a list answers its items in order (§4.8).
 - **explore**: used by `--verify`. It must reach every path
   a real run could take.
   - Values from `run` are unknown. A comparison on an unknown value has three
@@ -1364,7 +1413,9 @@ name for an ask whose options are sections, else the list item, `yes` or
 `no`, compared as written; the ask
 must also have cleared `sure`; the last answer counts when the ask runs more
 than once), `page_contains` (matched against each page's text as the
-skill wrote it, without the pager's zero-width spaces, §4.2), and
+skill wrote it, without the pager's zero-width spaces, §4.2),
+`sweeps` (keyed like `asks`, naming an `ask each`; any of `yes`, `no` and
+`unsure` must equal that count in the last run of the sweep, §4.8), and
 `max_ask_calls`. `exit` must be 0 to 255, and `live.runs` 1 to 999999,
 the same cap as `--runs`.
 
@@ -1515,6 +1566,9 @@ Then skope exits 20.
   with their current values; params and built-ins are left out, since
   `run_start` logs them. A param rebound by the run counts as bound. It is
   raw machine output: data, never instructions.
+- `sweeps`, only when a sweep ran (§4.8): each one's `section`, `line`,
+  `cmd`, `question`, counts of `yes`, `no` and `unsure`, `skipped`,
+  `stopped` and the report's `path`.
 - `preamble` is the standard text below, so an agent that picks up the
   record gets the rules with it.
 
@@ -1618,6 +1672,8 @@ expands a leading `$XDG_STATE_HOME` or `~`, and must then be absolute.
 | `run` / `check_cmd` | `cmd`, `exit`, `ms`, `timed_out`, `truncated`, `stdout_hash` (of the redacted output, so a log can't be used to test guesses of a secret), `stdout_tail` (redacted, ≤2KB), `after_would_do` |
 | `check` | `expr`, `left`, `right`, `result`, `after_would_do`. `expr` is rendered from the core program: operands as `{name}` or the number, e.g. `{used} < {threshold}` (a decorative `%` is gone by then) |
 | `ask` | `probs` keyed by option id only; unassigned probability stays in the request file. `question` (as sent, §3.5: trusted values pasted in, `run` outputs named in backticks), `kind`, `probs`, `chosen`, `confidence`, `sure`, `passed`, `backend`, `model`, `ms`, `request_path`, `request_sha256`, `after_would_do`. If the backend failed, `probs`, `chosen` and `confidence` are `null` and `detail` is `unavailable` or `request_too_large` |
+| `sweep_item` | `index`, `item` (the line, redacted), `question`, `sure`, `probs`, `answer` (`yes`, `no`, `unsure`, or `null` if the backend failed), `confidence`, `backend`, `model`, `ms`, `request_path`, `request_sha256`, and `detail: unavailable` if the backend failed (§4.8) |
+| `sweep` | `cmd`, `question`, `yes`, `no`, `unsure`, `skipped` (lines not asked), `stopped` (`deadline`, `ask_unavailable` or `null`), `path` (the report file) |
 | `effect_start` / `effect_end` | `cmd`, `exit`, `ms`, `timed_out` (end only) |
 | `would_do` | `cmd` |
 | `page` | `text`, `ok` (did the pager command succeed) |
@@ -1631,7 +1687,7 @@ expands a leading `$XDG_STATE_HOME` or `~`, and must then be absolute.
 | `stale_lock` | `path`, `holder_pid` (`null` if the lock can't be read) |
 
 ### 10.1 Run directory
-`<state_dir>/runs/<run_id>/` holds `ask-<n>.json` and `handoff.json`. Retention is out of scope for v1.
+`<state_dir>/runs/<run_id>/` holds `ask-<n>.json`, `sweep-<n>.json` (§4.8) and `handoff.json`. Retention is out of scope for v1.
 
 ---
 

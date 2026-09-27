@@ -481,6 +481,9 @@
           "$ref": "#/$defs/stmtForEach"
         },
         {
+          "$ref": "#/$defs/stmtAskEach"
+        },
+        {
           "$ref": "#/$defs/stmtIfYes"
         },
         {
@@ -608,6 +611,38 @@
             },
             "body": {
               "$ref": "#/$defs/body"
+            }
+          }
+        }
+      }
+    },
+    "stmtAskEach": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["src", "ask_each"],
+      "description": "`**ask each** ITEM of `CMD`: QUESTION → yes | no · sure N%` (SPEC §4.8). To the core, a run of cmd that binds nothing; the host asks the question once per output line.",
+      "properties": {
+        "src": {
+          "$ref": "#/$defs/src"
+        },
+        "ask_each": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["item", "cmd", "question", "sure"],
+          "properties": {
+            "item": {
+              "$ref": "#/$defs/name"
+            },
+            "cmd": {
+              "$ref": "#/$defs/parts"
+            },
+            "question": {
+              "$ref": "#/$defs/parts"
+            },
+            "sure": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100
             }
           }
         }

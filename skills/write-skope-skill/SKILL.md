@@ -73,7 +73,7 @@ scenarios:
 - **Answers:** naming an ask's expected choice in `asks` is enough; skope
   scripts that answer. Give `answers` only for `unsure`, `unavailable`, or a
   deliberately low-confidence answer.
-- **Also available:** `path_prefix`, `page_contains`, `max_ask_calls`,
+- **Also available:** `path_prefix`, `page_contains`, `sweeps`, `max_ask_calls`,
   `exit`.
 
 ## 3. Red
@@ -151,6 +151,11 @@ keyword is an error. Ask forms: a list of `[Section]` options; `→ yes | no`
 Failure handling: `· else skip` or `· else [Section]`; without one, a
 failure hands off. Action lists are `1. Label — \`command\``, and
 `- **for each** step in [List]` with `**if yes** do step` runs them.
+To sort many lines of output, `- **ask each** line of \`cmd\`: Is {line}
+…? → yes | no · sure 80%` asks once per line and reports yes, no and
+unsure counts; nothing acts on them. Test it with a list answer
+(`Section.ask: [{yes: 0.9, no: 0.1}, unsure]`) and
+`sweeps: { Section: { yes: 1, unsure: 1 } }`.
 
 Rules that keep a skill safe and testable:
 

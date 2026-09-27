@@ -26,7 +26,8 @@ export class FakeAskAmbiguous extends Error {
   readonly code = "E-FAKE-AMBIGUOUS";
 }
 
-export function askFake(answers: FakesAnswers, request: AskRequest, src?: number, strict = false): AskOutput {
+// An `ask each` (SPEC §4.8) asks once per item: an answer that's a list gives one answer per item, in order.
+export function askFake(answers: FakesAnswers, request: AskRequest, src?: number, strict = false, item?: number): AskOutput {
   const lineKey = src !== undefined ? `line:${src}` : undefined;
   if (strict && lineKey !== undefined && Object.hasOwn(answers, lineKey) && Object.hasOwn(answers, request.question))
     throw new FakeAskAmbiguous(`--fake has two answers for line ${src}: ${lineKey} and its text, ${request.question}`);
@@ -34,7 +35,12 @@ export function askFake(answers: FakesAnswers, request: AskRequest, src?: number
   if (!Object.hasOwn(answers, key)) {
     throw new FakeAskUnmatched(`--fake has no answer for: ${key}`);
   }
-  const entry = answers[key];
+  let entry = answers[key];
+  if (Array.isArray(entry)) {
+    if (item === undefined || item >= entry.length)
+      throw new FakeAskUnmatched(`--fake has no answer for item ${item ?? "(none)"} of: ${key}`);
+    entry = entry[item];
+  }
 
   if (entry === "unavailable") {
     return {

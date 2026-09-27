@@ -54,6 +54,33 @@
       "type": "integer",
       "minimum": 0
     },
+    "sweeps": {
+      "description": "Keyed like asks, naming an `ask each` (SPEC \u00a74.8): how many items the last run of that sweep answered yes, no and unsure. Counts left out aren't checked.",
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "minLength": 1
+      },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "minProperties": 1,
+        "properties": {
+          "yes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "no": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "unsure": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    },
     "live": {
       "description": "Used only with --live (SPEC \u00a77.3): runs per scenario, the share of runs that must be hits (default 1), and the points by which each expected ask's lowest confidence must clear sure (without it, under 5 is a warning).",
       "type": "object",
