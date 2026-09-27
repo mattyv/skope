@@ -401,7 +401,8 @@ run moves from section to section until it ends.
 | **run** `cmd` as x | Runs a read-only command, optionally keeping its output as `x` |
 | **do** `cmd` | Runs a command that changes something. Skipped in a dry run. |
 | **check** {x} < 80 → [Section] | Compares measured values, or checks that a command succeeds |
-| **ask** question · sure 85% | Asks Jev to pick a section, yes or no, one item from a list, or a level from 1 to N |
+| **ask** question · sure 85% | Asks Jev to pick a section, yes or no, or one item from a list |
+| **ask each** line of `cmd`: question → yes \| no · sure 80% | Asks a yes-or-no question about every line a command prints, and reports the answers. Nothing acts on them. |
 | **for each** item in [List] | Repeats the nested steps for each item in a list |
 | **if yes** do … | Acts on the answer to the yes-or-no question just asked |
 | **then** [Section] | Moves to another section |

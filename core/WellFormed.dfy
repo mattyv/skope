@@ -97,6 +97,7 @@ module SkopeWellFormed {
     case Ask(src, _, _, form, els) =>
       (if form.Sections? then set k | 0 <= k < |form.options| :: Jump(form.options[k].ref, form.options[k].src) else {}) + ElseJump(els, src)
     case ForEach(_, _, _, _) => {}
+    case Sweep(src, _, _, _, _, els) => ElseJump(els, src)
     case IfYesRun(src, _, els) => ElseJump(els, src)
     case IfYesDo(src, _, els) => ElseJump(els, src)
     case Then(src, r) => {Jump(r, src)}
@@ -241,7 +242,10 @@ module SkopeWellFormed {
   // Names in question and page text. They may be unbound on some path
   // (they render as "(unavailable)"), but not on every path.
   function TextVars(s: Stmt): set<Name> {
-    if s.Ask? then PartVars(s.question) else if s.Page? then PartVars(s.text) else {}
+    if s.Ask? then PartVars(s.question)
+    // A sweep's item is named in its question, and bound only while the host asks it.
+    else if s.Sweep? then PartVars(s.question) - {s.item}
+    else if s.Page? then PartVars(s.text) else {}
   }
 
   ghost predicate NamesKnown(p: Program) {
@@ -409,6 +413,7 @@ module SkopeWellFormed {
   function CmdVars(s: Stmt): set<Name> {
     match s
     case Run(_, cmd, _, _) => PartVars(cmd)
+    case Sweep(_, cmd, _, _, _, _) => PartVars(cmd)
     case Do(_, DoCmd(cmd), _) => PartVars(cmd)
     case Check(_, Succeeds(cmd), _, _) => PartVars(cmd)
     case IfYesRun(_, cmd, _) => PartVars(cmd)
@@ -513,6 +518,7 @@ module SkopeWellFormed {
     // Once per item, in order; then the loop variable is unbound.
     case ForEach(_, v, l, _) =>
       IsData(p, l.id) && exists cn :: Iterates(p, s, DataList(p, l.id).items, c, cn) && c' == cn - {v}
+    case Sweep(_, _, _, _, _, _) => c' == c
     case IfYesRun(_, _, _) => c' == c
     case IfYesDo(_, _, _) => c' == c
     case Then(_, _) => false

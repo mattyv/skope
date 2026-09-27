@@ -52,6 +52,8 @@ function targets(body: Stmt[], kind: FakeKind): Target[] {
   return body.flatMap((st): Target[] => {
     if ("for_each" in st) return targets(st.for_each.body as Stmt[], kind);
     if (kind === "answers") {
+      // An `ask each` is an ask; its item is named in backticks, so the template's any-value fits.
+      if ("ask_each" in st) return [{ src: st.src, ask: true, text: template(st.ask_each.question) }];
       if (!("ask" in st)) return [];
       const a = st.ask;
       return [{ src: st.src, binds: a.yesno?.as ?? a.one_of?.as, ask: true, text: template(a.question) }];
@@ -61,6 +63,7 @@ function targets(body: Stmt[], kind: FakeKind): Target[] {
       return b?.item !== undefined ? ANY : template(b?.cmd);
     };
     if ("run" in st) return [{ src: st.src, binds: st.run.as, ask: false, text: cmd(st.run) }];
+    if ("ask_each" in st) return [{ src: st.src, ask: false, text: template(st.ask_each.cmd) }];
     if ("do" in st) return [{ src: st.src, ask: false, text: cmd(st.do) }];
     if ("if_yes" in st) return [{ src: st.src, ask: false, text: cmd(st.if_yes.run ?? st.if_yes.do) }];
     if ("check" in st && "succeeds" in st.check.cond) return [{ src: st.src, ask: false, text: template(st.check.cond.succeeds) }];

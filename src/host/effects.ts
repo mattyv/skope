@@ -90,6 +90,7 @@ export function effectsOf(program: CoreProgram, choices: Record<string, (string 
         for (const parts of templates) for (const t of render(parts, lists)) add(kind, t, s.name);
       };
       if ("run" in st) cmd("run", st.run as { cmd?: unknown; item?: string });
+      if ("ask_each" in st) cmd("run", { cmd: st.ask_each.cmd });
       if ("do" in st) cmd("do", st.do as { cmd?: unknown; item?: string });
       if ("if_yes" in st) {
         cmd("run", st.if_yes.run as { cmd?: unknown; item?: string } | undefined);

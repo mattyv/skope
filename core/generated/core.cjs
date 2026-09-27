@@ -1870,39 +1870,49 @@ let SkopeAst = (function() {
       $dt.body = body;
       return $dt;
     }
-    static create_IfYesRun(src, cmd, els) {
+    static create_Sweep(src, cmd, item, question, sure, els) {
       let $dt = new Stmt(5);
+      $dt.src = src;
+      $dt.cmd = cmd;
+      $dt.item = item;
+      $dt.question = question;
+      $dt.sure = sure;
+      $dt.els = els;
+      return $dt;
+    }
+    static create_IfYesRun(src, cmd, els) {
+      let $dt = new Stmt(6);
       $dt.src = src;
       $dt.cmd = cmd;
       $dt.els = els;
       return $dt;
     }
     static create_IfYesDo(src, action, els) {
-      let $dt = new Stmt(6);
+      let $dt = new Stmt(7);
       $dt.src = src;
       $dt.action = action;
       $dt.els = els;
       return $dt;
     }
     static create_Then(src, ref) {
-      let $dt = new Stmt(7);
+      let $dt = new Stmt(8);
       $dt.src = src;
       $dt.ref = ref;
       return $dt;
     }
     static create_Page(src, text) {
-      let $dt = new Stmt(8);
+      let $dt = new Stmt(9);
       $dt.src = src;
       $dt.text = text;
       return $dt;
     }
     static create_HandOff(src) {
-      let $dt = new Stmt(9);
+      let $dt = new Stmt(10);
       $dt.src = src;
       return $dt;
     }
     static create_Stop(src) {
-      let $dt = new Stmt(10);
+      let $dt = new Stmt(11);
       $dt.src = src;
       return $dt;
     }
@@ -1911,12 +1921,13 @@ let SkopeAst = (function() {
     get is_Check() { return this.$tag === 2; }
     get is_Ask() { return this.$tag === 3; }
     get is_ForEach() { return this.$tag === 4; }
-    get is_IfYesRun() { return this.$tag === 5; }
-    get is_IfYesDo() { return this.$tag === 6; }
-    get is_Then() { return this.$tag === 7; }
-    get is_Page() { return this.$tag === 8; }
-    get is_HandOff() { return this.$tag === 9; }
-    get is_Stop() { return this.$tag === 10; }
+    get is_Sweep() { return this.$tag === 5; }
+    get is_IfYesRun() { return this.$tag === 6; }
+    get is_IfYesDo() { return this.$tag === 7; }
+    get is_Then() { return this.$tag === 8; }
+    get is_Page() { return this.$tag === 9; }
+    get is_HandOff() { return this.$tag === 10; }
+    get is_Stop() { return this.$tag === 11; }
     get dtor_src() { return this.src; }
     get dtor_cmd() { return this.cmd; }
     get dtor_binding() { return this.binding; }
@@ -1930,6 +1941,7 @@ let SkopeAst = (function() {
     get dtor_loopVar() { return this.loopVar; }
     get dtor_list() { return this.list; }
     get dtor_body() { return this.body; }
+    get dtor_item() { return this.item; }
     get dtor_ref() { return this.ref; }
     get dtor_text() { return this.text; }
     toString() {
@@ -1944,16 +1956,18 @@ let SkopeAst = (function() {
       } else if (this.$tag === 4) {
         return "SkopeAst.Stmt.ForEach" + "(" + _dafny.toString(this.src) + ", " + this.loopVar.toVerbatimString(true) + ", " + _dafny.toString(this.list) + ", " + _dafny.toString(this.body) + ")";
       } else if (this.$tag === 5) {
-        return "SkopeAst.Stmt.IfYesRun" + "(" + _dafny.toString(this.src) + ", " + _dafny.toString(this.cmd) + ", " + _dafny.toString(this.els) + ")";
+        return "SkopeAst.Stmt.Sweep" + "(" + _dafny.toString(this.src) + ", " + _dafny.toString(this.cmd) + ", " + this.item.toVerbatimString(true) + ", " + _dafny.toString(this.question) + ", " + _dafny.toString(this.sure) + ", " + _dafny.toString(this.els) + ")";
       } else if (this.$tag === 6) {
-        return "SkopeAst.Stmt.IfYesDo" + "(" + _dafny.toString(this.src) + ", " + _dafny.toString(this.action) + ", " + _dafny.toString(this.els) + ")";
+        return "SkopeAst.Stmt.IfYesRun" + "(" + _dafny.toString(this.src) + ", " + _dafny.toString(this.cmd) + ", " + _dafny.toString(this.els) + ")";
       } else if (this.$tag === 7) {
-        return "SkopeAst.Stmt.Then" + "(" + _dafny.toString(this.src) + ", " + _dafny.toString(this.ref) + ")";
+        return "SkopeAst.Stmt.IfYesDo" + "(" + _dafny.toString(this.src) + ", " + _dafny.toString(this.action) + ", " + _dafny.toString(this.els) + ")";
       } else if (this.$tag === 8) {
-        return "SkopeAst.Stmt.Page" + "(" + _dafny.toString(this.src) + ", " + _dafny.toString(this.text) + ")";
+        return "SkopeAst.Stmt.Then" + "(" + _dafny.toString(this.src) + ", " + _dafny.toString(this.ref) + ")";
       } else if (this.$tag === 9) {
-        return "SkopeAst.Stmt.HandOff" + "(" + _dafny.toString(this.src) + ")";
+        return "SkopeAst.Stmt.Page" + "(" + _dafny.toString(this.src) + ", " + _dafny.toString(this.text) + ")";
       } else if (this.$tag === 10) {
+        return "SkopeAst.Stmt.HandOff" + "(" + _dafny.toString(this.src) + ")";
+      } else if (this.$tag === 11) {
         return "SkopeAst.Stmt.Stop" + "(" + _dafny.toString(this.src) + ")";
       } else  {
         return "<unexpected>";
@@ -1973,17 +1987,19 @@ let SkopeAst = (function() {
       } else if (this.$tag === 4) {
         return other.$tag === 4 && _dafny.areEqual(this.src, other.src) && _dafny.areEqual(this.loopVar, other.loopVar) && _dafny.areEqual(this.list, other.list) && _dafny.areEqual(this.body, other.body);
       } else if (this.$tag === 5) {
-        return other.$tag === 5 && _dafny.areEqual(this.src, other.src) && _dafny.areEqual(this.cmd, other.cmd) && _dafny.areEqual(this.els, other.els);
+        return other.$tag === 5 && _dafny.areEqual(this.src, other.src) && _dafny.areEqual(this.cmd, other.cmd) && _dafny.areEqual(this.item, other.item) && _dafny.areEqual(this.question, other.question) && _dafny.areEqual(this.sure, other.sure) && _dafny.areEqual(this.els, other.els);
       } else if (this.$tag === 6) {
-        return other.$tag === 6 && _dafny.areEqual(this.src, other.src) && _dafny.areEqual(this.action, other.action) && _dafny.areEqual(this.els, other.els);
+        return other.$tag === 6 && _dafny.areEqual(this.src, other.src) && _dafny.areEqual(this.cmd, other.cmd) && _dafny.areEqual(this.els, other.els);
       } else if (this.$tag === 7) {
-        return other.$tag === 7 && _dafny.areEqual(this.src, other.src) && _dafny.areEqual(this.ref, other.ref);
+        return other.$tag === 7 && _dafny.areEqual(this.src, other.src) && _dafny.areEqual(this.action, other.action) && _dafny.areEqual(this.els, other.els);
       } else if (this.$tag === 8) {
-        return other.$tag === 8 && _dafny.areEqual(this.src, other.src) && _dafny.areEqual(this.text, other.text);
+        return other.$tag === 8 && _dafny.areEqual(this.src, other.src) && _dafny.areEqual(this.ref, other.ref);
       } else if (this.$tag === 9) {
-        return other.$tag === 9 && _dafny.areEqual(this.src, other.src);
+        return other.$tag === 9 && _dafny.areEqual(this.src, other.src) && _dafny.areEqual(this.text, other.text);
       } else if (this.$tag === 10) {
         return other.$tag === 10 && _dafny.areEqual(this.src, other.src);
+      } else if (this.$tag === 11) {
+        return other.$tag === 11 && _dafny.areEqual(this.src, other.src);
       } else  {
         return false; // unexpected
       }
@@ -2444,24 +2460,31 @@ let SkopeWellFormed = (function() {
         }
       }
       {
-        if (_source0.is_IfYesRun) {
+        if (_source0.is_Sweep) {
           let _11_src = (_source0).src;
           let _12_els = (_source0).els;
           return SkopeWellFormed.__default.ElseJump(_12_els, _11_src);
         }
       }
       {
-        if (_source0.is_IfYesDo) {
+        if (_source0.is_IfYesRun) {
           let _13_src = (_source0).src;
           let _14_els = (_source0).els;
           return SkopeWellFormed.__default.ElseJump(_14_els, _13_src);
         }
       }
       {
-        if (_source0.is_Then) {
+        if (_source0.is_IfYesDo) {
           let _15_src = (_source0).src;
-          let _16_r = (_source0).ref;
-          return _dafny.Set.fromElements(SkopeWellFormed.Jump.create_Jump(_16_r, _15_src));
+          let _16_els = (_source0).els;
+          return SkopeWellFormed.__default.ElseJump(_16_els, _15_src);
+        }
+      }
+      {
+        if (_source0.is_Then) {
+          let _17_src = (_source0).src;
+          let _18_r = (_source0).ref;
+          return _dafny.Set.fromElements(SkopeWellFormed.Jump.create_Jump(_18_r, _17_src));
         }
       }
       {
@@ -2601,6 +2624,8 @@ let SkopeWellFormed = (function() {
     static TextVars(s) {
       if ((s).is_Ask) {
         return SkopeWellFormed.__default.PartVars((s).dtor_question);
+      } else if ((s).is_Sweep) {
+        return (SkopeWellFormed.__default.PartVars((s).dtor_question)).Difference(_dafny.Set.fromElements((s).dtor_item));
       } else if ((s).is_Page) {
         return SkopeWellFormed.__default.PartVars((s).dtor_text);
       } else {
@@ -2845,11 +2870,17 @@ let SkopeWellFormed = (function() {
         }
       }
       {
+        if (_source0.is_Sweep) {
+          let _1_cmd = (_source0).cmd;
+          return SkopeWellFormed.__default.PartVars(_1_cmd);
+        }
+      }
+      {
         if (_source0.is_Do) {
           let action0 = (_source0).action;
           if (action0.is_DoCmd) {
-            let _1_cmd = (action0).cmd;
-            return SkopeWellFormed.__default.PartVars(_1_cmd);
+            let _2_cmd = (action0).cmd;
+            return SkopeWellFormed.__default.PartVars(_2_cmd);
           }
         }
       }
@@ -2857,23 +2888,23 @@ let SkopeWellFormed = (function() {
         if (_source0.is_Check) {
           let cond0 = (_source0).cond;
           if (cond0.is_Succeeds) {
-            let _2_cmd = (cond0).cmd;
-            return SkopeWellFormed.__default.PartVars(_2_cmd);
+            let _3_cmd = (cond0).cmd;
+            return SkopeWellFormed.__default.PartVars(_3_cmd);
           }
         }
       }
       {
         if (_source0.is_IfYesRun) {
-          let _3_cmd = (_source0).cmd;
-          return SkopeWellFormed.__default.PartVars(_3_cmd);
+          let _4_cmd = (_source0).cmd;
+          return SkopeWellFormed.__default.PartVars(_4_cmd);
         }
       }
       {
         if (_source0.is_IfYesDo) {
           let action1 = (_source0).action;
           if (action1.is_DoCmd) {
-            let _4_cmd = (action1).cmd;
-            return SkopeWellFormed.__default.PartVars(_4_cmd);
+            let _5_cmd = (action1).cmd;
+            return SkopeWellFormed.__default.PartVars(_5_cmd);
           }
         }
       }
@@ -6150,6 +6181,11 @@ let SkopeState = (function() {
           }
         }
         {
+          if (_source0.is_Sweep) {
+            return true;
+          }
+        }
+        {
           if (_source0.is_Do) {
             return !(((s).dtor_cfg).dtor_dry);
           }
@@ -6216,18 +6252,25 @@ let SkopeState = (function() {
         }
       }
       {
-        if (_source0.is_Do) {
+        if (_source0.is_Sweep) {
           let _4_src = (_source0).src;
-          let _5_a = (_source0).action;
-          return SkopeState.__default.ExecOf((s).dtor_vars, SkopeState.__default.DoParts((s).dtor_vars, _5_a), SkopeStep.ExecKind.create_DoExec(), ((_0_p).dtor_limits).dtor_doTimeoutMs, _4_src);
+          let _5_c = (_source0).cmd;
+          return SkopeState.__default.ExecOf((s).dtor_vars, _5_c, SkopeStep.ExecKind.create_RunExec(), ((_0_p).dtor_limits).dtor_runTimeoutMs, _4_src);
+        }
+      }
+      {
+        if (_source0.is_Do) {
+          let _6_src = (_source0).src;
+          let _7_a = (_source0).action;
+          return SkopeState.__default.ExecOf((s).dtor_vars, SkopeState.__default.DoParts((s).dtor_vars, _7_a), SkopeStep.ExecKind.create_DoExec(), ((_0_p).dtor_limits).dtor_doTimeoutMs, _6_src);
         }
       }
       {
         if (_source0.is_Check) {
-          let _6_src = (_source0).src;
-          let _7_cond = (_source0).cond;
-          if ((_7_cond).is_Succeeds) {
-            return SkopeState.__default.ExecOf((s).dtor_vars, (_7_cond).dtor_cmd, SkopeStep.ExecKind.create_CheckExec(), ((_0_p).dtor_limits).dtor_runTimeoutMs, _6_src);
+          let _8_src = (_source0).src;
+          let _9_cond = (_source0).cond;
+          if ((_9_cond).is_Succeeds) {
+            return SkopeState.__default.ExecOf((s).dtor_vars, (_9_cond).dtor_cmd, SkopeStep.ExecKind.create_CheckExec(), ((_0_p).dtor_limits).dtor_runTimeoutMs, _8_src);
           } else {
             return SkopeStep.Next.create_Choose(new BigNumber(3));
           }
@@ -6235,31 +6278,31 @@ let SkopeState = (function() {
       }
       {
         if (_source0.is_Ask) {
-          let _8_src = (_source0).src;
-          let _9_q = (_source0).question;
-          let _10_form = (_source0).form;
-          return SkopeStep.Next.create_AskNext(SkopeState.__default.AskReq(_0_p, (s).dtor_sec, (s).dtor_vars, (s).dtor_runNames, _9_q, _10_form), _8_src);
+          let _10_src = (_source0).src;
+          let _11_q = (_source0).question;
+          let _12_form = (_source0).form;
+          return SkopeStep.Next.create_AskNext(SkopeState.__default.AskReq(_0_p, (s).dtor_sec, (s).dtor_vars, (s).dtor_runNames, _11_q, _12_form), _10_src);
         }
       }
       {
         if (_source0.is_IfYesRun) {
-          let _11_src = (_source0).src;
-          let _12_c = (_source0).cmd;
-          return SkopeState.__default.ExecOf((s).dtor_vars, _12_c, SkopeStep.ExecKind.create_RunExec(), ((_0_p).dtor_limits).dtor_runTimeoutMs, _11_src);
+          let _13_src = (_source0).src;
+          let _14_c = (_source0).cmd;
+          return SkopeState.__default.ExecOf((s).dtor_vars, _14_c, SkopeStep.ExecKind.create_RunExec(), ((_0_p).dtor_limits).dtor_runTimeoutMs, _13_src);
         }
       }
       {
         if (_source0.is_IfYesDo) {
-          let _13_src = (_source0).src;
-          let _14_a = (_source0).action;
-          return SkopeState.__default.ExecOf((s).dtor_vars, SkopeState.__default.DoParts((s).dtor_vars, _14_a), SkopeStep.ExecKind.create_DoExec(), ((_0_p).dtor_limits).dtor_doTimeoutMs, _13_src);
+          let _15_src = (_source0).src;
+          let _16_a = (_source0).action;
+          return SkopeState.__default.ExecOf((s).dtor_vars, SkopeState.__default.DoParts((s).dtor_vars, _16_a), SkopeStep.ExecKind.create_DoExec(), ((_0_p).dtor_limits).dtor_doTimeoutMs, _15_src);
         }
       }
       {
         if (_source0.is_Page) {
-          let _15_src = (_source0).src;
-          let _16_text = (_source0).text;
-          return SkopeStep.Next.create_PageNext(SkopeState.__default.RenderText((s).dtor_vars, _16_text), _15_src);
+          let _17_src = (_source0).src;
+          let _18_text = (_source0).text;
+          return SkopeStep.Next.create_PageNext(SkopeState.__default.RenderText((s).dtor_vars, _18_text), _17_src);
         }
       }
       {
@@ -6279,7 +6322,7 @@ let SkopeState = (function() {
         }
       }
       {
-        if (_source0.is_IfYesRun) {
+        if (_source0.is_Sweep) {
           let _1_c = (_source0).cmd;
           if (_dafny.areEqual(kind, SkopeStep.ExecKind.create_RunExec())) {
             return SkopeAst.Option.create_Some(_1_c);
@@ -6289,12 +6332,22 @@ let SkopeState = (function() {
         }
       }
       {
+        if (_source0.is_IfYesRun) {
+          let _2_c = (_source0).cmd;
+          if (_dafny.areEqual(kind, SkopeStep.ExecKind.create_RunExec())) {
+            return SkopeAst.Option.create_Some(_2_c);
+          } else {
+            return SkopeAst.Option.create_None();
+          }
+        }
+      }
+      {
         if (_source0.is_Check) {
           let cond0 = (_source0).cond;
           if (cond0.is_Succeeds) {
-            let _2_c = (cond0).cmd;
+            let _3_c = (cond0).cmd;
             if (_dafny.areEqual(kind, SkopeStep.ExecKind.create_CheckExec())) {
-              return SkopeAst.Option.create_Some(_2_c);
+              return SkopeAst.Option.create_Some(_3_c);
             } else {
               return SkopeAst.Option.create_None();
             }
@@ -6305,9 +6358,9 @@ let SkopeState = (function() {
         if (_source0.is_Do) {
           let action0 = (_source0).action;
           if (action0.is_DoCmd) {
-            let _3_c = (action0).cmd;
+            let _4_c = (action0).cmd;
             if (_dafny.areEqual(kind, SkopeStep.ExecKind.create_DoExec())) {
-              return SkopeAst.Option.create_Some(_3_c);
+              return SkopeAst.Option.create_Some(_4_c);
             } else {
               return SkopeAst.Option.create_None();
             }
@@ -6318,9 +6371,9 @@ let SkopeState = (function() {
         if (_source0.is_IfYesDo) {
           let action1 = (_source0).action;
           if (action1.is_DoCmd) {
-            let _4_c = (action1).cmd;
+            let _5_c = (action1).cmd;
             if (_dafny.areEqual(kind, SkopeStep.ExecKind.create_DoExec())) {
-              return SkopeAst.Option.create_Some(_4_c);
+              return SkopeAst.Option.create_Some(_5_c);
             } else {
               return SkopeAst.Option.create_None();
             }
@@ -7015,6 +7068,11 @@ let SkopeRun = (function() {
       }
       {
         if (_source0.is_IfYesRun) {
+          return SkopeRun.__default.AfterExec(_2_s0, SkopeRun.__default.Ev(_2_s0, SkopeStep.EventBody.create_RunEv((_0_n).dtor_cmd, (r).dtor_exit, (r).dtor_timedOut, (s).dtor_afterWouldDo)), r);
+        }
+      }
+      {
+        if (_source0.is_Sweep) {
           return SkopeRun.__default.AfterExec(_2_s0, SkopeRun.__default.Ev(_2_s0, SkopeStep.EventBody.create_RunEv((_0_n).dtor_cmd, (r).dtor_exit, (r).dtor_timedOut, (s).dtor_afterWouldDo)), r);
         }
       }

@@ -20,6 +20,12 @@
       "$ref": "#/$defs/ask"
     },
     {
+      "$ref": "#/$defs/sweep_item"
+    },
+    {
+      "$ref": "#/$defs/sweep"
+    },
+    {
       "$ref": "#/$defs/effect_start"
     },
     {
@@ -482,6 +488,212 @@
         "request_path",
         "request_sha256",
         "after_would_do"
+      ],
+      "additionalProperties": false
+    },
+    "sweep_item": {
+      "title": "SweepItemEvent",
+      "type": "object",
+      "description": "One line of an `ask each` command's output and what the backend said about it (SPEC §4.8). Emitted after the command's run event. Nothing acts on it.",
+      "properties": {
+        "ts": {
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?Z$",
+          "description": "UTC, ISO 8601."
+        },
+        "run_id": {
+          "type": ["string", "null"],
+          "description": "null before a run exists."
+        },
+        "skill": {
+          "type": ["string", "null"],
+          "description": "null before a run exists."
+        },
+        "skill_hash": {
+          "type": ["string", "null"],
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "description": "null before a run exists."
+        },
+        "host": {
+          "type": "string"
+        },
+        "section": {
+          "type": "string",
+          "description": "The section's display name."
+        },
+        "line": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "event": {
+          "const": "sweep_item"
+        },
+        "index": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "The item's position among the command's non-empty output lines."
+        },
+        "item": {
+          "type": "string",
+          "description": "The output line, redacted."
+        },
+        "question": {
+          "type": "string"
+        },
+        "sure": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "probs": {
+          "type": ["object", "null"],
+          "additionalProperties": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        },
+        "answer": {
+          "enum": ["yes", "no", "unsure", null],
+          "description": "yes or no when the gate passed, unsure when it didn't; null when the backend was unavailable."
+        },
+        "confidence": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "backend": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        },
+        "ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "request_path": {
+          "type": "string"
+        },
+        "request_sha256": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "detail": {
+          "enum": ["unavailable"],
+          "description": "The backend failed or its answer was invalid; the sweep stops."
+        }
+      },
+      "required": [
+        "ts",
+        "run_id",
+        "skill",
+        "skill_hash",
+        "host",
+        "section",
+        "line",
+        "event",
+        "index",
+        "item",
+        "question",
+        "sure",
+        "probs",
+        "answer",
+        "confidence",
+        "backend",
+        "model",
+        "ms",
+        "request_path",
+        "request_sha256"
+      ],
+      "additionalProperties": false
+    },
+    "sweep": {
+      "title": "SweepEvent",
+      "type": "object",
+      "description": "An `ask each` finished (SPEC §4.8): counts of each answer, and the report file listing every item.",
+      "properties": {
+        "ts": {
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?Z$",
+          "description": "UTC, ISO 8601."
+        },
+        "run_id": {
+          "type": ["string", "null"],
+          "description": "null before a run exists."
+        },
+        "skill": {
+          "type": ["string", "null"],
+          "description": "null before a run exists."
+        },
+        "skill_hash": {
+          "type": ["string", "null"],
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "description": "null before a run exists."
+        },
+        "host": {
+          "type": "string"
+        },
+        "section": {
+          "type": "string",
+          "description": "The section's display name."
+        },
+        "line": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "event": {
+          "const": "sweep"
+        },
+        "cmd": {
+          "type": "string"
+        },
+        "question": {
+          "type": "string"
+        },
+        "yes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "no": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unsure": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "skipped": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Lines never asked about: past the 200-line cap, after the deadline, or after the backend failed."
+        },
+        "stopped": {
+          "enum": ["deadline", "ask_unavailable", null],
+          "description": "Why the sweep stopped early, if it did."
+        },
+        "path": {
+          "type": ["string", "null"],
+          "description": "The report file in the run directory."
+        }
+      },
+      "required": [
+        "ts",
+        "run_id",
+        "skill",
+        "skill_hash",
+        "host",
+        "section",
+        "line",
+        "event",
+        "cmd",
+        "question",
+        "yes",
+        "no",
+        "unsure",
+        "skipped",
+        "stopped",
+        "path"
       ],
       "additionalProperties": false
     },

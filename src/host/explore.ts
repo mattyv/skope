@@ -5,6 +5,7 @@
 // same graph (SPEC §12.4).
 
 import { type CoreEvent, EVENT_FIELDS, type Next, type Outcome, type Response } from "../step.js";
+import { SWEEP_MAX_ITEMS } from "./loop.js";
 
 /** A run the explorer can branch: the interpreter in explore mode. */
 export interface Explorable {
@@ -13,6 +14,8 @@ export interface Explorable {
   fork(): Explorable;
   /** The abstract state (SPEC §5.4): equal keys, equal futures. */
   key(): string;
+  /** Non-null while a sweep's command is pending (SPEC §4.8). */
+  sweepAsk?(item: string): unknown;
 }
 
 export interface Costs {
@@ -87,10 +90,10 @@ export function branches(next: Exclude<Next, { kind: "done" }>, costs: Costs): B
 
 const outcomeName = (o: Outcome) => (o.kind === "handoff" ? `handoff:${o.reason}` : o.kind);
 
-function edge(events: CoreEvent[], ms: number, rest: Summary): Summary {
+function edge(events: CoreEvent[], ms: number, rest: Summary, sweepAsks = 0): Summary {
   const sections = new Set(rest.sections);
   const transfers = new Set(rest.transfers);
-  let asks = 0;
+  let asks = sweepAsks;
   let effects = 0;
   for (const e of events) {
     if (e.at) sections.add(e.at.section);
@@ -143,7 +146,10 @@ export function explore(start: Explorable, costs: Costs): Summary & { asks: AskB
         const top = r.kind === "answer" ? Object.keys(r.probs).find((k) => r.probs[k] === 1) : undefined;
         seen.taken.add(r.kind === "ask_failed" ? "unavailable" : top === undefined ? "unsure" : `option ${top}`);
       }
-      sum = merge(sum, edge(out.events, b.ms, visit(child, out.next)));
+      // A sweep whose command succeeds asks once per line, up to its cap, between steps (SPEC §4.8).
+      const r = b.response;
+      const sweepAsks = r.kind === "exec" && r.exit === 0 && !r.timedOut && run.sweepAsk?.("") ? SWEEP_MAX_ITEMS : 0;
+      sum = merge(sum, edge(out.events, b.ms + sweepAsks * costs.askMs, visit(child, out.next), sweepAsks));
     }
     memo.set(key, sum);
     return sum;

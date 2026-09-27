@@ -151,7 +151,12 @@ function askForm(a: J, at: string): D {
 }
 
 function stmt(v: unknown, at: string): D {
-  const [k, s] = tag(v, at, ["run", "do", "check", "ask", "for_each", "if_yes", "then", "page", "hand_off", "stop"], ["src", "else"]);
+  const [k, s] = tag(
+    v,
+    at,
+    ["run", "do", "check", "ask", "for_each", "ask_each", "if_yes", "then", "page", "hand_off", "stop"],
+    ["src", "else"],
+  );
   const src = nat(s.src, `${at}.src`);
   const where = `${at} (line ${s.src})`;
   const hasElse = ["run", "do"].includes(k);
@@ -194,6 +199,19 @@ function stmt(v: unknown, at: string): D {
         name(f.var, where),
         ref(f.list, `${where}.for_each.list`),
         seq(f.body, `${where}.for_each.body`, stmt),
+      );
+    }
+    case "ask_each": {
+      const a = obj(s.ask_each, `${where}.ask_each`, ["item", "cmd", "question", "sure"]);
+      const sure = nat(a.sure, `${where}.ask_each.sure`);
+      if (sure.gt(100)) throw new Unsupported(`${where}: sure must be 0–100`);
+      return SkopeAst.Stmt.create_Sweep(
+        src,
+        parts(a.cmd, `${where}.ask_each.cmd`),
+        name(a.item, where),
+        parts(a.question, `${where}.ask_each.question`),
+        sure,
+        SkopeAst.Else.create_NoElse(),
       );
     }
     case "if_yes": {
@@ -320,6 +338,11 @@ function stmtJ(d: D): J {
   if (d.is_Ask)
     return { src, ask: { question: partsJ(d.dtor_question), sure: N(d.dtor_sure), else: elsJ(d.dtor_els), ...formJ(d.dtor_form) } };
   if (d.is_ForEach) return { src, for_each: { var: S(d.dtor_loopVar), list: refJ(d.dtor_list), body: arr(d.dtor_body, stmtJ) } };
+  if (d.is_Sweep)
+    return {
+      src,
+      ask_each: { item: S(d.dtor_item), cmd: partsJ(d.dtor_cmd), question: partsJ(d.dtor_question), sure: N(d.dtor_sure) },
+    };
   if (d.is_IfYesRun) return { src, if_yes: { run: { cmd: partsJ(d.dtor_cmd) }, else: elsJ(d.dtor_els) } };
   if (d.is_IfYesDo) return { src, if_yes: { do: doJ(d.dtor_action), else: elsJ(d.dtor_els) } };
   if (d.is_Then) return { src, then: refJ(d.dtor_ref) };

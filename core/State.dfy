@@ -317,6 +317,7 @@ module SkopeState {
     t.op.S? &&
     match t.op.stmt
     case Run(_, _, _, _) => true
+    case Sweep(_, _, _, _, _, _) => true
     case Do(_, _, _) => !s.cfg.dry
     case Check(_, cond, _, _) =>
       cond.Succeeds? || (s.cfg.mode == Explore && (Unknown(s.vars, cond.l) || Unknown(s.vars, cond.r)))
@@ -346,6 +347,7 @@ module SkopeState {
     Ready(s);
     match st
     case Run(src, c, _, _) => ExecOf(s.vars, c, RunExec, p.limits.runTimeoutMs, src)
+    case Sweep(src, c, _, _, _, _) => ExecOf(s.vars, c, RunExec, p.limits.runTimeoutMs, src)
     case Do(src, a, _) => ExecOf(s.vars, DoParts(s.vars, a), DoExec, p.limits.doTimeoutMs, src)
     case Check(src, cond, _, _) =>
       if cond.Succeeds? then ExecOf(s.vars, cond.cmd, CheckExec, p.limits.runTimeoutMs, src) else Choose(3)
@@ -390,6 +392,7 @@ module SkopeState {
   function TemplateOf(st: Stmt, kind: ExecKind): Option<Parts> {
     match st
     case Run(_, c, _, _) => if kind == RunExec then Some(c) else None
+    case Sweep(_, c, _, _, _, _) => if kind == RunExec then Some(c) else None
     case IfYesRun(_, c, _) => if kind == RunExec then Some(c) else None
     case Check(_, Succeeds(c), _, _) => if kind == CheckExec then Some(c) else None
     case Do(_, DoCmd(c), _) => if kind == DoExec then Some(c) else None

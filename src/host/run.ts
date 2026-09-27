@@ -94,12 +94,21 @@ export async function runSkill(o: RunOptions): Promise<number> {
 
   const emit = (e: Record<string, unknown>) => {
     // Counted here, not taken from the core's outcome, so a run that ends in error still reports them.
-    if (e.event === "ask") askCalls++;
+    if (e.event === "ask" || e.event === "sweep_item") askCalls++;
     if (e.event === "effect_start") effects++;
     // The core found the answer invalid, which counts as unavailable (SPEC §4.2): say so, as for a failed call.
-    if (e.event === "ask" && e.detail !== undefined && !askFailed)
+    if ((e.event === "ask" || e.event === "sweep_item") && e.detail !== undefined && !askFailed)
       say("skope: the backend's answer was invalid, so it counts as the backend being unavailable\n");
     toOut(`${JSON.stringify(redactDeep(redactor, { ts: new Date().toISOString(), ...run, host, ...e }))}\n`);
+    // A sweep's answers are the point of running it: say where they are (SPEC §4.8).
+    if (e.event === "sweep" && !o.test) {
+      const early = e.stopped
+        ? `; stopped early (${e.stopped}), ${e.skipped} not asked`
+        : e.skipped
+          ? `; ${e.skipped} over the cap, not asked`
+          : "";
+      say(`skope: ask each on line ${e.line}: ${e.yes} yes, ${e.no} no, ${e.unsure} unsure${early}. Report: ${e.path}\n`);
+    }
   };
   // Warnings about a run that goes ahead are emitted after run_start, so they carry its run_id (SPEC §10).
   const held: Diagnostic[] = [];
@@ -378,9 +387,10 @@ export async function runSkill(o: RunOptions): Promise<number> {
 
     const started = Date.now();
     let asks = 0;
+    let sweepN = 0;
     const handlers: Handlers = {
       exec: async (next) => halt(await (fakeRun ? fakeRun(next) : execCommand(next.cmd, { timeoutMs: next.timeoutMs, env }))),
-      async ask(request, src) {
+      async ask(request, src, item) {
         // Redacted before it's saved or sent. Option ids are left alone: the answer is keyed by them.
         const r = (s: string) => redactor.redact(s);
         const req: AskRequest = {
@@ -406,7 +416,7 @@ export async function runSkill(o: RunOptions): Promise<number> {
           fail("E-IO", "runtime", `can't write ${path}: ${(err as Error).message}`);
         }
         const t = Date.now();
-        const out: AskOutput = answers ? askFake(answers, req, src, o.test !== undefined) : await backend.ask(req);
+        const out: AskOutput = answers ? askFake(answers, req, src, o.test !== undefined, item) : await backend.ask(req);
         askFailed = isFailure(out);
         if (isFailure(out)) say(`skope: the backend was unavailable: ${out.detail}\n`);
         if (!answers && !isFailure(out) && config.jev && backend.name === "jev" && out.model !== config.jev.model)
@@ -425,6 +435,15 @@ export async function runSkill(o: RunOptions): Promise<number> {
         };
       },
       page,
+      sweepReport(report) {
+        const path = join(runDir, `sweep-${++sweepN}.json`);
+        try {
+          writeFileSync(path, `${JSON.stringify(redactDeep(redactor, report), null, 2)}\n`, { flag: "wx", mode: 0o600 });
+        } catch (err) {
+          fail("E-IO", "runtime", `can't write ${path}: ${(err as Error).message}`);
+        }
+        return path;
+      },
     };
 
     const result = await runLoop(new Interp(program, cfg), {
@@ -450,6 +469,7 @@ export async function runSkill(o: RunOptions): Promise<number> {
         detail: detail(result),
         variables: result.variables,
         effects: result.effects,
+        ...(result.sweeps.length > 0 ? { sweeps: result.sweeps } : {}),
         dry_run: dryRun,
         skope: { version, build },
         preamble: PREAMBLE,

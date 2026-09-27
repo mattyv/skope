@@ -113,6 +113,22 @@ export function parseForEach(rest: string) {
   return { var: name, list };
 }
 
+/** `ITEM of `CMD`: QUESTION → yes | no · sure N%` (SPEC §4.8): one yes/no question per output line.
+ * It binds nothing and has no else, so `as NAME` and `· else` aren't allowed. */
+export function parseAskEach(rest: string) {
+  const cur = new Cursor(rest);
+  if (!cur.eat(T.sp)) return fail();
+  const item = cur.name();
+  if (item === null || !cur.eat(T.of)) return fail();
+  const cmd = cur.codeSpan();
+  if (cmd === null || !cur.eat(/: */y)) return fail();
+  const q = rest.slice(cur.pos);
+  const m = /^(.*?) +(?:→|->) +yes *\| *no +· +sure +(\d+)%$/.exec(q);
+  const sure = safeInt(m?.[2]);
+  if (!m || m[1] === "" || /→|->|·/.test(m[1] ?? "") || sure === null || sure > 100) return fail();
+  return { item, cmd: splitParts(cmd), question: splitParts(m[1] as string), sure };
+}
+
 export function parseIfYes(rest: string, resolve: Resolve) {
   const cur = new Cursor(rest);
   if (!cur.eat(T.sp)) return fail();

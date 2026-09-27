@@ -183,7 +183,7 @@ module SkopeRun {
   // `detail` is Some for a comparison that couldn't coerce (CmpDetail).
   function Failed(s: State, detail: Option<string>): (res: (State, seq<CoreEvent>, Next))
     requires Idle(s) && s.tasks[0].op.S?
-    requires Stmt0(s).Run? || Stmt0(s).Do? || Stmt0(s).Check? || Stmt0(s).IfYesRun? || Stmt0(s).IfYesDo?
+    requires Stmt0(s).Run? || Stmt0(s).Do? || Stmt0(s).Check? || Stmt0(s).IfYesRun? || Stmt0(s).IfYesDo? || Stmt0(s).Sweep?
     ensures Post(s, res, Busy(s))
     decreases Busy(s), 3
   {
@@ -305,6 +305,7 @@ module SkopeRun {
     match st
     case Run(_, _, _, _) => AfterRun(s0, Ev(s0, RunEv(n.cmd, r.exit, r.timedOut, s.afterWouldDo)), r)
     case IfYesRun(_, _, _) => AfterExec(s0, Ev(s0, RunEv(n.cmd, r.exit, r.timedOut, s.afterWouldDo)), r)
+    case Sweep(_, _, _, _, _, _) => AfterExec(s0, Ev(s0, RunEv(n.cmd, r.exit, r.timedOut, s.afterWouldDo)), r)
     case Do(_, _, _) => AfterExec(s0, Ev(s0, EffectEndEv(n.cmd, r.exit, r.timedOut)), r)
     case IfYesDo(_, _, _) => AfterExec(s0, Ev(s0, EffectEndEv(n.cmd, r.exit, r.timedOut)), r)
     case Check(_, cond, _, _) =>
@@ -338,7 +339,7 @@ module SkopeRun {
 
   // An `if yes run`, `do` or `if yes do` finished: carry on, or failure handling.
   function AfterExec(s: State, e: CoreEvent, r: Response): (res: (State, seq<CoreEvent>, Next))
-    requires Idle(s) && s.tasks[0].op.S? && (Stmt0(s).IfYesRun? || Stmt0(s).Do? || Stmt0(s).IfYesDo?) && Plain(s, e) && r.ExecResult?
+    requires Idle(s) && s.tasks[0].op.S? && (Stmt0(s).IfYesRun? || Stmt0(s).Do? || Stmt0(s).IfYesDo? || Stmt0(s).Sweep?) && Plain(s, e) && r.ExecResult?
     ensures Post(s, res, Busy(s))
   {
     Then(e, if Ok(r) then SameOk(Log(s, e)); Continue(Log(s, e), s.vars) else Failed(Log(s, e), None))

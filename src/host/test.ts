@@ -458,6 +458,15 @@ export function check(expect: Expect, code: number, events: Event[], program: Co
     if (!ask.passed) return `asks.${key}: chose ${want.chosen}, but below sure (confidence ${ask.confidence}, sure ${ask.sure}%)`;
   }
 
+  for (const [key, want] of Object.entries(expect.sweeps ?? {})) {
+    const line = askLine(program, key);
+    if (line === null) return { invalid: `sweeps.${key} doesn't name exactly one ask each` };
+    const sweep = events.findLast((e) => e.event === "sweep" && e.line === line);
+    if (!sweep) return `sweeps.${key}: the run never finished that sweep`;
+    for (const k of ["yes", "no", "unsure"] as const)
+      if (want[k] !== undefined && sweep[k] !== want[k]) return `sweeps.${key}.${k}: expected ${want[k]}, got ${sweep[k]}`;
+  }
+
   if (expect.page_contains !== undefined) {
     const pages = events
       .filter((e) => ["page", "would_page", "handoff_page"].includes(e.event))

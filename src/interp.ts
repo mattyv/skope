@@ -9,7 +9,17 @@
 
 import { toAst } from "./ast.js";
 import { _dafny, BigNumber, gen, Unsupported } from "./core.js";
-import { ANSWERS, type CoreEvent, type Next, type Outcome, REASONS, type Response, type RunConfig, type Val } from "./step.js";
+import {
+  ANSWERS,
+  type AskRequest,
+  type CoreEvent,
+  type Next,
+  type Outcome,
+  REASONS,
+  type Response,
+  type RunConfig,
+  type Val,
+} from "./step.js";
 
 const { SkopeAst, SkopeStep, SkopeState, SkopeRun, SkopeValues, SkopeWellFormed, SkopeCheck } = gen;
 type D = any;
@@ -135,29 +145,30 @@ function toNext(d: D): Next {
     const exec = oneOf(d.dtor_kind, ["run", "do", "check"] as const, ["RunExec", "DoExec", "CheckExec"]);
     return { kind: "exec", cmd: unstr(d.dtor_cmd), exec, timeoutMs: d.dtor_timeoutMs.toNumber(), src: d.dtor_src.toNumber() };
   }
-  if (d.is_AskNext) {
-    const q = d.dtor_request;
-    const context: Record<string, string> = {};
-    for (const k of q.dtor_context.Keys.Elements) context[unstr(k)] = unstr(q.dtor_context.get(k));
-    const request = {
-      kind: askKind(q.dtor_kind),
-      question: unstr(q.dtor_question),
-      guidance: opt(q.dtor_guidance, unstr),
-      options: [...q.dtor_options].map((o: D) => ({
-        id: unstr(o.dtor_id),
-        label: unstr(o.dtor_text),
-        description: opt(o.dtor_description, unstr),
-      })),
-      context,
-      // ask.timeout_ms is config the core doesn't see; the host sets it.
-      timeout_ms: q.dtor_timeoutMs.toNumber(),
-    };
-    return { kind: "ask", request: request as Extract<Next, { kind: "ask" }>["request"], src: d.dtor_src.toNumber() };
-  }
+  if (d.is_AskNext) return { kind: "ask", request: askRequest(d.dtor_request), src: d.dtor_src.toNumber() };
   if (d.is_PageNext) return { kind: "page", text: unstr(d.dtor_text), src: d.dtor_src.toNumber() };
   if (d.is_Choose) return { kind: "choose", n: d.dtor_n.toNumber() };
   if (d.is_Done) return { kind: "done", outcome: outcome(d.dtor_outcome) };
   throw new Error(`unknown request from the core: ${d}`);
+}
+
+function askRequest(q: D): AskRequest {
+  const context: Record<string, string> = {};
+  for (const k of q.dtor_context.Keys.Elements) context[unstr(k)] = unstr(q.dtor_context.get(k));
+  const request = {
+    kind: askKind(q.dtor_kind),
+    question: unstr(q.dtor_question),
+    guidance: opt(q.dtor_guidance, unstr),
+    options: [...q.dtor_options].map((o: D) => ({
+      id: unstr(o.dtor_id),
+      label: unstr(o.dtor_text),
+      description: opt(o.dtor_description, unstr),
+    })),
+    context,
+    // ask.timeout_ms is config the core doesn't see; the host sets it.
+    timeout_ms: q.dtor_timeoutMs.toNumber(),
+  };
+  return request as AskRequest;
 }
 
 function body(b: D): Record<string, unknown> {
@@ -261,6 +272,42 @@ export class Interp {
     this.state = res[0];
     this.last = toNext(res[2]);
     return { events: [...res[1]].map(event), next: this.last };
+  }
+
+  /**
+   * While a sweep's command is pending (SPEC §4.8): its yes/no question for
+   * one output line, rendered by the core as for an `ask`, with the item
+   * bound as run output (named in backticks, sent as context). Null if the
+   * pending request isn't a sweep's command.
+   */
+  sweepAsk(item: string): { request: AskRequest; sure: number; section: string } | null {
+    const s = this.state;
+    if (this.last?.kind !== "exec" || s.dtor_tasks.length === 0 || !s.dtor_tasks[0].dtor_op.is_S) return null;
+    const st = s.dtor_tasks[0].dtor_op.dtor_stmt;
+    if (!st.is_Sweep) return null;
+    const slot = SkopeState.Slot.create_Slot(
+      SkopeStep.Bound.create_Bound(SkopeStep.Val.create_Str(str(item, "item")), SkopeStep.Origin.create_FromRunOutput()),
+      none(),
+    );
+    const vars = s.dtor_vars.update(st.dtor_item, slot);
+    const form = SkopeAst.AskForm.create_YesNo(st.dtor_item);
+    const q = SkopeState.__default.AskReq(s.dtor_prog, s.dtor_sec, vars, s.dtor_runNames, st.dtor_question, form);
+    return { request: askRequest(q), sure: st.dtor_sure.toNumber(), section: unstr(s.dtor_prog.dtor_sections.get(s.dtor_sec).dtor_name) };
+  }
+
+  /**
+   * The proven gate (Gate in core/Values.dfy) on a yes/no answer: invalid,
+   * or the chosen id, its confidence, and whether it passed `sure`.
+   */
+  gateYesNo(probs: Record<string, number>, unassigned: number, sure: number) {
+    const nums = [...Object.values(probs), unassigned];
+    if (!nums.every((x) => typeof x === "number" && Number.isFinite(x))) return null;
+    let m = _dafny.Map.Empty;
+    for (const [k, x] of Object.entries(probs)) m = m.update(str(k, "option id"), real(x));
+    const ids = _dafny.Seq.of(str("yes", "id"), str("no", "id"));
+    const v = SkopeValues.__default.Gate(ids, m, real(unassigned), int(sure, "sure", 0));
+    if (v.is_Invalid) return null;
+    return { chosen: v.dtor_chosen.toNumber() === 0 ? "yes" : "no", confidence: unreal(v.dtor_conf), passed: !!v.is_Sure };
   }
 
   /**

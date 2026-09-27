@@ -11,6 +11,7 @@ export interface Expect {
   page_contains?: string;
   handoff_reason?: "explicit" | "gate_failed" | "command_failed" | "ask_unavailable" | "deadline";
   max_ask_calls?: number;
+  sweeps?: Record<string, { yes?: number; no?: number; unsure?: number }>;
   live?: { runs?: number; min_hit_rate?: number; min_margin?: number };
 }
 
@@ -22,7 +23,7 @@ const nonEmpty = (v: unknown) => typeof v === "string" && v.length > 0;
 export const MAX_EXIT = 255;
 /** The same cap as --runs (src/cli.ts): without one, live.runs: .inf repeats backend calls forever. */
 export const MAX_RUNS = 999999;
-const KEYS = ["outcome", "exit", "path", "path_prefix", "asks", "page_contains", "handoff_reason", "max_ask_calls", "live"];
+const KEYS = ["outcome", "exit", "path", "path_prefix", "asks", "page_contains", "handoff_reason", "max_ask_calls", "sweeps", "live"];
 const REASONS = ["explicit", "gate_failed", "command_failed", "ask_unavailable", "deadline"];
 
 /** Why `doc` isn't a valid expect.yaml, or null if it is. */
@@ -52,6 +53,17 @@ export function expectError(doc: unknown): string | null {
     return `handoff_reason must be one of ${REASONS.join(", ")}`;
   if ("max_ask_calls" in doc && !(isInt(doc.max_ask_calls) && (doc.max_ask_calls as number) >= 0))
     return "max_ask_calls must be a whole number of 0 or more";
+  if ("sweeps" in doc) {
+    if (!isObj(doc.sweeps)) return "sweeps must be a mapping";
+    for (const [key, w] of Object.entries(doc.sweeps)) {
+      if (key === "") return "a sweeps key must not be empty";
+      if (!isObj(w) || Object.keys(w).length === 0) return `sweeps.${key} must count at least one of yes, no or unsure`;
+      const wx = Object.keys(w).find((k) => !["yes", "no", "unsure"].includes(k));
+      if (wx !== undefined) return `unknown key sweeps.${key}.${wx}`;
+      for (const [k, n] of Object.entries(w))
+        if (!(isInt(n) && (n as number) >= 0)) return `sweeps.${key}.${k} must be a whole number of 0 or more`;
+    }
+  }
   if ("live" in doc) {
     const l = doc.live;
     if (!isObj(l)) return "live must be a mapping";

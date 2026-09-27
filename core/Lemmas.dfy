@@ -637,6 +637,7 @@ module SkopeLemmas {
     match st
     case Run(_, c, _, _) => CmdOk(s, c); assert TemplateOf(st, RunExec) == Some(c);
     case IfYesRun(_, c, _) => CmdOk(s, c); assert TemplateOf(st, RunExec) == Some(c);
+    case Sweep(_, c, _, _, _, _) => CmdOk(s, c); assert TemplateOf(st, RunExec) == Some(c);
     case Check(_, cond, _, _) =>
       if cond.Succeeds? { CmdOk(s, cond.cmd); assert TemplateOf(st, CheckExec) == Some(cond.cmd); }
     case Do(_, a, _) => DoOk(s, a);
