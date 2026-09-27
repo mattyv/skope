@@ -14,7 +14,7 @@
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, test } from "vitest";
+import { describe, test } from "vitest";
 import { runSkope } from "../lib/cli.js";
 import { allScenarios } from "../lib/scenarios.js";
 
@@ -31,11 +31,24 @@ function writeTrace(events: object[]): string {
   return path;
 }
 
-describe("differential check: a real run's trace is one --verify's explorer can take (SPEC §12.4)", () => {
+// One real run per scenario, shared by its two tests (each run spawns the CLI).
+const runs = new Map<string, ReturnType<typeof runSkope>>();
+function runOnce(s: ReturnType<typeof allScenarios>[number]) {
+  const key = `${s.fixture}/${s.name}`;
+  let run = runs.get(key);
+  if (!run) {
+    const mode = s.name === "dry-run" ? "--dry-run" : "--apply";
+    run = runSkope([s.skillPath, mode, "--fake", s.answersPath, "--fake-exec", s.commandsPath]);
+    runs.set(key, run);
+  }
+  return run;
+}
+
+// Every test spawns its own CLI with its own temp dirs, so they can run concurrently.
+describe.concurrent("differential check: a real run's trace is one --verify's explorer can take (SPEC §12.4)", () => {
   for (const s of allScenarios().filter((s) => !s.name.startsWith("deadline"))) {
-    test(`${s.fixture}/${s.name}: --verify --trace exits 0 on the run's own trace`, async () => {
-      const mode = s.name === "dry-run" ? "--dry-run" : "--apply";
-      const run = await runSkope([s.skillPath, mode, "--fake", s.answersPath, "--fake-exec", s.commandsPath]);
+    test(`${s.fixture}/${s.name}: --verify --trace exits 0 on the run's own trace`, async ({ expect }) => {
+      const run = await runOnce(s);
       expect(run.events.length).toBeGreaterThan(0);
       const trace = writeTrace(run.events);
 
@@ -43,9 +56,8 @@ describe("differential check: a real run's trace is one --verify's explorer can 
       expect(r.code).toBe(0);
     });
 
-    test(`${s.fixture}/${s.name}: --verify --trace exits 40 on a tampered trace`, async () => {
-      const mode = s.name === "dry-run" ? "--dry-run" : "--apply";
-      const run = await runSkope([s.skillPath, mode, "--fake", s.answersPath, "--fake-exec", s.commandsPath]);
+    test(`${s.fixture}/${s.name}: --verify --trace exits 40 on a tampered trace`, async ({ expect }) => {
+      const run = await runOnce(s);
       // Tamper with the trace by dropping its outcome event: no explored path ends mid-stream,
       // so the explorer can't have taken this (truncated) sequence.
       const tampered = run.events.filter((e) => (e as { event: string }).event !== "outcome");

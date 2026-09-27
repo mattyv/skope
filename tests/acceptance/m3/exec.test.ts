@@ -10,7 +10,8 @@ import { normalise } from "../../helpers/golden.js";
 import { runSkope } from "../lib/cli.js";
 import { allScenarios, readExpectedExit, readGolden } from "../lib/scenarios.js";
 
-describe("M3: exec with fakes matches the golden event stream (SPEC §12.3)", () => {
+// Every test spawns its own CLI with its own temp dirs, so they can run concurrently.
+describe.concurrent("M3: exec with fakes matches the golden event stream (SPEC §12.3)", () => {
   for (const s of allScenarios()) {
     // dry-run scenarios are the SPEC §4.5 half of M3 ("dry run issues no `do` and no page");
     // everything else is the general "matches a golden JSONL" clause.

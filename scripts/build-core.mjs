@@ -7,9 +7,15 @@
 //
 // Needs the Dafny version pinned in .dafny-version, found as $DAFNY or
 // `dafny` on the PATH.
+//
+// Verifying takes minutes, so a successful build records a hash of its
+// inputs (the .dfy files, the Dafny version and this script) in
+// node_modules/.cache, and the next run skips Dafny when nothing changed.
+// `--force` rebuilds anyway. CI has no cache, so it always verifies.
 
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -42,6 +48,18 @@ const files = readdirSync(join(ROOT, "core"))
   .sort()
   .map((f) => join("core", f));
 
+const out = join(ROOT, "core", "generated", "core.cjs");
+const stamp = join(ROOT, "node_modules", ".cache", "skope", "core.sha256");
+const inputs = createHash("sha256")
+  .update(installed)
+  .update(readFileSync(fileURLToPath(import.meta.url)));
+for (const f of files) inputs.update(f).update(readFileSync(join(ROOT, f)));
+const hash = inputs.digest("hex");
+if (!process.argv.includes("--force") && existsSync(out) && existsSync(stamp) && readFileSync(stamp, "utf8") === hash) {
+  console.log("build-core: core/*.dfy unchanged since the last verified build; skipping Dafny (--force to rebuild).");
+  process.exit(0);
+}
+
 const tmp = mkdtempSync(join(tmpdir(), "skope-core-"));
 try {
   // translate verifies first, and fails on any unproven obligation.
@@ -50,11 +68,12 @@ try {
   // constructors, so values built by the adapter wouldn't match.
   dafny(["translate", "js", "--include-runtime", "--optimize-erasable-datatype-wrapper:false", "--output", join(tmp, "core"), ...files]);
   const js = patchRuntime(readFileSync(join(tmp, "core.js"), "utf8"));
-  const out = join(ROOT, "core", "generated", "core.cjs");
   // Dafny's JavaScript declares each module as a top-level binding and
   // exports nothing, so export the ones the adapter needs.
   writeFileSync(out, `${js}\nmodule.exports = { _dafny, ${MODULES.join(", ")} };\n`);
   console.log(`build-core: wrote ${out.slice(ROOT.length + 1)}`);
+  mkdirSync(dirname(stamp), { recursive: true });
+  writeFileSync(stamp, hash);
 } finally {
   rmSync(tmp, { recursive: true, force: true });
 }
