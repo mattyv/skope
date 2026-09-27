@@ -76,7 +76,8 @@ async function test_(path: string, ...args: string[]) {
   return { ...r, scenarios: lines.filter((l) => "scenario" in l), summary: lines.at(-1) };
 }
 
-describe("skope --test", () => {
+// Every test uses its own temp dirs, so the tests in this file run concurrently.
+describe.concurrent("skope --test", () => {
   const PAGER_SKILL = [
     "---",
     "name: pagetext",
@@ -301,7 +302,7 @@ describe("skope --test", () => {
   });
 });
 
-describe("tests.yaml", () => {
+describe.concurrent("tests.yaml", () => {
   test("defaults plus 2 scenarios, one overriding a single default command: both pass", async () => {
     const testsYaml = {
       defaults: { commands: RESTART_COMMANDS, answers: RESTART_ANSWERS },
@@ -412,7 +413,7 @@ describe("tests.yaml", () => {
   });
 });
 
-describe("the fixtures' scenarios pass under --test", () => {
+describe.concurrent("the fixtures' scenarios pass under --test", () => {
   // Dry-run scenarios stay with the golden tests: --test runs as --apply.
   const scenarios = allScenarios().filter((s) => {
     const first = existsSync(s.goldenPath) ? JSON.parse(readFileSync(s.goldenPath, "utf8").split("\n")[0] as string) : {};
@@ -425,7 +426,7 @@ describe("the fixtures' scenarios pass under --test", () => {
   });
 });
 
-describe("tests.yaml: what a user writes first", () => {
+describe.concurrent("tests.yaml: what a user writes first", () => {
   // Line 14 is the run; Big's ask is on line 21.
   const probe = (sure: number) =>
     [

@@ -28,6 +28,7 @@
     "typecheck": "tsc --noEmit",
     "pretest": "npm run build",
     "test": "vitest run",
+    "test:quick": "npm run build && SKOPE_QUICK=1 vitest run",
     "postinstall": "node scripts/postinstall.mjs",
     "lint": "biome check .",
     "format": "biome check --write .",

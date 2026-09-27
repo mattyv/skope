@@ -557,7 +557,8 @@ explorer behind `--verify`.
 
 ```console
 $ npm ci
-$ npm test            # builds, then runs every test
+$ npm test            # builds, then runs every test (about a minute)
+$ npm run test:quick  # builds, then skips the slowest suites (about 15 seconds)
 $ npm run lint        # Biome: lint and formatting
 $ npx tsc --noEmit    # type check
 ```
@@ -569,6 +570,9 @@ does:
 ```console
 $ DAFNY=/path/to/dafny npm run core   # verify the proofs and rebuild core/generated
 ```
+
+`npm run core` skips Dafny when the `.dfy` files haven't changed since its
+last successful run; `npm run core -- --force` rebuilds anyway.
 
 ## Read more
 
