@@ -42,23 +42,6 @@ const everything = {
         { src: 15, if_yes: { run: { cmd: lit("echo yes") }, else: null } },
         { src: 16, if_yes: { do: { item: "step" }, else: { skip: {} } } },
         { src: 17, ask: { question: lit("Pick"), sure: 100, else: null, one_of: { list: { section: "s:list" }, as: "svc" } } },
-        {
-          src: 18,
-          ask: {
-            question: [{ lit: "How bad is " }, { var: "used" }, { lit: "?" }],
-            sure: 40,
-            else: null,
-            score: {
-              low: 1,
-              high: 2,
-              rubric: [
-                { src: 19, level: 1, text: "fine" },
-                { src: 20, level: 2, text: "bad" },
-              ],
-              as: "sev",
-            },
-          },
-        },
         { src: 21, for_each: { var: "step", list: { section: "s:list" }, body: [{ src: 22, do: { item: "step" }, else: null }] } },
         { src: 23, page: [{ lit: "help " }, { var: "a" }] },
         { src: 24, then: { section: "s:other" } },

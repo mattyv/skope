@@ -48,9 +48,6 @@ for (const { name, core, skill } of cases) {
         if (s.ask.sections) {
           for (const opt of s.ask.sections) add(`${ctx} ask option`, opt.src, `[${sections[opt.section].name}]`);
         }
-        if (s.ask.score) {
-          for (const r of s.ask.score.rubric) add(`${ctx} rubric level ${r.level}`, r.src, r.text);
-        }
       } else if (s.for_each) {
         for (const b of s.for_each.body) walkStmt(b, `${ctx} for_each`);
       } else if (s.if_yes) {

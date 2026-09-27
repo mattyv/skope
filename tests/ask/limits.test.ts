@@ -10,17 +10,14 @@ describe("checkAskLimits (SPEC §6.2, §12.2)", () => {
   test("declares the limits table from SPEC §6.2", () => {
     expect(JEV_LIMITS).toEqual({
       maxOptions: 255,
-      maxScoreLevels: 10,
       contextTokens: 30000,
     });
     expect(OPENROUTER_LIMITS).toEqual({
       maxOptions: 20,
-      maxScoreLevels: 10,
       contextTokens: null,
     });
     expect(FAKE_LIMITS).toEqual({
       maxOptions: 255,
-      maxScoreLevels: 10,
       contextTokens: null,
     });
   });
@@ -47,12 +44,5 @@ describe("checkAskLimits (SPEC §6.2, §12.2)", () => {
 
   test("a backend with no context limit (fake) never fails on context size", () => {
     expect(checkAskLimits({ kind: "choice", optionCount: 4, declaredContextTokens: 1_000_000 }, FAKE_LIMITS).ok).toBe(true);
-  });
-
-  test("a score ask checks the level count against maxScoreLevels, not maxOptions", () => {
-    // openrouter's option cap (20) is lower than its score cap (10 is the
-    // language max anyway), so this exercises the score branch specifically.
-    const r = checkAskLimits({ kind: "score", optionCount: 11, declaredContextTokens: null }, JEV_LIMITS);
-    expect(r.ok).toBe(false);
   });
 });

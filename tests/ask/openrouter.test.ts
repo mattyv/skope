@@ -472,7 +472,7 @@ describe("checkModel (SPEC §6.2, E-BACKEND-MODEL)", () => {
     );
     const result = await checkModel("test/model", { fetch: fetchImpl, sleep });
     expect(result.contextTokens).toBe(30000);
-    const limits = { maxOptions: 20, maxScoreLevels: 10, contextTokens: result.contextTokens ?? null };
+    const limits = { maxOptions: 20, contextTokens: result.contextTokens ?? null };
     const r = checkAskLimits({ kind: "choice", optionCount: 4, declaredContextTokens: 30001 }, limits);
     expect(r.ok).toBe(false);
     expect(!r.ok && r.code).toBe("E-BACKEND-LIMIT");

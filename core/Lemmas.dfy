@@ -624,7 +624,6 @@ module SkopeLemmas {
       case Sections(opts) => |opts|
       case YesNo(_) => 2
       case OneOf(l, _) => |DataList(p, l.id).items|
-      case Score(lo, hi, _, _) => hi - lo + 1
   {}
 
   // ---- P3, P4 for each request ----
@@ -668,17 +667,7 @@ module SkopeLemmas {
     case KValue(l) =>
       var it :| it in DataList(p, l).items && it.Value? && sl.b.value == Str(it.value);
       assert Label(it) == it.value;
-    case KScore => ScoreDigits(p, cfg, x, sl);
     case _ =>
-  }
-
-  lemma ScoreDigits(p: Program, cfg: RunConfig, x: Name, sl: Slot)
-    requires WellFormed(p) && sl.kind == KScore && SlotOk(p, cfg, x, sl)
-    ensures sl.b.value.i >= 0 && AllDigits(Show(sl.b.value)) && SafeValue(Show(sl.b.value))
-  {
-    var st :| st in Stmts(p) && st.Ask? && st.form.Score? && st.form.binding == x && st.form.low <= sl.b.value.i <= st.form.high;
-    assert AskOk(st);
-    NatDigits(sl.b.value.i);
   }
 
   lemma PiecesOk(p: Program, cfg: RunConfig, vars: Vars, c: Parts)
@@ -737,7 +726,6 @@ module SkopeLemmas {
     match sl.kind
     case KValue(l) => var it :| it in DataList(p, l).items && it.Value? && sl.b.value == Str(it.value); assert Label(it) == it.value;
     case KAction(l) => var it := sl.item.value; assert Label(it) == it.text;
-    case KScore => ScoreDigits(p, cfg, x, sl);
     case _ =>
   }
 

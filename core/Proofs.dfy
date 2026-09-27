@@ -165,7 +165,6 @@ module SkopeProofs {
             v.chosen < |req.options|
             && res.1[0].body.chosen == Some(ChosenOf(st.form, Ids(req.options), v.chosen))
             && res.1[0].body.confidence == Some(v.conf)
-            && (st.form.Score? ==> st.form.low <= st.form.low + v.chosen <= st.form.high)
             && (st.form.Sections? ==>
                   |res.1| > 1 && res.1[1].body.TransferEv?
                   && res.1[1].body.to == s.prog.sections[st.form.options[v.chosen].ref.id].name))
@@ -176,14 +175,13 @@ module SkopeProofs {
   }
 
   // The slot a passed gate binds (SPEC §4.2): yes/no and one of bind the
-  // chosen option's id as a string, a Score its level as an integer.
+  // chosen option's id as a string.
   ghost function AnswerSlot(form: AskForm, ids: seq<string>, c: nat): Slot
     requires !form.Sections? && c < |ids|
   {
     match form
     case YesNo(_) => Slot(Bound(Str(ids[c]), FromYesNo), None, KYesNo)
     case OneOf(l, _) => Slot(Bound(Str(ids[c]), FromListItem), None, KValue(l.id))
-    case Score(lo, _, _, _) => Slot(Bound(Int(lo + c), FromScore), None, KScore)
   }
 
   // The state a bound answer carries the run on from: the ask's state,
@@ -195,7 +193,7 @@ module SkopeProofs {
     s1.(tasks := s1.tasks[1..], vars := s1.vars[name := sl])
   }
 
-  // P5, what an answer binds: a passed gate on a yes/no, one of or Score
+  // P5, what an answer binds: a passed gate on a yes/no or one of
   // ask, or a failed one with `else skip` (yes/no only: it binds "no",
   // SPEC §4.2), carries the run on from exactly the ask's state with that
   // one name bound; nothing else changes but the log and the ask count.
@@ -245,7 +243,7 @@ module SkopeProofs {
     var s1 := s.(last := None, askCalls := s.askCalls + 1);
     var v := Gate(ids, r.probs, r.unassigned, st.sure);
     assert Answered(s1, st, req, r) == GatePassed(s1, st, req, r, v.chosen, v.conf);
-    var e := Ev(s1, AskEv(req.question, req.kind, Some(r.probs), Some(ChosenOf(st.form, ids, v.chosen)), Some(v.conf), st.sure, true, Range(st.form), None, s1.afterWouldDo));
+    var e := Ev(s1, AskEv(req.question, req.kind, Some(r.probs), Some(ChosenOf(st.form, ids, v.chosen)), Some(v.conf), st.sure, true, None, s1.afterWouldDo));
     assert GatePassed(s1, st, req, r, v.chosen, v.conf) == SkopeRun.Then(e, Accept(Log(s1, e), v.chosen));
     AcceptAdvance(Log(s1, e), v.chosen);
     assert Log(s1, e) == s.(last := None, askCalls := s.askCalls + 1, log := s.log + [e]);
@@ -281,7 +279,7 @@ module SkopeProofs {
     var s1 := s.(last := None, askCalls := s.askCalls + 1);
     var v := Gate(ids, r.probs, r.unassigned, st.sure);
     assert Answered(s1, st, req, r) == GateMissed(s1, st, req, r, v.chosen, v.conf);
-    var e := Ev(s1, AskEv(req.question, req.kind, Some(r.probs), Some(ChosenOf(st.form, ids, v.chosen)), Some(v.conf), st.sure, false, Range(st.form), None, s1.afterWouldDo));
+    var e := Ev(s1, AskEv(req.question, req.kind, Some(r.probs), Some(ChosenOf(st.form, ids, v.chosen)), Some(v.conf), st.sure, false, None, s1.afterWouldDo));
     assert GateMissed(s1, st, req, r, v.chosen, v.conf) == SkopeRun.Then(e, GateMiss(Log(s1, e)));
     SkipAdvance(Log(s1, e));
     assert Log(s1, e) == s.(last := None, askCalls := s.askCalls + 1, log := s.log + [e]);
@@ -353,8 +351,7 @@ module SkopeProofs {
       var st := s.tasks[0].op.stmt;
       SafeAt(p, st, KindMap(s.vars), s.tasks[0].gov)
       && (forall x <- CmdVars(st) :: x in s.vars && CmdSafe(p, s.cfg, s.vars[x]))
-      // A comparison on a Score variable never fails coercion.
-      && (forall x <- OperandVars(st) :: x in s.vars && (s.vars[x].kind == KScore ==> Coerce(s.vars[x].b.value).Some?))
+      && (forall x <- OperandVars(st) :: x in s.vars)
       && ((st.Do? || st.IfYesDo?) ==> DoReady(s.vars, st.action))
       && (forall j <- Jumps(st) :: IsInstr(p, j.ref.id))
       && (forall r <- ListRefs(st) :: IsData(p, r.id))
@@ -371,9 +368,6 @@ module SkopeProofs {
       forall x <- CmdVars(st) ensures x in s.vars && CmdSafe(p, s.cfg, s.vars[x]) {
         assert x in CmdNames(p);
         CmdVarSafe(p, s.cfg, s.vars, x);
-      }
-      forall x <- OperandVars(st) | s.vars[x].kind == KScore ensures Coerce(s.vars[x].b.value).Some? {
-        assert SlotOk(p, s.cfg, x, s.vars[x]);
       }
     }
   }

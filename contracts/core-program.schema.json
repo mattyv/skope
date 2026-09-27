@@ -405,7 +405,7 @@
       "required": ["question", "sure", "else"],
       "minProperties": 4,
       "maxProperties": 4,
-      "description": "Exactly one of sections, yesno, one_of or score (SPEC §3.4, §4.7).",
+      "description": "Exactly one of sections, yesno or one_of (SPEC §3.4, §4.7).",
       "properties": {
         "question": {
           "$ref": "#/$defs/parts"
@@ -455,44 +455,6 @@
           "properties": {
             "list": {
               "$ref": "#/$defs/sectionRef"
-            },
-            "as": {
-              "$ref": "#/$defs/name"
-            }
-          }
-        },
-        "score": {
-          "description": "v1.1.",
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["low", "high", "rubric", "as"],
-          "properties": {
-            "low": {
-              "type": "integer",
-              "minimum": 0
-            },
-            "high": {
-              "type": "integer",
-              "minimum": 0
-            },
-            "rubric": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": ["src", "level", "text"],
-                "properties": {
-                  "src": {
-                    "$ref": "#/$defs/src"
-                  },
-                  "level": {
-                    "type": "integer"
-                  },
-                  "text": {
-                    "type": "string"
-                  }
-                }
-              }
             },
             "as": {
               "$ref": "#/$defs/name"

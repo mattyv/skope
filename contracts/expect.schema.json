@@ -25,7 +25,7 @@
       "$ref": "#/$defs/sections"
     },
     "asks": {
-      "description": "Keyed by a section with one ask, or Section.var for the ask that binds var. `chosen` is the option's label: a section name, a list item, yes or no, or a Score level. When the ask runs more than once, the last answer counts.",
+      "description": "Keyed by a section with one ask, or Section.var for the ask that binds var. `chosen` is the option's label: a section name, a list item, or yes or no. When the ask runs more than once, the last answer counts.",
       "type": "object",
       "propertyNames": {
         "type": "string",

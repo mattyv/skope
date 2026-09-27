@@ -10,7 +10,7 @@
       "required": ["kind", "question", "guidance", "options", "context", "timeout_ms"],
       "properties": {
         "kind": {
-          "enum": ["choice", "yesno", "score"]
+          "enum": ["choice", "yesno"]
         },
         "question": {
           "type": "string",

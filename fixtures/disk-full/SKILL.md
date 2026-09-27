@@ -5,8 +5,8 @@ description: Free disk space safely when a Linux volume fills up. Use when a dis
 
 # Disk full
 
-*A [skope](https://github.com/mattyv/skope) skill. Run it with the run-skope-skill skill if you have
-it; if not, the bold steps are the procedure, and `{names}` are params set in the skope block below.*
+*A [skope](https://github.com/mattyv/skope) skill. Run it with `skope` (see the run-skope-skill skill),
+never by hand: its commands are reviewed as a set. `{names}` are params, set in the skope block below.*
 
 ```skope
 format: 1

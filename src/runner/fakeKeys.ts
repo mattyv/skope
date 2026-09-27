@@ -54,7 +54,7 @@ function targets(body: Stmt[], kind: FakeKind): Target[] {
     if (kind === "answers") {
       if (!("ask" in st)) return [];
       const a = st.ask;
-      return [{ src: st.src, binds: a.yesno?.as ?? a.one_of?.as ?? a.score?.as, ask: true, text: template(a.question) }];
+      return [{ src: st.src, binds: a.yesno?.as ?? a.one_of?.as, ask: true, text: template(a.question) }];
     }
     const cmd = (body: unknown) => {
       const b = body as { cmd?: unknown; item?: string } | undefined;

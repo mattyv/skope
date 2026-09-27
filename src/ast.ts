@@ -131,7 +131,7 @@ function cond(v: unknown, at: string): D {
 }
 
 function askForm(a: J, at: string): D {
-  const [k, o] = tag(a, at, ["sections", "yesno", "one_of", "score"], ["question", "sure", "else"]);
+  const [k, o] = tag(a, at, ["sections", "yesno", "one_of"], ["question", "sure", "else"]);
   switch (k) {
     case "sections":
       return SkopeAst.AskForm.create_Sections(
@@ -143,17 +143,9 @@ function askForm(a: J, at: string): D {
       );
     case "yesno":
       return SkopeAst.AskForm.create_YesNo(name(obj(o.yesno, `${at}.yesno`, ["as"]).as, at));
-    case "one_of": {
+    default: {
       const x = obj(o.one_of, `${at}.one_of`, ["list", "as"]);
       return SkopeAst.AskForm.create_OneOf(ref(x.list, `${at}.one_of.list`), name(x.as, at));
-    }
-    default: {
-      const x = obj(o.score, `${at}.score`, ["low", "high", "rubric", "as"]);
-      const rubric = seq(x.rubric, `${at}.score.rubric`, (y, at) => {
-        const r = obj(y, at, ["src", "level", "text"]);
-        return SkopeAst.RubricLine.create_RubricLine(nat(r.src, at), int(r.level, at), str(r.text, at));
-      });
-      return SkopeAst.AskForm.create_Score(int(x.low, at), int(x.high, at), rubric, name(x.as, at));
     }
   }
 }
@@ -184,7 +176,7 @@ function stmt(v: unknown, at: string): D {
       return SkopeAst.Stmt.create_Check(src, cond(c.cond, `${where}.check.cond`), onTrue, els(c.else, `${where}.check.else`));
     }
     case "ask": {
-      const a = obj(s.ask, `${where}.ask`, ["question", "sure", "else"], ["sections", "yesno", "one_of", "score"]);
+      const a = obj(s.ask, `${where}.ask`, ["question", "sure", "else"], ["sections", "yesno", "one_of"]);
       const sure = nat(a.sure, `${where}.ask.sure`);
       if (sure.gt(100)) throw new Unsupported(`${where}: sure must be 0–100`);
       return SkopeAst.Stmt.create_Ask(
@@ -301,9 +293,7 @@ const operandJ = (d: D) => (d.is_VarOp ? { var: S(d.dtor_name) } : { num: S(d.dt
 function formJ(d: D): J {
   if (d.is_Sections) return { sections: arr(d.dtor_options, (o) => ({ src: N(o.dtor_src), ...refJ(o.dtor_ref) })) };
   if (d.is_YesNo) return { yesno: { as: S(d.dtor_binding) } };
-  if (d.is_OneOf) return { one_of: { list: refJ(d.dtor_list), as: S(d.dtor_binding) } };
-  const rubric = arr(d.dtor_rubric, (r) => ({ src: N(r.dtor_src), level: N(r.dtor_level), text: S(r.dtor_text) }));
-  return { score: { low: N(d.dtor_low), high: N(d.dtor_high), rubric, as: S(d.dtor_binding) } };
+  return { one_of: { list: refJ(d.dtor_list), as: S(d.dtor_binding) } };
 }
 
 function stmtJ(d: D): J {

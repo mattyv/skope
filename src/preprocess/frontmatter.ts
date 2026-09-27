@@ -24,6 +24,8 @@ export interface Frontmatter {
   skill?: string;
   entry?: { section: string; src: number };
   params: [string, ParamValue][];
+  /** Params limited to a fixed set of values (SPEC §3.1), the default among them. */
+  choices: Record<string, (string | number)[]>;
   limits: Limits;
   bodyStart: number; // 0-based index into `lines` where the body begins
   /** The intro, outside the skope block, says the file is a skope skill (W-NO-SKOPE-NOTE otherwise). */
@@ -109,7 +111,7 @@ const H2 = /^ {0,3}##(?:\s|$)/;
 
 export function parseFrontmatter(lines: string[], errors: ParseError[]): Frontmatter {
   const limits: Limits = { run_timeout_ms: 30_000, do_timeout_ms: 300_000, deadline_ms: 900_000, ask_context_tokens: 4000 };
-  const result: Frontmatter = { notRunnable: true, params: [], limits, bodyStart: 0, noted: false, blockLine: 1 };
+  const result: Frontmatter = { notRunnable: true, params: [], choices: {}, limits, bodyStart: 0, noted: false, blockLine: 1 };
 
   if ((lines[0] ?? "").trim() !== "---") {
     errors.push(mkErr("E-NOT-RUNNABLE", 1, "no ```skope block with `format: 1` (the file has no frontmatter either)"));
@@ -207,8 +209,24 @@ export function parseFrontmatter(lines: string[], errors: ParseError[]): Frontma
     else {
       for (const [name, value] of Object.entries(doc.params)) {
         const src = lineOf(`params.${name}`, "params");
+        const scalar = (v: unknown) => (typeof v === "number" && Number.isSafeInteger(v)) || typeof v === "string";
         if (!/^[a-z_][a-z0-9_]*$/.test(name)) bad(`params.${name}`, `param name "${name}" doesn't match [a-z_][a-z0-9_]*`, "params");
-        else if (typeof value === "number" && Number.isSafeInteger(value)) result.params.push([name, { int: value, src }]);
+        else if (isMapping(value)) {
+          // `name: { default: x, choices: [x, y] }`: the param can only be one of its choices.
+          const { default: d, choices, ...rest } = value;
+          const extra = Object.keys(rest);
+          if (extra.length > 0) bad(`params.${name}`, `param "${name}" has unknown key ${extra[0]} (default, choices)`, "params");
+          else if (!Array.isArray(choices) || choices.length === 0 || !choices.every(scalar))
+            bad(`params.${name}`, `param "${name}": choices must be a non-empty list of strings or integers`, "params");
+          else if (!scalar(d)) bad(`params.${name}`, `param "${name}" needs a default, a string or an integer`, "params");
+          else if (!choices.every((c) => typeof c === typeof d))
+            bad(`params.${name}`, `param "${name}": every choice must be the same type as its default`, "params");
+          else if (!choices.includes(d)) bad(`params.${name}`, `param "${name}": its default ${d} isn't one of its choices`, "params");
+          else {
+            result.params.push([name, typeof d === "number" ? { int: d, src } : { str: d as string, src }]);
+            result.choices[name] = [...new Set(choices as (string | number)[])];
+          }
+        } else if (typeof value === "number" && Number.isSafeInteger(value)) result.params.push([name, { int: value, src }]);
         else if (typeof value === "string") result.params.push([name, { str: value, src }]);
         else bad(`params.${name}`, `param "${name}" must be a string or an integer within ±(2^53 − 1)`, "params");
       }

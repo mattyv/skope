@@ -345,8 +345,7 @@ describe("jev label lookups use Object.hasOwn (SPEC §6.2)", () => {
 });
 
 // Wire formats per docs.typesafe.ai: Noul answers with a single P(yes);
-// Score takes the rubric as an array and keys probabilities by position.
-describe("askJev yes/no and Score questions (SPEC §6.2)", () => {
+describe("askJev yes/no questions (SPEC §6.2)", () => {
   const yesno: AskRequest = {
     kind: "yesno",
     question: 'Is it worth running "Vacuum the journal"?',
@@ -356,19 +355,6 @@ describe("askJev yes/no and Score questions (SPEC §6.2)", () => {
       { id: "no", label: "no", description: null },
     ],
     context: {},
-    timeout_ms: 2000,
-  };
-  const score: AskRequest = {
-    kind: "score",
-    question: "How severe are the errors in `errors`?",
-    guidance: null,
-    options: [1, 2, 3, 4].map((l, i) => ({
-      id: String(l),
-      label: String(l),
-      description:
-        ["known noise, nothing to do", "worth a human look, not urgent", "degraded service", "outage or data at risk"][i] ?? null,
-    })) as AskRequest["options"],
-    context: { errors: "…" },
     timeout_ms: 2000,
   };
   const capture = (file: string) => {
@@ -403,41 +389,6 @@ describe("askJev yes/no and Score questions (SPEC §6.2)", () => {
       sleep,
     });
     expect(out).toMatchObject({ error: "unavailable", backend: "jev" });
-  });
-
-  test("a Score question sends the rubric lowest first and maps positions back to levels", async () => {
-    const { sent, fetchImpl } = capture("score-success.json");
-    const out = await askJev(score, config, retryCfg, {
-      fetch: fetchImpl as any,
-      sleep,
-    });
-    expect(sent[0].questions.q.type).toBe("score");
-    expect(sent[0].questions.q.criteria).toEqual([
-      "known noise, nothing to do",
-      "worth a human look, not urgent",
-      "degraded service",
-      "outage or data at risk",
-    ]);
-    expect(!isFailure(out) && out.probs).toEqual({
-      "1": 0.05,
-      "2": 0.1,
-      "3": 0.45,
-      "4": 0.4,
-    });
-  });
-
-  test("a Score answer missing a level is unavailable, never filled in", async () => {
-    const res = {
-      model: "jev-1.13.0",
-      answers: {
-        q: { type: "score", probabilities: { "0": 0.5, "1": 0.5, "2": 0 } },
-      },
-    };
-    const out = await askJev(score, config, retryCfg, {
-      fetch: fetchReturning(new Response(JSON.stringify(res))) as any,
-      sleep,
-    });
-    expect(out).toMatchObject({ error: "unavailable" });
   });
 
   test("408 is retried", async () => {

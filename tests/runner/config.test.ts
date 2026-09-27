@@ -215,6 +215,16 @@ describe("loadConfig (SPEC §9)", () => {
     ]);
   });
 
+  describe("approvals (SPEC §7.4)", () => {
+    test("unset by default; absolute or ~/… when given; relative is an error", () => {
+      expect(loadConfig(write(FAKE)).approvals).toBeUndefined();
+      expect(loadConfig(write(`${FAKE}approvals: /etc/skope/approvals\n`)).approvals).toBe("/etc/skope/approvals");
+      expect(loadConfig(write(`${FAKE}approvals: ~/approved\n`)).approvals).toBe(join(homedir(), "approved"));
+      expect(configError(write(`${FAKE}approvals: approved\n`)).message).toContain("approvals must be an absolute path or beside-skill");
+      expect(loadConfig(write(`${FAKE}approvals: beside-skill\n`)).approvals).toBe("beside-skill");
+    });
+  });
+
   describe("state_dir (P2-12)", () => {
     test("a leading $XDG_STATE_HOME is expanded", () => {
       process.env.XDG_STATE_HOME = "/xs";

@@ -203,8 +203,8 @@ describe("run flow", () => {
     const pagerOnly = () => file("config.yaml", "pager:\n  command: 'cat > /dev/null'\n");
     const noConfig = () => ({ env: { XDG_CONFIG_HOME: mkdtempSync(join(tmpdir(), "skope-noconfig-")) } });
 
-    test("--lint, --explain and --verify don't need a backend block", async () => {
-      for (const mode of ["--lint", "--explain", "--verify"]) {
+    test("--lint, --verify and --effects don't need a backend block", async () => {
+      for (const mode of ["--lint", "--verify", "--effects"]) {
         const r = await runSkope([asks(), mode, "--config", pagerOnly()]);
         expect(r.code, mode).toBe(0);
         expect(find(r.events, "error"), mode).toBeUndefined();
@@ -268,6 +268,19 @@ describe("run flow", () => {
     const r = await runSkope([skill("- **hand off**"), "--dry-run"]);
     expect(r.code).toBe(20);
     expect(find(r.events, "handoff_record")).toMatchObject({ record: { dry_run: true, reason: "explicit", detail: null } });
+    // Exit 20 reads like a failure, so stderr says what happened and where the record is (SPEC §8).
+    expect(r.stderr).toMatch(/^skope: handed off \(explicit\) in Main; a person or agent takes it from here\. Record: .*handoff\.json$/m);
+  });
+
+  test("no backend configured: the error names the config file and says --fake runs without a key", async () => {
+    const xdg = mkdtempSync(join(tmpdir(), "skope-xdg-"));
+    const config = join(xdg, "skope", "config.yaml");
+    const r = await runSkope([skill("- **ask** Is it ok? → yes | no · sure 80%\n- **stop**"), "--dry-run"], {
+      env: { XDG_CONFIG_HOME: xdg },
+    });
+    expect(r.code).toBe(40);
+    expect(r.stderr).toContain(`the config (${config}) has no jev block`);
+    expect(r.stderr).toContain("To run without a key, pass --fake answers.yaml.");
   });
 
   test("S3: a comparison that can't coerce hands off with detail {expr, left, right}, not the last command (SPEC §4.2, §8.1)", async () => {
@@ -419,7 +432,8 @@ describe("review fixes", () => {
       [path, "--apply", "--param", "n"],
       [path, "--lint", "--verify"],
       [path, "--apply", "--verify"],
-      [path, "--dry-run", "--explain"],
+      [path, "--dry-run", "--effects"],
+      [path, "--explain"], // folded into --verify
     ]) {
       const r = await runSkope(args);
       expect(r.code, args.join(" ")).toBe(40);
@@ -534,8 +548,9 @@ describe("final review nits", () => {
       "--dry-run",
       "--no-page",
       "--param",
-      "--explain",
       "--verify",
+      "--effects",
+      "--approve",
       "--trace",
       "--lint",
       "--fake",
@@ -556,12 +571,19 @@ describe("final review nits", () => {
     expect(r.stderr).toBe(`skope: ${path}: ok\n`);
   });
 
-  test("--explain prints its JSON on stdout and a short summary on stderr", async () => {
-    const r = await runSkope([skill("- **do** `x`\n- **stop**"), "--explain"]);
+  test("--verify prints its JSON on stdout and a readable summary on stderr", async () => {
+    const r = await runSkope([skill("- **do** `x`\n- **stop**"), "--verify"]);
     expect(r.code).toBe(0);
     expect(r.stdout.trim().split("\n")).toHaveLength(1);
-    expect(JSON.parse(r.stdout)).toMatchObject({ entry: "Main", max_effects: 1 });
-    expect(r.stderr).toMatch(/^skope: 1 section, entry Main; at most 0 asks and 1 effect; worst case \d+(\.\d+)?s\n$/);
+    expect(JSON.parse(r.stdout)).toMatchObject({
+      entry: "Main",
+      sections: [{ name: "Main", kind: "instructions" }],
+      paths: 3,
+      max_effects: 1,
+    });
+    expect(r.stderr).toMatch(
+      /^skope: 1 section, entry Main; 3 paths, ending handoff:command_failed, stopped; at most 0 asks and 1 effect; worst case \d+(\.\d+)?s\n$/,
+    );
   });
 
   test("locked prints who holds the lock and where", async () => {

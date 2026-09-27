@@ -468,12 +468,6 @@ module SkopeCheck {
 
   // ---- ask forms ----
 
-  function RubricErrs(src: Src, low: int, high: int, rubric: seq<RubricLine>): set<LintError> {
-    (set r <- rubric | !(low <= r.level <= high) :: Err("E-SCORE-RUBRIC", r.src))
-    + (set a, b | 0 <= a < b < |rubric| && rubric[a].level == rubric[b].level :: Err("E-SCORE-RUBRIC", rubric[b].src))
-    + (set level | low <= level <= high && level !in Levels(rubric) :: Err("E-SCORE-RUBRIC", src))
-  }
-
   function AskErrsOf(s: Stmt): set<LintError>
     requires s.Ask?
   {
@@ -482,9 +476,6 @@ module SkopeCheck {
       case Sections(opts) =>
         (if |opts| < 2 || |opts| > 255 then {Err("E-OPTION-COUNT", s.src)} else {})
         + (set a, b | 0 <= a < b < |opts| && opts[a].ref.id == opts[b].ref.id :: Err("E-OPTION-COUNT", opts[b].src))
-      case Score(low, high, rubric, _) =>
-        if !(0 <= low < high && high - low < 10) then {Err("E-SCORE-RANGE", s.src)}
-        else RubricErrs(s.src, low, high, rubric)
       case _ => {}
   }
 
@@ -504,16 +495,6 @@ module SkopeCheck {
     case Sections(opts) =>
       forall a, b | 0 <= a < b < |opts| ensures opts[a].ref.id != opts[b].ref.id {
         if opts[a].ref.id == opts[b].ref.id { assert Err("E-OPTION-COUNT", opts[b].src) in AskErrsOf(s); }
-      }
-    case Score(low, high, rubric, _) =>
-      forall r | r in rubric ensures low <= r.level <= high {
-        if !(low <= r.level <= high) { assert Err("E-SCORE-RUBRIC", r.src) in AskErrsOf(s); }
-      }
-      forall a, b | 0 <= a < b < |rubric| ensures rubric[a].level != rubric[b].level {
-        if rubric[a].level == rubric[b].level { assert Err("E-SCORE-RUBRIC", rubric[b].src) in AskErrsOf(s); }
-      }
-      forall level | low <= level <= high ensures level in Levels(rubric) {
-        if level !in Levels(rubric) { assert Err("E-SCORE-RUBRIC", s.src) in AskErrsOf(s); }
       }
     case _ =>
   }
@@ -820,7 +801,7 @@ module SkopeCheck {
   // ---- warnings ----
 
   function WarningsWith(p: Program, f: Facts): set<LintError> {
-    UnreachedWarns(p, f.reach) + NoGuidanceWarns(p) + ScoreWarns(p, f.reach)
+    UnreachedWarns(p, f.reach) + NoGuidanceWarns(p)
     + (if CycleErrs(p, f.reach) == {} then NoContextWarns(p, f.In) else {})
   }
 
@@ -854,57 +835,6 @@ module SkopeCheck {
 
   function NoContextWarns(p: Program, In: map<SectionId, Env>): set<LintError> {
     OverSections(p, id => if IsInstr(p, id) && id in In then NoContext(p, Body(p, id), In[id]) else {})
-  }
-
-  // How often a statement names x.
-  function Uses(s: Stmt, x: Name): nat {
-    var parts := match s
-      case Run(_, cmd, _, _) => cmd
-      case Do(_, DoCmd(cmd), _) => cmd
-      case Check(_, Succeeds(cmd), _, _) => cmd
-      case Ask(_, q, _, _, _) => q
-      case IfYesRun(_, cmd, _) => cmd
-      case IfYesDo(_, DoCmd(cmd), _) => cmd
-      case Page(_, text) => text
-      case _ => [];
-    multiset(parts)[Var(x)]
-    + (if s.Check? && s.cond.Cmp? && s.cond.l == VarOp(x) then 1 else 0)
-    + (if s.Check? && s.cond.Cmp? && s.cond.r == VarOp(x) then 1 else 0)
-    + (if x in DoItems(s) then 1 else 0)
-  }
-
-  // A comparison of x with a number.
-  predicate Threshold(s: Stmt, x: Name) {
-    s.Check? && s.cond.Cmp?
-    && ((s.cond.l == VarOp(x) && s.cond.r.Num?) || (s.cond.r == VarOp(x) && s.cond.l.Num?))
-  }
-
-  // For each Score ask, the statements that name its variable afterwards:
-  // later in its section, or in any section reachable from it.
-  function ScoreWarns(p: Program, reach: map<SectionId, set<SectionId>>): set<LintError> {
-    OverSections(p, id => if IsInstr(p, id) && id in reach then ScoreWarnsIn(p, reach, id, Flat(Body(p, id)), 0) else {})
-  }
-
-  function ScoreWarnsIn(p: Program, reach: map<SectionId, set<SectionId>>, id: SectionId, flat: seq<Stmt>, i: nat): set<LintError>
-    requires id in reach
-    decreases |flat| - i
-  {
-    if i >= |flat| then {} else ScoreWarn(p, reach, id, flat, i) + ScoreWarnsIn(p, reach, id, flat, i + 1)
-  }
-
-  function ScoreWarn(p: Program, reach: map<SectionId, set<SectionId>>, id: SectionId, flat: seq<Stmt>, i: nat): set<LintError>
-    requires id in reach && i < |flat|
-  {
-    var s := flat[i];
-    if !(s.Ask? && s.form.Score?) then {}
-    else
-      var x := s.form.binding;
-      var later := (set j | i < j < |flat| :: flat[j])
-                   + (set t, u | t in reach[id] && t != id && IsInstr(p, t) && u in Flat(Body(p, t)) :: u);
-      var users := set u | u in later && Uses(u, x) > 0;
-      if users == {} then {Err("W-SCORE-UNUSED", s.src)}
-      else if exists u <- users :: users == {u} && Uses(u, x) == 1 && Threshold(u, x) then {Err("W-SCORE-THRESHOLD", s.src)}
-      else {}
   }
 
   // ---- ordering: by line, then code ----

@@ -30,13 +30,11 @@ module SkopeAst {
   datatype Cond = Succeeds(cmd: Parts) | Cmp(op: CmpOp, l: Operand, r: Operand)
 
   datatype AskOption = AskOption(src: Src, ref: SectionRef)
-  datatype RubricLine = RubricLine(src: Src, level: int, text: string)
   // Exactly one form per ask (SPEC §4.7). YesNo binds `_yn` when the skill doesn't name it.
   datatype AskForm =
     | Sections(options: seq<AskOption>)
     | YesNo(binding: Name)
     | OneOf(list: SectionRef, binding: Name)
-    | Score(low: int, high: int, rubric: seq<RubricLine>, binding: Name) // v1.1
 
   datatype Stmt =
     | Run(src: Src, cmd: Parts, binding: Option<Name>, els: Else)

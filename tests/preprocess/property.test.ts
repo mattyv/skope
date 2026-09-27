@@ -1,7 +1,7 @@
 // Property test (PLAN §4 A): a list item that starts with a bold keyword is
 // an instruction or an error, never prose, wherever it sits (SPEC §3.3 rules
 // 3, 4 and 7). The keyword item goes in every kind of place: after prose
-// items, in a second list, nested under prose, option, rubric and data
+// items, in a second list, nested under prose, option and data
 // items, in blockquotes of depth 1-3, before the first section, in a data
 // section, and in a for-each body. Its suffix may contain `:`, `\r` and `\t`.
 
@@ -28,14 +28,6 @@ const CONTEXTS: Record<string, string[]> = {
     "- **stop**",
   ],
   "as an option item": ["## Triage", "- **ask** Pick · sure 80%", "  - [Page]", "  - %K%", "", "## Page", "- **stop**"],
-  "nested under a rubric item": [
-    "## Triage",
-    "- **ask** Bad? → 1 to 2 as x · sure 75%",
-    "  - 1: fine",
-    "    - %K%",
-    "  - 2: bad",
-    "- **stop**",
-  ],
   "nested under a data item": [
     "## Triage",
     "- **for each** s in [Items]",

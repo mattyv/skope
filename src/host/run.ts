@@ -6,7 +6,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { hostname } from "node:os";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { load as loadYaml } from "js-yaml";
 import { askFake } from "../ask/fake.js";
 import { askJev, isModelAlias } from "../ask/jev.js";
@@ -19,7 +19,7 @@ import { CODE_MEANINGS } from "../contracts.gen.js";
 import { Interp, unsafeInputs } from "../interp.js";
 import { lint } from "../lint.js";
 import { preprocess } from "../preprocess/index.js";
-import { type Config, defaultConfig, loadConfig } from "../runner/config.js";
+import { type Config, defaultConfig, defaultConfigPath, loadConfig } from "../runner/config.js";
 import { type Diagnostic, diagnosticLine, plainText, type Stage } from "../runner/events.js";
 import { commandEnv, execCommand, stopAll } from "../runner/exec.js";
 import { createFakeClock, fakeExec } from "../runner/fakeExec.js";
@@ -29,6 +29,7 @@ import { acquireLock, LockError } from "../runner/lock.js";
 import { sendPage } from "../runner/pager.js";
 import { buildRedactor, type Redactor, redactDeep } from "../runner/redact.js";
 import type { AskRequest, Response, RunConfig, Val } from "../step.js";
+import { describe, diffEffects, effectsOf, readApproval, writeApproval } from "./effects.js";
 import { escapePage, type Handlers, type LoopResult, runLoop } from "./loop.js";
 import { readOnly } from "./verify.js";
 
@@ -36,7 +37,7 @@ export interface RunOptions {
   /** Why the command line can't be used (E-USAGE), if it can't. */
   usage?: string;
   file: string;
-  mode: "run" | "lint" | "verify" | "explain";
+  mode: "run" | "lint" | "verify" | "effects" | "approve";
   /** With --verify: a run's events.jsonl to replay (SPEC §12.4). */
   trace?: string;
   apply: boolean;
@@ -165,6 +166,7 @@ export async function runSkill(o: RunOptions): Promise<number> {
       throw new End("invalid");
     }
     const program = parsed.program;
+    const choices = parsed.choices;
     for (const w of parsed.warnings) diag("warning", { code: w.code, stage: "parse", file: o.file, line: w.line, message: w.message });
     const found = lint(program);
     for (const w of found.warnings) diag("warning", { code: w.code, stage: "lint", file: o.file, line: w.line, message: meaning(w.code) });
@@ -176,22 +178,82 @@ export async function runSkill(o: RunOptions): Promise<number> {
       say(`skope: ${o.file}: ok\n`);
       return 0;
     }
-    if (o.mode === "verify" || o.mode === "explain") {
+
+    // The skill's scope: every command it could run, and whether that set is approved (SPEC §7.4).
+    const effects = effectsOf(program, choices);
+    // `beside-skill` keeps the approval in the skill's own folder, for review in the repository.
+    const approvalsDir =
+      config.approvals === undefined ? undefined : config.approvals === "beside-skill" ? dirname(resolve(o.file)) : config.approvals;
+    const approval = () => {
+      try {
+        return approvalsDir === undefined ? null : readApproval(approvalsDir, program.skill);
+      } catch (err) {
+        return fail("E-CONFIG", "args", `can't read the approval for ${program.skill}: ${(err as Error).message}`);
+      }
+    };
+    const { version: skopeVersion, build: skopeBuild } = IDENTITY;
+    if (o.mode === "effects") {
+      for (const line of describe(effects)) say(`${line}\n`);
+      toOut(
+        `${JSON.stringify({ skope_version: skopeVersion, skope_build: skopeBuild, skill: effects.skill, effects_hash: effects.hash, commands: effects.commands, params: effects.params, open_params: effects.open_params })}\n`,
+      );
+      return 0;
+    }
+    if (o.mode === "approve") {
+      if (approvalsDir === undefined)
+        fail("E-CONFIG", "args", "--approve needs approvals in the config: approvals: <dir>, or approvals: beside-skill (SPEC §9)");
+      const dir = approvalsDir as string;
+      const before = approval();
+      const changes = diffEffects(before, effects);
+      for (const line of describe(effects)) say(`${line}\n`);
+      if (before?.effects_hash === effects.hash) {
+        say(`skope: ${program.skill} is already approved with these commands\n`);
+      } else {
+        let path: string;
+        try {
+          path = writeApproval(dir, effects);
+        } catch (err) {
+          return fail("E-IO", "args", `can't write the approval to ${dir}: ${(err as Error).message}`);
+        }
+        say(`skope: approved ${program.skill}: ${path}${before ? `; changes since the last approval: ${changes.join("; ")}` : ""}\n`);
+      }
+      toOut(
+        `${JSON.stringify({ skope_version: skopeVersion, skope_build: skopeBuild, skill: effects.skill, effects_hash: effects.hash, changes })}\n`,
+      );
+      return 0;
+    }
+    // With approvals configured, nothing runs until a person has approved exactly these commands.
+    // A dry run runs the `run` commands, so it needs the approval too. --test fakes every command.
+    if (o.mode === "run" && !o.test && approvalsDir !== undefined) {
+      const approved = approval();
+      if (approved?.effects_hash !== effects.hash)
+        fail(
+          "E-NOT-APPROVED",
+          "args",
+          approved
+            ? `${program.skill}'s commands changed since it was approved (${diffEffects(approved, effects).join("; ")}). Review them with --effects, then approve with --approve`
+            : `${program.skill} has no approval in ${approvalsDir}. Review its commands with --effects, then approve with --approve`,
+        );
+    }
+    if (o.mode === "verify") {
       const trace = o.trace === undefined ? undefined : readTrace(o.trace, fail);
-      return readOnly(o.mode === "verify" ? { verify: true, trace } : { explain: true }, {
-        program,
-        config,
-        params: params(program, o.params, fail),
-        start: (c) => new Interp(program, c),
-        emit: (e) => toOut(`${JSON.stringify(redactDeep(redactor, e))}\n`),
-        say: (line) => say(`${line}\n`),
-      });
+      return readOnly(
+        { verify: true, trace },
+        {
+          program,
+          config,
+          params: params(program, o.params, fail, choices),
+          start: (c) => new Interp(program, c),
+          emit: (e) => toOut(`${JSON.stringify(redactDeep(redactor, e))}\n`),
+          say: (line) => say(`${line}\n`),
+        },
+      );
     }
 
     // Step 2: params and built-ins (SPEC §3.5, §7).
     const runId = `r-${randomBytes(4).toString("hex")}`;
     const cfg: RunConfig = {
-      params: params(program, o.params, fail),
+      params: params(program, o.params, fail, choices),
       builtins: { host, run_id: runId, skill: program.skill },
       dry: dryRun as boolean,
       mode: "concrete",
@@ -300,6 +362,7 @@ export async function runSkill(o: RunOptions): Promise<number> {
       run_dir: runDir,
       skope_version: version,
       skope_build: build,
+      effects_hash: effects.hash,
     });
     flush();
 
@@ -397,6 +460,9 @@ export async function runSkill(o: RunOptions): Promise<number> {
         fail("E-IO", "runtime", `can't write ${path}: ${(err as Error).message}`);
       }
       emit({ event: "handoff_record", ...at, path, record });
+      // A handoff exits 20, which reads like a failure: say in words what happened and where the record is.
+      if (!o.test)
+        say(`skope: handed off (${result.outcome.reason}) in ${at.section}; a person or agent takes it from here. Record: ${path}\n`);
       const optedOut = o.noPage || process.env.SKOPE_CALLER === "agent" || config.on_handoff === "none";
       if (!optedOut) {
         // Only the section name is the author's; the host and record path stay copyable.
@@ -432,7 +498,12 @@ function detail(r: LoopResult): Record<string, unknown> | null {
 type Fail = (code: string, stage: Stage, message: string, line?: number) => never;
 
 /** Frontmatter params with --param overrides, typed like their defaults (SPEC §7 step 2). */
-export function params(program: CoreProgram, overrides: string[], fail: Fail): Record<string, Val> {
+export function params(
+  program: CoreProgram,
+  overrides: string[],
+  fail: Fail,
+  choices: Record<string, (string | number)[]> = {},
+): Record<string, Val> {
   const out: Record<string, Val> = {};
   for (const [k, v] of Object.entries(program.params)) out[k] = "int" in v ? v.int : v.str;
   for (const kv of overrides) {
@@ -445,6 +516,9 @@ export function params(program: CoreProgram, overrides: string[], fail: Fail): R
       if (!/^-?\d+$/.test(v) || !Number.isSafeInteger(Number(v))) fail("E-PARAM-TYPE", "args", `${k} must be an integer, got ${v}`);
       out[k] = Number(v);
     } else out[k] = v;
+    const allowed = Object.hasOwn(choices, k) ? choices[k] : undefined;
+    if (allowed && !allowed.includes(out[k] as string | number))
+      fail("E-PARAM-CHOICE", "args", `${k} must be one of ${allowed.join(", ")}, got ${v}`);
   }
   return out;
 }
@@ -482,7 +556,13 @@ async function checkBackend(
     return none;
   }
   const block = name === "jev" ? config.jev : config.openrouter;
-  if (!block) return fail("E-CONFIG", "args", `ask.backend is ${name}, but the config has no ${name} block. ${BLOCK_HINT[name]}`);
+  if (!block)
+    return fail(
+      "E-CONFIG",
+      "args",
+      `ask.backend is ${name}, but the config (${o.config ?? defaultConfigPath()}) has no ${name} block. ${BLOCK_HINT[name]} ` +
+        "To run without a key, pass --fake answers.yaml.",
+    );
   const apiKey = process.env[block.key_env];
   if (!apiKey) return fail("E-CONFIG", "args", `${name}: no API key in $${block.key_env}`);
   const limits = name === "jev" ? JEV_LIMITS : OPENROUTER_LIMITS;
@@ -501,10 +581,8 @@ async function checkBackend(
     });
   }
   for (const a of asks) {
-    const n =
-      a.ask.sections?.length ??
-      (a.ask.yesno ? 2 : a.ask.score ? a.ask.score.high - a.ask.score.low + 1 : listSize(program, a.ask.one_of?.list.section));
-    const kind = a.ask.score ? "score" : a.ask.yesno ? "yesno" : "choice";
+    const n = a.ask.sections?.length ?? (a.ask.yesno ? 2 : listSize(program, a.ask.one_of?.list.section));
+    const kind = a.ask.yesno ? "yesno" : "choice";
     const c = checkAskLimits(
       { kind, optionCount: n, declaredContextTokens: program.limits.ask_context_tokens },
       { ...limits, contextTokens },

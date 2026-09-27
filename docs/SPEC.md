@@ -1,12 +1,11 @@
-# skope (skill op) — Implementation Spec (v1, rev 19)
+# skope (skill op) — Implementation Spec (v1, rev 20)
 
 Audience: an engineer or LLM implementing this from scratch. Everything
 marked **MUST** is normative. Where this spec says "verify against current
 docs", do so rather than guessing: some external APIs (Jev, the Dafny CLI and
 its JavaScript backend) are named here from memory and may have changed.
 
-Appendix C lists what changed in each revision. Score asks (rev 4) target
-v1.1: build them after milestones M1–M6 (§12.3).
+Appendix C lists what changed in each revision.
 
 ---
 
@@ -119,8 +118,8 @@ description: ...                # required, one line (used by agents)
 
 # Disk full
 
-*A skope skill. Run it with the run-skope-skill skill if you have it; if
-not, the bold steps are the procedure, and {names} are params set below.*
+*A skope skill. Run it with `skope`, never by hand: its commands are
+reviewed as a set. {names} are params, set in the skope block below.*
 
 ```skope
 format: 1                       # required for runnable skills
@@ -137,6 +136,12 @@ limits:                         # optional; defaults shown
 ```
 ~~~
 
+- A param can be limited to fixed values: `svc: { default: web, choices:
+  [web, api] }`. The default must be one of the choices, and every choice the
+  same type as it. A `--param` outside them is `E-PARAM-CHOICE`. Choices make
+  the skill's scope finite (§7.4): a param with choices is listed as each of
+  its values, while one without stays `{name}`, any value that passes the
+  safe-value check.
 - A skill has one skope block. Any other key in it is `E-FRONTMATTER`.
 - The intro SHOULD say, outside the block, that the file is a skope skill,
   as the note line above does, so an agent that loads it knows what the
@@ -188,17 +193,15 @@ Rules:
    every top-level list in an instruction section, and (b) items of the
    nested list under a `for each`, including a nested `for each`. A
    section's lists run in document order, as one sequence, whatever
-   paragraphs or `###` headings sit between them. Two other nested lists
-   are not instructions:
-   - under a section-option `ask`: each item MUST be exactly one `[Section]`
-     link;
-   - under a Score `ask`: each item MUST be a rubric line (§3.4).
+   paragraphs or `###` headings sit between them. One other nested list
+   is not instructions: under a section-option `ask`, each item MUST be
+   exactly one `[Section]` link.
 2. **Nested lists.** A nested list under any other instruction is a **parse
    error**. A nested list under a prose item is prose, subject to rule 7.
 3. **Leading bold.** Rules 3 and 4 apply only to instruction lists (rule 1
-   (a) and (b)). Option and rubric lists have their own strict forms, and any
-   item that doesn't match its form exactly is a parse error: `**4**: outage`
-   in a rubric is an error, not prose. In an instruction list, an item that
+   (a) and (b)). An option list has its own strict form, and any item that
+   doesn't match it exactly is a parse error: `**Note:** …` under an ask is
+   an error, not prose. In an instruction list, an item that
    starts with bold text is classified as follows:
    - a keyword, even with a `:` inside or right after the bold
      (`**run**:`, `**Stop:**`) → instruction, so a colon can never turn a
@@ -227,7 +230,7 @@ Rules:
 7. **Misplaced instructions.** A list item that starts with a keyword
    anywhere rule 1 doesn't cover is `E-MISPLACED`, never prose. That
    includes before the first section, inside a blockquote (at any depth),
-   in a list nested under a prose, option, rubric or data item, and in a
+   in a list nested under a prose, option or data item, and in a
    data section. Skope must never quietly skip something that looks like an
    instruction.
 8. **What counts as a list item** is what CommonMark renders as one:
@@ -267,9 +270,6 @@ ELSE     = " · else " ("skip" | "[" SECTION "]")
 ask      = "**ask**" Q " · sure " INT "%" [ELSE]              (* section options, nested list *)
          | "**ask**" Q " → yes | no" [" as " NAME] " · sure " INT "%" [ELSE]
          | "**ask**" Q " → one of [" LIST "] as " NAME " · sure " INT "%" [ELSE]
-         | "**ask**" Q " → " INT " to " INT " as " NAME " · sure " INT "%" [ELSE]
-                                                               (* score, v1.1; rubric required *)
-RUBRIC   = INT ": " TEXT                                       (* one per nested item *)
 
 foreach  = "**for each**" NAME " in [" LIST "]"               (* body = nested list *)
 ifyes    = "**if yes**" INLINE [ELSE]
@@ -283,23 +283,9 @@ stop     = "**stop**"
 - Section-option `ask`: at least 2, at most 255 options. A backend may
   allow fewer (§6.2).
 - `one of [L]`: L MUST be a list of value items.
-- Score `ask` (v1.1), `→ LOW to HIGH`. All of these are lint errors:
-  - `LOW` and `HIGH` aren't integers with `0 ≤ LOW < HIGH`;
-  - the ask has fewer than 2 or more than 10 levels (`HIGH − LOW + 1`).
-    10 is the language's maximum, and a backend may allow fewer (§6.2);
-  - the rubric doesn't give exactly one `INT: text` line for every level in
-    `LOW..HIGH`. It's required and complete because Jev's model sees only the
-    level descriptions, never the numbers or the neighbouring levels;
-  - `else skip`. (`else [X]` is allowed.)
-
-  Example:
-  ~~~markdown
-  - **ask** How severe are the errors in {errors}? → 1 to 4 as severity · sure 75%
-    - 1: known noise, nothing to do
-    - 2: worth a human look, not urgent
-    - 3: degraded service
-    - 4: outage or data at risk
-  ~~~
+- There is no numeric ask. `→ 1 to 4 as x` is `E-GRAMMAR`, and the message
+  points to `one of` and `yes | no`. For a graded decision, use a
+  section-option ask with one section per grade (Appendix D).
 - The `%` on an operand is decoration. It is stripped during coercion (§4.2).
 
 ### 3.5 Interpolation
@@ -309,9 +295,7 @@ variables bound by `run … as`, `ask … as`, `for each`.
 
 **Taint rule (MUST be enforced statically by the core lint):**
 - *Trusted*: params, built-ins, value items (bound by `for each` or chosen by
-  `one of`), yes/no answers (`yes` or `no`), and Score answers. A Score
-  answer is an integer, so it always passes the safe-value check and may be
-  interpolated into a `CMD`.
+  `one of`), and yes/no answers (`yes` or `no`).
 - *Untrusted*: anything bound by `run … as`.
 - *Action items*: `{item}` renders the item's label. An action item MUST NOT
   be interpolated into a `CMD`. Use `do item` to run its command.
@@ -328,7 +312,7 @@ variables bound by `run … as`, `ask … as`, `for each`.
   from. A name can be rebound, and hold a param on one path and command
   output on another, so this is decided at run time by the core, which
   tags every bound value with its origin:
-  - a trusted value (param, built-in, list item, Score answer) is pasted
+  - a trusted value (param, built-in, list item) is pasted
     into the question, as in `Is it worth running "{step}"?`;
   - a value from a `run` command is written into the question as its name
     in backticks, and the value goes in the request's context (§6.3). `Given {errors},
@@ -363,7 +347,6 @@ nothing to escape, and mounts, domains and unit names never need more.
 - A `for each` variable is scoped to the loop body. When the loop ends, or a
   transfer leaves it, the name is unbound, even if it had a value before
   the loop.
-- A Score answer is bound only on paths where its gate passed.
 
 As a result the runtime never meets an unbound name (proven, §5.3).
 
@@ -387,8 +370,8 @@ Rules:
 - Value items that reach a `CMD` MUST pass the safe-value check (§3.5).
 
 ### 3.7 Canonical examples
-See Appendix A (`disk-full`), Appendix B (`cert-expiry`) and, for v1.1,
-Appendix D (`error-triage`). All MUST be
+See Appendix A (`disk-full`), Appendix B (`cert-expiry`) and Appendix D
+(`error-triage`). All MUST be
 included as test fixtures.
 
 ---
@@ -490,36 +473,6 @@ flowchart TD
   els -- "else [X]" --> x["transfer to X"]
 ```
 
-**`ask … → LOW to HIGH as NAME`** (Score, v1.1): one backend call (§6).
-- Options are the levels `LOW..HIGH`. Each id is the level number as a
-  string (`"0"`, `"1"`, … when LOW is 0), and the rubric text is its
-  description.
-- Validation is the same as for `choice` (§6.1).
-- Chosen = the level with the highest probability. Confidence = that
-  probability. A tie, counted the same way as for `choice`, fails the gate.
-  The gate doesn't combine
-  neighbouring levels.
-- Confidence ≥ `sure` → bind NAME to the chosen level as an integer and
-  continue. A Score ask never transfers by itself.
-- Gate failed → no else: `handoff` (reason `gate_failed`); `else [X]`:
-  transfer to X.
-- Backend unavailable or invalid response → `handoff` (reason `ask_unavailable`).
-
-Branch on the answer with ordinary `check`s on a known, trusted value:
-~~~markdown
-- **check** {severity} <= 1 → stop
-- **check** {severity} == 2 → [Investigate]
-- **then** [Page]
-~~~
-
-Authoring note (put this in the user docs; see also §4.7). Probability spreads across
-neighbouring levels. A 0.45 / 0.45 split between 3 and 4 fails a 75% gate,
-even though "at least 3" is 90% likely. So:
-- If the next step is a single threshold ("page if severe"), ask a
-  `yes | no` instead: "Is this severe enough to page someone?"
-- Use Score when three or more levels lead to different actions, as in the
-  example above.
-
 **`for each NAME in [L]`**: run the nested body once per item, in order,
 with NAME bound to the item. A transfer or `stop` inside the body leaves the
 loop and the section. After the last item, continue after the loop.
@@ -602,15 +555,14 @@ silently never paging.
   proven (P1, §5.3), and the explore handler (§5.4) walks the paths.
 
 ### 4.7 Question forms and patterns
-Backends answer three kinds of question, which match Jev's three types.
-Skope's four `ask` forms each use one of them:
+Backends answer two kinds of question, which match two of Jev's types.
+Skope's three `ask` forms each use one of them:
 
 | Skope form | Kind (§6.1) | Jev type | Result |
 |---|---|---|---|
 | `ask …` with a list of `[Section]` options | `choice` | Choice | transfers to the chosen section |
 | `→ one of [List] as x` | `choice` | Choice | binds the chosen item to `x` |
 | `→ yes \| no` | `yesno` | Noul | binds true or false; `if yes` acts on it |
-| `→ LOW to HIGH as x` (v1.1) | `score` | Score | binds a level to `x`; branch with `check` |
 
 Everything else is a pattern built from these forms and the other
 instructions. None of them needs new syntax:
@@ -619,8 +571,8 @@ instructions. None of them needs new syntax:
 |---|---|---|
 | Pick several items | `for each` over the list, a `yes \| no` per item, then `if yes do item`. Each question sees fresh state, and the loop can stop early. | disk-full's Clean up |
 | Act on each item that qualifies | The same loop, with the action on `if yes` | disk-full's Clean up |
-| Act only above one threshold | A `yes \| no` phrased as the threshold ("Is this severe enough to page someone?"), not a Score | §4.2 authoring note |
-| Branch three or more ways by degree | A Score, then one `check` per branch | error-triage (Appendix D) |
+| Act only above one threshold | A `yes \| no` phrased as the threshold ("Is this severe enough to page someone?") | |
+| Branch three or more ways by degree | A section-option ask with one section per way; each section's guidance paragraph describes its degree | error-triage (Appendix D) |
 | A number | Measure it with `run`, then compare with `check`. The model never estimates numbers. | disk-full's usage checks |
 | "None of these fit" | An escape option, such as a section that hands off | Investigate in both examples |
 
@@ -634,7 +586,7 @@ apply to any backend:
 - **Phrase a yes/no so yes means the thing you're checking.** "Does the log
   show disk errors?", not "Is the log free of disk errors?".
 - **Say exactly what you mean.** The model reads the question literally.
-  Put boundary cases in the option descriptions or rubric.
+  Put boundary cases in the option descriptions.
 - **Don't reuse thresholds across forms.** A `sure` tuned on a yes/no
   question doesn't carry over to a Choice asking the same thing, and a
   question and its negation needn't add up to 100%.
@@ -650,9 +602,8 @@ apply to any backend:
 questions, not from a round number. The same study found miscalibration
 depends on the question type, on the same inputs: yes/no answers were
 under-confident (right more often than they claimed), Choice answers
-slightly over-confident, and Score answers badly over-confident. So a
-yes/no gate errs on the side of handing off, and a Score level shouldn't
-carry a gate on its own (`W-SCORE-THRESHOLD`). skope gates on the chosen
+slightly over-confident. So a yes/no gate errs on the side of handing
+off. skope gates on the chosen
 option's probability, never on a confidence the backend reports about
 itself, which the study also found less reliable. Jev's probabilities come
 in steps of 0.01 and are often exactly 0 or 1, so a `sure` finer than a
@@ -660,8 +611,8 @@ whole percent means nothing.
 
 [^ood]: scienthoon, *jev-ood-calibration*: 4,621 published Jev calls, 900
 of them on synthetic support tickets whose labels the model couldn't have
-seen. Expected calibration error 0.08 for Choice and yes/no, 0.33 for
-Score. <https://github.com/scienthoon/jev-ood-calibration>
+seen. Expected calibration error 0.08 for Choice and yes/no.
+<https://github.com/scienthoon/jev-ood-calibration>
 
 Appendix E explains why multi-select and numeric answers are patterns, not
 features.
@@ -688,19 +639,6 @@ shapes here as shape, not copy-paste.
    "s:cleanups":{"name":"Cleanups","src":67,"lists":[{"src":70,"items":[
      {"src":70,"action":{"label":"Vacuum the journal to 500MB","cmd":[{"lit":"journalctl --vacuum-size=500M"}]}}]}]}}}
 ```
-
-A Score ask (v1.1) in core JSON:
-```json
-{"src":22,"ask":{"score":{"low":1,"high":4,
-  "rubric":[{"src":23,"level":1,"text":"known noise, nothing to do"},
-            {"src":24,"level":2,"text":"worth a human look, not urgent"},
-            {"src":25,"level":3,"text":"degraded service"},
-            {"src":26,"level":4,"text":"outage or data at risk"}],
-  "as":"severity"},
-  "question":[{"lit":"How severe are the errors in "},{"var":"errors"},{"lit":"?"}],
-  "sure":75,"else":null}}
-```
-Bound variables can hold an `int` (params already can).
 
 - `CMD`, `Q` and `QUOTED` arrive pre-split into literal and variable parts, so
   the core never scans strings for `{`. The preprocessor emits every name as
@@ -787,16 +725,14 @@ CI runs `dafny verify` and fails on any unproven obligation.
 - **P4 Taint.** Every `Exec` command string is a concatenation of author
   literals and trusted values that passed the safe-value check. Every backend
   question string is author literals and trusted values; values from `run`
-  commands appear only as their names, with the values in context. (Score
-  answers are trusted integers, so they pass trivially.)
+  commands appear only as their names, with the values in context.
 - **P5 Answers.** Confidence never counts `unassigned` probability for the
   chosen option, and a gate fails if that probability could change the
   winner. A gate passes only on a response that passed validation
-  (§6.1), and only ever selects one of the options the author wrote. A Score
-  gate binds an integer in `LOW..HIGH`.
+  (§6.1), and only ever selects one of the options the author wrote.
 - **P6 Lint soundness.** If `Lint(prog) == []`, `Step` never hits an unbound
   name, a missing section or list, or a type mismatch. No internal-error path
-  is reachable. A comparison on a Score variable never fails coercion.
+  is reachable.
 
 Shipped Dafny code MUST NOT contain `assume`, `{:axiom}` or
 `{:verify false}`. CI greps for them.
@@ -822,7 +758,7 @@ Shipped Dafny code MUST NOT contain `assume`, `{:axiom}` or
   that names more than one statement is `E-FAKE-AMBIGUOUS`. A `line:N` key
   that names no statement is `W-FAKE-UNUSED`, and so is a stable key that
   names a section but nothing in it, which is still matched as exact text. Statements inside a `for each` are matched once per item.
-- **explore**: used by `--verify` and `--explain`. It must reach every path
+- **explore**: used by `--verify`. It must reach every path
   a real run could take.
   - Values from `run` are unknown. A comparison on an unknown value has three
     results: true, false, or not a number (failure handling). The core
@@ -831,12 +767,9 @@ Shipped Dafny code MUST NOT contain `assume`, `{:axiom}` or
   - Every `Ask` is answered with each option confident, plus unsure, plus
     unavailable (backend down or an invalid response, §4.2). Unsure and
     unavailable differ: with `else [Page]`, unsure pages but unavailable hands
-    off. A `one of` answer binds the real item, so its value stays known. A
-    Score ask gives one branch per level plus unsure plus unavailable, at
-    most 12. The level is a known
-    value, so later `check`s on it are decided, not split three ways.
+    off. A `one of` answer binds the real item, so its value stays known.
   - Memoise on abstract state: position, bound names, **known values** (params,
-    list items, yes/no answers, Score levels), loop index, counters. Two states that
+    list items, yes/no answers), loop index, counters. Two states that
     differ in a known value are different states. Compute maxima as a
     longest path over the resulting finite graph, not by listing paths.
   - Out of scope: `deadline` handoffs. The host can end any run between any
@@ -897,6 +830,8 @@ Shipped Dafny code MUST NOT contain `assume`, `{:axiom}` or
 ### 5.6 Verify report (`skope --verify`)
 From the explore handler, report the skope release version and build
 identity (§7.2), then:
+- the entry section; each section's name, line and kind (instructions,
+  data or prose); and every transfer between sections
 - total abstract paths; outcomes reachable (`stopped` / `paged` / `handoff`,
   with reasons)
 - **fail** if any path ends without an outcome, or in `error` (impossible by
@@ -906,7 +841,11 @@ identity (§7.2), then:
   timeouts plus kill grace, every backend attempt allowed by `ask.retries` with its wait, and the pager
   timeout. The enforced limit is `limits.deadline` (§7).
 - sections never reached (warning `W-SECTION-UNREACHED`)
-- each ask reached, with its section, line, kind and the branches explored there: one per option (Score: per level), plus unsure and unavailable (§5.4)
+- each ask reached, with its section, line, kind and the branches explored there: one per option, plus unsure and unavailable (§5.4)
+
+The report is one JSON line on stdout. A one-line summary on stderr gives
+the sections, paths, outcomes, most asks and effects, worst case, and any
+section never reached, for a person to read.
 
 ---
 
@@ -929,14 +868,11 @@ Request:
              "description":"Restart the one service most likely behind the growth. Never more than one."}],
  "context":{"used":"91%","errors":"...","biggest":"..."},"timeout_ms":2000}
 ```
-- `kind` is `choice`, `yesno` or `score` (v1.1).
+- `kind` is `choice` or `yesno`.
 - Section options: `label` is the display name, `description` is the
   section's guidance (§3.2).
 - `one of` options: `id` = `label` = the item text, no description.
 - `yesno`: options are `yes` and `no`.
-- `score`: one option per level. `id` = `label` = the level number as a
-  string, `description` = its rubric text. Validation is the
-  same as for `choice`.
 - `guidance` is the asking section's guidance.
 
 Response:
@@ -967,7 +903,7 @@ Exactly one backend is used per run.
 - takes the request in §6.1 and returns `probs` keyed by option id, plus
   `unassigned` if it has any. The core validates every backend's answer
   the same way (§6.1, P5);
-- supports `choice`, `yesno` and `score`;
+- supports `choice` and `yesno`;
 - reports `backend` and `model` with every answer, for the logs;
 - follows the shared timeout and retry rules below;
 - declares its limits. Before the run starts, skope checks the skill against
@@ -977,7 +913,6 @@ Exactly one backend is used per run.
 | Limit | Language maximum | `jev` | `openrouter` | `fake` |
 |---|---|---|---|---|
 | options per ask | 255 | 255 | 20 | 255 |
-| Score levels | 10 | 10 | 10 | 10 |
 | context tokens (`limits.ask_context`) | none | 30k | the model's context length from OpenRouter's model list, minus 2k | none |
 
 The context limit is a **best-effort budget**, not a guarantee. It covers
@@ -1051,14 +986,10 @@ fail again (§6.3).
   - **SDK.** `skope-ask` MAY use TypeSafe's JavaScript SDK
     (`@typesafe-ai/sdk`), with its own retries turned off so skope's time
     budget stays exact.
-  - Map `score` → Jev *Score*. Send the rubric as Jev's `criteria` array,
-    lowest level first. Jev numbers levels by array position from 0, so Jev
-    level `i` is skope level `LOW + i`. `skope-ask` converts the ids before the
-    core validates them.
-  - Require Jev's full `probabilities` object; if any level is missing, the
-    response is invalid. Never fill in missing probabilities. The gate uses
-    the top level's probability, not Jev's separate `confidence` figure or
-    its `score`.
+  - Require Jev's full `probabilities` object; if any option is missing,
+    the response is invalid. Never fill in missing probabilities. The gate
+    uses the top option's probability, not Jev's separate `confidence`
+    figure.
 - **`openrouter`**: a general model through OpenRouter. **Read OpenRouter's
   current API docs for parameter names; do not guess.**
   - **Probabilities come only from token logprobs.** A chat model's own
@@ -1070,7 +1001,7 @@ fail again (§6.3).
     the option's **label**, and its description if it has one. It then asks
     for the letter alone. `one of` options have no description, so the
     label is what tells the model that `A` means nginx. This works the same
-    for `choice`, `yesno` (A = yes, B = no) and `score` (A = LOW).
+    for `choice` and `yesno` (A = yes, B = no).
   - **Request.** One output token at temperature 0, with logprobs and the
     top 20 alternatives. Turn reasoning off, and ask OpenRouter to route
     only to providers that support all of these parameters (historically
@@ -1106,7 +1037,7 @@ fail again (§6.3).
     model changes how often gates pass, so re-tune before trusting it (§13).
 - **`fake`**: reads `--fake answers.yaml`, keyed by question text (after
   interpolation) or by source-map id; value is a probs object or the literal
-  `unsure`. Score probabilities are keyed by level id. Used by tests and
+  `unsure`. Used by tests and
   `skope --fake`.
 
 ### 6.3 Context
@@ -1141,11 +1072,12 @@ skope <path/to/SKILL.md> [options]
   --dry-run               don't (§4.5); a run needs exactly one of these two
   --no-page               with --apply: don't page on handoff (§8)
   --param k=v             override a param from the skope block (repeatable, typed, safe-value checked)
-  --explain               print sections, transfer graph, and worst-case cost; run nothing
   --verify                run the explore handler and print the verify report; run nothing.
                           The report is the last stdout line; warning events come before it
   --trace events.jsonl    with --verify: check that one run's path is one the explorer can take (§12.4)
   --lint                  parse + static checks only
+  --effects               list every command the skill could ever run (§7.4); run nothing
+  --approve               approve that list into the config's approvals directory (§7.4, §9)
   --test                  run the scenarios in tests/ and tests.yaml next to the skill and check each (§7.3)
   --scenario DIR or NAME  with --test: run only this scenario directory, or this tests.yaml scenario by name
   --live                  with --test: ask the configured backend, and repeat each scenario (§7.3)
@@ -1172,7 +1104,7 @@ with no events.
 Responsibilities, in order:
 0. Check the mode. A run needs exactly one of `--apply` and `--dry-run`.
    Neither or both → print why to stderr and exit 40 before anything runs.
-   Read-only modes (`--lint`, `--explain`, `--verify`) need neither.
+   Read-only modes (`--lint`, `--verify`, `--effects`, `--approve`) need neither.
 1. Preprocess + lint. Report every error found, not just the first (§7.1).
    Any error → exit 40.
 2. Validate params and built-ins: types, and the safe-value check for any
@@ -1230,11 +1162,6 @@ Linting (step 1) MUST include:
 - `else skip` only where allowed
 - `ask` with section options has 2–255 options; `one of` uses value items
 - lists non-empty and not mixed (§3.6)
-- Score constraints (§3.4, v1.1)
-- warn: a Score variable whose only use is one comparison against one
-  threshold. Message: "this Score is only used as a threshold; a `yes | no`
-  ask gates more reliably." This counts uses; it doesn't guess at meaning.
-- warn: a Score variable never used after it's bound
 
 ### 7.1 Errors and warnings
 
@@ -1269,7 +1196,6 @@ and have no codes.
 | `E-GRAMMAR` | parse | a keyword item doesn't match §3.4 | `**Run** the tests first`; `**run** df -h` |
 | `E-NESTED-LIST` | parse | a nested list under an instruction that doesn't take one | a list under a `run` item |
 | `E-OPTION-ITEM` | parse | an option item isn't exactly one `[Section]` link | `- [Page] or restart` |
-| `E-RUBRIC-ITEM` | parse | a rubric line isn't `INT: text` (v1.1) | `- very bad`; `- **4**: outage` |
 | `E-UNRESOLVED` | lint | a `[Section]` or `[List]` reference doesn't resolve | `[Nonexistent]` |
 | `E-REF-KIND` | lint | a data section used as a target, or an instruction section used as a list | `then [Cleanups]` |
 | `E-CYCLE` | lint | the transfer graph has a cycle (§4.6) | A → B → A |
@@ -1280,22 +1206,22 @@ and have no codes.
 | `E-UNSAFE-VALUE` | lint | a param default or value item reaching a command fails the safe-value check | value item `my app` |
 | `E-UNBOUND` | lint | a name in a command or comparison may be unbound, is never bound, or is out of scope | a `for each` variable used after the loop |
 | `E-IF-YES` | lint | `if yes` has no governing `yes \| no` ask (§4.2) | `if yes` first in a section |
-| `E-ELSE-SKIP` | lint | `else skip` where it isn't allowed | on a section-option or Score ask |
+| `E-ELSE-SKIP` | lint | `else skip` where it isn't allowed | on a section-option ask |
 | `E-OPTION-COUNT` | lint | a section-option ask has fewer than 2 or more than 255 options | one option |
 | `E-LIST-KIND` | lint | the wrong kind of list for the instruction | `one of` over action items; `do item` over value items |
 | `E-LIST-EMPTY` | lint | a data list has no items | |
 | `E-LIST-MIXED` | lint | a data list mixes action and value items | |
 | `E-LIST-DUP` | lint | two items in a data list have the same label, ignoring case (§3.6) | `nginx` twice |
-| `E-SCORE-RANGE` | lint | Score bounds invalid, or not 2–10 levels (v1.1) | `→ 5 to 1`; `→ 1 to 11` |
-| `E-SCORE-RUBRIC` | lint | Score rubric missing, incomplete, out of range or duplicated (v1.1) | no line for level 2 |
 | `E-USAGE` | args | an unknown flag, a missing or malformed flag value, a missing or unreadable skill path, or an unreadable or malformed `--trace` file (§7) | `--aply`; `--param k` |
 | `E-MODE` | args | neither or both of `--apply` and `--dry-run` (§7 step 0) | |
+| `E-NOT-APPROVED` | args | the config has `approvals`, and the skill has no approval there, or its commands changed since (§7.4) | a new `do` the agent added |
 | `E-PARAM-UNKNOWN` | args | `--param` names a param the skill doesn't declare | |
 | `E-PARAM-TYPE` | args | a `--param` value has the wrong type | `threshold=high` |
+| `E-PARAM-CHOICE` | args | a `--param` value isn't one of the param's `choices` (§3.1) | `svc=db` when the choices are `[web, api]` |
 | `E-PARAM-UNSAFE` | args | a param override or built-in fails the safe-value check | `mount='/; rm -rf /'` |
 | `E-CONFIG` | args | the config file, or a `--fake` or `--fake-exec` file, is unreadable or invalid (fake files are checked against `contracts/fakes.schema.json` before the run) | |
 | `E-BACKEND-MODEL` | args | the `openrouter` model doesn't support logprobs, or its reasoning can't be turned off (§6.2) | |
-| `E-BACKEND-LIMIT` | args | the skill exceeds the configured backend's limits: options, Score levels or context (§6.2) | 21 options on `openrouter`; `ask_context: 40k tokens` on `jev` |
+| `E-BACKEND-LIMIT` | args | the skill exceeds the configured backend's limits: options or context (§6.2) | 21 options on `openrouter`; `ask_context: 40k tokens` on `jev` |
 | `E-FAKE-UNMATCHED` | runtime | `--fake-exec` has no answer for a command, or `--fake` has none for a question (§5.4) | |
 | `E-FAKE-UNUSED` | args | under `--test`, a fake key names no statement: a `line:N` with nothing on that line, or a `Section.var` / `Section.ask` the section doesn't have (§7.3) | `line:21` on a prose line |
 | `E-FAKE-AMBIGUOUS` | args | a `Section.var` or `Section.ask` fake key names more than one statement (§5.4) | `Counters.used` when Counters binds `used` twice |
@@ -1307,8 +1233,6 @@ Warnings don't stop a run:
 
 | Code | Meaning |
 |---|---|
-| `W-SCORE-THRESHOLD` | a Score variable is only used in one comparison against one threshold; a `yes \| no` ask gates more reliably, since Score confidence runs high (§4.7) (v1.1) |
-| `W-SCORE-UNUSED` | a Score variable is never used after it's bound (v1.1) |
 | `W-SECTION-UNREACHED` | no path reaches a section (§5.6) |
 | `W-ASK-NO-CONTEXT` | an `ask` question names nothing that could hold `run` output, so the model gets no evidence (§6.3) |
 | `W-MODEL-ALIAS` | `jev.model` is an alias, or a response came from a different model than configured (§6.2) |
@@ -1410,8 +1334,7 @@ scenario's expectations that no answer already covers (by a stable key,
 chooses it: probability 1 for the chosen option and 0 for every other, so
 the answer is valid, never a tie, and clears any `sure`, `sure 100%`
 included. Option ids are the core's own: a section option is
-`sectionId(label)`, a `one of` item its value, yes/no `"yes"`/`"no"`, and a
-Score level its level id. This means a scenario with `asks` and no
+`sectionId(label)`, a `one of` item its value, and yes/no `"yes"`/`"no"`. This means a scenario with `asks` and no
 `answers.yaml` at all can still pass; an ask `asks` doesn't name, with no
 answer either, is still `E-FAKE-UNMATCHED`. `--live` never derives answers:
 `answers.yaml` is ignored either way, and every ask goes to the backend.
@@ -1438,7 +1361,7 @@ any action item's command for a `do step`), like `fix.sh` next to a
 `transfer`, matched by slug) or `path_prefix`, `asks` (keyed by a section
 with one ask, or `Section.var`; `chosen` is the option's label: a section
 name for an ask whose options are sections, else the list item, `yes` or
-`no`, or the Score level, compared as written; the ask
+`no`, compared as written; the ask
 must also have cleared `sure`; the last answer counts when the ask runs more
 than once), `page_contains` (matched against each page's text as the
 skill wrote it, without the pager's zero-width spaces, §4.2), and
@@ -1468,7 +1391,7 @@ so 84.6% against sure 80 is +4.6, under a `min_margin` of 5. Without
 `min_margin`, a margin under 5 is a warning. The median confidence of an
 even number of runs is the mean of the middle two.
 Before running, skope prints the most backend calls the runs could make:
-the most asks any path can reach (from the explorer, as `--explain`
+the most asks any path can reach (from the explorer, as `--verify`
 counts), times each scenario's runs. It can't know the exact number, since a
 wrong answer can lead down a path with more asks. Answers are never cached.
 A live scenario's line adds `runs`, `hits`, `hit_rate`, `min_hit_rate`,
@@ -1482,10 +1405,54 @@ Output: one JSON line per scenario on stdout,
 `{"scenario","pass","mismatch"}` (or `"invalid"` with the reason), with
 `events` naming the file that holds that run's own events; then a summary
 line, `{"skope_version","skope_build","scenarios","passed","failed","invalid"}`.
-stderr gets a readable line for each. Exit 0 when every scenario passed, 60
+stderr gets a readable line for each. When stdout is a terminal, the JSON
+lines are left out, so a person sees only the readable ones; piped or
+redirected, stdout gets them all. Exit 0 when every scenario passed, 60
 when any failed, 40 when any is invalid or there are none.
 
 ---
+
+### 7.4 Scope: effects and approval
+A skill's **scope** is every command it could ever run. The taint rule
+(§3.5) makes it finite and knowable before any run: a command holds only
+literals, params, built-ins, and items from the skill's own lists, never
+command output.
+
+`--effects` lists the scope: one line per distinct command, `do` first, then
+`run` (which includes `check … succeeds`), with the sections each can run
+from. A variable bound from a list (a `one of` answer or a `for each` item)
+is expanded to every item in that list, skill-wide, since a variable lives
+for the whole run; `do step` is expanded to every action item's command. A
+param with `choices` (§3.1) is expanded to each choice. Any other param, or
+a built-in, stays `{name}`: the caller sets it, and the safe-value check
+bounds it. The report names these open params, since the approval can't
+pin their values; give a param choices to pin it. The report is the usual JSON line on stdout,
+with `effects_hash`, the sha256 of the sorted `(kind, command)` pairs, plus
+readable lines on stderr.
+
+`run` commands are meant to be read-only, but skope can't check that, and
+they run in a dry run. So the scope lists them too, and approval covers them.
+
+**Approval.** With `approvals: <dir>` in the config (§9), a run, dry or
+applied, needs `<dir>/<skill>.approval.json` holding the current `effects_hash`,
+or it stops with `E-NOT-APPROVED` before anything runs, naming the commands
+added and removed since the approval. `--approve` writes that file (the
+hash, the commands, the time, `$USER`) after printing the scope and its
+changes. `--lint`, `--verify`, `--effects` and `--test` never
+need an approval: they run nothing real.
+
+- The hash pins *what* can run, not *where*. Rewording prose or questions,
+  changing `sure`, or moving a command to another section keeps the
+  approval; `--verify` shows the paths. Adding or changing a command, or a
+  list item that reaches one, needs a new approval.
+- `approvals: beside-skill` keeps each approval in its skill's folder, as
+  `<skill>.approval.json`, so it's reviewed with the skill in a pull request.
+- Approval is only as strong as who can write it. Keep `<dir>` where the
+  agent or user that runs skope can't write, for example root-owned; with
+  `beside-skill`, protect the file with code review (CODEOWNERS), so an
+  agent can't approve its own change.
+- It doesn't make an approved command safe: `do ./fix.sh` runs whatever the
+  script does. It makes sure nothing unapproved runs.
 
 ## 8. Handoff
 
@@ -1506,6 +1473,10 @@ human on handoff, unless one of these says not to:
 
 Skope decides from these flags and settings only, never from whether it has
 a terminal.
+
+Whether or not it pages, skope also writes one line to stderr, since exit
+20 reads like a failure to a person: `skope: handed off ({reason}) in
+{section}; a person or agent takes it from here. Record: {path}`.
 
 - An agent that runs skope SHOULD set `SKOPE_CALLER=agent`.
 - The handoff page says: `{host}: skope {skill} handed off ({reason}) in
@@ -1536,8 +1507,6 @@ Then skope exits 20.
   the question as above; for `command_failed`, `{cmd, exit, timed_out,
   stderr_tail}` (redacted), or `{expr, left, right}` when a comparison
   couldn't coerce its operands; for `explicit` and `deadline`, `null`.
-- For a Score ask, `detail.probs` is keyed by level
-  (`{"1":0.05,"2":0.1,"3":0.45,"4":0.4}`) and `detail` adds `"range":[1,4]`.
 - `reason` is one of `explicit`, `gate_failed`, `command_failed`,
   `ask_unavailable`, `deadline`.
 - `effects[].status` is `done`, `failed`, `would_do` (dry run), or `unknown`
@@ -1591,6 +1560,7 @@ redact:
     - 'myco-[0-9a-f]{32}'
 on_handoff: page          # page | none (§8)
 state_dir: $XDG_STATE_HOME/skope   # run directories (§10.1)
+approvals: /etc/skope/approvals     # optional; a directory (absolute or ~/…), or beside-skill. When set, runs need approval (§7.4)
 ```
 
 **Built-in redaction patterns** (on unless `redact.defaults: false`, which
@@ -1627,7 +1597,7 @@ defaults. Anything else is `E-CONFIG`: a file that can't be read, a
 level, or a wrong type or out-of-range value. A run whose skill asks
 needs a block for the selected backend, whether or not the file exists,
 and without one it's `E-CONFIG` before the run starts; `--lint`,
-`--explain`, `--verify` and runs that never ask don't. `state_dir`
+`--verify`, `--effects` and runs that never ask don't. `state_dir`
 expands a leading `$XDG_STATE_HOME` or `~`, and must then be absolute.
 
 ---
@@ -1644,10 +1614,10 @@ expands a leading `$XDG_STATE_HOME` or `~`, and must then be absolute.
 
 | `event` | Extra fields |
 |---|---|
-| `run_start` | `params`, `dry_run`, `caller`, `run_dir`, `skope_version`, `skope_build` (§7.2) |
+| `run_start` | `params`, `dry_run`, `caller`, `run_dir`, `skope_version`, `skope_build` (§7.2), `effects_hash` (§7.4) |
 | `run` / `check_cmd` | `cmd`, `exit`, `ms`, `timed_out`, `truncated`, `stdout_hash` (of the redacted output, so a log can't be used to test guesses of a secret), `stdout_tail` (redacted, ≤2KB), `after_would_do` |
 | `check` | `expr`, `left`, `right`, `result`, `after_would_do`. `expr` is rendered from the core program: operands as `{name}` or the number, e.g. `{used} < {threshold}` (a decorative `%` is gone by then) |
-| `ask` | `probs` keyed by option id only; unassigned probability stays in the request file. `question` (as sent, §3.5: trusted values pasted in, `run` outputs named in backticks), `kind`, `probs`, `chosen`, `confidence`, `sure`, `passed`, `backend`, `model`, `ms`, `request_path`, `request_sha256`, `after_would_do`; for `score`, `range`, and `chosen` is an integer. If the backend failed, `probs`, `chosen` and `confidence` are `null` and `detail` is `unavailable` or `request_too_large` |
+| `ask` | `probs` keyed by option id only; unassigned probability stays in the request file. `question` (as sent, §3.5: trusted values pasted in, `run` outputs named in backticks), `kind`, `probs`, `chosen`, `confidence`, `sure`, `passed`, `backend`, `model`, `ms`, `request_path`, `request_sha256`, `after_would_do`. If the backend failed, `probs`, `chosen` and `confidence` are `null` and `detail` is `unavailable` or `request_too_large` |
 | `effect_start` / `effect_end` | `cmd`, `exit`, `ms`, `timed_out` (end only) |
 | `would_do` | `cmd` |
 | `page` | `text`, `ok` (did the pager command succeed) |
@@ -1709,8 +1679,8 @@ generation, skill signing, off-host log shipping, agent launching.
 ## 12. Testing and acceptance
 
 ### 12.1 Fixtures
-- Appendix A and B skills, and for v1.1 Appendix D. Its fakes cover each
-  level, unsure (pages via Unsure), and backend unavailable.
+- Appendix A, B and D skills. Appendix D's fakes cover each section option,
+  unsure (pages via Unsure), and backend unavailable.
 - A `fakes/` directory per fixture with a backend answer file and a command file
   for each scenario: happy path, every section option, gate failure, command
   failure, `do` timeout, backend unavailable, invalid backend response, deadline,
@@ -1760,25 +1730,6 @@ extra option, a value of 1.1, a negative value, `NaN`, and values summing to
 0.9. A tie for highest MUST fail the gate. So MUST A = 0.5, B = 0.2,
 `unassigned` = 0.3 at `sure` 40%: the response is valid and A clears 40%,
 but B plus `unassigned` could tie A.
-
-Score tests (v1.1). Each lint case MUST fail with the listed code and line:
-- `→ 5 to 1` (LOW ≥ HIGH), `→ 1 to 1` (one level), `→ 1 to 11` (too many): `E-SCORE-RANGE`
-- rubric item `6: …` on a `1 to 5` ask (out of range): `E-SCORE-RUBRIC`
-- two rubric items for level 3 (duplicate): `E-SCORE-RUBRIC`
-- a `1 to 4` ask with no rubric, or with no line for level 2: `E-SCORE-RUBRIC`
-- rubric item without a level (`- very bad`): `E-RUBRIC-ITEM`
-- a bold rubric line (`- **4**: outage`): `E-RUBRIC-ITEM`
-- `else skip` on a Score ask: `E-ELSE-SKIP`
-- a nested instruction (`- **run** …`) under a Score ask: `E-RUBRIC-ITEM`
-
-Each of these responses MUST be rejected as invalid: a missing level, an
-extra level `"5"` on a `1 to 4` ask, values summing to 0.9. A tie between two
-levels fails the gate, and so does 0.45 / 0.45 / 0.1 at 75%.
-
-Positive Score tests: `check {severity} == 2` after a Score ask lints and
-runs; a Score answer in a `CMD` lints; the threshold-only warning fires for a
-Score used in one `>=` check (`W-SCORE-THRESHOLD`); `--verify` on Appendix D reports 4 level
-branches, 1 unsure and 1 unavailable at the ask.
 
 Positive: `- **Note:** …` and `- **Warning**: …` in an instruction list are
 prose; `**run**` in a paragraph is prose; a section ending in `**stop**`
@@ -1831,9 +1782,8 @@ file paths.
   test suite passes on linux-x64, linux-arm64 and macOS-arm64 twice: once
   through the npm package with only Node installed, and once through the
   binary with no Node on the machine.
-- **M7 Score asks (v1.1)**: all Score tests in §12.2 pass; P4–P6 still
-  verify with the Score additions; the Appendix D fixture passes M1–M3 with
-  fakes for each level, unsure, and backend unavailable.
+- **M7 Score asks**: retired in 0.1.0-beta.3, when the Score ask form was
+  removed. The Appendix D fixture is now a choice ask covered by M1–M3.
 
 Identity tests (§7.2), in M6:
 - `skope --version` prints the release version and build identity.
@@ -1913,8 +1863,8 @@ description: Free disk space safely when a Linux volume fills up. Use when a dis
 
 # Disk full
 
-*A [skope](https://github.com/mattyv/skope) skill. Run it with the run-skope-skill skill if you have
-it; if not, the bold steps are the procedure, and `{names}` are params set in the skope block below.*
+*A [skope](https://github.com/mattyv/skope) skill. Run it with `skope` (see the run-skope-skill skill),
+never by hand: its commands are reviewed as a set. `{names}` are params, set in the skope block below.*
 
 ```skope
 format: 1
@@ -2032,8 +1982,8 @@ description: Check and renew TLS certificates before they expire. Use when a cer
 
 # Cert expiry
 
-*A [skope](https://github.com/mattyv/skope) skill. Run it with the run-skope-skill skill if you have
-it; if not, the bold steps are the procedure, and `{names}` are params set in the skope block below.*
+*A [skope](https://github.com/mattyv/skope) skill. Run it with `skope` (see the run-skope-skill skill),
+never by hand: its commands are reviewed as a set. `{names}` are params, set in the skope block below.*
 
 ```skope
 format: 1
@@ -2431,9 +2381,15 @@ Also, where things live in the Markdown:
 - **Redaction covers everything that leaves skope** (§9), not only command
   output: params, questions and guidance too.
 
+### Rev 20 (Score asks removed)
+
+- **Score asks removed.** A `one of` or section-choice ask covers graded
+  decisions, with each grade's meaning in its section's guidance. Its error
+  codes, the `range` event field and M7 are gone.
+
 ---
 
-## Appendix D — `error-triage/SKILL.md` (v1.1)
+## Appendix D — `error-triage/SKILL.md`
 
 ````markdown
 ---
@@ -2443,8 +2399,8 @@ description: Decide what to do about a burst of system errors. Use when an error
 
 # Error triage
 
-*A [skope](https://github.com/mattyv/skope) skill. Run it with the run-skope-skill skill if you have
-it; if not, the bold steps are the procedure, and `{names}` are params set in the skope block below.*
+*A [skope](https://github.com/mattyv/skope) skill. Run it with `skope` (see the run-skope-skill skill),
+never by hand: its commands are reviewed as a set. `{names}` are params, set in the skope block below.*
 
 ```skope
 format: 1
@@ -2457,42 +2413,48 @@ Work out how bad a burst of errors is, then either leave it, hand it to
 someone to look at, or page.
 
 ## Triage
-Read the recent errors and rate how severe they are.
+Read the recent errors and decide how to handle them.
 
 - **run** `journalctl -p err --since -15min --no-pager` as errors
-- **ask** How severe are the errors in {errors}? → 1 to 4 as severity · sure 75% · else [Unsure]
-  - 1: known noise, nothing to do
-  - 2: worth a human look, not urgent
-  - 3: degraded service
-  - 4: outage or data at risk
-- **check** {severity} <= 1 → stop
-- **check** {severity} == 2 → [Investigate]
-- **then** [Page]
+- **ask** Given {errors}, how should this burst be handled? · sure 75% · else [Unsure]
+  - [Noise]
+  - [Investigate]
+  - [Page]
 
-## Page
-- **page** "{host}: error burst rated {severity}/4. Run {run_id} has the details."
+## Noise
+Known noise: nothing is wrong and there's nothing to do.
 
-## Unsure
-An unwatched alert shouldn't end in a handoff nobody reads. If the rating is
-unclear, page.
-
-- **page** "{host}: error burst, severity unclear. Run {run_id} has the details."
+- **stop**
 
 ## Investigate
+Worth a human look, but not urgent: nothing is degraded yet.
+
 - **hand off**
 
 The errors look real but not urgent. Find the cause from the errors gathered
 in Triage and suggest a fix or a change to this skill as a diff.
+
+## Page
+Degraded service, an outage, or data at risk.
+
+- **page** "{host}: error burst needs attention. Run {run_id} has the details."
+
+## Unsure
+An unwatched alert shouldn't end in a handoff nobody reads. If the call is
+unclear, page.
+
+- **page** "{host}: error burst, handling unclear. Run {run_id} has the details."
 ````
 
 Transfer graph. Any command failure or failed gate without an else also ends in handoff. Those edges aren't drawn.
 
 ```mermaid
 flowchart LR
-  triage["Triage"] -- "severity ≤ 1" --> stopped(["stopped"])
-  triage -- "severity = 2" --> inv["Investigate"]
-  triage -- "severity ≥ 3" --> page["Page"]
+  triage["Triage"] --> noise["Noise"]
+  triage --> inv["Investigate"]
+  triage --> page["Page"]
   triage -- "unsure" --> unsure["Unsure"]
+  noise --> stopped(["stopped"])
   page --> paged(["paged"])
   unsure --> paged
   inv --> handoff(["handoff"])
@@ -2523,4 +2485,4 @@ The only gain would be one backend call instead of several, about 100ms each.
 - The explorer tracks known values in its state. A 0–48 range in steps of 2
   is 25 values per question, multiplied through every later branch.
 - Real cases are buckets anyway ("under an hour / a few hours / a day"),
-  which a `choice` or Score covers.
+  which a `choice` covers.

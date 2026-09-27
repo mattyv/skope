@@ -42,20 +42,6 @@ export const askOneOf = (src: number, q: unknown[], sure: number, list: string, 
   src,
   ask: { question: q, sure, else: els, one_of: { list: { section: list }, as } },
 });
-export const askScore = (src: number, q: unknown[], sure: number, low: number, high: number, as: string, els: unknown = null) => ({
-  src,
-  ask: {
-    question: q,
-    sure,
-    else: els,
-    score: {
-      low,
-      high,
-      as,
-      rubric: Array.from({ length: high - low + 1 }, (_, i) => ({ src: src + 1 + i, level: low + i, text: `level ${low + i}` })),
-    },
-  },
-});
 export const forEach = (src: number, name: string, list: string, body: unknown[]) => ({
   src,
   for_each: { var: name, list: { section: list }, body },

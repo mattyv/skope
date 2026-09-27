@@ -1,15 +1,17 @@
 # skope
 
-**Write the runbook once. An agent can follow it, or skope can run it in
-milliseconds.**
+**Let agents act on production without handing them a shell.**
 
-skope only acts when Jev is confident, and hands everything else to a
-person or an agent. Unlike a prompt, a skill can be unit tested, and the part
-that decides what runs is mathematically proven.
+An agent writes the automation as a skope skill. You approve its scope:
+every command it could ever run, in one list. skope then runs it in
+milliseconds, asks a small model only the judgement calls, and hands back to
+the agent or a person when it isn't sure. Change a command and it won't run
+until you approve again. Skills are unit tested, and the part that decides
+what runs is mathematically proven.
 
-A skope skill is an ordinary Markdown file. A person or a language model can
-read it and follow it. skope can also *execute* it: it runs the commands,
-checks the results, and at the branch points asks
+A skope skill is an ordinary Markdown file that a person can read and
+review. skope executes it: it runs the commands, checks the results, and at
+the branch points asks
 **[Jev](https://docs.typesafe.ai)**, TypeSafe's fast decision model, small
 multiple-choice questions. When Jev isn't sure enough, skope stops and hands
 the incident to a human or an agent, with a record of everything it already
@@ -58,9 +60,17 @@ reads it, human or model. The whole skill is
 
 ## Why
 
-Runbooks are either prose, which only a person or an expensive agent can
-follow, or scripts, which can't use judgement. skope keeps one file for both,
-and decides who does each step:
+Agents are good at working out what to do, but slow and costly to run every
+time, and risky to leave alone with production access. Scripts are fast and
+predictable, but can't use judgement, and an agent-written script can do
+anything. To know what it might do, you have to read all of it.
+
+A skope skill sits between the two. **Everything it could ever do is
+visible before it runs:** a command can't be assembled from anything it
+reads at run time, so `skope --effects` lists every possible command, and
+with approvals on, skope refuses to run until a person has approved exactly
+that list (see [Approve](#approve)). Inside that scope, skope decides who
+does each step:
 
 - **Code does what's certain:** measurements, comparisons and commands.
 - **Jev makes the small judgement calls.** It only ever chooses between
@@ -101,37 +111,31 @@ the shell, the pager and the backend, is ordinary tested TypeScript.
 
 ## Install
 
+skope is in beta. Install the beta by name:
+
 ```console
-$ curl -fsSL https://github.com/mattyv/skope/releases/latest/download/install.sh | sh
+$ curl -fsSL https://github.com/mattyv/skope/releases/download/v0.1.0-beta.2/install.sh | SKOPE_VERSION=0.1.0-beta.2 sh
 $ skope --version
-skope 0.1.0 (build identity 3f1c…)
+skope 0.1.0-beta.2 (build identity …)
 ```
 
 That installs a single self-contained binary for Linux (x64, arm64) or
 macOS (Apple silicon) into `~/.local/bin`. It doesn't need Node. The
 installer checks the download against the release's checksums before
-installing anything. Set `SKOPE_VERSION` to pin a version, or
-`SKOPE_INSTALL_DIR` to install elsewhere.
+installing anything. Set `SKOPE_INSTALL_DIR` to install elsewhere.
 
-Or, with Node 20 or newer, `npm install -g skope`. Or run the container
-image, `ghcr.io/mattyv/skope`.
+Or run the container image, `ghcr.io/mattyv/skope:0.1.0-beta.2`.
 
-**Beta.** Until 0.1.0 is out, `latest` has nothing to install. Install the
-beta by name:
+**Not on npm yet.** The `skope` name on npm belongs to an unrelated
+project, so don't `npm install skope`. A package under a different name
+will follow.
 
-```console
-$ curl -fsSL https://github.com/mattyv/skope/releases/download/v0.1.0-beta.2/install.sh | SKOPE_VERSION=0.1.0-beta.2 sh
-```
-
-or `npm install -g skope@beta`, or `ghcr.io/mattyv/skope:0.1.0-beta.2`.
-
-If you use Claude Code (`~/.claude` exists), both the installer and
-`npm install -g` also install two agent skills:
+If you use Claude Code (`~/.claude` exists), the installer also installs
+two agent skills:
 [`write-skope-skill`](skills/write-skope-skill/SKILL.md) has an agent write
 skope skills test first, and
 [`run-skope-skill`](skills/run-skope-skill/SKILL.md) has one run a skope
-skill (with skope if it's there, by hand if not) and take over when skope
-hands off. Set `SKOPE_NO_SKILL=1` to skip them.
+skill through skope, never by hand, and take over when skope hands off. Set `SKOPE_NO_SKILL=1` to skip them.
 
 ### Try it
 
@@ -152,12 +156,15 @@ $ skope SKILL.md --verify   # every path it can take, and how each ends
 $ skope SKILL.md --dry-run --fake answers.yaml --fake-exec commands.yaml
 ```
 
-The dry run prints one JSON event per step. The faked model picks Restart
-and then `myapp-worker`, skope logs the restart it *would* do, and disk
-usage drops under target. Now make the model less sure: in `answers.yaml`,
+skope's output is JSON on stdout, one event per line, for scripts and
+agents; a person reads stderr: errors, `--verify`'s summary, and one line
+when a run hands off. `--test` prints its JSON only when stdout isn't a
+terminal, so at a terminal you see just the PASS lines. In the dry run, the faked model
+picks Restart and then `myapp-worker`, skope logs the restart it *would*
+do, and disk usage drops under target. Now make the model less sure: in `answers.yaml`,
 move 0.2 from `s:restart` to `s:page` (each ask's probabilities add up to
 1), or replace the whole answer with `Triage.ask: unsure`. Run it again,
-and skope hands off instead of guessing.
+and skope hands off instead of guessing: it exits 20 and says where on stderr.
 
 ## Use
 
@@ -168,9 +175,53 @@ links, and command output that could leak into a command:
 
 ```console
 $ skope disk-full/SKILL.md --lint
-$ skope disk-full/SKILL.md --explain    # sections, transfer graph, worst-case cost
 $ skope disk-full/SKILL.md --verify     # every path the run can take, and how each ends
 ```
+
+### Approve
+
+Before a skill runs anywhere real, see everything it could do:
+
+```console
+$ skope disk-full/SKILL.md --effects
+skope: disk-full can run 12 commands, 9 of them changing things (sha256:b03238161bae…)
+  do   apt-get clean    [Clean up]
+  do   systemctl restart myapp-worker    [Restart]
+  …
+  run  df --output=pcent {mount} | tail -1    [Triage, Clean up, Restart]
+```
+
+Every command is written out, with list items such as the services filled
+in. That works because command output can never reach a command (proven),
+so nothing is assembled at run time. A param stays `{mount}`, since the
+caller sets it, and `--effects` names it as open. To pin it, give it
+choices in the skope block, and it's listed as each one:
+
+```yaml
+params:
+  mount: { default: /, choices: [/, /var] }   # --param mount=/tmp is refused
+```
+
+Turn approvals on in the config with `approvals: /etc/skope/approvals`,
+somewhere the user or agent running skope can't write. Or use
+`approvals: beside-skill` to keep each approval next to its skill, as
+`disk-full.approval.json`, reviewed in pull requests (protect it with
+CODEOWNERS, so an agent can't approve its own change). Then no dry run or
+apply happens until a person runs `--approve`, and any change to the command
+list stops it again:
+
+```console
+$ skope disk-full/SKILL.md --approve
+skope: approved disk-full: /etc/skope/approvals/disk-full.approval.json
+$ # the agent adds a command to the skill…
+$ skope disk-full/SKILL.md --apply
+E-NOT-APPROVED: disk-full's commands changed since it was approved (+ do   rm -rf /var/cache). Review them with --effects, then approve with --approve
+```
+
+Rewording guidance or questions, or changing `sure`, keeps the approval, and
+`--verify` shows the paths. Approval doesn't make an approved command safe:
+`do ./fix.sh` runs whatever the script does. What it guarantees is that
+nothing outside the approved list runs.
 
 ### Rehearse
 
@@ -358,6 +409,16 @@ run moves from section to section until it ends.
 | **hand off** | Hands the incident to a person or agent, with the section's prose as instructions |
 | **stop** | Ends the run |
 
+Variables come from `run … as x` (the command's trimmed output), from an
+`ask`'s answer, and from params. They can go into `check`, `ask` questions
+and `page` text. **Command output never goes into a command** (lint rejects
+it as `E-TAINT`), so a command can use params and items from the skill's own
+lists, including one an `ask` picked, but never what another command
+printed. There's no arithmetic either: `check` only compares. Do the maths
+inside a command (`free -m | awk '/Mem/ {print int($3*100/$2)}'`). To
+combine two measurements, take them in one command, or compare them with
+`check {after} < {before}`.
+
 A bold word that looks like a keyword but isn't one is an error, never
 prose, so a typo can't silently skip a step. The full grammar is in
 [`docs/SPEC.md`](docs/SPEC.md).
@@ -387,14 +448,13 @@ narrow decisions and to return a probability for every possible answer,
 which is exactly what skope's confidence thresholds need. It answers
 in about a tenth of a second.
 
-Each of skope's question forms maps onto one of Jev's three question types:
+Each of skope's question forms maps onto one of Jev's question types:
 
 | In a skill | Jev question type | What skope does with the answer |
 |---|---|---|
 | `ask` with a list of `[Section]` options | Choice | moves to the chosen section |
 | `→ one of [List] as x` | Choice | keeps the chosen item as `x` |
 | `→ yes \| no` | Noul | keeps yes or no, for `if yes` |
-| `→ 1 to 4 as x` | Score | keeps the level as `x`, for `check` |
 
 skope sends Jev only the evidence a question names. It pins a Jev version,
 because a threshold like `sure 85%` is tuned against a particular model, and
@@ -450,9 +510,8 @@ of 4,621 Jev calls found:
   Put the deciding fact in the question's evidence, and use
   `--test --live` to check.
 - **Calibration depends on the question type.** Yes/no answers were
-  under-confident, Choice answers slightly over-confident, and Score
-  answers badly over-confident. A yes/no gate errs towards handing off;
-  don't gate on a Score level alone (skope warns, `W-SCORE-THRESHOLD`).
+  under-confident and Choice answers slightly over-confident, so a yes/no
+  gate errs towards handing off.
 - **Use the probability, not the model's own confidence field.** skope
   already gates on the chosen option's probability.
 
@@ -472,6 +531,7 @@ these wouldn't get through CI, even if every test still passed.
 | A dry run never executes a `do`. | Proven over every possible run. |
 | Every run ends, with exactly one outcome. | Proven. |
 | Every skill is checked before it runs. | Lint, proven sound: a skill that passes can't hit an internal error. |
+| With approvals on, only the approved commands can run. | The list is complete because of the taint rule, which is proven; the check against the approval before any run is tested TypeScript. |
 | Confidence is measured, never self-reported. | The probability Jev gives each option, or a model's token probabilities; never a confidence the model writes about itself. |
 
 ## How it works

@@ -1,13 +1,14 @@
 ---
 name: write-skope-skill
-description: Write or change a skope skill (a runbook in Markdown that skope can run and an agent can follow), test first. Use when asked to turn a runbook, incident notes or an on-call procedure into a skope skill, to add a case to an existing skill, or to fix a skill that chose wrong.
+description: Write or change a skope skill (automation in Markdown that skope runs, with every command it could run reviewed as a set), test first. Use when asked to turn a runbook, incident notes or an on-call procedure into a skope skill, to add a case to an existing skill, or to fix a skill that chose wrong.
 ---
 
 # Writing a skope skill, test first
 
-A skope skill is a Markdown runbook that two things can use: an agent reads
-and follows it, and `skope` runs it, asking Jev only the judgement calls.
-Because skope can run it, it can be tested like code. Write the tests
+A skope skill is automation written in Markdown. `skope` runs it, asking
+a small model only the judgement calls, and a person approves the full list
+of commands it could run. Nobody follows it by hand. Because skope runs it,
+it can be tested like code. Write the tests
 first, then the skill, then check the questions against the real model.
 
 Never run a skill with `--apply` while writing it. Everything below uses
@@ -95,8 +96,8 @@ description: Free disk space safely when a volume fills up. Use when a disk aler
 
 # Disk full
 
-*A [skope](https://github.com/mattyv/skope) skill. Run it with the run-skope-skill skill if you have
-it; if not, the bold steps are the procedure, and `{names}` are params set in the skope block below.*
+*A [skope](https://github.com/mattyv/skope) skill. Run it with `skope` (see the run-skope-skill skill),
+never by hand: its commands are reviewed as a set. `{names}` are params, set in the skope block below.*
 
 ```skope
 format: 1
@@ -141,12 +142,12 @@ Layout: the frontmatter holds only `name` and `description` (and other
 Agent Skills keys). `format: 1`, params and limits go in the `skope` block,
 because agents never see frontmatter and claude.ai rejects unknown keys
 there. Keep the note line under the title: it tells an agent that loads the
-skill what the bold steps are.
+skill to run it with skope, not follow it.
 
 Keywords: **run**, **do**, **check**, **ask**, **for each**, **if yes**,
 **then**, **page**, **hand off**, **stop**. A bold word that isn't a
 keyword is an error. Ask forms: a list of `[Section]` options; `→ yes | no`
-(then **if yes**); `→ one of [List] as x`; `→ 1 to 4 as x` with a rubric.
+(then **if yes**); `→ one of [List] as x`.
 Failure handling: `· else skip` or `· else [Section]`; without one, a
 failure hands off. Action lists are `1. Label — \`command\``, and
 `- **for each** step in [List]` with `**if yes** do step` runs them.
@@ -162,12 +163,25 @@ Rules that keep a skill safe and testable:
   wrong and the gate won't catch it. If it matters, `run` it and name it.
 - **Always offer an escape.** A choice list needs an option that hands off
   or pages ("Investigate"), for when none fit.
-- **Prefer yes/no over a Score level for a single threshold.** A Score's
-  confidence runs high; gate on yes/no instead.
+- **Grade with options, not numbers.** For "how bad is it?", offer one
+  section per way to handle it (Noise, Investigate, Page) and describe each
+  grade in that section's guidance paragraph.
 - **`do` only what's reversible or explicitly approved,** and only
   interpolate params and list items into commands. Command output can
-  never go into a command; lint enforces this.
+  never go into a command (`E-TAINT`): output could hold `; rm -rf /`.
+  To act on what a command found, let an `ask` pick from a list you wrote
+  (`→ one of [Services] as service`, then `do systemctl restart {service}`).
+- **No arithmetic: do the maths in the command.** `check` only compares
+  (`<`, `<=`, `>`, `>=`, `==`, `!=`) a variable with a number or another
+  variable. Compute inside one command, e.g.
+  `` `free -m | awk '/Mem/ {print int($3*100/$2)}'` as mem_pct ``, with
+  params allowed (`awk -v t={threshold}`). You can't combine two earlier
+  outputs in a command (`$(( {a} - {b} ))` is `E-TAINT`): measure both in
+  one command, or compare them with `check {after} < {before}`.
 - **Every section ends** in `stop`, `page`, `hand off` or `then [X]`.
+- **Give params that reach a `do` fixed choices** (`svc: { default: web,
+  choices: [web, api] }`), so `--effects` lists every value and the approval
+  pins them. A param without choices can be any safe value.
 
 ## 5. Check, then green
 
@@ -209,6 +223,9 @@ expects, its lowest and median confidence, and the margin over `sure`.
   reported to the person, including any thin margins.
 - Show the person the skill and `tests.yaml`, and say which cases are
   covered and what you assumed.
+- Show them `skope SKILL.md --effects`, the full list of commands the skill
+  could run, and point out any you added or changed. **Never run
+  `--approve` yourself:** approving the scope is the person's decision.
 - Changing an existing skill: add or change the scenario first (red), then
   the skill (green). Never change a scenario's expectations just to make
   it pass without saying why.

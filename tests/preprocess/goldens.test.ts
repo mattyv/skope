@@ -1,6 +1,6 @@
 // M1 goldens (SPEC §12.3): the preprocessor's output for disk-full and
-// cert-expiry must equal contracts/examples/*.core.json exactly.
-// error-triage (v1.1, Score) is also a golden, per the stream brief.
+// cert-expiry must equal contracts/examples/*.core.json exactly, and so
+// must error-triage's.
 
 import { readFileSync } from "node:fs";
 import { describe, expect, test } from "vitest";
@@ -12,7 +12,7 @@ const cases = [
   { name: "disk-full", skill: "../../fixtures/disk-full/SKILL.md", golden: "../../contracts/examples/disk-full.core.json" },
   { name: "cert-expiry", skill: "../../fixtures/cert-expiry/SKILL.md", golden: "../../contracts/examples/cert-expiry.core.json" },
   {
-    name: "error-triage (v1.1 Score)",
+    name: "error-triage",
     skill: "../../fixtures/error-triage/SKILL.md",
     golden: "../../contracts/examples/error-triage.core.json",
   },

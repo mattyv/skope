@@ -267,40 +267,12 @@ describe("E-OPTION-ITEM (parse): an option item isn't exactly one [Section] link
   });
 });
 
-describe("E-RUBRIC-ITEM (parse): a rubric line isn't `INT: text` (v1.1)", () => {
-  test("a rubric item with no level (`- very bad`)", () => {
-    const md = skillMd(
-      "## Triage",
-      "- **ask** How bad? → 1 to 2 as x · sure 75%",
-      "  - very bad",
-      "  - 2: ok",
-      "- **check** {x} == 1 → stop",
-    );
-    expect(codesAt(md)).toContainEqual({ code: "E-RUBRIC-ITEM", line: BODY_START + 2 });
-  });
-
-  test("a bold rubric line (`- **4**: outage`)", () => {
-    const md = skillMd(
-      "## Triage",
-      "- **ask** How bad? → 1 to 4 as x · sure 75%",
-      "  - 1: fine",
-      "  - 2: ok",
-      "  - 3: bad",
-      "  - **4**: outage",
-      "- **check** {x} == 1 → stop",
-    );
-    expect(codesAt(md)).toContainEqual({ code: "E-RUBRIC-ITEM", line: BODY_START + 5 });
-  });
-
-  test("a nested instruction under a Score ask (`- **run** ...`)", () => {
-    const md = skillMd(
-      "## Triage",
-      "- **ask** How bad? → 1 to 2 as x · sure 75%",
-      "  - **run** `df -h`",
-      "  - 2: ok",
-      "- **check** {x} == 1 → stop",
-    );
-    expect(codesAt(md)).toContainEqual({ code: "E-RUBRIC-ITEM", line: BODY_START + 2 });
+describe("E-GRAMMAR: the removed Score form", () => {
+  test("→ 1 to 4 as x names the ask forms to use instead", () => {
+    const md = skillMd("## Triage", "- **ask** How bad? → 1 to 4 as sev · sure 75%", "- **stop**");
+    const r = preprocess(md);
+    expect("errors" in r && r.errors).toContainEqual(expect.objectContaining({ code: "E-GRAMMAR", line: BODY_START + 1 }));
+    expect(JSON.stringify(r)).toContain("one of [List]");
   });
 });
 

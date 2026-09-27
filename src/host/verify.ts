@@ -1,4 +1,4 @@
-// --verify, --verify --trace and --explain (SPEC §5.6, §7, §12.4): the
+// --verify and --verify --trace (SPEC §5.6, §7, §12.4): the
 // explore handler's graph, reported without running anything.
 
 import IDENTITY from "../build-identity.js";
@@ -8,7 +8,7 @@ import { DEFAULT_GRACE_MS } from "../runner/exec.js";
 import type { RunConfig, Val } from "../step.js";
 import { askMs, type Costs, coreEventsOf, type Explorable, explore, responseClass, signature, traceFits } from "./explore.js";
 
-export type ReadOnly = { verify: true; trace?: Record<string, unknown>[] } | { explain: true };
+export type ReadOnly = { verify: true; trace?: Record<string, unknown>[] };
 
 export interface VerifyInput {
   program: CoreProgram;
@@ -38,7 +38,7 @@ export function readOnly(mode: ReadOnly, v: VerifyInput): number {
     mode: "explore",
   });
 
-  if ("verify" in mode && mode.trace) {
+  if (mode.trace) {
     const events = mode.trace;
     const start = events.find((e) => e.event === "run_start") as { dry_run?: boolean; params?: Record<string, string> } | undefined;
     // The trace's own mode and params decide which paths exist.
@@ -75,30 +75,22 @@ export function readOnly(mode: ReadOnly, v: VerifyInput): number {
   const unreached = sections.filter(([, x]) => "body" in x && !s.sections.has(x.name)).map(([, x]) => x as Section);
   const { version, build } = IDENTITY;
   const maxima = { max_ask_calls: s.maxAsks, max_effects: s.maxEffects, worst_case_ms: s.maxMs, asks: s.asks };
-  if ("explain" in mode) {
-    const n = (k: number, word: string) => `${k} ${word}${k === 1 ? "" : "s"}`;
-    const entry = (v.program.sections[v.program.entry.section] as Section).name;
-    v.say(
-      `skope: ${n(sections.length, "section")}, entry ${entry}; at most ${n(s.maxAsks, "ask")} and ${n(s.maxEffects, "effect")}; worst case ${s.maxMs / 1000}s`,
-    );
-    v.emit({
-      skope_version: version,
-      skope_build: build,
-      entry: (v.program.sections[v.program.entry.section] as Section).name,
-      sections: sections.map(([, x]) => ({
-        name: x.name,
-        line: x.src,
-        kind: "body" in x ? "instructions" : "lists" in x && x.lists.length > 0 ? "data" : "prose",
-      })),
-      transfers: [...s.transfers].sort(),
-      ...maxima,
-    });
-    return 0;
-  }
   // A path that ends without an outcome, or in error, can't get here: the loop would have thrown (P6).
+  const n = (k: number | bigint, word: string) => `${k} ${word}${k === 1 || k === 1n ? "" : "s"}`;
+  const entry = (v.program.sections[v.program.entry.section] as Section).name;
+  v.say(
+    `skope: ${n(sections.length, "section")}, entry ${entry}; ${n(s.paths, "path")}, ending ${[...s.outcomes].sort().join(", ")}; at most ${n(s.maxAsks, "ask")} and ${n(s.maxEffects, "effect")}; worst case ${s.maxMs / 1000}s${unreached.length > 0 ? `; never reached: ${unreached.map((x) => x.name).join(", ")}` : ""}`,
+  );
   v.emit({
     skope_version: version,
     skope_build: build,
+    entry,
+    sections: sections.map(([, x]) => ({
+      name: x.name,
+      line: x.src,
+      kind: "body" in x ? "instructions" : "lists" in x && x.lists.length > 0 ? "data" : "prose",
+    })),
+    transfers: [...s.transfers].sort(),
     paths: s.paths <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(s.paths) : String(s.paths),
     outcomes: [...s.outcomes].sort(),
     ...maxima,

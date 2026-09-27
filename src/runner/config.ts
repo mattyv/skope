@@ -26,6 +26,8 @@ export interface Config {
   redact: { defaults: boolean; patterns: string[] };
   on_handoff: "page" | "none";
   state_dir: string;
+  /** Where approved effect sets live (SPEC §7.4). When set, a run needs its skill approved. */
+  approvals?: string;
 }
 
 /** An XDG base directory: the variable if it's an absolute path (relative ones are ignored, per the XDG spec), else `~/<fallback>`. */
@@ -127,7 +129,7 @@ export function loadConfig(path?: string, warn: (message: string) => void = () =
   } catch (err) {
     fail(`invalid YAML in ${file}: ${(err as Error).message}`);
   }
-  const doc = mapping(parsed ?? {}, "config", ["ask", "jev", "openrouter", "pager", "redact", "on_handoff", "state_dir"]);
+  const doc = mapping(parsed ?? {}, "config", ["ask", "jev", "openrouter", "pager", "redact", "on_handoff", "state_dir", "approvals"]);
 
   if (doc.ask !== undefined) {
     const a = mapping(doc.ask, "ask", ["backend", "timeout_ms", "retries"]);
@@ -188,6 +190,16 @@ export function loadConfig(path?: string, warn: (message: string) => void = () =
     cfg.on_handoff = h;
   }
 
+  if (doc.approvals !== undefined) {
+    const v = typeof doc.approvals === "string" && doc.approvals.length > 0 ? doc.approvals : fail("approvals must be a non-empty string");
+    const p = /^~(?=\/|$)/.test(v) ? join(homedir(), v.slice(1)) : v;
+    cfg.approvals =
+      v === "beside-skill" || isAbsolute(p)
+        ? v === "beside-skill"
+          ? v
+          : p
+        : fail(`approvals must be an absolute path or beside-skill, got ${v}`);
+  }
   if (doc.state_dir !== undefined)
     cfg.state_dir = expandStateDir(typeof doc.state_dir === "string" ? doc.state_dir : fail("state_dir must be a string"));
 

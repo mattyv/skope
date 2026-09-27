@@ -7,7 +7,6 @@ import {
   actions,
   answer,
   askOneOf,
-  askScore,
   askYesNo,
   bodies,
   checkCmd,
@@ -417,41 +416,6 @@ describe("for each, yes/no and if yes (SPEC §4.2, §4.7)", () => {
       { mount: "/" },
     );
     expect(nexts(drive(p, config({ mount: "/var" }), []).turns)[0]).toMatchObject({ kind: "exec", cmd: "trim /var", exec: "do" });
-  });
-});
-
-describe("Score asks (SPEC §4.2, v1.1)", () => {
-  const p = program({
-    "s:a": section("A", [
-      askScore(2, [lit("How severe?")], 75, 1, 4, "severity"),
-      cmp(8, "==", v("severity"), { num: "3" }, { stop: {} }),
-      handOff(9),
-    ]),
-  });
-
-  test("options are the levels with their rubric; a pass binds the level as an integer", () => {
-    const { turns } = drive(p, config(), [answer({ "1": 0.05, "2": 0.05, "3": 0.85, "4": 0.05 })]);
-    const ask = nexts(turns)[0];
-    expect(request(ask).kind).toBe("score");
-    expect(request(ask).options.map((o) => [o.id, o.description])).toEqual([
-      ["1", "level 1"],
-      ["2", "level 2"],
-      ["3", "level 3"],
-      ["4", "level 4"],
-    ]);
-    expect(bodies(turns)[0]).toMatchObject({ event: "ask", kind: "score", chosen: 3, range: [1, 4], passed: true });
-    expect(bodies(turns)[1]).toMatchObject({ event: "check", left: "3", right: "3", result: true });
-    expect(last(turns)).toEqual(STOPPED);
-  });
-
-  test("0.45 / 0.45 / 0.1 fails a 75% gate: gate_failed", () => {
-    expect(last(drive(p, config(), [answer({ "1": 0, "2": 0.1, "3": 0.45, "4": 0.45 })]).turns)).toEqual(handoff("gate_failed"));
-  });
-
-  test("an extra level `5` is invalid: ask_unavailable", () => {
-    expect(last(drive(p, config(), [answer({ "1": 0.1, "2": 0.1, "3": 0.6, "4": 0.1, "5": 0.1 })]).turns)).toEqual(
-      handoff("ask_unavailable", "unavailable"),
-    );
   });
 });
 

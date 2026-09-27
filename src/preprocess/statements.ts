@@ -1,6 +1,6 @@
 // Per-keyword grammar (SPEC §3.4), on the Cursor from grammar.ts. Each parser
 // takes the text after the leading `**keyword**` and returns the statement's
-// fields or GRAMMAR_ERROR. Nested lists (ask options, Score rubric, for-each
+// fields or GRAMMAR_ERROR. Nested lists (ask options, for-each
 // body) aren't parsed here; the caller has them.
 
 import { type BracketRef, Cursor, GRAMMAR_ERROR, type GrammarError, type Part, splitParts, T } from "./grammar.js";
@@ -149,11 +149,7 @@ export function parseNoArg(rest: string): true | GrammarError {
 
 // --- ask ---------------------------------------------------------------
 
-export type AskForm =
-  | { sections: true }
-  | { yesno: { as: string } }
-  | { one_of: { list: BracketRef; as: string } }
-  | { score: { low: number; high: number; as: string } };
+export type AskForm = { sections: true } | { yesno: { as: string } } | { one_of: { list: BracketRef; as: string } };
 
 /** An integer the core can hold exactly (SPEC §5.1: JSON numbers). */
 const safeInt = (s: string | undefined): number | null => {
@@ -161,7 +157,7 @@ const safeInt = (s: string | undefined): number | null => {
   return Number.isSafeInteger(n) ? n : null;
 };
 
-/** What follows ` → ` in an ask: `yes | no`, `one of [L]` or a Score range. */
+/** What follows ` → ` in an ask: `yes | no` or `one of [L]`. */
 function askForm(cur: Cursor): AskForm | GrammarError {
   if (cur.eat(T.yesNo)) {
     const as = optionalAs(cur);
@@ -172,11 +168,7 @@ function askForm(cur: Cursor): AskForm | GrammarError {
     const as = list ? requiredAs(cur) : GRAMMAR_ERROR;
     return list && as !== GRAMMAR_ERROR ? { one_of: { list, as } } : GRAMMAR_ERROR;
   }
-  const m = cur.match(T.score);
-  const low = safeInt(m?.[1]);
-  const high = safeInt(m?.[2]);
-  const as = low !== null && high !== null ? requiredAs(cur) : GRAMMAR_ERROR;
-  return low !== null && high !== null && as !== GRAMMAR_ERROR ? { score: { low, high, as } } : GRAMMAR_ERROR;
+  return GRAMMAR_ERROR;
 }
 
 export function parseAsk(rest: string, resolve: Resolve) {

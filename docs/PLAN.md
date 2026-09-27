@@ -1,8 +1,8 @@
 # skope build plan
 
 How to build skope from `SPEC.md` with several agents working in parallel,
-test-first, with every stage verified by CI. Milestones M1–M7 are defined in
-SPEC §12.3; this plan says who builds what, in what order, and how each
+test-first, with every stage verified by CI. Milestones M1–M6 are defined in
+SPEC §12.3, which also records M7 as retired; this plan says who builds what, in what order, and how each
 piece is proven done.
 
 ---
@@ -64,7 +64,7 @@ flowchart TD
   E --> G
   F --> G
   G --> H["Phase 3: packaging (M6)"]
-  H --> S["Phase 4: Score asks (M7, v1.1)"]
+  H --> S["Phase 4: Score asks (M7, retired)"]
 ```
 
 | Phase | Agents | Milestones closed |
@@ -73,7 +73,7 @@ flowchart TD
 | 1. Parallel streams A–F | 6 | M1 (A); most of M2 (B, C); backend half of M4 (D); runner half of M4 (E) |
 | 2. Integration | 1–2 | rest of M2, M3, M4, M5 |
 | 3. Packaging | 1 | M6 |
-| 4. Score asks | up to 4 (stream owners) | M7 |
+| 4. Score asks (retired in 0.1.0-beta.3) | up to 4 (stream owners) | M7, since retired |
 
 The critical path is **C** (the Dafny interpreter and its proofs). Phase 2
 starts wiring against a stand-in interpreter, so it isn't blocked by C
@@ -191,14 +191,16 @@ and options nothing in the spec needs (§6).
   `skill_hash` and file paths (SPEC §12.3).
 - The example skills copied out of the spec: disk-full and cert-expiry into
   `fixtures/`, and error-triage into `fixtures-next/`. Only `fixtures/`
-  ships with a release, so the Score example (v1.1) moves across as part of
-  M7 (done: all three are in `fixtures/`). Each fake scenario directory holds `answers.yaml`, `commands.yaml` and
+  ships with a release, so the error-triage example (v1.1) moved across as
+  part of M7 (done: all three are in `fixtures/`; error-triage is now a
+  choice ask, since M7 is retired). Each fake scenario directory holds `answers.yaml`, `commands.yaml` and
   `expected-exit`, since paged (10) and handoff (20) are correct results
   that the release smoke test must not treat as failures.
 - **Spec coverage check.** `scripts/check_spec.py coverage` fails CI if a
   code in SPEC §7.1, except `E-INTERNAL` and `E-IO`, isn't named in any
   test file once the code's milestone has closed: parse and lint codes at
-  M2, argument, runtime and backend codes at M4, Score codes at M7. Before
+  M2, argument, runtime and backend codes at M4 (M7's Score codes were
+  removed with Score asks). Before
   that it lists what's missing. It's a **reference check** only: it shows a
   code is mentioned, not that a test exercises it. Reviewers and the
   milestone check cover the rest.
@@ -217,7 +219,8 @@ open blocking findings.
 
 ## Status
 
-**Phases 0–4 are built; milestones M1–M7 are closed** (`tests/acceptance/CLOSED`),
+**Phases 0–4 are built; milestones M1–M6 are closed** (`tests/acceptance/CLOSED`),
+and M7 is retired (Phase 4's Score asks were removed in 0.1.0-beta.3),
 so CI now requires every milestone's acceptance tests to pass, none skipped,
 and every error code to have a test. Every stream was reviewed by an
 independent Opus agent (a proof reviewer for Dafny), and a final
@@ -514,7 +517,12 @@ One agent, joined by a second once the pieces arrive.
 
 ---
 
-## 9. Phase 4: Score asks (M7, v1.1)
+## 9. Phase 4: Score asks (M7, v1.1) — retired
+
+**Retired in 0.1.0-beta.3.** The Score ask form was removed from the
+language, the core and the tests, and M7 with it. A section-option or
+`one of` ask covers graded decisions (SPEC Appendix D). The plan below is
+kept as history.
 
 After v1 ships. The same stream owners pick up their part in parallel:
 

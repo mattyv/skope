@@ -16,7 +16,7 @@
     "s:triage": {
       "name": "Triage",
       "src": 21,
-      "guidance": "Read the recent errors and rate how severe they are.",
+      "guidance": "Read the recent errors and decide how to handle them.",
       "body": [
         {
           "src": 24,
@@ -35,115 +35,72 @@
           "ask": {
             "question": [
               {
-                "lit": "How severe are the errors in "
+                "lit": "Given "
               },
               {
                 "var": "errors"
               },
               {
-                "lit": "?"
+                "lit": ", how should this burst be handled?"
               }
             ],
             "sure": 75,
             "else": {
               "section": "s:unsure"
             },
-            "score": {
-              "low": 1,
-              "high": 4,
-              "as": "severity",
-              "rubric": [
-                {
-                  "src": 26,
-                  "level": 1,
-                  "text": "known noise, nothing to do"
-                },
-                {
-                  "src": 27,
-                  "level": 2,
-                  "text": "worth a human look, not urgent"
-                },
-                {
-                  "src": 28,
-                  "level": 3,
-                  "text": "degraded service"
-                },
-                {
-                  "src": 29,
-                  "level": 4,
-                  "text": "outage or data at risk"
-                }
-              ]
-            }
-          }
-        },
-        {
-          "src": 30,
-          "check": {
-            "cond": {
-              "cmp": {
-                "op": "<=",
-                "l": {
-                  "var": "severity"
-                },
-                "r": {
-                  "num": "1"
-                }
+            "sections": [
+              {
+                "src": 26,
+                "section": "s:noise"
+              },
+              {
+                "src": 27,
+                "section": "s:investigate"
+              },
+              {
+                "src": 28,
+                "section": "s:page"
               }
-            },
-            "then": {
-              "stop": {}
-            },
-            "else": null
+            ]
           }
-        },
+        }
+      ]
+    },
+    "s:noise": {
+      "name": "Noise",
+      "src": 30,
+      "guidance": "Known noise: nothing is wrong and there's nothing to do.",
+      "body": [
         {
-          "src": 31,
-          "check": {
-            "cond": {
-              "cmp": {
-                "op": "==",
-                "l": {
-                  "var": "severity"
-                },
-                "r": {
-                  "num": "2"
-                }
-              }
-            },
-            "then": {
-              "section": "s:investigate"
-            },
-            "else": null
-          }
-        },
+          "src": 33,
+          "stop": {}
+        }
+      ]
+    },
+    "s:investigate": {
+      "name": "Investigate",
+      "src": 35,
+      "guidance": "Worth a human look, but not urgent: nothing is degraded yet.",
+      "body": [
         {
-          "src": 32,
-          "then": {
-            "section": "s:page"
-          }
+          "src": 38,
+          "hand_off": {}
         }
       ]
     },
     "s:page": {
       "name": "Page",
-      "src": 34,
-      "guidance": null,
+      "src": 43,
+      "guidance": "Degraded service, an outage, or data at risk.",
       "body": [
         {
-          "src": 35,
+          "src": 46,
           "page": [
             {
               "var": "host"
             },
             {
-              "lit": ": error burst rated "
-            },
-            {
-              "var": "severity"
-            },
-            {
-              "lit": "/4. Run "
+              "lit": ": error burst needs attention. Run "
             },
             {
               "var": "run_id"
@@ -157,17 +114,17 @@
     },
     "s:unsure": {
       "name": "Unsure",
-      "src": 37,
-      "guidance": "An unwatched alert shouldn't end in a handoff nobody reads. If the rating is unclear, page.",
+      "src": 48,
+      "guidance": "An unwatched alert shouldn't end in a handoff nobody reads. If the call is unclear, page.",
       "body": [
         {
-          "src": 41,
+          "src": 52,
           "page": [
             {
               "var": "host"
             },
             {
-              "lit": ": error burst, severity unclear. Run "
+              "lit": ": error burst, handling unclear. Run "
             },
             {
               "var": "run_id"
@@ -176,17 +133,6 @@
               "lit": " has the details."
             }
           ]
-        }
-      ]
-    },
-    "s:investigate": {
-      "name": "Investigate",
-      "src": 43,
-      "guidance": "The errors look real but not urgent. Find the cause from the errors gathered in Triage and suggest a fix or a change to this skill as a diff.",
-      "body": [
-        {
-          "src": 44,
-          "hand_off": {}
         }
       ]
     }

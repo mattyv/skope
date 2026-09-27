@@ -31,7 +31,7 @@ module SkopeWellFormed {
     && Acyclic(p)       // E-CYCLE
     && Structured(p)    // E-FALLS-OFF, E-UNREACHABLE
     && ChecksOk(p)      // E-GRAMMAR (a check with neither target nor else)
-    && AsksOk(p)        // E-OPTION-COUNT, E-ELSE-SKIP, E-SCORE-RANGE, E-SCORE-RUBRIC
+    && AsksOk(p)        // E-OPTION-COUNT, E-ELSE-SKIP
     && NamesKnown(p)    // E-UNBOUND (a question or page names something never bound)
     && ActionCmdsOk(p)  // E-UNBOUND, E-TAINT, E-UNSAFE-VALUE (in an action item's command)
     && FlowOk(p)        // E-UNBOUND, E-TAINT, E-ACTION-IN-CMD, E-UNSAFE-VALUE, E-IF-YES, E-LIST-KIND (do item)
@@ -192,16 +192,6 @@ module SkopeWellFormed {
 
   // ---- ask forms (SPEC §3.4, §4.2, §4.7) ----
 
-  predicate RubricOk(low: int, high: int, rubric: seq<RubricLine>) {
-    (forall r <- rubric :: low <= r.level <= high)
-    && (forall a, b | 0 <= a < b < |rubric| :: rubric[a].level != rubric[b].level)
-    && forall level | low <= level <= high :: level in Levels(rubric)
-  }
-
-  function Levels(rubric: seq<RubricLine>): set<int> {
-    set r <- rubric :: r.level
-  }
-
   predicate AskOk(s: Stmt)
     requires s.Ask?
   {
@@ -211,8 +201,6 @@ module SkopeWellFormed {
       && forall a, b | 0 <= a < b < |opts| :: opts[a].ref.id != opts[b].ref.id
     case YesNo(_) => true
     case OneOf(_, _) => !s.els.Skip?
-    case Score(low, high, rubric, _) =>
-      !s.els.Skip? && 0 <= low < high && high - low < 10 && RubricOk(low, high, rubric)
   }
 
   ghost predicate AsksOk(p: Program) {
@@ -231,7 +219,6 @@ module SkopeWellFormed {
     if s.Run? then s.binding
     else if s.Ask? && s.form.YesNo? then Some(s.form.binding)
     else if s.Ask? && s.form.OneOf? then Some(s.form.binding)
-    else if s.Ask? && s.form.Score? then Some(s.form.binding)
     else None
   }
 
@@ -276,7 +263,7 @@ module SkopeWellFormed {
   // Where a value came from. A list item carries its list, so the
   // safe-value check knows which items can reach a command, and `do item`
   // knows which commands it may run.
-  datatype Kind = KParam | KBuiltin | KRun | KValue(list: SectionId) | KAction(list: SectionId) | KYesNo | KScore
+  datatype Kind = KParam | KBuiltin | KRun | KValue(list: SectionId) | KAction(list: SectionId) | KYesNo
 
   // What's known at a point in a run: `bound` holds the names bound on
   // every path to it, and `kinds[x]` every kind x may hold on some path.
@@ -304,7 +291,6 @@ module SkopeWellFormed {
     if s.Run? then {KRun}
     else if s.Ask? && s.form.YesNo? then {KYesNo}
     else if s.Ask? && s.form.OneOf? then {KValue(s.form.list.id)}
-    else if s.Ask? && s.form.Score? then {KScore}
     else {}
   }
 
@@ -523,8 +509,7 @@ module SkopeWellFormed {
       (match form
        case Sections(_) => false
        case YesNo(x) => c' == c[x := KYesNo]
-       case OneOf(l, x) => IsData(p, l.id) && c' == c[x := KValue(l.id)]
-       case Score(_, _, _, x) => c' == c[x := KScore])
+       case OneOf(l, x) => IsData(p, l.id) && c' == c[x := KValue(l.id)])
     // Once per item, in order; then the loop variable is unbound.
     case ForEach(_, v, l, _) =>
       IsData(p, l.id) && exists cn :: Iterates(p, s, DataList(p, l.id).items, c, cn) && c' == cn - {v}

@@ -1,6 +1,0 @@
-{
-  "line:24": {
-    "exit": 0,
-    "stdout": "elevated 5xx rate, not yet critical\n"
-  }
-}
