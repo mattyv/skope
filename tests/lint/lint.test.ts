@@ -332,18 +332,21 @@ describe("ask forms (SPEC §3.4, §4.2)", () => {
     expect(errors(distinct(256))).toEqual([E("E-OPTION-COUNT", 11)]);
   }, 60_000);
 
-  test("an ask with 255 distinct options lints, within 5 s", () => {
-    const t = Date.now();
+  test("an ask with 255 distinct options lints, within 5 s of CPU time", () => {
+    // Wall time includes other Vitest workers competing for CI's CPUs.
+    const t = process.cpuUsage();
     expect(lint(distinct(255))).toEqual({ errors: [], warnings: [] });
-    expect(Date.now() - t).toBeLessThan(5000);
+    const used = process.cpuUsage(t);
+    expect(used.user + used.system).toBeLessThan(5_000_000);
   }, 60_000);
 
-  test("a chain of 100 sections lints, within 5 s", () => {
+  test("a chain of 100 sections lints, within 5 s of CPU time", () => {
     const more: Record<string, J> = {};
     for (let i = 1; i < 100; i++) more[`s:c${i}`] = section(100 + 2 * i, [i < 99 ? then(101 + 2 * i, `s:c${i + 1}`) : stop(101 + 2 * i)]);
-    const t = Date.now();
+    const t = process.cpuUsage();
     expect(lint(prog([then(11, "s:c1")], more))).toEqual({ errors: [], warnings: [] });
-    expect(Date.now() - t).toBeLessThan(5000);
+    const used = process.cpuUsage(t);
+    expect(used.user + used.system).toBeLessThan(5_000_000);
   }, 60_000);
 
   test("E-OPTION-COUNT: the same section offered twice, at the repeat", () => {

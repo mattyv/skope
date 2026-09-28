@@ -3,7 +3,7 @@
 // `skope --install-hooks` puts it in their settings.
 
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -134,7 +134,7 @@ describe("Claude Code: PostToolUse on ExitPlanMode", () => {
     const wrong = run(other);
     expect(wrong.status).toBe(40);
     expect(wrong.stderr).toContain("E-NOT-APPROVED");
-    expect(wrong.stderr).toContain(`approved for ${w.repo}`);
+    expect(wrong.stderr).toContain(`approved for ${realpathSync(w.repo)}`);
     expect(readFileSync(join(other, "a.txt"), "utf8")).toBe("old\n");
     const correct = run(w.repo);
     expect(correct.status).toBe(0);
