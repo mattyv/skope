@@ -765,8 +765,12 @@ person approves before it runs, usually written by an agent in plan mode.
   change's exact text; rewording prose or reordering doesn't change it.
   - **Claude Code:** a `PostToolUse` hook on `ExitPlanMode`, which runs only
     once the person approves; the plan line comes from the approved plan.
-    The session transcript must be under Claude Code's directory, and this
-    must be its latest `ExitPlanMode` call, not rejected.
+    The hook can run before Claude Code writes the call and result to the
+    transcript. It records the hook's transcript path, tool-use ID and plan
+    line with the approval. Before running the plan, skope checks that the
+    transcript is under Claude Code's directory, that the ID is its latest
+    `ExitPlanMode` call, that its result succeeded, and that its plan line
+    matches. A fabricated hook response alone cannot authorize a run.
   - **Codex:** approving a plan sends a user message, so the hook is
     `UserPromptSubmit`: either `Implement the plan.`, and the plan line comes
     from the last `<proposed_plan>` before it, or the clear-context message,

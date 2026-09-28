@@ -118,7 +118,7 @@ describe("Claude Code: PostToolUse on ExitPlanMode", () => {
       tool_response: { plan: line },
     });
     expect(approved.status).toBe(0);
-    expect(approved.stderr).toContain(`approved ${file}`);
+    expect(approved.stderr).toContain(`recorded approval for ${file}`);
     const config = join(w.root, "config.yaml");
     writeFileSync(config, `state_dir: ${join(w.root, "state")}\n`);
     const run = (cwd: string) =>
@@ -159,6 +159,24 @@ describe("Claude Code: PostToolUse on ExitPlanMode", () => {
     expect(readFileSync(join(w.repo, "a.txt"), "utf8")).toBe("new\n");
   });
 
+  test("records a pending hook, but runs only after Claude records the successful result", async () => {
+    const w = world();
+    const transcript = join(w.claude, "projects", "p", "s.jsonl");
+    writeFileSync(transcript, jsonl()); // Claude may not have flushed even the tool call yet.
+    const r = claudeHook(w, { transcript });
+    expect(r.status).toBe(0);
+    expect(w.approved()).toBe(true);
+    const agentEnv = { CLAUDE_CONFIG_DIR: w.claude, CODEX_HOME: w.codex };
+    const before = await runSkope([w.plan, "--apply"], { env: agentEnv });
+    expect(before.events.find((e) => e.event === "error")).toMatchObject({ code: "E-NOT-APPROVED" });
+    expect(readFileSync(join(w.repo, "a.txt"), "utf8")).toBe("old\n");
+
+    writeFileSync(transcript, jsonl(exitPlan("toolu_1", w.line), planResult("toolu_1", w.line)));
+    const after = await runSkope([w.plan, "--apply", "--no-page"], { env: agentEnv });
+    expect(after.events.at(-1)).toMatchObject({ outcome: "stopped" });
+    expect(readFileSync(join(w.repo, "a.txt"), "utf8")).toBe("new\n");
+  });
+
   test.each([
     [
       "a plan changed after the person saw it",
@@ -174,34 +192,37 @@ describe("Claude Code: PostToolUse on ExitPlanMode", () => {
       },
       "isn't in",
     ],
-    [
-      "a rejected plan",
-      (w: ReturnType<typeof world>) => {
-        const t = join(w.claude, "projects", "p", "r.jsonl");
-        const rejected = {
-          type: "user",
-          message: { content: [{ type: "tool_result", tool_use_id: "toolu_1", is_error: true, content: "rejected" }] },
-        };
-        writeFileSync(t, jsonl(exitPlan("toolu_1", w.line), rejected));
-        return claudeHook(w, { transcript: t });
-      },
-      "rejected",
-    ],
-    [
-      "an older approval replayed",
-      (w: ReturnType<typeof world>) => {
-        const t = join(w.claude, "projects", "p", "o.jsonl");
-        writeFileSync(t, jsonl(exitPlan("toolu_1", w.line), planResult("toolu_1", w.line), exitPlan("toolu_2", w.line)));
-        return claudeHook(w, { transcript: t, id: "toolu_1" });
-      },
-      "latest",
-    ],
   ])("doesn't approve %s", (_, go, why) => {
     const w = world();
     const r = go(w);
     expect(r.status).toBe(0);
     expect(r.stderr).toContain(why);
     expect(w.approved()).toBe(false);
+  });
+
+  test.each([
+    [
+      "a rejected plan",
+      (w: ReturnType<typeof world>) => {
+        const rejected = {
+          type: "user",
+          message: { content: [{ type: "tool_result", tool_use_id: "toolu_1", is_error: true, content: "rejected" }] },
+        };
+        return jsonl(exitPlan("toolu_1", w.line), rejected);
+      },
+    ],
+    [
+      "an older approval replayed",
+      (w: ReturnType<typeof world>) => jsonl(exitPlan("toolu_1", w.line), planResult("toolu_1", w.line), exitPlan("toolu_2", w.line)),
+    ],
+  ])("doesn't run with %s", async (_, transcriptText) => {
+    const w = world();
+    const t = join(w.claude, "projects", "p", "r.jsonl");
+    writeFileSync(t, transcriptText(w));
+    expect(claudeHook(w, { transcript: t }).status).toBe(0);
+    const run = await runSkope([w.plan, "--apply"], { env: { CLAUDE_CONFIG_DIR: w.claude, CODEX_HOME: w.codex } });
+    expect(run.events.find((e) => e.event === "error")).toMatchObject({ code: "E-NOT-APPROVED" });
+    expect(readFileSync(join(w.repo, "a.txt"), "utf8")).toBe("old\n");
   });
 
   test("an approval works once", () => {
@@ -212,19 +233,23 @@ describe("Claude Code: PostToolUse on ExitPlanMode", () => {
     expect(again.stderr).toContain("already used");
   });
 
-  test("a pending result and an unrelated plan in hook input cannot approve", () => {
+  test("a pending result or an unrelated plan cannot authorize a run", async () => {
     const w = world();
     const t = join(w.claude, "projects", "p", "pending.jsonl");
     writeFileSync(t, jsonl(exitPlan("toolu_1", w.line)));
-    expect(claudeHook(w, { transcript: t }).stderr).toContain("no successful ExitPlanMode result");
-    expect(w.approved()).toBe(false);
+    expect(claudeHook(w, { transcript: t }).status).toBe(0);
+    const before = await runSkope([w.plan, "--apply"], { env: { CLAUDE_CONFIG_DIR: w.claude, CODEX_HOME: w.codex } });
+    expect(before.events.find((e) => e.event === "error")).toMatchObject({ code: "E-NOT-APPROVED" });
+    expect(readFileSync(join(w.repo, "a.txt"), "utf8")).toBe("old\n");
 
-    writeFileSync(t, jsonl(exitPlan("toolu_1", `skope plan: other.md ${w.hash}`), planResult("toolu_1", `skope plan: other.md ${w.hash}`)));
-    expect(claudeHook(w, { transcript: t }).stderr).toContain("differs from the approved transcript");
-    expect(w.approved()).toBe(false);
+    writeFileSync(t, jsonl(exitPlan("toolu_2", `skope plan: other.md ${w.hash}`), planResult("toolu_2", `skope plan: other.md ${w.hash}`)));
+    expect(claudeHook(w, { transcript: t, id: "toolu_2" }).status).toBe(0);
+    const mismatched = await runSkope([w.plan, "--apply"], { env: { CLAUDE_CONFIG_DIR: w.claude, CODEX_HOME: w.codex } });
+    expect(mismatched.events.find((e) => e.event === "error")).toMatchObject({ code: "E-NOT-APPROVED" });
+    expect(readFileSync(join(w.repo, "a.txt"), "utf8")).toBe("old\n");
   });
 
-  test("a result nested inside the agent's tool input is not an approval", () => {
+  test("a result nested inside the agent's tool input cannot authorize a run", async () => {
     const w = world();
     const t = join(w.claude, "projects", "p", "nested.jsonl");
     writeFileSync(
@@ -243,8 +268,10 @@ describe("Claude Code: PostToolUse on ExitPlanMode", () => {
         },
       }),
     );
-    expect(claudeHook(w, { transcript: t }).stderr).toContain("no successful ExitPlanMode result");
-    expect(w.approved()).toBe(false);
+    expect(claudeHook(w, { transcript: t }).status).toBe(0);
+    const run = await runSkope([w.plan, "--apply"], { env: { CLAUDE_CONFIG_DIR: w.claude, CODEX_HOME: w.codex } });
+    expect(run.events.find((e) => e.event === "error")).toMatchObject({ code: "E-NOT-APPROVED" });
+    expect(readFileSync(join(w.repo, "a.txt"), "utf8")).toBe("old\n");
   });
 
   test("a plan that isn't a skope plan, or another tool, is none of its business", () => {
