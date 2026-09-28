@@ -62,6 +62,15 @@ export function fileSteps(root: string, changes: Change[]): Map<string, { texts:
   return out;
 }
 
+/** A file's hash as the pins record it, or null if it can't be read. */
+export function fileHash(root: string, path: string): string | null {
+  try {
+    return sha(currentText(root, path));
+  } catch {
+    return null;
+  }
+}
+
 /** For --approve: each touched file's hash now and after each of its changes. */
 export function pinnedStates(root: string, changes: Change[]): Record<string, string[]> {
   return Object.fromEntries([...fileSteps(root, changes)].map(([p, f]) => [p, f.texts.map(sha)]));

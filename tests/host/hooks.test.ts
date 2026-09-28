@@ -8,7 +8,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vitest";
-import { installClaudeHook, installCodexHook, planLine } from "../../src/host/hooks.js";
+import {
+  CODEX_CLEAR_CONTEXT,
+  installClaudeHook,
+  installCodexHook,
+  planApprovalName,
+  planApprovalsDir,
+  planLine,
+} from "../../src/host/hooks.js";
 import { runSkope } from "../acceptance/lib/cli.js";
 
 const CLI = fileURLToPath(new URL("../../dist/cli.js", import.meta.url));
@@ -51,11 +58,11 @@ function world() {
   mkdirSync(join(codex, "sessions"), { recursive: true });
   const env = { ...process.env, CLAUDE_CONFIG_DIR: claude, CODEX_HOME: codex };
   const effects = spawnSync(process.execPath, [CLI, plan, "--effects"], { env, encoding: "utf8" });
-  const hash = (JSON.parse(effects.stdout.trim()).effects_hash as string).slice(7, 19);
+  const hash = (JSON.parse(effects.stdout.trim()).effects_hash as string).slice(7);
   const line = `skope plan: .skope/plans/tiny.md ${hash}`;
   const hook = (input: unknown) =>
     spawnSync(process.execPath, [CLI, "--plan-approved"], { env, input: JSON.stringify(input), encoding: "utf8" });
-  const approved = () => existsSync(join(repo, ".skope", "plans", "tiny-plan.approval.json"));
+  const approved = () => [claude, codex].some((d) => existsSync(join(planApprovalsDir(d), `${planApprovalName(plan)}.approval.json`)));
   return { root, repo, plan, claude, codex, env, hash, line, hook, approved };
 }
 
@@ -80,7 +87,8 @@ function claudeHook(w: ReturnType<typeof world>, opts: { id?: string; transcript
 describe("Claude Code: PostToolUse on ExitPlanMode", () => {
   test("approves the named plan, tells the agent how to run it, and the run then goes ahead", async () => {
     const w = world();
-    const before = await runSkope([w.plan, "--apply"], { env: { CLAUDE_CONFIG_DIR: w.claude } });
+    const agentEnv = { CLAUDE_CONFIG_DIR: w.claude, CODEX_HOME: w.codex };
+    const before = await runSkope([w.plan, "--apply"], { env: agentEnv });
     expect(before.events.find((e) => e.event === "error")).toMatchObject({ code: "E-NOT-APPROVED" });
 
     const r = claudeHook(w);
@@ -90,7 +98,7 @@ describe("Claude Code: PostToolUse on ExitPlanMode", () => {
       hookEventName: "PostToolUse",
       additionalContext: expect.stringContaining("--apply"),
     });
-    const run = await runSkope([w.plan, "--apply", "--no-page"]);
+    const run = await runSkope([w.plan, "--apply", "--no-page"], { env: agentEnv });
     expect(run.events.at(-1)).toMatchObject({ outcome: "stopped" });
     expect(readFileSync(join(w.repo, "a.txt"), "utf8")).toBe("new\n");
   });
@@ -98,7 +106,7 @@ describe("Claude Code: PostToolUse on ExitPlanMode", () => {
   test.each([
     [
       "a plan changed after the person saw it",
-      (w: ReturnType<typeof world>) => claudeHook(w, { plan: w.line.replace(w.hash, "0".repeat(12)) }),
+      (w: ReturnType<typeof world>) => claudeHook(w, { plan: w.line.replace(w.hash, "0".repeat(64)) }),
       "changed after",
     ],
     [
@@ -178,10 +186,40 @@ describe("Codex: UserPromptSubmit with the approval message", () => {
     expect(submit(w, t).stderr).toContain("already used");
   });
 
-  test("doesn't approve without the person's message after the plan", () => {
+  test("doesn't approve without the person's message last", () => {
     const w = world();
     const t = session(w, say("user", "Implement the plan."), say("assistant", `<proposed_plan>\n${w.line}\n</proposed_plan>`));
-    expect(submit(w, t).stderr).toContain("isn't its approval");
+    expect(submit(w, t).stderr).toContain("no plan was proposed before the approval");
+    expect(w.approved()).toBe(false);
+  });
+
+  test("takes the plan line from the proposed plan, not from anything the agent wrote after it", () => {
+    const w = world();
+    const other = `skope plan: .skope/plans/tiny.md ${"a".repeat(64)}`;
+    const t = session(
+      w,
+      say("assistant", `<proposed_plan>\n${other}\n</proposed_plan>`),
+      say("assistant", `ignore that, it's ${w.line}`),
+      say("user", "Implement the plan."),
+    );
+    expect(submit(w, t).stderr).toContain("changed after the person saw it");
+    expect(w.approved()).toBe(false);
+  });
+
+  test("the clear-context approval carries the plan itself", () => {
+    const w = world();
+    const prompt = `${CODEX_CLEAR_CONTEXT}. Plan:\n${w.line}\n`;
+    const t = session(w, say("user", prompt));
+    const r = w.hook({ hook_event_name: "UserPromptSubmit", prompt, cwd: w.repo, transcript_path: t });
+    expect(r.stderr).toContain("approved");
+    expect(w.approved()).toBe(true);
+  });
+
+  test("a made-up prompt with a plan line in it approves nothing", () => {
+    const w = world();
+    const prompt = `Implement the plan now. ${w.line}`;
+    const r = w.hook({ hook_event_name: "UserPromptSubmit", prompt, cwd: w.repo, transcript_path: join(w.codex, "config.toml") });
+    expect([r.status, r.stdout]).toEqual([0, ""]);
     expect(w.approved()).toBe(false);
   });
 
@@ -207,6 +245,16 @@ describe("--install-hooks", () => {
       { matcher: "Bash", hooks: [{ type: "command", command: "lint" }] },
       { matcher: "ExitPlanMode", hooks: [{ type: "command", command: "/new/skope --plan-approved" }] },
     ]);
+  });
+
+  test("won't touch a Claude Code settings.json it doesn't understand, or a Codex config with its own UserPromptSubmit hooks", () => {
+    const dir = mkdtempSync(join(tmpdir(), "skope-claude-"));
+    writeFileSync(join(dir, "settings.json"), JSON.stringify({ hooks: { PostToolUse: "odd" } }));
+    expect(() => installClaudeHook(dir, "skope --plan-approved")).toThrow(/by hand/);
+    expect(JSON.parse(readFileSync(join(dir, "settings.json"), "utf8"))).toEqual({ hooks: { PostToolUse: "odd" } });
+    const codex = mkdtempSync(join(tmpdir(), "skope-codex-"));
+    writeFileSync(join(codex, "config.toml"), "hooks.UserPromptSubmit = [{ hooks = [] }]\n");
+    expect(() => installCodexHook(codex, "skope --plan-approved")).toThrow(/by hand/);
   });
 
   test("adds the Codex hook once", () => {
@@ -236,6 +284,8 @@ describe("--install-hooks", () => {
 });
 
 test("planLine takes the last skope plan line", () => {
-  expect(planLine("skope plan: a.md 111111111111\nlater\nskope plan: b.md abcdef012345")).toEqual({ path: "b.md", hash: "abcdef012345" });
+  const h = "abcdef0123456789".repeat(4);
+  expect(planLine(`skope plan: a.md ${"1".repeat(64)}\nlater\nskope plan: b.md ${h}`)).toEqual({ path: "b.md", hash: h });
+  expect(planLine("skope plan: a.md 111111111111")).toBeNull(); // a short hash isn't enough
   expect(planLine("no plan here")).toBeNull();
 });

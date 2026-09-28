@@ -401,15 +401,18 @@ diff of every file it changes (`skope PLAN --effects --diff`). When you
 approve it in plan mode, a hook approves it for skope, and skope then runs
 exactly that:
 
-- nothing runs that isn't in the plan, and not once the plan changes;
+- nothing runs that isn't in the plan, and nothing at all once a command or
+  a change's text differs from what you approved;
 - a file someone else changed since you approved stops the run
   (`E-PLAN-STALE`);
 - a failed check hands back to the agent with its output, and the agent
   fixes the plan and resumes (`--from SECTION`); edits already made are
   skipped.
 
-The agent never approves its own plan. `skope --install-hooks` adds the
-hook if the installer didn't. See SPEC §4.9 and
+Only you approve a plan: skope refuses `--approve` on one, and keeps plan
+approvals in Claude Code's or Codex's own config directory, which the agent
+can't write without asking. `skope --install-hooks` adds the hook if the
+installer didn't; in Codex, trust it with `/hooks`. See SPEC §4.9 and
 [the design](docs/design/plan-mode.md).
 
 ## The language

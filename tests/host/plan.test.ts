@@ -6,6 +6,7 @@ import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
+import { approvePlan, planApprovalName, planApprovalsDir } from "../../src/host/hooks.js";
 import { unifiedDiff } from "../../src/host/plan.js";
 import { preprocess } from "../../src/preprocess/index.js";
 import { runSkope } from "../acceptance/lib/cli.js";
@@ -33,7 +34,7 @@ const PLAN = [
   "- **hand off**",
 ];
 
-/** A git repo with a plan and a config that keeps approvals beside it. */
+/** A git repo with a plan, a config, and a Claude Code directory the hook approves plans into. */
 function setup(check = "new thing", block = "kind: plan\n") {
   const dir = mkdtempSync(join(tmpdir(), "skope-plan-"));
   execFileSync("git", ["init", "-q"], { cwd: dir });
@@ -45,8 +46,16 @@ function setup(check = "new thing", block = "kind: plan\n") {
   );
   const config = join(dir, "config.yaml");
   writeFileSync(config, `approvals: beside-skill\nstate_dir: ${dir}/state\nask:\n  backend: fake\npager:\n  command: "cat > /dev/null"\n`);
-  const skope = (...args: string[]) => runSkope([path, ...args, "--config", config]);
-  return { dir, path, skope };
+  const claude = join(dir, "claude-config");
+  const env = { CLAUDE_CONFIG_DIR: claude, CODEX_HOME: join(dir, "codex-config") };
+  const skope = (...args: string[]) => runSkope([path, ...args, "--config", config], { env });
+  /** What the plan-mode hook does when the person approves: approve the plan as it is now. */
+  const approve = async () => {
+    const hash = (JSON.parse((await skope("--effects")).stdout.trim().split("\n").at(-1) as string).effects_hash as string).slice(7);
+    expect(approvePlan(path, hash, claude)).toBeNull();
+    return join(planApprovalsDir(claude), `${planApprovalName(path)}.approval.json`);
+  };
+  return { dir, path, skope, approve };
 }
 
 describe("kind: plan", () => {
@@ -97,9 +106,8 @@ describe("the static diff", () => {
 
 describe("approval pins the files", () => {
   test("a run refuses a file someone changed after approval (E-PLAN-STALE), but not the plan's own changes", async () => {
-    const { dir, skope } = setup();
-    await skope("--approve");
-    const approval = JSON.parse(readFileSync(join(dir, "plan.approval.json"), "utf8"));
+    const { dir, skope, approve } = setup();
+    const approval = JSON.parse(readFileSync(await approve(), "utf8"));
     expect(Object.keys(approval.files)).toEqual(["a.txt"]);
     expect(approval.files["a.txt"]).toHaveLength(2); // as approved, and after the edit
 
@@ -117,10 +125,34 @@ describe("approval pins the files", () => {
   });
 });
 
+describe("only the person approves a plan", () => {
+  test("--approve refuses a plan, and an approval file the agent writes beside it counts for nothing", async () => {
+    const { dir, path, skope } = setup();
+    const r = await skope("--approve");
+    expect(r.events.find((e) => e.event === "error")).toMatchObject({ code: "E-USAGE" });
+    const hash = JSON.parse((await skope("--effects")).stdout.trim().split("\n").at(-1) as string).effects_hash;
+    writeFileSync(join(dir, "plan.approval.json"), JSON.stringify({ skill: "plan", effects_hash: hash, commands: [] }));
+    const run = await skope("--apply");
+    expect(run.events.find((e) => e.event === "error")).toMatchObject({ code: "E-NOT-APPROVED" });
+    expect(readFileSync(join(dir, "a.txt"), "utf8")).toContain("old thing");
+    expect(path).toBeTruthy();
+  });
+
+  test("a re-run skips an edit that deleted lines, by the pinned states", async () => {
+    const { dir, path, skope, approve } = setup("line one");
+    writeFileSync(path, readFileSync(path, "utf8").replace("  new thing\n", ""));
+    await approve();
+    expect((await skope("--apply", "--no-page")).events.at(-1)).toMatchObject({ outcome: "stopped" });
+    expect(readFileSync(join(dir, "a.txt"), "utf8")).toBe("line one\nline three\n");
+    const again = await skope("--apply", "--no-page");
+    expect(again.events.find((e) => e.event === "change")).toMatchObject({ result: "already_applied" });
+  });
+});
+
 describe("--from and the fix loop", () => {
   test("a failed check hands off with the command's output and log; --from resumes past it", async () => {
-    const { skope } = setup("not there yet");
-    await skope("--approve");
+    const { skope, approve } = setup("not there yet");
+    await approve();
     const r = await skope("--apply", "--no-page");
     expect(r.events.at(-1)).toMatchObject({ outcome: "handoff" });
     const record = r.events.find((e) => e.event === "handoff_record")?.record as { detail: Record<string, unknown> };
@@ -141,8 +173,8 @@ describe("--from and the fix loop", () => {
   });
 
   test("--progress prints a line per command as it starts", async () => {
-    const { skope } = setup();
-    await skope("--approve");
+    const { skope, approve } = setup();
+    await approve();
     const r = await skope("--apply", "--no-page", "--progress");
     expect(r.stderr).toContain("skope: [1] do edit a.txt\n");
     expect(r.stderr).toContain('skope: [2] check grep -q "new thing" a.txt\n');

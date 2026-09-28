@@ -1,6 +1,6 @@
 # Design: skope as the plan in plan mode
 
-Status: v1 built. Plans' commands also run at the repository root, and plans always keep their approval beside the plan file. v2 is not built.
+Status: v1 built, revised after a second review. Plans' commands run at the repository root, and plan approvals live in the agent tool's config directory, never beside the plan (item 7 below predates that). v2 is not built.
 
 ## Problem
 

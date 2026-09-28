@@ -31,12 +31,11 @@ export interface Effects {
   open_params: string[];
 }
 
-/** The first 12 hex digits of the sha256 of a change's op, path and text. */
+/** The sha256 of a change's op, path and text, in hex: whole, so no other text can match it. */
 export const changeHash = (c: { op: string; path: string; old?: string; new?: string; all?: boolean }) =>
   createHash("sha256")
     .update(JSON.stringify([c.op, c.path, c.old ?? null, c.new ?? null, c.all ?? false]))
-    .digest("hex")
-    .slice(0, 12);
+    .digest("hex");
 
 /** Every value a list-bound variable can take: a list's items, or its action items' commands. */
 function listItems(program: CoreProgram, section: string): { values: string[]; actions: Parts[] } {
@@ -170,9 +169,9 @@ export function readApproval(dir: string, skill: string): Approval | null {
 }
 
 /** Writes the approval, replacing any older one in one step. Returns its path. */
-export function writeApproval(dir: string, e: Effects, files?: Record<string, string[]>): string {
+export function writeApproval(dir: string, e: Effects, files?: Record<string, string[]>, name = e.skill): string {
   mkdirSync(dir, { recursive: true });
-  const path = approvalPath(dir, e.skill);
+  const path = approvalPath(dir, name);
   const approval: Approval = {
     skill: e.skill,
     effects_hash: e.hash,

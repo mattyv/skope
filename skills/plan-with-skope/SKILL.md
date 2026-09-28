@@ -87,19 +87,20 @@ $ skope .skope/plans/NAME.md --effects --diff
 ```
 
 Fix anything `--lint` reports. Then put this in the plan you present for
-approval, word for word from `--effects` (the 12 hex digits after
+approval, word for word from `--effects` (all 64 hex digits after
 `sha256:` in `effects_hash`):
 
 ```
-skope plan: .skope/plans/NAME.md 1a2b3c4d5e6f
+skope plan: .skope/plans/NAME.md 3f1c…(64 hex digits)…9e0a
 ```
 
 followed by a short summary, the commands `--effects` lists, and the diff.
 The hook approves only that file, only with that hash: if you change the
 plan after the person saw it, it won't run.
 
-**Never run `skope --approve` or `skope --plan-approved` yourself.** The
-person's approval is theirs to give.
+The approval is the person's: skope refuses `--approve` on a plan, and an
+approval file you write counts for nothing. Never run
+`skope --plan-approved` yourself.
 
 ## 3. Run it
 
@@ -113,16 +114,20 @@ $ SKOPE_CALLER=agent skope .skope/plans/NAME.md --apply
 - **Exit 20, a handoff:** read the record it names. Its `detail` has the
   failed command, its output and a `log` file with all of it. Fix the plan:
   change an edit, or add one. Then:
-  - if `--effects` lists the same commands (you changed no edit's text and
-    no command), resume: `skope .skope/plans/NAME.md --apply --from SECTION`,
-    where SECTION is where the failure was.
-  - otherwise the plan needs approving again: go back to plan mode (in
+  - if `--effects` gives the same `effects_hash` (you changed no edit's
+    text and no command), resume: `skope .skope/plans/NAME.md --apply --from
+    SECTION`, where SECTION is where the failure was.
+  - otherwise the plan needs approving again. First take out the edits the
+    run already made (`--effects --diff` reports them as not matching), so
+    the plan and its diff show what's left. Then go back to plan mode (in
     Claude Code, enter plan mode; in Codex, ask the person to) and present
-    it again, saying what you changed and why, with the new `skope plan:`
-    line and diff.
-  Edits that already applied are skipped, so resuming is safe.
+    it again: which edits already applied, what you changed and why, the
+    new `skope plan:` line and the diff. Once approved, run it with
+    `--apply` from the start.
+  Changes already in place are skipped on a re-run, so re-running is safe.
 - **`E-NOT-APPROVED`:** the plan changed since it was approved, or the hook
-  isn't installed (`skope --install-hooks`).
+  isn't installed (`skope --install-hooks`; in Codex the person must also
+  trust it with `/hooks`).
 - **`E-PLAN-STALE`:** someone changed a file the plan edits. Look at what
   changed, update the plan, and ask for approval again.
 

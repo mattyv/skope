@@ -730,7 +730,7 @@ person approves before it runs, usually written by an agent in plan mode.
   applied in document order to copies of the files, whatever path a run
   would take. (A dry run can't show this: its checks see the unchanged
   files.) The `--effects` JSON carries it as `diff`.
-- **Pinned files:** `--approve` records each file the plan changes: its hash
+- **Pinned files:** the approval records each file the plan changes: its hash
   now, and after each of the plan's changes in order. A real run refuses to
   start (`E-PLAN-STALE`) if a file matches none of them, which means
   someone else changed it since the approval. The plan's own changes, from
@@ -745,28 +745,39 @@ person approves before it runs, usually written by an agent in plan mode.
   skipped section is `E-UNBOUND`. With changes that re-apply safely, an
   agent fixes the plan and resumes where it failed. `run_start` and the
   handoff record carry `from`.
-- **Approval.** A plan always needs an approval, and it always sits beside
-  the plan file, whatever the config's `approvals` says. The agent that
-  wrote the plan must not approve it: the person does, in their agent's
-  plan mode, and a hook writes the approval (`skope --install-hooks` adds
-  it). The plan the person approves carries the line
-  `skope plan: PATH HASH12`, where HASH12 is the first 12 hex digits of the
-  plan's effects hash; `skope --plan-approved` approves PATH only if its
-  effects still have that hash, so a plan changed after the person saw it
-  doesn't run.
+- **Approval.** A plan always needs an approval, and only the person gives
+  it, in their agent's plan mode; a hook writes it (`skope --install-hooks`
+  adds the hook). `--approve` refuses a plan. The approval goes in the
+  agent tool's own config directory (`$CLAUDE_CONFIG_DIR` or `~/.claude`,
+  `$CODEX_HOME` or `~/.codex`), under `skope/approvals/`, named by the
+  plan's real path: never in the repository, where the agent could write
+  one. A plan with changes needs its approval to pin their files.
+  The plan the person approves carries the line `skope plan: PATH HASH`,
+  where HASH is the plan's whole effects hash in hex (64 digits);
+  `skope --plan-approved` approves PATH, resolved from the repository root,
+  only if its effects still have that hash, so a plan changed after the
+  person saw it doesn't run. The hash covers every command and each
+  change's exact text; rewording prose or reordering doesn't change it.
   - **Claude Code:** a `PostToolUse` hook on `ExitPlanMode`, which runs only
-    once the person approves. The hook also checks the session transcript
-    (it must be under Claude Code's directory): the call is the latest
-    `ExitPlanMode` and wasn't rejected.
-  - **Codex:** approving a plan sends the message `Implement the plan.`, so
-    the hook is `UserPromptSubmit`, matching that message; the plan line
-    comes from the transcript, whose last user message after it must be
-    that approval.
-  - Each approval approves one plan: a ledger in the agent's config
-    directory records the ones used. The agent could run `--plan-approved`
-    itself with made-up input; these checks rest on the transcripts and the
-    ledger living in directories the agent can't write without asking.
-
+    once the person approves; the plan line comes from the approved plan.
+    The session transcript must be under Claude Code's directory, and this
+    must be its latest `ExitPlanMode` call, not rejected.
+  - **Codex:** approving a plan sends a user message, so the hook is
+    `UserPromptSubmit`: either `Implement the plan.`, and the plan line comes
+    from the last `<proposed_plan>` before it, or the clear-context message,
+    which carries the plan itself. Either way the message and the plan come
+    from the session transcript (under Codex's directory), whose last user
+    message must be the approval, never from the hook's input. The person
+    must trust the hook in Codex (`/hooks`).
+  - Each approval approves one plan: a ledger in the agent tool's config
+    directory records the ones used.
+  - **The limit:** these checks rest on the approvals, transcripts and
+    ledger living in directories the agent can't write without asking. An
+    agent allowed to write there, or to run arbitrary shell commands
+    unprompted, could forge an approval.
+- **Re-runs.** A change already in place is skipped (`already_applied`):
+  an edit whose new text is there, or, for an edit that only deletes lines,
+  a file in a state the approval pinned as after that edit.
 ---
 
 ## 5. Core (Dafny)

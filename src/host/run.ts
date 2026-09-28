@@ -32,8 +32,9 @@ import { sendPage } from "../runner/pager.js";
 import { buildRedactor, type Redactor, redactDeep } from "../runner/redact.js";
 import type { AskRequest, Response, RunConfig, Val } from "../step.js";
 import { describe, diffEffects, effectsOf, readApproval, writeApproval } from "./effects.js";
+import { claudeDir, codexDir, planApprovalName, planApprovalsDir } from "./hooks.js";
 import { escapePage, type Handlers, type LoopResult, runLoop } from "./loop.js";
-import { pinnedStates, planChanges, planDiff, repoRoot, staleFiles } from "./plan.js";
+import { fileHash, pinnedStates, planChanges, planDiff, repoRoot, staleFiles } from "./plan.js";
 import { readOnly } from "./verify.js";
 
 export interface RunOptions {
@@ -206,6 +207,8 @@ export async function runSkill(o: RunOptions): Promise<number> {
       program = { ...program, entry: { section: id, src: s.src } };
     }
     const planRoot = () => repoRoot(dirname(resolve(o.file)));
+    // The approved plan's file pins, which also tell a re-run which changes already applied.
+    let planPins: Record<string, string[]> | undefined;
     const choices = parsed.choices;
     for (const w of parsed.warnings) diag("warning", { code: w.code, stage: "parse", file: o.file, line: w.line, message: w.message });
     const found = lint(program);
@@ -222,16 +225,26 @@ export async function runSkill(o: RunOptions): Promise<number> {
     // The skill's scope: every command it could run, and whether that set is approved (SPEC §7.4).
     const effects = effectsOf(program, choices);
     // `beside-skill` keeps the approval in the skill's own folder, for review in the repository.
-    // A plan's approval always sits beside it, whatever the config says: nothing in a plan runs
-    // unapproved, and the plan-mode hook (skope --plan-approved) writes it there.
-    const approvalsDir =
-      program.kind === "plan" || config.approvals === "beside-skill"
+    // A plan always needs an approval, and only the person gives it, in plan mode: the hook
+    // (skope --plan-approved) writes it into Claude Code's or Codex's config directory, which the
+    // agent can't write without asking. Never in the repository, where the agent could write one.
+    const isPlanFile = program.kind === "plan";
+    const approvalsDir = isPlanFile
+      ? undefined
+      : config.approvals === "beside-skill"
         ? dirname(resolve(o.file))
         : config.approvals === undefined
           ? undefined
           : config.approvals;
     const approval = () => {
       try {
+        if (isPlanFile) {
+          for (const agent of [claudeDir(), codexDir()]) {
+            const a = readApproval(planApprovalsDir(agent), planApprovalName(o.file));
+            if (a) return a;
+          }
+          return null;
+        }
         return approvalsDir === undefined ? null : readApproval(approvalsDir, program.skill);
       } catch (err) {
         return fail("E-CONFIG", "args", `can't read the approval for ${program.skill}: ${(err as Error).message}`);
@@ -249,6 +262,12 @@ export async function runSkill(o: RunOptions): Promise<number> {
       return 0;
     }
     if (o.mode === "approve") {
+      if (isPlanFile)
+        fail(
+          "E-USAGE",
+          "args",
+          "a plan is approved by the person, in their agent's plan mode (skope --install-hooks sets it up), not with --approve",
+        );
       if (approvalsDir === undefined)
         fail("E-CONFIG", "args", "--approve needs approvals in the config: approvals: <dir>, or approvals: beside-skill (SPEC §9)");
       const dir = approvalsDir as string;
@@ -277,16 +296,19 @@ export async function runSkill(o: RunOptions): Promise<number> {
     }
     // With approvals configured, nothing runs until a person has approved exactly these commands.
     // A dry run runs the `run` commands, so it needs the approval too. --test fakes every command.
-    if (o.mode === "run" && !o.test && approvalsDir !== undefined) {
+    if (o.mode === "run" && !o.test && (approvalsDir !== undefined || isPlanFile)) {
       const approved = approval();
-      if (approved?.effects_hash !== effects.hash)
+      if (approved?.effects_hash !== effects.hash || (isPlanFile && planChanges(program).length > 0 && !approved?.files))
         fail(
           "E-NOT-APPROVED",
           "args",
           approved
             ? `${program.skill}'s commands changed since it was approved (${diffEffects(approved, effects).join("; ")}). Review them with --effects, then approve with --approve`
-            : `${program.skill} has no approval in ${approvalsDir}. Review its commands with --effects, then approve with --approve`,
+            : isPlanFile
+              ? `${program.skill} isn't approved. A plan is approved by the person in plan mode; is the hook installed (skope --install-hooks)?`
+              : `${program.skill} has no approval in ${approvalsDir}. Review its commands with --effects, then approve with --approve`,
         );
+      planPins = approved?.files;
       // The files a plan changes must be as approved, or as its own changes left them.
       const stale = !dryRun && approved?.files ? staleFiles(planRoot(), approved.files) : [];
       if (stale.length > 0)
@@ -445,9 +467,24 @@ export async function runSkill(o: RunOptions): Promise<number> {
     // With --fake-exec they're faked like any command: a test never touches the files.
     const changes = changesOf(program);
     let root: string | undefined;
+    // Each change's position among the changes to its file, in document order (as the pins are).
+    const changeIndex = new Map<number, number>();
+    const perFile = new Map<string, number>();
+    for (const [src, c] of changes) {
+      const k = perFile.get(c.path) ?? 0;
+      changeIndex.set(src, k);
+      perFile.set(c.path, k + 1);
+    }
     const applyPlanChange = (c: Change, src: number): ExecResult => {
       root ??= planRoot();
-      const r = applyChange(root, c);
+      let r = applyChange(root, c);
+      // A change whose text can't say it's already in place (an edit that deletes lines) is already
+      // applied if the file is in a state the approval pinned as after this change.
+      if (r.result === "failed" && planPins?.[c.path]) {
+        const states = planPins[c.path] as string[];
+        const now = fileHash(root, c.path);
+        if (now !== null && states.indexOf(now) > (changeIndex.get(src) ?? Number.POSITIVE_INFINITY)) r = { result: "already_applied" };
+      }
       const message = r.result === "failed" ? r.message : null;
       emit({ event: "change", line: src, op: c.op, path: c.path, result: r.result, message });
       if (message !== null) say(`skope: ${c.op} ${c.path} failed: ${message}\n`);

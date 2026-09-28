@@ -77,7 +77,7 @@ describe("runs", () => {
     const b = plan([...EDIT.map((l) => l.replace("new thing", "other thing")), "- **stop**"]);
     const ea = await runSkope([a.path, "--effects"]);
     const eb = await runSkope([b.path, "--effects"]);
-    expect(ea.stderr).toMatch(/do {3}edit a\.txt #[0-9a-f]{12}/);
+    expect(ea.stderr).toMatch(/do {3}edit a\.txt #[0-9a-f]{64}/);
     const hash = (r: { stdout: string }) => JSON.parse(r.stdout.trim().split("\n").at(-1) as string).effects_hash;
     expect(hash(ea)).not.toBe(hash(eb));
   });
