@@ -111,12 +111,11 @@ Type errors after the grammar change. Read the record, fix the plan, resume from
    record.
 7. **Approval: the person, not the agent.** The agent can't approve its own
    plan: it computes the hash, so passing a hash it computed proves nothing.
-   Plans use skope's existing approval (§7.4): the approval file is written
-   by `skope <plan> --approve`, which the agent never runs. In Claude Code
-   the person's plan-mode approval triggers it: a hook on leaving plan mode,
-   run by Claude Code as the user, runs `skope <plan> --approve` for the plan
-   the agent presented. `--pin HASH` remains as a change detector only (the
-   run refuses if the plan's effects changed), not as approval.
+   The person's plan-mode approval triggers `skope --plan-approved` through
+   the installed hook. Claude Code may write the successful `ExitPlanMode`
+   result to the transcript after the hook runs. Skope records the hook's
+   plan and tool-use ID, then verifies the transcript result when the agent
+   runs the plan. The agent's own hash alone never grants approval.
 8. **Progress.** One stderr line per instruction (`[3/12] check npm test…`)
    when stderr is a terminal or `--progress` is given.
 9. **The `skope-it-out` skill**, installed with skope. In Claude Code plan

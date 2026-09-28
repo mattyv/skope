@@ -4,7 +4,7 @@
 // readable stderr line (SPEC §7.1, §10).
 
 import { createHash, randomBytes } from "node:crypto";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { hostname } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { load as loadYaml } from "js-yaml";
@@ -32,7 +32,7 @@ import { sendPage } from "../runner/pager.js";
 import { buildRedactor, type Redactor, redactDeep } from "../runner/redact.js";
 import type { AskRequest, Response, RunConfig, Val } from "../step.js";
 import { describe, diffEffects, effectsOf, readApproval, writeApproval } from "./effects.js";
-import { claudeDir, codexDir, planApprovalName, planApprovalsDir } from "./hooks.js";
+import { claudeApproved, claudeDir, codexDir, planApprovalName, planApprovalsDir } from "./hooks.js";
 import { escapePage, type Handlers, type LoopResult, runLoop } from "./loop.js";
 import { fileHash, pinnedStates, planChanges, planDiff, repoRoot, rootForPlan, staleFiles } from "./plan.js";
 import { readOnly } from "./verify.js";
@@ -297,7 +297,20 @@ export async function runSkill(o: RunOptions): Promise<number> {
     // With approvals configured, nothing runs until a person has approved exactly these commands.
     // A dry run runs the `run` commands, so it needs the approval too. --test fakes every command.
     if (o.mode === "run" && !o.test && (approvalsDir !== undefined || isPlanFile)) {
-      const approved = approval();
+      let approved = approval();
+      if (isPlanFile && approved?.claude) {
+        const proof = approved.claude;
+        try {
+          if (
+            proof.hash !== effects.hash.slice(7) ||
+            realpathSync(resolve(approved.root ?? "", proof.path)) !== realpathSync(o.file) ||
+            claudeApproved(proof.transcript, proof.tool_use_id, proof) !== null
+          )
+            approved = null;
+        } catch {
+          approved = null;
+        }
+      }
       if (isPlanFile && approved?.root !== undefined && approved.root !== planRoot())
         fail("E-NOT-APPROVED", "args", `${program.skill} was approved for ${approved.root}, but this run would use ${planRoot()}`);
       if (approved?.effects_hash !== effects.hash || (isPlanFile && planChanges(program).length > 0 && !approved?.files))

@@ -9,7 +9,8 @@
 // `skope --plan-approved` is that hook. The approved plan names a skope plan file and its effects
 // hash (`skope plan: PATH HASH12`); the hook approves that file only if its effects still have
 // that hash, so a plan changed after the person saw it doesn't run. Because the agent could run
-// the command itself, it checks the tool's own transcript for the approval too. It never blocks
+// the command itself, a Claude approval is checked against the successful transcript result again
+// before the plan runs. The hook may fire before that result is written. It never blocks
 // the agent: problems go to stderr, and it exits 0.
 //
 // `skope --install-hooks` adds the hook to ~/.claude/settings.json and ~/.codex/config.toml.
@@ -71,8 +72,9 @@ function* objects(v: unknown): Generator<Record<string, unknown>> {
 }
 
 /**
- * Claude Code: the transcript records the latest ExitPlanMode call, its successful result, and the
- * same plan the hook is about to approve. An older or still-pending call cannot approve a plan.
+ * Claude Code: after the hook returns, the transcript records the latest ExitPlanMode call, its
+ * successful result, and the same plan the hook recorded. An older or still-pending call cannot
+ * authorize a run. Both the call and result may be missing while PostToolUse runs.
  */
 export function claudeApproved(transcript: string, toolUseId: string, plan: { path: string; hash: string }): string | null {
   if (!inside(claudeDir(), transcript)) return `the transcript isn't in ${claudeDir()}`;
@@ -169,7 +171,13 @@ export const planApprovalsDir = (agentDir: string) => join(agentDir, "skope", "a
 export const planApprovalName = (file: string) => `plan-${createHash("sha256").update(realpathSync(file)).digest("hex").slice(0, 32)}`;
 
 /** Approves `file` into `agentDir` if it's a plan whose effects hash is `hash`. Null on success, else why not. */
-export function approvePlan(file: string, hash: string, agentDir: string, cwd = dirname(resolve(file))): string | null {
+export function approvePlan(
+  file: string,
+  hash: string,
+  agentDir: string,
+  cwd = dirname(resolve(file)),
+  claude?: { transcript: string; tool_use_id: string; path: string; hash: string },
+): string | null {
   let text: string;
   try {
     text = readFileSync(file, "utf8");
@@ -186,7 +194,7 @@ export function approvePlan(file: string, hash: string, agentDir: string, cwd = 
   if (effects.hash !== `sha256:${hash}`)
     return `${file} changed after the person saw it (its effects are ${effects.hash.slice(7, 19)}…, the approved plan said ${hash.slice(0, 12)}…)`;
   const root = rootForPlan(file, cwd, claudeDir());
-  writeApproval(planApprovalsDir(agentDir), effects, pinnedStates(root, planChanges(program)), planApprovalName(file), root);
+  writeApproval(planApprovalsDir(agentDir), effects, pinnedStates(root, planChanges(program)), planApprovalName(file), root, claude);
   return null;
 }
 
@@ -207,14 +215,20 @@ export function planApproved(stdin: string, out: (s: string) => void, err: (s: s
   let check: () => string | null;
   let agentDir: string;
   let claude = false;
+  let claudeProvenance: { transcript: string; tool_use_id: string; path: string; hash: string } | undefined;
   if (event === "PostToolUse" && input.tool_name === "ExitPlanMode") {
     // The approved text, after any edits the person made (tool_response.plan), else what was proposed.
     const resp = input.tool_response as { plan?: unknown } | undefined;
     const inp = input.tool_input as { plan?: unknown } | undefined;
     plan = planLine(typeof resp?.plan === "string" ? resp.plan : typeof inp?.plan === "string" ? inp.plan : "");
-    const id = String(input.tool_use_id ?? "");
+    const id = typeof input.tool_use_id === "string" ? input.tool_use_id : "";
+    if (!id) {
+      say("didn't record the plan approval: the hook has no tool_use_id");
+      return 0;
+    }
+    if (plan) claudeProvenance = { transcript, tool_use_id: id, ...plan };
     check = () =>
-      claudeApproved(transcript, id, plan as { path: string; hash: string }) ??
+      (!inside(claudeDir(), transcript) ? `the transcript isn't in ${claudeDir()}` : null) ??
       (useOnce(claudeDir(), id) ? null : "that approval was already used");
     agentDir = claudeDir();
     claude = true;
@@ -234,13 +248,15 @@ export function planApproved(stdin: string, out: (s: string) => void, err: (s: s
     agentDir = codexDir();
   } else return 0; // not a plan approval
   if (!plan) return 0; // not a skope plan
-  const why = check() ?? approvePlan(resolve(repoRoot(cwd), plan.path), plan.hash, agentDir, cwd);
+  const why = check() ?? approvePlan(resolve(repoRoot(cwd), plan.path), plan.hash, agentDir, cwd, claudeProvenance);
   if (why !== null) {
     say(`didn't approve ${plan.path}: ${why}`);
     return 0;
   }
-  const next = `skope approved ${plan.path}. Run it with: SKOPE_CALLER=agent skope ${plan.path} --apply`;
-  say(`approved ${plan.path}`);
+  const next = claude
+    ? `skope recorded the approval for ${plan.path}; skope will verify Claude's transcript before running. Run it with: SKOPE_CALLER=agent skope ${plan.path} --apply`
+    : `skope approved ${plan.path}. Run it with: SKOPE_CALLER=agent skope ${plan.path} --apply`;
+  say(claude ? `recorded approval for ${plan.path}` : `approved ${plan.path}`);
   if (claude) out(`${JSON.stringify({ hookSpecificOutput: { hookEventName: "PostToolUse", additionalContext: next } })}\n`);
   else out(`${next}\n`);
   return 0;
