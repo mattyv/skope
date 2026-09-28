@@ -57,6 +57,19 @@ export function parseRun(rest: string, resolve: Resolve) {
   return { run: { cmd: splitParts(cmd), ...(as === null ? {} : { as }) }, else: e };
 }
 
+/** `**edit** `PATH` [· all] [ELSE]`, `**create** `PATH` [ELSE]`, `**delete** `PATH` [ELSE]`: the text is in fenced blocks. */
+export function parseChange(rest: string, resolve: Resolve, op: "edit" | "create" | "delete") {
+  const cur = new Cursor(rest);
+  if (!cur.eat(T.sp)) return fail();
+  const path = cur.codeSpan();
+  // v1 paths are literal: no values reach a path, so nothing can steer a change outside what was approved.
+  if (path === null || path.trim() === "" || /[{}]/.test(path)) return fail();
+  const all = op === "edit" && cur.eat(/ +· +all/y);
+  const e = elseThenEnd(cur, resolve);
+  if (e === GRAMMAR_ERROR) return fail();
+  return { path, all, else: e };
+}
+
 export function parseDo(rest: string, resolve: Resolve) {
   const cur = new Cursor(rest);
   if (!cur.eat(T.sp)) return fail();

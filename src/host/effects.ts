@@ -7,6 +7,7 @@
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { changeCmd } from "../ast.js";
 import type { CoreProgram, Section } from "../contracts.gen.js";
 
 type Stmt = Section["body"][number];
@@ -29,6 +30,13 @@ export interface Effects {
   /** Params that reach a command with no fixed choices: they stay `{name}`, any value that passes the safe-value check. */
   open_params: string[];
 }
+
+/** The first 12 hex digits of the sha256 of a change's op, path and text. */
+export const changeHash = (c: { op: string; path: string; old?: string; new?: string; all?: boolean }) =>
+  createHash("sha256")
+    .update(JSON.stringify([c.op, c.path, c.old ?? null, c.new ?? null, c.all ?? false]))
+    .digest("hex")
+    .slice(0, 12);
 
 /** Every value a list-bound variable can take: a list's items, or its action items' commands. */
 function listItems(program: CoreProgram, section: string): { values: string[]; actions: Parts[] } {
@@ -92,6 +100,8 @@ export function effectsOf(program: CoreProgram, choices: Record<string, (string 
       if ("run" in st) cmd("run", st.run as { cmd?: unknown; item?: string });
       if ("ask_each" in st) cmd("run", { cmd: st.ask_each.cmd });
       if ("do" in st) cmd("do", st.do as { cmd?: unknown; item?: string });
+      // A change lists with a hash of its exact text, so approving the list approves the text.
+      if ("change" in st) add("do", `${changeCmd(st.change)} #${changeHash(st.change)}`, s.name);
       if ("if_yes" in st) {
         cmd("run", st.if_yes.run as { cmd?: unknown; item?: string } | undefined);
         cmd("do", st.if_yes.do as { cmd?: unknown; item?: string } | undefined);

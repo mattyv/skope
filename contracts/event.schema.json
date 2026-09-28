@@ -32,6 +32,9 @@
       "$ref": "#/$defs/effect_end"
     },
     {
+      "$ref": "#/$defs/change"
+    },
+    {
       "$ref": "#/$defs/would_do"
     },
     {
@@ -794,6 +797,61 @@
         }
       },
       "required": ["ts", "run_id", "skill", "skill_hash", "host", "event", "cmd", "exit", "ms", "timed_out"],
+      "additionalProperties": false
+    },
+    "change": {
+      "title": "ChangeEvent",
+      "type": "object",
+      "description": "A plan's edit, create or delete, applied by the host (docs/design/plan-mode.md). Comes between the change's effect_start and effect_end.",
+      "properties": {
+        "ts": {
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?Z$",
+          "description": "UTC, ISO 8601."
+        },
+        "run_id": {
+          "type": ["string", "null"],
+          "description": "null before a run exists."
+        },
+        "skill": {
+          "type": ["string", "null"],
+          "description": "null before a run exists."
+        },
+        "skill_hash": {
+          "type": ["string", "null"],
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "description": "null before a run exists."
+        },
+        "host": {
+          "type": "string"
+        },
+        "section": {
+          "type": "string",
+          "description": "The section's display name."
+        },
+        "line": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "event": {
+          "const": "change"
+        },
+        "op": {
+          "enum": ["edit", "create", "delete"]
+        },
+        "path": {
+          "type": "string"
+        },
+        "result": {
+          "enum": ["applied", "already_applied", "failed"],
+          "description": "already_applied: the change was already in place, so the plan can be re-run."
+        },
+        "message": {
+          "type": ["string", "null"],
+          "description": "Why it failed; null otherwise."
+        }
+      },
+      "required": ["ts", "run_id", "skill", "skill_hash", "host", "line", "event", "op", "path", "result", "message"],
       "additionalProperties": false
     },
     "would_do": {

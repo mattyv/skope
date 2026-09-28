@@ -472,6 +472,9 @@
           "$ref": "#/$defs/stmtDo"
         },
         {
+          "$ref": "#/$defs/stmtChange"
+        },
+        {
           "$ref": "#/$defs/stmtCheck"
         },
         {
@@ -757,6 +760,48 @@
           "items": {
             "$ref": "#/$defs/list"
           }
+        }
+      }
+    },
+    "stmtChange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["src", "change", "else"],
+      "description": "`**edit**`, `**create**` or `**delete**` `PATH` (plans, docs/design/plan-mode.md). To the core, a `do` whose command is `OP PATH`; the host applies the change itself and never runs it as a command.",
+      "properties": {
+        "src": {
+          "$ref": "#/$defs/src"
+        },
+        "change": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["op", "path"],
+          "properties": {
+            "op": {
+              "enum": ["edit", "create", "delete"]
+            },
+            "path": {
+              "type": "string",
+              "minLength": 1,
+              "description": "A literal path, relative to the repository root."
+            },
+            "old": {
+              "type": "string",
+              "minLength": 1,
+              "description": "edit only: the lines to replace."
+            },
+            "new": {
+              "type": "string",
+              "description": "edit and create: the replacement or the file's content."
+            },
+            "all": {
+              "type": "boolean",
+              "description": "edit only: replace every occurrence."
+            }
+          }
+        },
+        "else": {
+          "$ref": "#/$defs/else"
         }
       }
     }

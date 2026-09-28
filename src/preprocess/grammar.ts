@@ -5,7 +5,22 @@
 
 import { sectionId } from "./slug.js";
 
-export const KEYWORDS = ["run", "do", "check", "ask", "ask each", "for each", "if yes", "then", "page", "hand off", "stop"] as const;
+export const KEYWORDS = [
+  "run",
+  "do",
+  "check",
+  "ask",
+  "ask each",
+  "for each",
+  "if yes",
+  "then",
+  "page",
+  "hand off",
+  "stop",
+  "edit",
+  "create",
+  "delete",
+] as const;
 export type Keyword = (typeof KEYWORDS)[number];
 
 export type Lead =
