@@ -35,7 +35,6 @@ export function world(files: Record<string, string | Buffer>, opts: { git?: bool
   const config = join(root, "config.yaml");
   writeFileSync(config, `state_dir: ${join(root, "state")}\npager:\n  command: "cat > /dev/null"\n`);
   const env = { ...process.env, CLAUDE_CONFIG_DIR: claude, CODEX_HOME: codex, SKOPE_CALLER: "agent" };
-  delete (env as Record<string, string | undefined>).SKOPE_RECORD;
 
   function write(rel: string, content: string | Buffer) {
     const p = join(repo, rel);

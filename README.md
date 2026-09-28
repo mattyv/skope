@@ -619,9 +619,9 @@ $ DAFNY=/path/to/dafny npm run core   # verify the proofs and rebuild core/gener
 `npm run core` skips Dafny when the `.dfy` files haven't changed since its
 last successful run; `npm run core -- --force` rebuilds anyway.
 
-Plan mode has end-to-end tests in `tests/e2e`: scenarios for Claude Code and
-Codex, and replays of recorded real sessions. To record one, see
-[tests/e2e/README.md](tests/e2e/README.md).
+Plan mode has end-to-end tests in `tests/e2e`: simulated Claude Code and
+Codex sessions through the real CLI and hook
+([tests/e2e/README.md](tests/e2e/README.md)).
 
 ## Read more
 
