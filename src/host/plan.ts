@@ -5,6 +5,8 @@
 
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
+import { realpathSync } from "node:fs";
+import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import type { CoreProgram, Section } from "../contracts.gen.js";
 import { type Change, changeText, currentText } from "../runner/change.js";
 
@@ -18,6 +20,18 @@ export function repoRoot(dir: string): string {
   } catch {
     return dir;
   }
+}
+
+/** Claude writes plans under its config directory in plan mode. For those plans, use the
+ * repository the agent is working in; plans elsewhere retain their file-based root. */
+export function rootForPlan(file: string, cwd: string, claudeConfigDir: string): string {
+  try {
+    const rel = relative(realpathSync(join(claudeConfigDir, "plans")), realpathSync(file));
+    if (rel !== "" && !rel.startsWith("..") && !isAbsolute(rel)) return realpathSync(repoRoot(cwd));
+  } catch {
+    // No Claude plans directory, or this isn't a file in it.
+  }
+  return realpathSync(repoRoot(dirname(resolve(file))));
 }
 
 /** Every change in the plan, in document order, loops included. */

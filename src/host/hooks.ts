@@ -22,7 +22,7 @@ import { lint } from "../lint.js";
 import { preprocess } from "../preprocess/index.js";
 import { plainText } from "../runner/events.js";
 import { effectsOf, writeApproval } from "./effects.js";
-import { pinnedStates, planChanges, repoRoot } from "./plan.js";
+import { pinnedStates, planChanges, repoRoot, rootForPlan } from "./plan.js";
 
 /** What Codex sends when the person approves a plan (codex-rs/tui/src/chatwidget/plan_implementation.rs). */
 export const CODEX_APPROVAL = "Implement the plan.";
@@ -169,7 +169,7 @@ export const planApprovalsDir = (agentDir: string) => join(agentDir, "skope", "a
 export const planApprovalName = (file: string) => `plan-${createHash("sha256").update(realpathSync(file)).digest("hex").slice(0, 32)}`;
 
 /** Approves `file` into `agentDir` if it's a plan whose effects hash is `hash`. Null on success, else why not. */
-export function approvePlan(file: string, hash: string, agentDir: string): string | null {
+export function approvePlan(file: string, hash: string, agentDir: string, cwd = dirname(resolve(file))): string | null {
   let text: string;
   try {
     text = readFileSync(file, "utf8");
@@ -185,12 +185,8 @@ export function approvePlan(file: string, hash: string, agentDir: string): strin
   const effects = effectsOf(program, choices);
   if (effects.hash !== `sha256:${hash}`)
     return `${file} changed after the person saw it (its effects are ${effects.hash.slice(7, 19)}…, the approved plan said ${hash.slice(0, 12)}…)`;
-  writeApproval(
-    planApprovalsDir(agentDir),
-    effects,
-    pinnedStates(repoRoot(dirname(resolve(file))), planChanges(program)),
-    planApprovalName(file),
-  );
+  const root = rootForPlan(file, cwd, claudeDir());
+  writeApproval(planApprovalsDir(agentDir), effects, pinnedStates(root, planChanges(program)), planApprovalName(file), root);
   return null;
 }
 
@@ -238,7 +234,7 @@ export function planApproved(stdin: string, out: (s: string) => void, err: (s: s
     agentDir = codexDir();
   } else return 0; // not a plan approval
   if (!plan) return 0; // not a skope plan
-  const why = check() ?? approvePlan(resolve(repoRoot(cwd), plan.path), plan.hash, agentDir);
+  const why = check() ?? approvePlan(resolve(repoRoot(cwd), plan.path), plan.hash, agentDir, cwd);
   if (why !== null) {
     say(`didn't approve ${plan.path}: ${why}`);
     return 0;

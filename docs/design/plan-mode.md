@@ -1,6 +1,6 @@
 # Design: skope as the plan in plan mode
 
-Status: v1 built, revised after a second review. Plans' commands run at the repository root, and plan approvals live in the agent tool's config directory, never beside the plan (item 7 below predates that). v2 is not built.
+Status: v1 built, revised after a second review. Plans' commands run at the repository root, and plan approvals live in the agent tool's config directory, never beside the plan (item 7 below predates that). Claude Code can keep its skope plan in its own `~/.claude/plans/` directory; the approval pins the working repository root. v2 is not built.
 
 ## Problem
 
@@ -119,8 +119,9 @@ Type errors after the grammar change. Read the record, fix the plan, resume from
    run refuses if the plan's effects changed), not as approval.
 8. **Progress.** One stderr line per instruction (`[3/12] check npm test…`)
    when stderr is a terminal or `--progress` is given.
-9. **The `plan-with-skope` skill**, installed with skope. In plan mode: write
-   the plan as a `kind: plan` file under `.claude/plans/`; `--lint` and
+9. **The `plan-with-skope` skill**, installed with skope. In Claude Code plan
+   mode, write the `kind: plan` file under `~/.claude/plans/`; in Codex use
+   `.skope/plans/` in the repository. Then `--lint` and
    `--verify` it; show the person the plan, `--effects` and `--effects --diff`;
    after approval (the hook writes the approval) run it with `--apply`; on a
    handoff read the record, fix the plan and resume with `--from`. Rules: a

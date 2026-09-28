@@ -23,8 +23,17 @@ plan-approval hook with `/hooks` before approving the first plan.
 
 ## 1. Explore, then write the plan
 
-Write it to `.skope/plans/NAME.md` at the repository root. Paths in it are
-relative to that root, and its commands run there.
+Choose the plan file for your agent:
+
+- **Claude Code:** use the plan file Claude Code gives you under
+  `$CLAUDE_CONFIG_DIR/plans/` (normally `~/.claude/plans/`). Write the skope
+  plan directly in that file. Use its absolute path as `PATH` below. There is
+  no repository plan file to create or commit.
+- **Codex:** write `.skope/plans/NAME.md` at the repository root and use that
+  relative path as `PATH` below.
+
+Run skope from the repository root. Changes and commands in either plan use
+that repository; approval pins it as well as the files the plan changes.
 
 ````markdown
 ---
@@ -87,8 +96,8 @@ A check failed. The record has the command's output; fix the plan and resume.
 ## 2. Check it, then show it
 
 ```console
-$ skope .skope/plans/NAME.md --lint
-$ skope .skope/plans/NAME.md --effects --diff
+$ skope PATH --lint
+$ skope PATH --effects --diff
 ```
 
 Fix anything `--lint` reports. Then put this in the plan you present for
@@ -96,10 +105,11 @@ approval, word for word from `--effects` (all 64 hex digits after
 `sha256:` in `effects_hash`):
 
 ```
-skope plan: .skope/plans/NAME.md 3f1c…(64 hex digits)…9e0a
+skope plan: PATH 3f1c…(64 hex digits)…9e0a
 ```
 
-followed by a short summary, the commands `--effects` lists, and the diff.
+Replace `PATH` with the exact path used for `--effects`. Follow the line with
+a short summary, the commands `--effects` lists, and the diff.
 The hook approves only that file, only with that hash: if you change the
 plan after the person saw it, it won't run.
 
@@ -112,7 +122,7 @@ approval file you write counts for nothing. Never run
 Once the person approves (you're out of plan mode):
 
 ```console
-$ SKOPE_CALLER=agent skope .skope/plans/NAME.md --apply
+$ SKOPE_CALLER=agent skope PATH --apply
 ```
 
 - **Exit 0:** done. Tell the person what changed.
@@ -120,8 +130,8 @@ $ SKOPE_CALLER=agent skope .skope/plans/NAME.md --apply
   failed command, its output and a `log` file with all of it. Fix the plan:
   change an edit, or add one. Then:
   - if `--effects` gives the same `effects_hash` (you changed no edit's
-    text and no command), resume: `skope .skope/plans/NAME.md --apply --from
-    SECTION`, where SECTION is where the failure was.
+    text and no command), resume: `skope PATH --apply --from SECTION`, where
+    SECTION is where the failure was.
   - otherwise the plan needs approving again. First take out the edits the
     run already made (`--effects --diff` reports them as not matching), so
     the plan and its diff show what's left. Then go back to plan mode (in

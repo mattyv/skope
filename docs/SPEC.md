@@ -724,8 +724,11 @@ person approves before it runs, usually written by an agent in plan mode.
 - **Limits:** `run_timeout` and `do_timeout` default to 10 minutes and
   `deadline` to 60, since plans run builds and tests; the skope block can
   still set them.
-- **Where commands run:** a plan's commands run at the root its paths are
-  relative to (the git work tree), wherever skope was started.
+- **Where commands run:** a plan in a repository uses that git work tree as
+  the root for paths and commands, wherever skope was started. A Claude Code
+  plan under `$CLAUDE_CONFIG_DIR/plans/` (default `~/.claude/plans/`) uses the
+  git work tree containing skope's current working directory. The approval
+  pins this root, and a run from another repository is refused.
 - **The diff:** `--effects --diff` prints one unified diff of every change,
   applied in document order to copies of the files, whatever path a run
   would take. (A dry run can't show this: its checks see the unchanged

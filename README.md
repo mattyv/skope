@@ -395,7 +395,9 @@ Every step is one line of JSON on stdout:
 To use `plan-with-skope`, enter plan mode in Claude Code or Codex and ask the
 agent to plan a code change. You can say "Plan this with skope" to request it
 explicitly. In Codex, trust the installed approval hook with `/hooks` before
-approving your first plan.
+approving your first plan. Claude Code writes the skope plan in its own plan
+file under `~/.claude/plans/`; Codex uses `.skope/plans/` in the repository.
+Neither requires a decision about committing the plan during approval.
 
 In Claude Code's or Codex's plan mode, an agent with
 [`plan-with-skope`](skills/plan-with-skope/SKILL.md) writes its plan as a

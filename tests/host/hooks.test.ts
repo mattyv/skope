@@ -92,6 +92,55 @@ function claudeHook(w: ReturnType<typeof world>, opts: { id?: string; transcript
 }
 
 describe("Claude Code: PostToolUse on ExitPlanMode", () => {
+  test("approves a plan in Claude's plans directory for the current repository only", () => {
+    const w = world();
+    const file = join(w.claude, "plans", "crosschecks.md");
+    mkdirSync(join(w.claude, "plans"));
+    writeFileSync(file, PLAN);
+    const effects = spawnSync(process.execPath, [CLI, file, "--effects", "--diff"], {
+      cwd: w.repo,
+      env: w.env,
+      encoding: "utf8",
+    });
+    expect(effects.status).toBe(0);
+    expect(effects.stderr).toContain("--- a/a.txt");
+    const hash = (JSON.parse(effects.stdout.trim()).effects_hash as string).slice(7);
+    const line = `skope plan: ${file} ${hash}`;
+    const transcript = join(w.claude, "projects", "p", "external.jsonl");
+    writeFileSync(transcript, jsonl(exitPlan("toolu_external", line), planResult("toolu_external", line)));
+    const approved = w.hook({
+      hook_event_name: "PostToolUse",
+      tool_name: "ExitPlanMode",
+      tool_use_id: "toolu_external",
+      cwd: w.repo,
+      transcript_path: transcript,
+      tool_input: { plan: line },
+      tool_response: { plan: line },
+    });
+    expect(approved.status).toBe(0);
+    expect(approved.stderr).toContain(`approved ${file}`);
+    const config = join(w.root, "config.yaml");
+    writeFileSync(config, `state_dir: ${join(w.root, "state")}\n`);
+    const run = (cwd: string) =>
+      spawnSync(process.execPath, [CLI, file, "--apply", "--no-page", "--config", config], {
+        cwd,
+        env: w.env,
+        encoding: "utf8",
+      });
+    const other = join(w.root, "other");
+    mkdirSync(other);
+    execFileSync("git", ["init", "-q"], { cwd: other });
+    writeFileSync(join(other, "a.txt"), "old\n");
+    const wrong = run(other);
+    expect(wrong.status).toBe(40);
+    expect(wrong.stderr).toContain("E-NOT-APPROVED");
+    expect(wrong.stderr).toContain(`approved for ${w.repo}`);
+    expect(readFileSync(join(other, "a.txt"), "utf8")).toBe("old\n");
+    const correct = run(w.repo);
+    expect(correct.status).toBe(0);
+    expect(readFileSync(join(w.repo, "a.txt"), "utf8")).toBe("new\n");
+  });
+
   test("approves the named plan, tells the agent how to run it, and the run then goes ahead", async () => {
     const w = world();
     const agentEnv = { CLAUDE_CONFIG_DIR: w.claude, CODEX_HOME: w.codex };
