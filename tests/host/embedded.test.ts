@@ -58,7 +58,7 @@ describe("skope --install-skill", () => {
 
 describe("the shipped agent skills", () => {
   // agentskills.io/specification: what claude.ai accepts on upload.
-  test.each(["write-skope-skill", "run-skope-skill"])("%s is a valid Agent Skill", (name) => {
+  test.each(["write-skope-skill", "run-skope-skill", "plan-with-skope"])("%s is a valid Agent Skill", (name) => {
     const text = readFileSync(join(ROOT, "skills", name, "SKILL.md"), "utf8");
     const fm = load((/^---\n([\s\S]*?)\n---\n/.exec(text) as RegExpExecArray)[1] as string) as Record<string, unknown>;
     expect(Object.keys(fm).sort()).toEqual(["description", "name"]);

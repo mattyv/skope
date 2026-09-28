@@ -16,6 +16,11 @@ Use it for changes you can plan up front: a set of edits, then builds and
 tests. Keep exploring the normal way; the plan replaces only the writing and
 running.
 
+Use this workflow when the person asks for a code change in Claude Code or
+Codex plan mode; they need not name the skill. They can ask for it explicitly
+with "Plan this with skope." In Codex, the person must trust the installed
+plan-approval hook with `/hooks` before approving the first plan.
+
 ## 1. Explore, then write the plan
 
 Write it to `.skope/plans/NAME.md` at the repository root. Paths in it are
@@ -68,8 +73,8 @@ A check failed. The record has the command's output; fix the plan and resume.
 
 - **Edits:** `old` is whole lines copied exactly from the file, including
   indentation; add a line of context if it isn't unique, or `· all` to
-  change every match. An empty `new` deletes the lines. Also
-  `- **create** \`path\`` with a `new` block, and `- **delete** \`path\``.
+  change every match. An empty `new` deletes the lines. Use `create` with a
+  path and `new` block to add a file, or `delete` with a path to remove one.
 - **Checks after each group of edits**, cheapest first (types, then tests),
   each with `· else [Fix]`. The Fix section hands off; it's how you get
   feedback.
@@ -126,8 +131,8 @@ $ SKOPE_CALLER=agent skope .skope/plans/NAME.md --apply
     `--apply` from the start.
   Changes already in place are skipped on a re-run, so re-running is safe.
 - **`E-NOT-APPROVED`:** the plan changed since it was approved, or the hook
-  isn't installed (`skope --install-hooks`; in Codex the person must also
-  trust it with `/hooks`).
+  did not run. Install a missing hook with `skope --install-hooks`; in Codex,
+  check that the person trusted it with `/hooks`.
 - **`E-PLAN-STALE`:** someone changed a file the plan edits. Look at what
   changed, update the plan, and ask for approval again.
 
