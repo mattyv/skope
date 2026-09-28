@@ -77,6 +77,10 @@ export function effectsOf(program: CoreProgram, choices: Record<string, (string 
   // reach a command in any section. Collect every list each name is bound from, skill-wide.
   // A param with fixed choices can only be one of them, so it expands like a list.
   const lists = new Map<string, string[]>(Object.entries(choices).map(([k, v]) => [k, v.map(String)]));
+  // A name can be used before a later ask or loop rebinds it. Keep its initial value in the
+  // enumeration too, including open params and built-ins whose values the caller supplies.
+  for (const k of Object.keys(program.params)) if (!lists.has(k)) lists.set(k, [`{${k}}`]);
+  for (const k of ["host", "run_id", "skill"]) if (!lists.has(k)) lists.set(k, [`{${k}}`]);
   const loops = new Map<string, Parts[]>();
   const bind = <T>(m: Map<string, T[]>, name: string, values: T[]) => m.set(name, [...new Set([...(m.get(name) ?? []), ...values])]);
   for (const s of bodies)

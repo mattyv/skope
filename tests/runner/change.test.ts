@@ -1,7 +1,7 @@
 // Plan changes applied by the host (docs/design/plan-mode.md): matching, re-running, confinement
 // and file hygiene. The core only ever sees a `do` of the descriptor.
 
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
@@ -117,5 +117,16 @@ describe("confinement", () => {
     expect(applyChange(root, { op: "delete", path: "out/secret.txt" })).toMatchObject({ result: "failed" });
     expect(read(outside, "secret.txt")).toBe("s\n");
     expect(existsSync(join(outside, "new.txt"))).toBe(false);
+  });
+
+  test("an existing temporary-file symlink cannot redirect an edit outside the root", () => {
+    const outside = repo({ "victim.txt": "private\n" });
+    const root = repo({ "a.txt": "before\n" });
+    const file = join(root, "a.txt");
+    symlinkSync(join(outside, "victim.txt"), `${file}.skope-tmp-${process.pid}`);
+    expect(applyChange(root, { op: "edit", path: "a.txt", old: "before", new: "after" })).toEqual({ result: "applied" });
+    expect(read(outside, "victim.txt")).toBe("private\n");
+    expect(read(root, "a.txt")).toBe("after\n");
+    expect(lstatSync(file).isSymbolicLink()).toBe(false);
   });
 });

@@ -67,12 +67,19 @@ function world() {
 }
 
 const jsonl = (...xs: unknown[]) => `${xs.map((x) => JSON.stringify(x)).join("\n")}\n`;
-const exitPlan = (id: string) => ({ type: "assistant", message: { content: [{ type: "tool_use", id, name: "ExitPlanMode", input: {} }] } });
+const exitPlan = (id: string, plan: string) => ({
+  type: "assistant",
+  message: { content: [{ type: "tool_use", id, name: "ExitPlanMode", input: { plan } }] },
+});
+const planResult = (id: string, plan: string) => ({
+  type: "user",
+  message: { content: [{ type: "tool_result", tool_use_id: id, content: [{ plan }] }] },
+});
 
 function claudeHook(w: ReturnType<typeof world>, opts: { id?: string; transcript?: string; plan?: string } = {}) {
   const id = opts.id ?? "toolu_1";
   const transcript = opts.transcript ?? join(w.claude, "projects", "p", "s.jsonl");
-  if (!opts.transcript) writeFileSync(transcript, jsonl(exitPlan(id)));
+  if (!opts.transcript) writeFileSync(transcript, jsonl(exitPlan(id, opts.plan ?? w.line), planResult(id, opts.plan ?? w.line)));
   return w.hook({
     hook_event_name: "PostToolUse",
     tool_name: "ExitPlanMode",
@@ -113,7 +120,7 @@ describe("Claude Code: PostToolUse on ExitPlanMode", () => {
       "a transcript outside Claude Code's directory",
       (w: ReturnType<typeof world>) => {
         const t = join(w.root, "fake.jsonl");
-        writeFileSync(t, jsonl(exitPlan("toolu_1")));
+        writeFileSync(t, jsonl(exitPlan("toolu_1", w.line), planResult("toolu_1", w.line)));
         return claudeHook(w, { transcript: t });
       },
       "isn't in",
@@ -126,7 +133,7 @@ describe("Claude Code: PostToolUse on ExitPlanMode", () => {
           type: "user",
           message: { content: [{ type: "tool_result", tool_use_id: "toolu_1", is_error: true, content: "rejected" }] },
         };
-        writeFileSync(t, jsonl(exitPlan("toolu_1"), rejected));
+        writeFileSync(t, jsonl(exitPlan("toolu_1", w.line), rejected));
         return claudeHook(w, { transcript: t });
       },
       "rejected",
@@ -135,7 +142,7 @@ describe("Claude Code: PostToolUse on ExitPlanMode", () => {
       "an older approval replayed",
       (w: ReturnType<typeof world>) => {
         const t = join(w.claude, "projects", "p", "o.jsonl");
-        writeFileSync(t, jsonl(exitPlan("toolu_1"), exitPlan("toolu_2")));
+        writeFileSync(t, jsonl(exitPlan("toolu_1", w.line), planResult("toolu_1", w.line), exitPlan("toolu_2", w.line)));
         return claudeHook(w, { transcript: t, id: "toolu_1" });
       },
       "latest",
@@ -154,6 +161,41 @@ describe("Claude Code: PostToolUse on ExitPlanMode", () => {
     expect(w.approved()).toBe(true);
     const again = claudeHook(w, { transcript: join(w.claude, "projects", "p", "s.jsonl") });
     expect(again.stderr).toContain("already used");
+  });
+
+  test("a pending result and an unrelated plan in hook input cannot approve", () => {
+    const w = world();
+    const t = join(w.claude, "projects", "p", "pending.jsonl");
+    writeFileSync(t, jsonl(exitPlan("toolu_1", w.line)));
+    expect(claudeHook(w, { transcript: t }).stderr).toContain("no successful ExitPlanMode result");
+    expect(w.approved()).toBe(false);
+
+    writeFileSync(t, jsonl(exitPlan("toolu_1", `skope plan: other.md ${w.hash}`), planResult("toolu_1", `skope plan: other.md ${w.hash}`)));
+    expect(claudeHook(w, { transcript: t }).stderr).toContain("differs from the approved transcript");
+    expect(w.approved()).toBe(false);
+  });
+
+  test("a result nested inside the agent's tool input is not an approval", () => {
+    const w = world();
+    const t = join(w.claude, "projects", "p", "nested.jsonl");
+    writeFileSync(
+      t,
+      jsonl({
+        type: "assistant",
+        message: {
+          content: [
+            {
+              type: "tool_use",
+              id: "toolu_1",
+              name: "ExitPlanMode",
+              input: { plan: w.line, nested: { type: "tool_result", tool_use_id: "toolu_1", content: w.line } },
+            },
+          ],
+        },
+      }),
+    );
+    expect(claudeHook(w, { transcript: t }).stderr).toContain("no successful ExitPlanMode result");
+    expect(w.approved()).toBe(false);
   });
 
   test("a plan that isn't a skope plan, or another tool, is none of its business", () => {

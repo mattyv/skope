@@ -123,6 +123,22 @@ describe("approval pins the files", () => {
     // A dry run changes nothing, so it still runs.
     expect((await skope("--dry-run")).code).not.toBe(40);
   });
+
+  test("a plan refuses a file changed while an earlier command is running", async () => {
+    const { dir, path, skope, approve } = setup();
+    writeFileSync(
+      path,
+      readFileSync(path, "utf8").replace("- **edit** `a.txt`", "- **run** `touch started; sleep 0.4`\n- **edit** `a.txt`"),
+    );
+    await approve();
+    const running = skope("--apply", "--no-page");
+    for (let i = 0; i < 100 && !existsSync(join(dir, "started")); i++) await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(existsSync(join(dir, "started"))).toBe(true);
+    writeFileSync(join(dir, "a.txt"), "someone else's edit\n");
+    const r = await running;
+    expect(r.events.find((e) => e.event === "error")).toMatchObject({ code: "E-PLAN-STALE" });
+    expect(readFileSync(join(dir, "a.txt"), "utf8")).toBe("someone else's edit\n");
+  });
 });
 
 describe("only the person approves a plan", () => {
@@ -179,4 +195,19 @@ describe("--from and the fix loop", () => {
     expect(r.stderr).toContain("skope: [1] do edit a.txt\n");
     expect(r.stderr).toContain('skope: [2] check grep -q "new thing" a.txt\n');
   });
+});
+
+test("a plan log drops a partial first line from truncated output before redaction", async () => {
+  const { dir, path, skope, approve } = setup();
+  writeFileSync(path, readFileSync(path, "utf8").replace(/## Change[\s\S]*/, "## Change\n- **run** `read-log`\n- **stop**\n"));
+  const commands = join(dir, "commands.yaml");
+  const secret = "SYNTHETIC_SECRET_SUFFIX";
+  writeFileSync(commands, JSON.stringify({ "read-log": { exit: 0, stdout: `password=${"X".repeat(1 << 20)}${secret}\nend\n` } }));
+  await approve();
+  const r = await skope("--apply", "--no-page", "--fake-exec", commands);
+  const start = r.events.find((e) => e.event === "run_start");
+  expect(start).toBeDefined();
+  const log = readFileSync(join(start?.run_dir as string, "exec-1.log"), "utf8");
+  expect(log).not.toContain(secret);
+  expect(log).toContain("end\n");
 });

@@ -71,18 +71,44 @@ function* objects(v: unknown): Generator<Record<string, unknown>> {
 }
 
 /**
- * Claude Code: this is the transcript's latest ExitPlanMode call, and it wasn't rejected. Being the
- * latest means an older approval can't be replayed for a newer plan.
+ * Claude Code: the transcript records the latest ExitPlanMode call, its successful result, and the
+ * same plan the hook is about to approve. An older or still-pending call cannot approve a plan.
  */
-export function claudeApproved(transcript: string, toolUseId: string): string | null {
+export function claudeApproved(transcript: string, toolUseId: string, plan: { path: string; hash: string }): string | null {
   if (!inside(claudeDir(), transcript)) return `the transcript isn't in ${claudeDir()}`;
   let latest: unknown = null;
-  for (const o of objects(lines(transcript))) {
-    if (o.type === "tool_use" && o.name === "ExitPlanMode") latest = o.id;
-    if (o.type === "tool_result" && o.tool_use_id === toolUseId && o.is_error === true) return "the person rejected that plan";
+  let proposed: string | null = null;
+  let returned: string | null = null;
+  let succeeded = false;
+  for (const entry of lines(transcript)) {
+    if (entry === null || typeof entry !== "object") continue;
+    const e = entry as { type?: unknown; message?: { content?: unknown } };
+    const blocks = e.message?.content;
+    if (!Array.isArray(blocks)) continue;
+    for (const o of blocks) {
+      if (o === null || typeof o !== "object") continue;
+      if (e.type === "assistant" && o.type === "tool_use" && o.name === "ExitPlanMode") {
+        latest = o.id;
+        const input = o.input as { plan?: unknown } | undefined;
+        if (o.id === toolUseId) proposed = typeof input?.plan === "string" ? input.plan : null;
+      }
+      if (e.type === "user" && o.type === "tool_result" && o.tool_use_id === toolUseId) {
+        if (o.is_error === true) return "the person rejected that plan";
+        succeeded = true;
+        // Claude may put the person's edited plan in the result. Use that when it is recorded.
+        returned =
+          [...objects(o.content)]
+            .flatMap((x) => Object.values(x).filter((v): v is string => typeof v === "string"))
+            .find((v) => planLine(v) !== null) ?? (typeof o.content === "string" ? o.content : null);
+      }
+    }
   }
   if (latest === null) return "the transcript has no ExitPlanMode call";
-  return latest === toolUseId ? null : "that isn't the latest plan the person was shown";
+  if (latest !== toolUseId) return "that isn't the latest plan the person was shown";
+  if (!succeeded) return "the transcript has no successful ExitPlanMode result";
+  const reviewed = planLine(returned ?? proposed ?? "");
+  if (!reviewed) return "the transcript has no skope plan line for that approval";
+  return reviewed.path === plan.path && reviewed.hash === plan.hash ? null : "the hook's plan differs from the approved transcript";
 }
 
 /**
@@ -191,7 +217,9 @@ export function planApproved(stdin: string, out: (s: string) => void, err: (s: s
     const inp = input.tool_input as { plan?: unknown } | undefined;
     plan = planLine(typeof resp?.plan === "string" ? resp.plan : typeof inp?.plan === "string" ? inp.plan : "");
     const id = String(input.tool_use_id ?? "");
-    check = () => claudeApproved(transcript, id) ?? (useOnce(claudeDir(), id) ? null : "that approval was already used");
+    check = () =>
+      claudeApproved(transcript, id, plan as { path: string; hash: string }) ??
+      (useOnce(claudeDir(), id) ? null : "that approval was already used");
     agentDir = claudeDir();
     claude = true;
   } else if (
