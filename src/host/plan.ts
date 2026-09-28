@@ -6,7 +6,7 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { realpathSync } from "node:fs";
-import { dirname, isAbsolute, join, relative, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import type { CoreProgram, Section } from "../contracts.gen.js";
 import { type Change, changeText, currentText } from "../runner/change.js";
 
@@ -31,7 +31,10 @@ export function rootForPlan(file: string, cwd: string, claudeConfigDir: string):
   } catch {
     // No Claude plans directory, or this isn't a file in it.
   }
-  return realpathSync(repoRoot(dirname(resolve(file))));
+  // A plan in `.skope/plans/` belongs to the folder holding `.skope`, git work tree or not.
+  const dir = dirname(resolve(file));
+  const home = basename(dir) === "plans" && basename(dirname(dir)) === ".skope" ? dirname(dirname(dir)) : dir;
+  return realpathSync(repoRoot(home));
 }
 
 /** Every change in the plan, in document order, loops included. */
