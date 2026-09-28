@@ -477,13 +477,15 @@ export async function runSkill(o: RunOptions): Promise<number> {
     }
     const applyPlanChange = (c: Change, src: number): ExecResult => {
       root ??= planRoot();
+      const states = planPins?.[c.path];
+      const now = fileHash(root, c.path);
+      if (program.kind === "plan" && (!states || now === null || !states.includes(now)))
+        fail("E-PLAN-STALE", "runtime", `${c.path} changed since the plan was approved, other than by the plan itself`);
       let r = applyChange(root, c);
       // A change whose text can't say it's already in place (an edit that deletes lines) is already
       // applied if the file is in a state the approval pinned as after this change.
-      if (r.result === "failed" && planPins?.[c.path]) {
-        const states = planPins[c.path] as string[];
-        const now = fileHash(root, c.path);
-        if (now !== null && states.indexOf(now) > (changeIndex.get(src) ?? Number.POSITIVE_INFINITY)) r = { result: "already_applied" };
+      if (r.result === "failed" && states && now !== null) {
+        if (states.indexOf(now) > (changeIndex.get(src) ?? Number.POSITIVE_INFINITY)) r = { result: "already_applied" };
       }
       const message = r.result === "failed" ? r.message : null;
       emit({ event: "change", line: src, op: c.op, path: c.path, result: r.result, message });
@@ -507,7 +509,9 @@ export async function runSkill(o: RunOptions): Promise<number> {
         const r = await (fakeRun ? fakeRun(next) : execCommand(next.cmd, { timeoutMs: next.timeoutMs, env, cwd }));
         if (isPlan) {
           lastLog = join(runDir, `exec-${n}.log`);
-          const log = `$ ${next.cmd}\nexit: ${r.exit}${r.timedOut ? " (timed out)" : ""}\n--- stdout\n${r.stdout}\n--- stderr\n${r.stderr}\n`;
+          const stdout = redactor.redact(r.stdout, { truncated: r.truncated });
+          const stderr = redactor.redact(r.stderr, { truncated: r.truncated });
+          const log = `$ ${next.cmd}\nexit: ${r.exit}${r.timedOut ? " (timed out)" : ""}\n--- stdout\n${stdout}\n--- stderr\n${stderr}\n`;
           try {
             writeFileSync(lastLog, redactor.redact(log), { flag: "wx", mode: 0o600 });
           } catch (err) {
@@ -699,7 +703,7 @@ async function checkBackend(
   fail: Fail,
   diag: (kind: "warning", d: Diagnostic) => void,
 ): Promise<Backend> {
-  const asks = Object.values(program.sections).flatMap((s) => ("body" in s ? allAsks(s.body) : []));
+  const asks = Object.values(program.sections).flatMap((s) => ("body" in s ? allAsks(program, s.body) : []));
   const name = o.fake ? "fake" : config.ask.backend;
   // Never called: the skill doesn't ask, or --fake answers every ask.
   const none: Backend = { name, model: name, ask: async () => ({ error: "unavailable", detail: "no backend", backend: name }) };
@@ -734,10 +738,8 @@ async function checkBackend(
     });
   }
   for (const a of asks) {
-    const n = a.ask.sections?.length ?? (a.ask.yesno ? 2 : listSize(program, a.ask.one_of?.list.section));
-    const kind = a.ask.yesno ? "yesno" : "choice";
     const c = checkAskLimits(
-      { kind, optionCount: n, declaredContextTokens: program.limits.ask_context_tokens },
+      { kind: a.kind, optionCount: a.optionCount, declaredContextTokens: program.limits.ask_context_tokens },
       { ...limits, contextTokens },
     );
     if (!c.ok) fail("E-BACKEND-LIMIT", "args", `${name}: ${c.detail}`, a.src);
@@ -758,10 +760,21 @@ async function checkBackend(
   };
 }
 
-type AskStmt = { src: number; ask: NonNullable<Extract<Section["body"][number], { ask: unknown }>["ask"]> };
+type AskStmt = { src: number; kind: "yesno" | "choice"; optionCount: number };
 
-function allAsks(body: Section["body"]): AskStmt[] {
-  return body.flatMap((st) => ("ask" in st ? [st as AskStmt] : "for_each" in st ? allAsks(st.for_each.body) : []));
+function allAsks(program: CoreProgram, body: Section["body"]): AskStmt[] {
+  return body.flatMap((st) => {
+    if ("ask" in st)
+      return [
+        {
+          src: st.src,
+          kind: st.ask.yesno ? ("yesno" as const) : ("choice" as const),
+          optionCount: st.ask.sections?.length ?? (st.ask.yesno ? 2 : listSize(program, st.ask.one_of?.list.section)),
+        },
+      ];
+    if ("ask_each" in st) return [{ src: st.src, kind: "yesno" as const, optionCount: 2 }];
+    return "for_each" in st ? allAsks(program, st.for_each.body) : [];
+  });
 }
 
 function listSize(program: CoreProgram, id: string | undefined): number {

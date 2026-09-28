@@ -56,6 +56,16 @@ describe("effectsOf", () => {
     ]);
   });
 
+  test("a later loop binding does not hide a command's initial param value", () => {
+    const md = skill(
+      "- **do** `echo {svc}`\n- **for each** svc in [Services]\n  - **do** `echo {svc}`\n- **stop**\n\n## Services\n- staging",
+      "params:\n  svc: production\n",
+    );
+    const effects = effectsOf(program(md));
+    expect(effects.commands.map((c) => c.cmd)).toEqual(["echo {svc}", "echo staging"]);
+    expect(effects.open_params).toEqual(["svc"]);
+  });
+
   test("the hash pins what can run, not prose, questions, sure or where", () => {
     const base = effectsOf(program(DISK_FULL)).hash;
     const reworded = DISK_FULL.replace("Look at usage, recent errors", "Check usage, recent errors").replace("sure 85%", "sure 95%");

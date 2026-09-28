@@ -8,6 +8,7 @@
 // as applied, so a plan can be re-run after a partial failure. Writes go to a temp file that's
 // renamed over the original, keeping its mode.
 
+import { randomUUID } from "node:crypto";
 import {
   chmodSync,
   existsSync,
@@ -16,6 +17,7 @@ import {
   readFileSync,
   realpathSync,
   renameSync,
+  rmSync,
   statSync,
   unlinkSync,
   writeFileSync,
@@ -84,10 +86,16 @@ function writeText(file: string, text: string, eol: "\n" | "\r\n", finalNewline:
   let out = finalNewline ? text : text.replace(/\n$/, "");
   if (eol === "\r\n") out = out.replace(/\n/g, "\r\n");
   mkdirSync(dirname(file), { recursive: true });
-  const tmp = `${file}.skope-tmp-${process.pid}`;
-  writeFileSync(tmp, out, { mode: mode ?? 0o644 });
-  if (mode !== undefined) chmodSync(tmp, mode);
-  renameSync(tmp, file);
+  const tmp = `${file}.skope-tmp-${randomUUID()}`;
+  try {
+    // Exclusive creation refuses an existing path, including a symlink. The random name also
+    // keeps another process from preparing the path before skope opens it.
+    writeFileSync(tmp, out, { flag: "wx", mode: mode ?? 0o644 });
+    if (mode !== undefined) chmodSync(tmp, mode);
+    renameSync(tmp, file);
+  } finally {
+    rmSync(tmp, { force: true });
+  }
 }
 
 /**

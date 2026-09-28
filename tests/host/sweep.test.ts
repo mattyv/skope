@@ -113,6 +113,16 @@ describe("lint", () => {
     expect(r.code).toBe(0);
     expect(r.events.at(-1) ?? JSON.parse(r.stdout.trim().split("\n").at(-1) as string)).toMatchObject({ max_ask_calls: 200 });
   });
+
+  test("a sweep-only skill requires the configured backend", async () => {
+    const d = dir();
+    const config = yaml(d, "config.yaml", { ask: { backend: "jev" } });
+    const commands = yaml(d, "commands.yaml", { [GREP]: "one\n" });
+    const r = await runSkope([skill(d, `${SWEEP}\n- **stop**`), "--dry-run", "--config", config, "--fake-exec", commands]);
+    expect(r.code).toBe(40);
+    expect(r.events.find((e) => e.event === "error")).toMatchObject({ code: "E-CONFIG" });
+    expect(r.stderr).toContain("has no jev block");
+  });
 });
 
 describe("runs", () => {

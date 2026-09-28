@@ -90,8 +90,8 @@ Type errors after the grammar change. Read the record, fix the plan, resume from
    `(kind, path, old, new, all)`, and the effects hash covers all of it, so
    approving the hash approves the exact text. `--effects` also records the
    sha256 of each touched file as it is now; a run refuses to start
-   (`E-PLAN-STALE`) if any differs. That makes "don't touch files the plan
-   edits" enforced, not just a rule.
+   (`E-PLAN-STALE`) if any differs and checks again before each change. That
+   makes "don't touch files the plan edits" enforced while the plan runs.
 4. **The diff is static.** `--effects --diff` prints one unified diff of every
    edit, create and delete in document order per file, applied to an
    in-memory copy, whatever path a run would take. A dry-run walk can't do

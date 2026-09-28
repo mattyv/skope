@@ -732,14 +732,16 @@ person approves before it runs, usually written by an agent in plan mode.
   files.) The `--effects` JSON carries it as `diff`.
 - **Pinned files:** the approval records each file the plan changes: its hash
   now, and after each of the plan's changes in order. A real run refuses to
-  start (`E-PLAN-STALE`) if a file matches none of them, which means
-  someone else changed it since the approval. The plan's own changes, from
-  an earlier partial run, don't count.
+  start (`E-PLAN-STALE`) if a file matches none of them, and checks again
+  before each change in case someone edits a file while the plan runs. The
+  plan's own changes, from an earlier partial run, don't count.
 - **Failure detail:** when a plan hands off after a failed command (whether
   failure handling handed off or an `else [Fix]` section did), the handoff
   record's `detail` has the command, its exit, 16 KB of its stdout and
   stderr (redacted), and `log`: the run directory's `exec-<n>.log` with
-  all of both. Every command of a plan run gets such a log.
+  the captured, redacted output. When capture truncates a stream, its partial
+  first line is dropped before the log is written. Every command of a plan
+  run gets such a log.
 - **Resuming:** `--from SECTION` starts the run at that section instead of
   the entry. Lint checks the program from there, so a name bound only in a
   skipped section is `E-UNBOUND`. With changes that re-apply safely, an
