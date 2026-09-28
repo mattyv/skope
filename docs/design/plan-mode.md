@@ -119,7 +119,7 @@ Type errors after the grammar change. Read the record, fix the plan, resume from
    run refuses if the plan's effects changed), not as approval.
 8. **Progress.** One stderr line per instruction (`[3/12] check npm test…`)
    when stderr is a terminal or `--progress` is given.
-9. **The `plan-with-skope` skill**, installed with skope. In Claude Code plan
+9. **The `skope-it-out` skill**, installed with skope. In Claude Code plan
    mode, write the `kind: plan` file under `~/.claude/plans/`; in Codex use
    `.skope/plans/` in the repository. Then `--lint` and
    `--verify` it; show the person the plan, `--effects` and `--effects --diff`;

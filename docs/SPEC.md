@@ -1269,9 +1269,10 @@ skope --demo [DIR]        write the disk-full skill (fixtures/disk-full/SKILL.md
                           or API key; takes no skill file or other option
 skope --install-skill [DIR]
                           write the agent skills write-skope-skill, run-skope-skill and
-                          plan-with-skope into DIR/<name>/ (default: $CLAUDE_CONFIG_DIR/skills, else
+                          skope-it-out into DIR/<name>/ (default: $CLAUDE_CONFIG_DIR/skills, else
                           ~/.claude/skills, and Codex's skills directory if Codex is set up),
-                          replacing older copies; takes no skill file or other option
+                          replacing older copies and removing an unmodified plan-with-skope copy;
+                          takes no skill file or other option
 skope --install-hooks [claude|codex]
                           add the plan-mode approval hook (§4.9) to Claude Code's settings.json and
                           Codex's config.toml: both that exist, or the one named

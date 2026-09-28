@@ -29,7 +29,7 @@ describe("skope --install-skill", () => {
     const r = skope(["--install-skill", dir]);
     expect(r.status).toBe(0);
     expect(r.stdout).toBe("");
-    for (const name of ["write-skope-skill", "run-skope-skill", "plan-with-skope"])
+    for (const name of ["write-skope-skill", "run-skope-skill", "skope-it-out"])
       expect(readFileSync(join(dir, name, "SKILL.md"), "utf8")).toBe(readFileSync(join(ROOT, "skills", name, "SKILL.md"), "utf8"));
   });
 
@@ -39,6 +39,23 @@ describe("skope --install-skill", () => {
     writeFileSync(join(claude, "skills", "write-skope-skill", "SKILL.md"), "old");
     expect(skope(["--install-skill"], { CLAUDE_CONFIG_DIR: claude }).status).toBe(0);
     expect(readFileSync(join(claude, "skills", "write-skope-skill", "SKILL.md"), "utf8")).toBe(readFileSync(SOURCE, "utf8"));
+  });
+
+  test("renames an unmodified planning skill but keeps a customized old copy", () => {
+    const dir = mkdtempSync(join(tmpdir(), "skope-skills-"));
+    const oldDir = join(dir, "plan-with-skope");
+    mkdirSync(oldDir);
+    writeFileSync(join(oldDir, "SKILL.md"), readFileSync(join(ROOT, "tests", "host", "fixtures", "plan-with-skope.md")));
+    expect(skope(["--install-skill", dir]).status).toBe(0);
+    expect(existsSync(oldDir)).toBe(false);
+    expect(readFileSync(join(dir, "skope-it-out", "SKILL.md"), "utf8")).toBe(
+      readFileSync(join(ROOT, "skills", "skope-it-out", "SKILL.md"), "utf8"),
+    );
+
+    mkdirSync(oldDir);
+    writeFileSync(join(oldDir, "SKILL.md"), "customized skill");
+    expect(skope(["--install-skill", dir]).status).toBe(0);
+    expect(readFileSync(join(oldDir, "SKILL.md"), "utf8")).toBe("customized skill");
   });
 
   test("with a skill file or another option, it's a usage error", () => {
@@ -58,7 +75,7 @@ describe("skope --install-skill", () => {
 
 describe("the shipped agent skills", () => {
   // agentskills.io/specification: what claude.ai accepts on upload.
-  test.each(["write-skope-skill", "run-skope-skill", "plan-with-skope"])("%s is a valid Agent Skill", (name) => {
+  test.each(["write-skope-skill", "run-skope-skill", "skope-it-out"])("%s is a valid Agent Skill", (name) => {
     const text = readFileSync(join(ROOT, "skills", name, "SKILL.md"), "utf8");
     const fm = load((/^---\n([\s\S]*?)\n---\n/.exec(text) as RegExpExecArray)[1] as string) as Record<string, unknown>;
     expect(Object.keys(fm).sort()).toEqual(["description", "name"]);

@@ -15,7 +15,7 @@
 #   SKOPE_INSTALL_DIR   Where to install. Defaults to ~/.local/bin. Never
 #                      uses sudo.
 #   SKOPE_NO_SKILL      Set to skip installing skope's agent skills
-#                      (write-skope-skill, run-skope-skill, plan-with-skope)
+#                      (write-skope-skill, run-skope-skill, skope-it-out)
 #                      into Claude Code's and Codex's skills directories.
 #   SKOPE_NO_HOOKS      Set to skip adding the plan-mode approval hook to
 #                      Claude Code's settings.json and Codex's config.toml.
