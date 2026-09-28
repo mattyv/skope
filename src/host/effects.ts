@@ -149,6 +149,8 @@ export interface Approval {
   commands: Command[];
   approved_at: string;
   approved_by: string | null;
+  /** A plan's touched files: each one's hash at approval, then after each of its changes in order. */
+  files?: Record<string, string[]>;
 }
 
 const approvalPath = (dir: string, skill: string) => join(dir, `${skill}.approval.json`);
@@ -168,7 +170,7 @@ export function readApproval(dir: string, skill: string): Approval | null {
 }
 
 /** Writes the approval, replacing any older one in one step. Returns its path. */
-export function writeApproval(dir: string, e: Effects): string {
+export function writeApproval(dir: string, e: Effects, files?: Record<string, string[]>): string {
   mkdirSync(dir, { recursive: true });
   const path = approvalPath(dir, e.skill);
   const approval: Approval = {
@@ -177,6 +179,7 @@ export function writeApproval(dir: string, e: Effects): string {
     commands: e.commands,
     approved_at: new Date().toISOString(),
     approved_by: process.env.USER ?? process.env.LOGNAME ?? null,
+    ...(files ? { files } : {}),
   };
   const tmp = `${path}.${process.pid}.tmp`;
   writeFileSync(tmp, `${JSON.stringify(approval, null, 2)}\n`);

@@ -116,6 +116,7 @@ class Preprocessor {
       entry,
       params: Object.fromEntries(fm.params), // own properties, even for `__proto__`
       limits: fm.limits,
+      ...(fm.plan ? { kind: "plan" as const } : {}),
       sections: Object.fromEntries(raws.flatMap((rs) => (rs.id === null ? [] : [[rs.id, built.get(rs) as Section | OtherSection]]))),
     };
     // Agents never see frontmatter, so the intro is where they learn this is a skope skill.

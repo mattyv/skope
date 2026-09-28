@@ -90,46 +90,58 @@ function writeText(file: string, text: string, eol: "\n" | "\r\n", finalNewline:
   renameSync(tmp, file);
 }
 
+/**
+ * What a change does to a file's text (null: no file), with line endings already normalised to
+ * `\n`. Pure, so the static diff and the stale check use the same rules as a run. Throws Refused.
+ */
+export function changeText(text: string | null, c: Change): { result: "applied"; after: string | null } | { result: "already_applied" } {
+  if (c.op === "delete") return text === null ? { result: "already_applied" } : { result: "applied", after: null };
+  const content = withNewline(c.new ?? "");
+  if (c.op === "create") {
+    if (text === null) return { result: "applied", after: content };
+    if (text === content) return { result: "already_applied" };
+    throw new Refused(`${c.path}: already exists with other content`);
+  }
+  if (text === null) throw new Refused(`${c.path}: no such file`);
+  const old = withNewline(c.old ?? "");
+  const hits = lineMatches(text, old);
+  if (hits.length === 0) {
+    // Already applied: the old text is gone and the new text is there, once.
+    if (content !== "" && lineMatches(text, content).length === 1) return { result: "already_applied" };
+    throw new Refused(`${c.path}: the old text isn't in the file (as whole lines)`);
+  }
+  if (hits.length > 1 && !c.all) throw new Refused(`${c.path}: the old text is there ${hits.length} times; add \`· all\` or more context`);
+  let out = "";
+  let from = 0;
+  for (const i of c.all ? hits : hits.slice(0, 1)) {
+    if (i < from) continue; // overlapping matches: the earlier one wins
+    out += text.slice(from, i) + content;
+    from = i + old.length;
+  }
+  return { result: "applied", after: out + text.slice(from) };
+}
+
+/** A file's text as a change sees it (null if there's no file), or why it can't be changed. */
+export function currentText(root: string, path: string): string | null {
+  const file = target(root, path);
+  if (!existsSync(file)) return null;
+  if (statSync(file).isDirectory()) throw new Refused(`${path}: a directory, not a file`);
+  return readText(path, file).text;
+}
+
+export { Refused };
+
 export function applyChange(root: string, c: Change): ChangeResult {
   try {
     const file = target(root, c.path);
     const exists = existsSync(file);
     if (exists && statSync(file).isDirectory()) throw new Refused(`${c.path}: a directory, not a file`);
-    if (c.op === "delete") {
-      if (!exists) return { result: "already_applied" };
-      unlinkSync(file);
-      return { result: "applied" };
-    }
-    const content = withNewline(c.new ?? "");
-    if (c.op === "create") {
-      if (exists) {
-        const { text } = readText(c.path, file);
-        if (text === content) return { result: "already_applied" };
-        throw new Refused(`${c.path}: already exists with other content`);
-      }
-      writeText(file, content, "\n", true);
-      return { result: "applied" };
-    }
-    if (!exists) throw new Refused(`${c.path}: no such file`);
-    const { text, eol, finalNewline } = readText(c.path, file);
-    const old = withNewline(c.old ?? "");
-    const hits = lineMatches(text, old);
-    if (hits.length === 0) {
-      // Already applied: the old text is gone and the new text is there, once.
-      if (content !== "" && lineMatches(text, content).length === 1) return { result: "already_applied" };
-      throw new Refused(`${c.path}: the old text isn't in the file (as whole lines)`);
-    }
-    if (hits.length > 1 && !c.all)
-      throw new Refused(`${c.path}: the old text is there ${hits.length} times; add \`· all\` or more context`);
-    let out = "";
-    let from = 0;
-    for (const i of c.all ? hits : hits.slice(0, 1)) {
-      if (i < from) continue; // overlapping matches: the earlier one wins
-      out += text.slice(from, i) + content;
-      from = i + old.length;
-    }
-    out += text.slice(from);
-    writeText(file, out, eol, finalNewline, statSync(file).mode & 0o7777);
+    const before = exists ? readText(c.path, file) : null;
+    const r = changeText(before?.text ?? null, c);
+    if (r.result === "already_applied") return r;
+    if (r.after === null) unlinkSync(file);
+    else if (before) writeText(file, r.after, before.eol, before.finalNewline, statSync(file).mode & 0o7777);
+    else writeText(file, r.after, "\n", true);
     return { result: "applied" };
   } catch (err) {
     if (err instanceof Refused) return { result: "failed", message: err.message };

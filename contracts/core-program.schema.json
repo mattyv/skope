@@ -79,6 +79,10 @@
           }
         ]
       }
+    },
+    "kind": {
+      "enum": ["plan"],
+      "description": "`kind: plan` in the skope block (docs/design/plan-mode.md); absent for a skill."
     }
   },
   "$defs": {

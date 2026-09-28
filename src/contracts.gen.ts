@@ -114,6 +114,10 @@ export interface CoreProgram {
   sections: {
     [k: string]: Section | OtherSection;
   };
+  /**
+   * `kind: plan` in the skope block (docs/design/plan-mode.md); absent for a skill.
+   */
+  kind?: "plan";
 }
 export interface Section {
   /**
@@ -453,6 +457,10 @@ export interface RunStartEvent {
    * The skill's scope, as --effects and approvals hash it (SPEC §7.4), so a run can be matched to what was approved.
    */
   effects_hash: string;
+  /**
+   * With --from: the section the run started at instead of the entry.
+   */
+  from?: string;
 }
 /**
  * A run command finished.
@@ -1199,6 +1207,7 @@ export const CODE_MEANINGS: Record<string, string> = {
   "E-USAGE": "an unknown flag, a missing or malformed flag value, a missing or unreadable skill path, or an unreadable or malformed `--trace` file (§7)",
   "E-MODE": "neither or both of `--apply` and `--dry-run` (§7 step 0)",
   "E-NOT-APPROVED": "the config has `approvals`, and the skill has no approval there, or its commands changed since (§7.4)",
+  "E-PLAN-STALE": "a file a plan changes differs from what was approved, and isn't a state the plan's own changes would leave it in (§4.9)",
   "E-PARAM-UNKNOWN": "`--param` names a param the skill doesn't declare",
   "E-PARAM-TYPE": "a `--param` value has the wrong type",
   "E-PARAM-CHOICE": "a `--param` value isn't one of the param's `choices` (§3.1)",

@@ -3,7 +3,6 @@
 // event goes to stdout as JSON Lines; every error and warning also gets a
 // readable stderr line (SPEC §7.1, §10).
 
-import { execFileSync } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { hostname } from "node:os";
@@ -20,6 +19,7 @@ import { CODE_MEANINGS } from "../contracts.gen.js";
 import { Interp, unsafeInputs } from "../interp.js";
 import { lint } from "../lint.js";
 import { preprocess } from "../preprocess/index.js";
+import { sectionId } from "../preprocess/slug.js";
 import { applyChange, type Change } from "../runner/change.js";
 import { type Config, defaultConfig, defaultConfigPath, loadConfig } from "../runner/config.js";
 import { type Diagnostic, diagnosticLine, plainText, type Stage } from "../runner/events.js";
@@ -33,6 +33,7 @@ import { buildRedactor, type Redactor, redactDeep } from "../runner/redact.js";
 import type { AskRequest, Response, RunConfig, Val } from "../step.js";
 import { describe, diffEffects, effectsOf, readApproval, writeApproval } from "./effects.js";
 import { escapePage, type Handlers, type LoopResult, runLoop } from "./loop.js";
+import { pinnedStates, planChanges, planDiff, repoRoot, staleFiles } from "./plan.js";
 import { readOnly } from "./verify.js";
 
 export interface RunOptions {
@@ -42,6 +43,12 @@ export interface RunOptions {
   mode: "run" | "lint" | "verify" | "effects" | "approve";
   /** With --verify: a run's events.jsonl to replay (SPEC §12.4). */
   trace?: string;
+  /** Start at this section instead of the entry (docs/design/plan-mode.md). */
+  from?: string;
+  /** With --effects: print the plan's static diff. */
+  diff?: boolean;
+  /** One stderr line per command as it starts. */
+  progress?: boolean;
   apply: boolean;
   dryRun: boolean;
   noPage: boolean;
@@ -85,18 +92,6 @@ function changesOf(program: CoreProgram): Map<number, Change> {
   };
   for (const s of Object.values(program.sections)) if ("body" in s) walk(s.body);
   return out;
-}
-
-/** The git work tree `dir` is in, else `dir` itself: where a plan's paths are relative to. */
-function repoRoot(dir: string): string {
-  try {
-    return (
-      execFileSync("git", ["rev-parse", "--show-toplevel"], { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim() ||
-      dir
-    );
-  } catch {
-    return dir;
-  }
 }
 
 const sha256hex = (s: string | Buffer) => createHash("sha256").update(s).digest("hex");
@@ -201,7 +196,16 @@ export async function runSkill(o: RunOptions): Promise<number> {
       for (const e of parsed.errors) diag("error", { code: e.code, stage: "parse", file: o.file, line: e.line, message: e.message });
       throw new End("invalid");
     }
-    const program = parsed.program;
+    let program = parsed.program;
+    // --from: start at another section, as a plan does when it resumes after a fix. Lint then checks
+    // the program from there, so a name bound only in a skipped section is E-UNBOUND.
+    if (o.from !== undefined) {
+      const id = sectionId(o.from);
+      const s = Object.hasOwn(program.sections, id) ? program.sections[id] : undefined;
+      if (!s || !("body" in s)) return fail("E-USAGE", "args", `--from ${o.from}: the skill has no instruction section by that name`);
+      program = { ...program, entry: { section: id, src: s.src } };
+    }
+    const planRoot = () => repoRoot(dirname(resolve(o.file)));
     const choices = parsed.choices;
     for (const w of parsed.warnings) diag("warning", { code: w.code, stage: "parse", file: o.file, line: w.line, message: w.message });
     const found = lint(program);
@@ -230,8 +234,11 @@ export async function runSkill(o: RunOptions): Promise<number> {
     const { version: skopeVersion, build: skopeBuild } = IDENTITY;
     if (o.mode === "effects") {
       for (const line of describe(effects)) say(`${line}\n`);
+      // The static diff: every change applied in document order, whatever path a run takes.
+      const diff = o.diff ? planDiff(planRoot(), planChanges(program)) : undefined;
+      if (diff !== undefined) toErr(diff === "" ? "skope: the plan changes no files\n" : diff);
       toOut(
-        `${JSON.stringify({ skope_version: skopeVersion, skope_build: skopeBuild, skill: effects.skill, effects_hash: effects.hash, commands: effects.commands, params: effects.params, open_params: effects.open_params })}\n`,
+        `${JSON.stringify({ skope_version: skopeVersion, skope_build: skopeBuild, skill: effects.skill, effects_hash: effects.hash, commands: effects.commands, params: effects.params, open_params: effects.open_params, ...(diff === undefined ? {} : { diff }) })}\n`,
       );
       return 0;
     }
@@ -242,12 +249,16 @@ export async function runSkill(o: RunOptions): Promise<number> {
       const before = approval();
       const changes = diffEffects(before, effects);
       for (const line of describe(effects)) say(`${line}\n`);
-      if (before?.effects_hash === effects.hash) {
+      // A plan's files are pinned as they are now, and as each change would leave them, so a run can
+      // refuse files someone else changed after this approval (E-PLAN-STALE).
+      const changesNow = planChanges(program);
+      const files = changesNow.length > 0 ? pinnedStates(planRoot(), changesNow) : undefined;
+      if (before?.effects_hash === effects.hash && JSON.stringify(before.files) === JSON.stringify(files)) {
         say(`skope: ${program.skill} is already approved with these commands\n`);
       } else {
         let path: string;
         try {
-          path = writeApproval(dir, effects);
+          path = writeApproval(dir, effects, files);
         } catch (err) {
           return fail("E-IO", "args", `can't write the approval to ${dir}: ${(err as Error).message}`);
         }
@@ -269,6 +280,14 @@ export async function runSkill(o: RunOptions): Promise<number> {
           approved
             ? `${program.skill}'s commands changed since it was approved (${diffEffects(approved, effects).join("; ")}). Review them with --effects, then approve with --approve`
             : `${program.skill} has no approval in ${approvalsDir}. Review its commands with --effects, then approve with --approve`,
+        );
+      // The files a plan changes must be as approved, or as its own changes left them.
+      const stale = !dryRun && approved?.files ? staleFiles(planRoot(), approved.files) : [];
+      if (stale.length > 0)
+        fail(
+          "E-PLAN-STALE",
+          "args",
+          `${stale.join(", ")} changed since ${program.skill} was approved, other than by the plan itself. Review with --effects --diff, then approve again`,
         );
     }
     if (o.mode === "verify") {
@@ -399,6 +418,7 @@ export async function runSkill(o: RunOptions): Promise<number> {
       skope_version: version,
       skope_build: build,
       effects_hash: effects.hash,
+      ...(o.from !== undefined ? { from: program.sections[program.entry.section]?.name } : {}),
     });
     flush();
 
@@ -420,18 +440,38 @@ export async function runSkill(o: RunOptions): Promise<number> {
     const changes = changesOf(program);
     let root: string | undefined;
     const applyPlanChange = (c: Change, src: number): ExecResult => {
-      root ??= repoRoot(dirname(resolve(o.file)));
+      root ??= planRoot();
       const r = applyChange(root, c);
       const message = r.result === "failed" ? r.message : null;
       emit({ event: "change", line: src, op: c.op, path: c.path, result: r.result, message });
       if (message !== null) say(`skope: ${c.op} ${c.path} failed: ${message}\n`);
       return { exit: message === null ? 0 : 1, signal: null, stdout: "", stderr: message ?? "", timedOut: false, truncated: false };
     };
+    // A plan keeps each command's whole (redacted) output in the run directory, for the agent that fixes it.
+    const isPlan = program.kind === "plan";
+    let execs = 0;
+    let lastLog: string | null = null;
+    const progress = o.progress || (!o.test && process.stderr.isTTY === true);
     const handlers: Handlers = {
       exec: async (next) => {
+        const n = ++execs;
+        if (progress) say(`skope: [${n}] ${next.exec} ${next.cmd}\n`);
         const change = next.exec === "do" && !fakeRun ? changes.get(next.src) : undefined;
         if (change) return halt(applyPlanChange(change, next.src));
-        return halt(await (fakeRun ? fakeRun(next) : execCommand(next.cmd, { timeoutMs: next.timeoutMs, env })));
+        // A plan's commands run at the repository root, where its paths are relative to.
+        if (isPlan) root ??= planRoot();
+        const cwd = isPlan ? root : undefined;
+        const r = await (fakeRun ? fakeRun(next) : execCommand(next.cmd, { timeoutMs: next.timeoutMs, env, cwd }));
+        if (isPlan) {
+          lastLog = join(runDir, `exec-${n}.log`);
+          const log = `$ ${next.cmd}\nexit: ${r.exit}${r.timedOut ? " (timed out)" : ""}\n--- stdout\n${r.stdout}\n--- stderr\n${r.stderr}\n`;
+          try {
+            writeFileSync(lastLog, redactor.redact(log), { flag: "wx", mode: 0o600 });
+          } catch (err) {
+            fail("E-IO", "runtime", `can't write ${lastLog}: ${(err as Error).message}`);
+          }
+        }
+        return halt(r);
       },
       async ask(request, src, item) {
         // Redacted before it's saved or sent. Option ids are left alone: the answer is keyed by them.
@@ -495,6 +535,7 @@ export async function runSkill(o: RunOptions): Promise<number> {
       now: () => Date.now() - started + clock.elapsedMs,
       deadlineMs: program.limits.deadline_ms,
       emit,
+      detailBytes: isPlan ? 16_384 : undefined,
     });
 
     // Step 6: handoff (SPEC §8).
@@ -509,7 +550,13 @@ export async function runSkill(o: RunOptions): Promise<number> {
         section: at.section,
         line: at.line,
         reason: result.outcome.reason,
-        detail: detail(result),
+        // A plan's Fix section usually hands off right after a check failed into it: the agent fixing the
+        // plan needs that command's output whatever the reason.
+        detail:
+          isPlan && result.lastExec && (result.outcome.reason === "command_failed" || result.lastExec.exit !== 0)
+            ? { ...(result.outcome.reason === "command_failed" ? detail(result) : result.lastExec), log: lastLog }
+            : detail(result),
+        ...(o.from !== undefined ? { from: program.sections[program.entry.section]?.name } : {}),
         variables: result.variables,
         effects: result.effects,
         ...(result.sweeps.length > 0 ? { sweeps: result.sweeps } : {}),

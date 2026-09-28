@@ -32,12 +32,14 @@ export interface Frontmatter {
   noted: boolean;
   /** The skope block's opening line, 1-based. */
   blockLine: number;
+  /** `kind: plan` (docs/design/plan-mode.md): longer default limits, fuller failure detail. */
+  plan?: boolean;
 }
 
 /** What the Agent Skills spec allows in frontmatter; claude.ai rejects any other key. */
 const SPEC_KEYS = ["name", "description", "license", "compatibility", "metadata", "allowed-tools"];
 /** What the skope block holds. */
-const SKOPE_KEYS = ["format", "entry", "params", "limits"];
+const SKOPE_KEYS = ["format", "kind", "entry", "params", "limits"];
 
 const DURATIONS: Record<string, keyof Limits> = { run_timeout: "run_timeout_ms", do_timeout: "do_timeout_ms", deadline: "deadline_ms" };
 const UNIT_MS: Record<string, number> = { s: 1000, m: 60_000, h: 3_600_000 };
@@ -231,6 +233,14 @@ export function parseFrontmatter(lines: string[], errors: ParseError[]): Frontma
         else bad(`params.${name}`, `param "${name}" must be a string or an integer within ±(2^53 − 1)`, "params");
       }
     }
+  }
+
+  if (doc.kind !== undefined) {
+    if (doc.kind === "plan") {
+      // A plan runs the repo's builds and tests: minutes, not seconds. Explicit limits still win.
+      result.plan = true;
+      Object.assign(limits, { run_timeout_ms: 600_000, do_timeout_ms: 600_000, deadline_ms: 3_600_000 });
+    } else if (doc.kind !== "skill") bad("kind", "`kind` must be skill (the default) or plan");
   }
 
   if (doc.limits !== undefined) {
