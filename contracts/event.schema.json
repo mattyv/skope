@@ -134,6 +134,10 @@
           "type": "string",
           "pattern": "^sha256:[0-9a-f]{64}$",
           "description": "The skill's scope, as --effects and approvals hash it (SPEC §7.4), so a run can be matched to what was approved."
+        },
+        "from": {
+          "type": "string",
+          "description": "With --from: the section the run started at instead of the entry."
         }
       },
       "required": [

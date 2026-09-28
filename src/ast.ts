@@ -278,7 +278,7 @@ function param(v: unknown, at: string): D {
 
 /** Core program JSON to a SkopeAst.Program. Throws Unsupported on anything the contract doesn't allow. */
 export function toAst(json: CoreProgram | unknown): D {
-  const p = obj(json, "program", ["skill", "format", "entry", "params", "limits", "sections"]);
+  const p = obj(json, "program", ["skill", "format", "entry", "params", "limits", "sections"], ["kind"]);
   if (p.format !== 1) throw new Unsupported(`program: format must be 1, got ${JSON.stringify(p.format)}`);
   const e = obj(p.entry, "entry", ["section", "src"]);
   const l = obj(p.limits, "limits", ["run_timeout_ms", "do_timeout_ms", "deadline_ms", "ask_context_tokens"]);

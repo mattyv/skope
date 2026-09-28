@@ -73,7 +73,7 @@ export interface LoopResult {
   effects: Effect[];
   /** The request and result the run ended on, for the handoff record's detail (SPEC §8.1). */
   lastAsk: Record<string, unknown> | null;
-  lastExec: { cmd: string; exit: number | null; timed_out: boolean; stderr_tail: string } | null;
+  lastExec: { cmd: string; exit: number | null; timed_out: boolean; stderr_tail: string; stdout_tail?: string } | null;
   variables: Record<string, Val>;
   /** Summaries of the sweeps that ran, for the handoff record. */
   sweeps: Record<string, unknown>[];
@@ -86,6 +86,8 @@ export interface LoopContext {
   now(): number;
   deadlineMs: number;
   emit(e: Record<string, unknown>): void;
+  /** How much of a failed command's output the handoff detail keeps (default 2 KB; plans keep more). */
+  detailBytes?: number;
 }
 
 const sha256 = (s: string) => `sha256:${createHash("sha256").update(s).digest("hex")}`;
@@ -246,7 +248,17 @@ export async function runLoop(interp: Interp, ctx: LoopContext): Promise<LoopRes
           stdout_hash: sha256(stdout),
           stdout_tail: tailBytes(stdout, TAIL_BYTES),
         };
-        lastExec = { cmd: next.cmd, exit: r.exit, timed_out: r.timedOut, stderr_tail: stderrTail };
+        const detailBytes = ctx.detailBytes ?? TAIL_BYTES;
+        lastExec =
+          detailBytes > TAIL_BYTES
+            ? {
+                cmd: next.cmd,
+                exit: r.exit,
+                timed_out: r.timedOut,
+                stderr_tail: redactor.redactedTail(r.stderr, detailBytes, r.truncated),
+                stdout_tail: tailBytes(stdout, detailBytes),
+              }
+            : { cmd: next.cmd, exit: r.exit, timed_out: r.timedOut, stderr_tail: stderrTail };
         // A sweep asks about each line only when its command succeeded; otherwise the core fails it as a run.
         if (next.exec === "run" && r.exit === 0 && !r.timedOut) await sweep(next, stdout, r.truncated);
         return { kind: "exec", exit: r.exit, stdout, stderrTail, timedOut: r.timedOut };

@@ -9,8 +9,8 @@ import { runSkill } from "./host/run.js";
 import { runTests } from "./host/test.js";
 import { plainText } from "./runner/events.js";
 
-const USAGE = `usage: skope <SKILL.md> (--apply | --dry-run) [--no-page] [--param k=v]... [--fake answers.yaml] [--fake-exec cmds.yaml] [--config path]
-       skope <SKILL.md> --lint | --verify [--trace events.jsonl] | --effects | --approve
+const USAGE = `usage: skope <SKILL.md> (--apply | --dry-run) [--from SECTION] [--progress] [--no-page] [--param k=v]... [--fake answers.yaml] [--fake-exec cmds.yaml] [--config path]
+       skope <SKILL.md> --lint | --verify [--trace events.jsonl] | --effects [--diff] | --approve
        skope <SKILL.md> --test [--scenario DIR or NAME] [--live] [--runs N] [--param k=v]... [--config path]
        skope --demo [DIR] | --install-skill [DIR]
        skope --version | --help`;
@@ -20,11 +20,14 @@ const HELP = `usage: skope <path/to/SKILL.md> [options]
   --apply                 execute \`do\` commands and invoke the pager
   --dry-run               don't; a run needs exactly one of these two
   --no-page               with --apply: don't page on handoff
+  --from SECTION          start at this section instead of the entry: resume a plan after fixing it
+  --progress              one line on stderr per command as it starts (the default when stderr is a terminal)
   --param k=v             override a param from the skope block (repeatable, typed, safe-value checked)
   --verify                run the explore handler and print the verify report; run nothing
   --trace events.jsonl    with --verify: check that one run's path is one the explorer can take
   --lint                  parse + static checks only
   --effects               list every command the skill could ever run; run nothing
+  --diff                  with --effects: also print, as one diff, what every edit, create and delete would change
   --approve               approve that list, into the config's approvals directory; with one set,
                           a run needs its skill approved and refuses once its commands change
   --test                  run the scenarios in tests/ and tests.yaml next to the skill and check each against its expect.yaml; nothing real runs
@@ -71,6 +74,9 @@ async function main(argv: string[]): Promise<number> {
     const modes = [values.lint, values.verify, values.effects, values.approve, values.apply || values["dry-run"]].filter(Boolean).length;
     if (positionals.length !== 1) usage = "give exactly one skill file";
     else if (values.trace !== undefined && !values.verify) usage = "--trace goes with --verify";
+    else if (values.diff && !values.effects) usage = "--diff goes with --effects";
+    else if ((values.from !== undefined || values.progress) && !(values.apply || values["dry-run"] || values.lint || values.verify))
+      usage = "--from and --progress go with a run (--apply or --dry-run), or --from with --lint or --verify";
     else if (modes > 1 || (values.test && modes > 0))
       usage = "--lint, --verify, --effects, --approve, --test and a run (--apply or --dry-run) don't combine";
     else if (values.scenario !== undefined && !values.test) usage = "--scenario goes with --test";
@@ -98,6 +104,9 @@ async function main(argv: string[]): Promise<number> {
     file: positionals[0] ?? "",
     mode: values.lint ? "lint" : values.verify ? "verify" : values.effects ? "effects" : values.approve ? "approve" : "run",
     trace: values.trace,
+    from: values.from,
+    diff: values.diff ?? false,
+    progress: values.progress ?? false,
     apply: values.apply ?? false,
     dryRun: values["dry-run"] ?? false,
     noPage: values["no-page"] ?? false,
@@ -119,6 +128,9 @@ function parse(argv: string[]) {
       param: { type: "string", multiple: true },
       verify: { type: "boolean" },
       trace: { type: "string" },
+      from: { type: "string" },
+      diff: { type: "boolean" },
+      progress: { type: "boolean" },
       lint: { type: "boolean" },
       effects: { type: "boolean" },
       approve: { type: "boolean" },

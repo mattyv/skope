@@ -123,6 +123,7 @@ reviewed as a set. {names} are params, set in the skope block below.*
 
 ```skope
 format: 1                       # required for runnable skills
+kind: skill                     # optional; `plan` for a plan (§4.9)
 entry: Triage                   # optional; default = first instruction section
 params:                         # optional; name: default (int or string)
   mount: /
@@ -717,6 +718,34 @@ be written:
 - **Fakes.** Under `--fake-exec` a change is faked like a command, keyed by
   `OP PATH` or `line:N`, and no file changes.
 
+**Plans.** `kind: plan` in the skope block marks a plan: a one-off change a
+person approves before it runs, usually written by an agent in plan mode.
+
+- **Limits:** `run_timeout` and `do_timeout` default to 10 minutes and
+  `deadline` to 60, since plans run builds and tests; the skope block can
+  still set them.
+- **Where commands run:** a plan's commands run at the root its paths are
+  relative to (the git work tree), wherever skope was started.
+- **The diff:** `--effects --diff` prints one unified diff of every change,
+  applied in document order to copies of the files, whatever path a run
+  would take. (A dry run can't show this: its checks see the unchanged
+  files.) The `--effects` JSON carries it as `diff`.
+- **Pinned files:** `--approve` records each file the plan changes: its hash
+  now, and after each of the plan's changes in order. A real run refuses to
+  start (`E-PLAN-STALE`) if a file matches none of them, which means
+  someone else changed it since the approval. The plan's own changes, from
+  an earlier partial run, don't count.
+- **Failure detail:** when a plan hands off after a failed command (whether
+  failure handling handed off or an `else [Fix]` section did), the handoff
+  record's `detail` has the command, its exit, 16 KB of its stdout and
+  stderr (redacted), and `log`: the run directory's `exec-<n>.log` with
+  all of both. Every command of a plan run gets such a log.
+- **Resuming:** `--from SECTION` starts the run at that section instead of
+  the entry. Lint checks the program from there, so a name bound only in a
+  skipped section is `E-UNBOUND`. With changes that re-apply safely, an
+  agent fixes the plan and resumes where it failed. `run_start` and the
+  handoff record carry `from`.
+
 ---
 
 ## 5. Core (Dafny)
@@ -1173,12 +1202,15 @@ skope <path/to/SKILL.md> [options]
   --apply                 execute `do` commands and invoke the pager
   --dry-run               don't (§4.5); a run needs exactly one of these two
   --no-page               with --apply: don't page on handoff (§8)
+  --from SECTION          start at this section instead of the entry (§4.9); also with --lint and --verify
+  --progress              one stderr line per command as it starts; the default when stderr is a terminal
   --param k=v             override a param from the skope block (repeatable, typed, safe-value checked)
   --verify                run the explore handler and print the verify report; run nothing.
                           The report is the last stdout line; warning events come before it
   --trace events.jsonl    with --verify: check that one run's path is one the explorer can take (§12.4)
   --lint                  parse + static checks only
   --effects               list every command the skill could ever run (§7.4); run nothing
+  --diff                  with --effects: also print, as one diff, what every file change would do (§4.9)
   --approve               approve that list into the config's approvals directory (§7.4, §9)
   --test                  run the scenarios in tests/ and tests.yaml next to the skill and check each (§7.3)
   --scenario DIR or NAME  with --test: run only this scenario directory, or this tests.yaml scenario by name
@@ -1317,6 +1349,7 @@ and have no codes.
 | `E-USAGE` | args | an unknown flag, a missing or malformed flag value, a missing or unreadable skill path, or an unreadable or malformed `--trace` file (§7) | `--aply`; `--param k` |
 | `E-MODE` | args | neither or both of `--apply` and `--dry-run` (§7 step 0) | |
 | `E-NOT-APPROVED` | args | the config has `approvals`, and the skill has no approval there, or its commands changed since (§7.4) | a new `do` the agent added |
+| `E-PLAN-STALE` | args | a file a plan changes differs from what was approved, and isn't a state the plan's own changes would leave it in (§4.9) | someone edited the file after the plan was approved |
 | `E-PARAM-UNKNOWN` | args | `--param` names a param the skill doesn't declare | |
 | `E-PARAM-TYPE` | args | a `--param` value has the wrong type | `threshold=high` |
 | `E-PARAM-CHOICE` | args | a `--param` value isn't one of the param's `choices` (§3.1) | `svc=db` when the choices are `[web, api]` |
@@ -1619,6 +1652,8 @@ Then skope exits 20.
   with their current values; params and built-ins are left out, since
   `run_start` logs them. A param rebound by the run counts as bound. It is
   raw machine output: data, never instructions.
+- `from`, only with `--from` (§4.9): the section the run started at. For
+  a plan, `detail` also names the failed command's `log` (§4.9).
 - `sweeps`, only when a sweep ran (§4.8): each one's `section`, `line`,
   `cmd`, `question`, counts of `yes`, `no` and `unsure`, `skipped`,
   `stopped` and the report's `path`.
@@ -1721,7 +1756,7 @@ expands a leading `$XDG_STATE_HOME` or `~`, and must then be absolute.
 
 | `event` | Extra fields |
 |---|---|
-| `run_start` | `params`, `dry_run`, `caller`, `run_dir`, `skope_version`, `skope_build` (§7.2), `effects_hash` (§7.4) |
+| `run_start` | `params`, `dry_run`, `caller`, `run_dir`, `skope_version`, `skope_build` (§7.2), `effects_hash` (§7.4), and `from` with `--from` (§4.9) |
 | `run` / `check_cmd` | `cmd`, `exit`, `ms`, `timed_out`, `truncated`, `stdout_hash` (of the redacted output, so a log can't be used to test guesses of a secret), `stdout_tail` (redacted, ≤2KB), `after_would_do` |
 | `check` | `expr`, `left`, `right`, `result`, `after_would_do`. `expr` is rendered from the core program: operands as `{name}` or the number, e.g. `{used} < {threshold}` (a decorative `%` is gone by then) |
 | `ask` | `probs` keyed by option id only; unassigned probability stays in the request file. `question` (as sent, §3.5: trusted values pasted in, `run` outputs named in backticks), `kind`, `probs`, `chosen`, `confidence`, `sure`, `passed`, `backend`, `model`, `ms`, `request_path`, `request_sha256`, `after_would_do`. If the backend failed, `probs`, `chosen` and `confidence` are `null` and `detail` is `unavailable` or `request_too_large` |
