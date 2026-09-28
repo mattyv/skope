@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Generates src/embedded.gen.ts: files that ship inside every build, the
 // standalone binary included, so skope can write them out without the repo.
-//   - SKILLS, the agent skills in skills/ (write-skope-skill, plan-with-skope and
+//   - SKILLS, the agent skills in skills/ (write-skope-skill, skope-it-out and
 //     run-skope-skill), for `skope --install-skill`
 //   - DEMO, the disk-full skill with its tests and fakes, for `skope --demo`
 // tests/host/embedded.test.ts fails if the committed file is stale.
@@ -18,7 +18,7 @@ const read = (p) => readFileSync(join(ROOT, p), "utf8");
 
 export function generate() {
   const skills = Object.fromEntries(
-    ["write-skope-skill", "run-skope-skill", "plan-with-skope"].map((name) => [name, read(`skills/${name}/SKILL.md`)]),
+    ["write-skope-skill", "run-skope-skill", "skope-it-out"].map((name) => [name, read(`skills/${name}/SKILL.md`)]),
   );
   const demo = {
     "SKILL.md": read("fixtures/disk-full/SKILL.md"),

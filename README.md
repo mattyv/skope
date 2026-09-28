@@ -136,8 +136,8 @@ also installs three agent skills:
 skope skills test first,
 [`run-skope-skill`](skills/run-skope-skill/SKILL.md) has one run a skope
 skill through skope, never by hand, and take over when skope hands off, and
-[`plan-with-skope`](skills/plan-with-skope/SKILL.md) has one write its
-plan-mode plan as a skope plan (see [Plans](#plans)). Set `SKOPE_NO_SKILL=1`
+[`skope-it-out`](skills/skope-it-out/SKILL.md) guides an agent through an
+executable plan (see [Plans](#plans)). Set `SKOPE_NO_SKILL=1`
 to skip them. It also adds a plan-approval hook to Claude Code's
 `settings.json` and Codex's `config.toml`; set `SKOPE_NO_HOOKS=1` to skip it.
 
@@ -392,13 +392,22 @@ Every step is one line of JSON on stdout:
 
 ## Plans
 
-To use `plan-with-skope`, enter plan mode in Claude Code or Codex and ask the
-agent to plan a code change. You can say "Plan this with skope" to request it
+To use `skope-it-out`, enter plan mode in Claude Code or Codex and ask the
+agent to plan a code change. You can say "Use skope-it-out to plan this" to request it
 explicitly. In Codex, trust the installed approval hook with `/hooks` before
-approving your first plan.
+approving your first plan. Claude Code writes the skope plan in its own plan
+file under `~/.claude/plans/`; Codex uses `.skope/plans/` in the repository.
+Neither requires a decision about committing the plan during approval.
+If you installed skope during an open Claude Code session, check `/hooks`
+before approving the first plan. It should show skope's `PostToolUse` hook
+for `ExitPlanMode`. Claude Code normally picks up settings edits automatically;
+if the hook is missing after a few seconds, restart Claude Code and resume
+the conversation. `/hooks` shows the current configuration; it does not
+reload hooks. If a plan gets `E-NOT-APPROVED`, approve it again after the
+hook is active, even if its file and hash are unchanged.
 
 In Claude Code's or Codex's plan mode, an agent with
-[`plan-with-skope`](skills/plan-with-skope/SKILL.md) writes its plan as a
+[`skope-it-out`](skills/skope-it-out/SKILL.md) writes its plan as a
 skope plan: a checklist of `edit`, `create` and `delete` steps, with the
 exact old and new text, and checks such as `npm test` that hand back to the
 agent when they fail. You read the plan, every command it can run, and one

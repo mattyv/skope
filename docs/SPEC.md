@@ -724,8 +724,11 @@ person approves before it runs, usually written by an agent in plan mode.
 - **Limits:** `run_timeout` and `do_timeout` default to 10 minutes and
   `deadline` to 60, since plans run builds and tests; the skope block can
   still set them.
-- **Where commands run:** a plan's commands run at the root its paths are
-  relative to (the git work tree), wherever skope was started.
+- **Where commands run:** a plan in a repository uses that git work tree as
+  the root for paths and commands, wherever skope was started. A Claude Code
+  plan under `$CLAUDE_CONFIG_DIR/plans/` (default `~/.claude/plans/`) uses the
+  git work tree containing skope's current working directory. The approval
+  pins this root, and a run from another repository is refused.
 - **The diff:** `--effects --diff` prints one unified diff of every change,
   applied in document order to copies of the files, whatever path a run
   would take. (A dry run can't show this: its checks see the unchanged
@@ -1266,9 +1269,10 @@ skope --demo [DIR]        write the disk-full skill (fixtures/disk-full/SKILL.md
                           or API key; takes no skill file or other option
 skope --install-skill [DIR]
                           write the agent skills write-skope-skill, run-skope-skill and
-                          plan-with-skope into DIR/<name>/ (default: $CLAUDE_CONFIG_DIR/skills, else
+                          skope-it-out into DIR/<name>/ (default: $CLAUDE_CONFIG_DIR/skills, else
                           ~/.claude/skills, and Codex's skills directory if Codex is set up),
-                          replacing older copies; takes no skill file or other option
+                          replacing older copies and removing an unmodified plan-with-skope copy;
+                          takes no skill file or other option
 skope --install-hooks [claude|codex]
                           add the plan-mode approval hook (§4.9) to Claude Code's settings.json and
                           Codex's config.toml: both that exist, or the one named

@@ -42,7 +42,7 @@ const HELP = `usage: skope <path/to/SKILL.md> [options]
   --demo [DIR]            write a demo skill with tests and fakes into DIR (default: ./skope-demo) and
                           say what to try; needs no API key; nothing else goes with it
   --install-skill [DIR]   install the agent skills write-skope-skill (write skills test first),
-                          run-skope-skill (run one, or take over a handoff) and plan-with-skope (plans
+                          run-skope-skill (run one, or take over a handoff) and skope-it-out (plans
                           in plan mode) into DIR (default: ~/.claude/skills, and ~/.codex/skills if
                           Codex is set up); nothing else goes with it
   --install-hooks [claude|codex]  add the plan-mode approval hook to Claude Code's settings.json and

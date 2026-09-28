@@ -1,5 +1,5 @@
 ---
-name: plan-with-skope
+name: skope-it-out
 description: In plan mode, write the plan as a skope plan, a Markdown file skope runs, so what the person approves is exactly what runs. Use when planning a change to a codebase in plan mode and skope is installed (`command -v skope`).
 ---
 
@@ -18,13 +18,28 @@ running.
 
 Use this workflow when the person asks for a code change in Claude Code or
 Codex plan mode; they need not name the skill. They can ask for it explicitly
-with "Plan this with skope." In Codex, the person must trust the installed
+with "Use skope-it-out to plan this." In Codex, the person must trust the installed
 plan-approval hook with `/hooks` before approving the first plan.
+In Claude Code, if skope was installed during this session, have the person
+check `/hooks` before the first approval. It must show skope's `PostToolUse`
+hook for `ExitPlanMode`. Settings edits normally load automatically; if the
+hook is missing after a few seconds, restart Claude Code and resume the
+conversation before presenting the plan. `/hooks` displays hooks; it does
+not reload them.
 
 ## 1. Explore, then write the plan
 
-Write it to `.skope/plans/NAME.md` at the repository root. Paths in it are
-relative to that root, and its commands run there.
+Choose the plan file for your agent:
+
+- **Claude Code:** use the plan file Claude Code gives you under
+  `$CLAUDE_CONFIG_DIR/plans/` (normally `~/.claude/plans/`). Write the skope
+  plan directly in that file. Use its absolute path as `PATH` below. There is
+  no repository plan file to create or commit.
+- **Codex:** write `.skope/plans/NAME.md` at the repository root and use that
+  relative path as `PATH` below.
+
+Run skope from the repository root. Changes and commands in either plan use
+that repository; approval pins it as well as the files the plan changes.
 
 ````markdown
 ---
@@ -87,8 +102,8 @@ A check failed. The record has the command's output; fix the plan and resume.
 ## 2. Check it, then show it
 
 ```console
-$ skope .skope/plans/NAME.md --lint
-$ skope .skope/plans/NAME.md --effects --diff
+$ skope PATH --lint
+$ skope PATH --effects --diff
 ```
 
 Fix anything `--lint` reports. Then put this in the plan you present for
@@ -96,10 +111,11 @@ approval, word for word from `--effects` (all 64 hex digits after
 `sha256:` in `effects_hash`):
 
 ```
-skope plan: .skope/plans/NAME.md 3f1c…(64 hex digits)…9e0a
+skope plan: PATH 3f1c…(64 hex digits)…9e0a
 ```
 
-followed by a short summary, the commands `--effects` lists, and the diff.
+Replace `PATH` with the exact path used for `--effects`. Follow the line with
+a short summary, the commands `--effects` lists, and the diff.
 The hook approves only that file, only with that hash: if you change the
 plan after the person saw it, it won't run.
 
@@ -112,7 +128,7 @@ approval file you write counts for nothing. Never run
 Once the person approves (you're out of plan mode):
 
 ```console
-$ SKOPE_CALLER=agent skope .skope/plans/NAME.md --apply
+$ SKOPE_CALLER=agent skope PATH --apply
 ```
 
 - **Exit 0:** done. Tell the person what changed.
@@ -120,8 +136,8 @@ $ SKOPE_CALLER=agent skope .skope/plans/NAME.md --apply
   failed command, its output and a `log` file with all of it. Fix the plan:
   change an edit, or add one. Then:
   - if `--effects` gives the same `effects_hash` (you changed no edit's
-    text and no command), resume: `skope .skope/plans/NAME.md --apply --from
-    SECTION`, where SECTION is where the failure was.
+    text and no command), resume: `skope PATH --apply --from SECTION`, where
+    SECTION is where the failure was.
   - otherwise the plan needs approving again. First take out the edits the
     run already made (`--effects --diff` reports them as not matching), so
     the plan and its diff show what's left. Then go back to plan mode (in
@@ -130,9 +146,14 @@ $ SKOPE_CALLER=agent skope .skope/plans/NAME.md --apply
     new `skope plan:` line and the diff. Once approved, run it with
     `--apply` from the start.
   Changes already in place are skipped on a re-run, so re-running is safe.
-- **`E-NOT-APPROVED`:** the plan changed since it was approved, or the hook
-  did not run. Install a missing hook with `skope --install-hooks`; in Codex,
-  check that the person trusted it with `/hooks`.
+- **`E-NOT-APPROVED`:** nothing ran. Check whether the plan or its hash
+  changed, and whether the approval hook ran. Install a missing hook with
+  `skope --install-hooks`. In Claude Code, check `/hooks` for skope's
+  `PostToolUse` hook on `ExitPlanMode`; if absent after a few seconds,
+  restart Claude Code and resume the conversation. In Codex, check that
+  the person trusted its hook with `/hooks`. Present the plan and its
+  current `skope plan:` line again for the person to approve, even if the
+  file and hash are unchanged. Then retry `--apply`.
 - **`E-PLAN-STALE`:** someone changed a file the plan edits. Look at what
   changed, update the plan, and ask for approval again.
 

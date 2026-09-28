@@ -34,7 +34,7 @@ import type { AskRequest, Response, RunConfig, Val } from "../step.js";
 import { describe, diffEffects, effectsOf, readApproval, writeApproval } from "./effects.js";
 import { claudeDir, codexDir, planApprovalName, planApprovalsDir } from "./hooks.js";
 import { escapePage, type Handlers, type LoopResult, runLoop } from "./loop.js";
-import { fileHash, pinnedStates, planChanges, planDiff, repoRoot, staleFiles } from "./plan.js";
+import { fileHash, pinnedStates, planChanges, planDiff, repoRoot, rootForPlan, staleFiles } from "./plan.js";
 import { readOnly } from "./verify.js";
 
 export interface RunOptions {
@@ -206,7 +206,6 @@ export async function runSkill(o: RunOptions): Promise<number> {
       if (!s || !("body" in s)) return fail("E-USAGE", "args", `--from ${o.from}: the skill has no instruction section by that name`);
       program = { ...program, entry: { section: id, src: s.src } };
     }
-    const planRoot = () => repoRoot(dirname(resolve(o.file)));
     // The approved plan's file pins, which also tell a re-run which changes already applied.
     let planPins: Record<string, string[]> | undefined;
     const choices = parsed.choices;
@@ -229,6 +228,7 @@ export async function runSkill(o: RunOptions): Promise<number> {
     // (skope --plan-approved) writes it into Claude Code's or Codex's config directory, which the
     // agent can't write without asking. Never in the repository, where the agent could write one.
     const isPlanFile = program.kind === "plan";
+    const planRoot = () => (isPlanFile ? rootForPlan(o.file, process.cwd(), claudeDir()) : repoRoot(dirname(resolve(o.file))));
     const approvalsDir = isPlanFile
       ? undefined
       : config.approvals === "beside-skill"
@@ -298,6 +298,8 @@ export async function runSkill(o: RunOptions): Promise<number> {
     // A dry run runs the `run` commands, so it needs the approval too. --test fakes every command.
     if (o.mode === "run" && !o.test && (approvalsDir !== undefined || isPlanFile)) {
       const approved = approval();
+      if (isPlanFile && approved?.root !== undefined && approved.root !== planRoot())
+        fail("E-NOT-APPROVED", "args", `${program.skill} was approved for ${approved.root}, but this run would use ${planRoot()}`);
       if (approved?.effects_hash !== effects.hash || (isPlanFile && planChanges(program).length > 0 && !approved?.files))
         fail(
           "E-NOT-APPROVED",
