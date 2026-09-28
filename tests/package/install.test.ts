@@ -103,7 +103,7 @@ describe("install.sh (SPEC §5.5, §12.3)", () => {
     expect(existsSync(join(installDir, "skope"))).toBe(true);
   });
 
-  test("installs the agent skills when Claude Code is set up, unless SKOPE_NO_SKILL is set", async () => {
+  test("installs the agent skills and the plan-mode hook for each agent set up, unless SKOPE_NO_SKILL / SKOPE_NO_HOOKS", async () => {
     // A binary that records its arguments, so the test sees what install.sh asked of it.
     const binary = '#!/bin/sh\necho "$@" >> "$HOME/calls"\necho "skope 9.9.9"\n';
     releaseDir = makeRelease({ [BINARY_NAME]: binary, SHA256SUMS: sumsFile(BINARY_NAME, binary) });
@@ -124,10 +124,22 @@ describe("install.sh (SPEC §5.5, §12.3)", () => {
     expect(result.status).toBe(0);
     // Its output goes to stderr: stdout stays the one --version line.
     expect(result.stdout).toBe("skope 9.9.9\n");
-    expect(calls()).toBe(`--install-skill ${join(workDir, ".claude", "skills")}\n--version\n`);
+    expect(calls()).toBe(`--install-skill ${join(workDir, ".claude", "skills")}\n--install-hooks\n--version\n`);
+
+    // Codex too: its own skills directory; one --install-hooks covers both.
+    mkdirSync(join(workDir, ".codex"));
+    rmSync(join(workDir, "calls"));
+    result = await run(env);
+    expect(calls()).toBe(
+      `--install-skill ${join(workDir, ".claude", "skills")}\n--install-skill ${join(workDir, ".codex", "skills")}\n--install-hooks\n--version\n`,
+    );
 
     rmSync(join(workDir, "calls"));
     result = await run({ ...env, SKOPE_NO_SKILL: "1" });
+    expect(calls()).toBe("--install-hooks\n--version\n");
+
+    rmSync(join(workDir, "calls"));
+    result = await run({ ...env, SKOPE_NO_SKILL: "1", SKOPE_NO_HOOKS: "1" });
     expect(calls()).toBe("--version\n");
   });
 

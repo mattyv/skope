@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 // skope's command line (SPEC §7).
 
+import { readFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 import IDENTITY from "./build-identity.js";
 import { writeDemo } from "./host/demo.js";
+import { installHooks, planApproved } from "./host/hooks.js";
 import { installSkill } from "./host/installSkill.js";
 import { runSkill } from "./host/run.js";
 import { runTests } from "./host/test.js";
@@ -12,7 +14,7 @@ import { plainText } from "./runner/events.js";
 const USAGE = `usage: skope <SKILL.md> (--apply | --dry-run) [--from SECTION] [--progress] [--no-page] [--param k=v]... [--fake answers.yaml] [--fake-exec cmds.yaml] [--config path]
        skope <SKILL.md> --lint | --verify [--trace events.jsonl] | --effects [--diff] | --approve
        skope <SKILL.md> --test [--scenario DIR or NAME] [--live] [--runs N] [--param k=v]... [--config path]
-       skope --demo [DIR] | --install-skill [DIR]
+       skope --demo [DIR] | --install-skill [DIR] | --install-hooks [claude|codex]
        skope --version | --help`;
 
 // SPEC §7's option list.
@@ -39,9 +41,14 @@ const HELP = `usage: skope <path/to/SKILL.md> [options]
   --config path           default: $XDG_CONFIG_HOME/skope/config.yaml
   --demo [DIR]            write a demo skill with tests and fakes into DIR (default: ./skope-demo) and
                           say what to try; needs no API key; nothing else goes with it
-  --install-skill [DIR]   install the agent skills write-skope-skill (write skills test first) and
-                          run-skope-skill (run one, or take over a handoff) into DIR (default:
-                          ~/.claude/skills); nothing else goes with it
+  --install-skill [DIR]   install the agent skills write-skope-skill (write skills test first),
+                          run-skope-skill (run one, or take over a handoff) and plan-with-skope (plans
+                          in plan mode) into DIR (default: ~/.claude/skills, and ~/.codex/skills if
+                          Codex is set up); nothing else goes with it
+  --install-hooks [claude|codex]  add the plan-mode approval hook to Claude Code's settings.json and
+                          Codex's config.toml (both that are set up, unless one is named): approving a
+                          skope plan in plan mode approves it for skope; nothing else goes with it
+  --plan-approved         the hook itself: reads the hook's JSON on stdin (not for running by hand)
   --version               print the release version and build identity
   --help                  print this`;
 
@@ -51,6 +58,13 @@ async function main(argv: string[]): Promise<number> {
     process.stderr.write(`${HELP}\n`);
     return 40;
   }
+  // The plan-mode approval hook (docs/design/plan-mode.md): the hook's JSON on stdin.
+  if (argv.length === 1 && argv[0] === "--plan-approved")
+    return planApproved(
+      readFileSync(0, "utf8"),
+      (s) => process.stdout.write(s),
+      (s) => process.stderr.write(s),
+    );
   // Only the flag itself, not a value that happens to spell it.
   if (argv.length === 1 && argv[0] === "--version") {
     const { version, build } = IDENTITY;
@@ -60,6 +74,7 @@ async function main(argv: string[]): Promise<number> {
   // No skill file: these write one out. An optional directory, and nothing else.
   if (argv.length <= 2 && !argv[1]?.startsWith("-")) {
     if (argv[0] === "--install-skill") return installSkill(argv[1] || undefined);
+    if (argv[0] === "--install-hooks") return installHooks(argv[1] || undefined);
     if (argv[0] === "--demo") return writeDemo(argv[1] || undefined);
   }
   let values: ReturnType<typeof parse>["values"] = {};

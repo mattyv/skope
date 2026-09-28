@@ -24,12 +24,12 @@ describe("skope --install-skill", () => {
     expect(readFileSync(join(ROOT, "src", "embedded.gen.ts"), "utf8")).toBe(generate());
   });
 
-  test("writes both skills into the directory given", () => {
+  test("writes every skill into the directory given", () => {
     const dir = mkdtempSync(join(tmpdir(), "skope-skills-"));
     const r = skope(["--install-skill", dir]);
     expect(r.status).toBe(0);
     expect(r.stdout).toBe("");
-    for (const name of ["write-skope-skill", "run-skope-skill"])
+    for (const name of ["write-skope-skill", "run-skope-skill", "plan-with-skope"])
       expect(readFileSync(join(dir, name, "SKILL.md"), "utf8")).toBe(readFileSync(join(ROOT, "skills", name, "SKILL.md"), "utf8"));
   });
 
