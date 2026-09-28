@@ -392,6 +392,11 @@ Every step is one line of JSON on stdout:
 
 ## Plans
 
+To use `plan-with-skope`, enter plan mode in Claude Code or Codex and ask the
+agent to plan a code change. You can say "Plan this with skope" to request it
+explicitly. In Codex, trust the installed approval hook with `/hooks` before
+approving your first plan.
+
 In Claude Code's or Codex's plan mode, an agent with
 [`plan-with-skope`](skills/plan-with-skope/SKILL.md) writes its plan as a
 skope plan: a checklist of `edit`, `create` and `delete` steps, with the
@@ -412,7 +417,7 @@ exactly that:
 Only you approve a plan: skope refuses `--approve` on one, and keeps plan
 approvals in Claude Code's or Codex's own config directory, which the agent
 can't write without asking. `skope --install-hooks` adds the hook if the
-installer didn't; in Codex, trust it with `/hooks`. See SPEC §4.9 and
+installer didn't. See SPEC §4.9 and
 [the design](docs/design/plan-mode.md).
 
 ## The language
