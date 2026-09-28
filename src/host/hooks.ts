@@ -24,6 +24,7 @@ import { preprocess } from "../preprocess/index.js";
 import { plainText } from "../runner/events.js";
 import { effectsOf, writeApproval } from "./effects.js";
 import { pinnedStates, planChanges, repoRoot, rootForPlan } from "./plan.js";
+import { record } from "./record.js";
 
 /** What Codex sends when the person approves a plan (codex-rs/tui/src/chatwidget/plan_implementation.rs). */
 export const CODEX_APPROVAL = "Implement the plan.";
@@ -248,6 +249,7 @@ export function planApproved(stdin: string, out: (s: string) => void, err: (s: s
     agentDir = codexDir();
   } else return 0; // not a plan approval
   if (!plan) return 0; // not a skope plan
+  record("hook", { input, transcript, cwd, plan: resolve(repoRoot(cwd), plan.path), root: repoRoot(cwd) });
   const why = check() ?? approvePlan(resolve(repoRoot(cwd), plan.path), plan.hash, agentDir, cwd, claudeProvenance);
   if (why !== null) {
     say(`didn't approve ${plan.path}: ${why}`);

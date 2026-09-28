@@ -35,6 +35,7 @@ import { describe, diffEffects, effectsOf, readApproval, writeApproval } from ".
 import { claudeApproved, claudeDir, codexDir, planApprovalName, planApprovalsDir } from "./hooks.js";
 import { escapePage, type Handlers, type LoopResult, runLoop } from "./loop.js";
 import { fileHash, pinnedStates, planChanges, planDiff, repoRoot, rootForPlan, staleFiles } from "./plan.js";
+import { record } from "./record.js";
 import { readOnly } from "./verify.js";
 
 export interface RunOptions {
@@ -298,6 +299,8 @@ export async function runSkill(o: RunOptions): Promise<number> {
     // A dry run runs the `run` commands, so it needs the approval too. --test fakes every command.
     if (o.mode === "run" && !o.test && (approvalsDir !== undefined || isPlanFile)) {
       let approved = approval();
+      if (isPlanFile)
+        record("apply", { input: approved, transcript: approved?.claude?.transcript, plan: resolve(o.file), root: planRoot() });
       if (isPlanFile && approved?.claude) {
         const proof = approved.claude;
         try {
