@@ -123,6 +123,8 @@ export const EVENT_FIELDS: Record<string, { core: string[]; host: string[] }> = 
     ],
   },
   sweep: { core: [], host: ["cmd", "question", "yes", "no", "unsure", "skipped", "stopped", "path"] },
+  // A plan's edit, create or delete, applied by the host between effect_start and effect_end.
+  change: { core: [], host: ["op", "path", "result", "message"] },
 };
 export const COMMON_FIELDS = { core: ["section", "line"], host: ["ts", "run_id", "skill", "skill_hash", "host"] };
 

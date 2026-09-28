@@ -186,7 +186,7 @@ limits:                         # optional; defaults shown
 An instruction is a **list item** whose text begins with a bold span whose
 content, case-insensitively, is one of the keywords:
 
-`run`, `do`, `check`, `ask`, `ask each`, `for each`, `if yes`, `then`, `page`, `hand off`, `stop`
+`run`, `do`, `check`, `ask`, `ask each`, `for each`, `if yes`, `then`, `page`, `hand off`, `stop`, `edit`, `create`, `delete`
 
 Rules:
 1. **Where instructions live.** Instructions are recognised in (a) items of
@@ -238,7 +238,10 @@ Rules:
    LF line endings. Code blocks (fenced with backticks or tildes, or
    indented) and HTML blocks, including `<!-- comments -->`, are opaque:
    nothing inside them is an instruction, because nothing inside them
-   renders as a list item. The preprocessor uses a CommonMark parser, so
+   renders as a list item. The one exception is the text of a fenced block
+   directly under an `edit` or `create` item, which is that change's text
+   (§4.9); any other block under one of them is `E-GRAMMAR`. The
+   preprocessor uses a CommonMark parser, so
    what runs is what a reader sees. A line break inside an item counts as
    a space between tokens; a tab between tokens is `E-GRAMMAR`. Lists
    nested more than 100 deep are `E-NESTED-LIST`. `[Name]` in an
@@ -279,6 +282,9 @@ then     = "**then** [" SECTION "]"
 page     = "**page**" QUOTED
 handoff  = "**hand off**"
 stop     = "**stop**"
+edit     = "**edit** `" PATH "`" [" · all"] [ELSE]     (* then a ```old and a ```new block, §4.9 *)
+create   = "**create** `" PATH "`" [ELSE]             (* then a ```new block *)
+delete   = "**delete** `" PATH "`" [ELSE]
 ~~~
 
 - Section-option `ask`: at least 2, at most 255 options. A backend may
@@ -663,6 +669,53 @@ are history rather than current text.
   `Section.ask`, or the rendered question) answers every item; a list
   answers item by item, in order (§5.4). A scenario checks the counts with
   `sweeps` (§7.3).
+
+### 4.9 File changes (`edit`, `create`, `delete`)
+Plans change files (docs/design/plan-mode.md). A change's text is in fenced
+blocks under the item, so the person approving it reads exactly what will
+be written:
+
+````markdown
+- **edit** `src/app.ts`
+  ```old
+  const retries = 3;
+  ```
+  ```new
+  const retries = 5;
+  ```
+- **create** `docs/notes.md`
+  ```new
+  Retries went from 3 to 5.
+  ```
+- **delete** `tmp/scratch.txt` · else skip
+````
+
+- **To the core** a change is a `do` whose command is `OP PATH`: an effect,
+  so it never happens in a dry run (P3), gets `effect_start` and
+  `effect_end` events, and counts in `effects`. The host applies it by its
+  line and never runs it as a command. `--effects` lists it as
+  `OP PATH #HASH`, with a hash of its exact text, so approving the list
+  approves the text.
+- **PATH** is a literal, relative to the git work tree the file is in (else
+  its directory). An absolute path, a `..` segment, anything under `.git/`,
+  and a symlink that leads outside the root are refused.
+- **`edit`**: the `old` block (not empty) must match whole lines exactly
+  once; `· all` replaces every match. An empty `new` deletes the lines.
+  **`create`** makes parent directories and fails if the file exists with
+  other content. **`delete`** removes a file, never a directory.
+- **Already applied.** An edit whose old text is gone and whose new text is
+  there exactly once, a create whose file already has the text, and a delete
+  whose file is gone all succeed without changing anything. So a plan can be
+  run again after a partial failure.
+- **Files:** text only (no NUL bytes, valid UTF-8, one kind of line ending,
+  which is kept, as are a missing final newline and the file's mode).
+  Writes go to a temporary file renamed over the original.
+- **Failure** (no match, too many, a refused path, a binary file) goes to
+  failure handling (§4.3) and leaves the file as it was. Each change emits a
+  `change` event (§10) with its result: `applied`, `already_applied` or
+  `failed`, and why.
+- **Fakes.** Under `--fake-exec` a change is faked like a command, keyed by
+  `OP PATH` or `line:N`, and no file changes.
 
 ---
 
@@ -1673,6 +1726,7 @@ expands a leading `$XDG_STATE_HOME` or `~`, and must then be absolute.
 | `check` | `expr`, `left`, `right`, `result`, `after_would_do`. `expr` is rendered from the core program: operands as `{name}` or the number, e.g. `{used} < {threshold}` (a decorative `%` is gone by then) |
 | `ask` | `probs` keyed by option id only; unassigned probability stays in the request file. `question` (as sent, §3.5: trusted values pasted in, `run` outputs named in backticks), `kind`, `probs`, `chosen`, `confidence`, `sure`, `passed`, `backend`, `model`, `ms`, `request_path`, `request_sha256`, `after_would_do`. If the backend failed, `probs`, `chosen` and `confidence` are `null` and `detail` is `unavailable` or `request_too_large` |
 | `sweep_item` | `index`, `item` (the line, redacted), `question`, `sure`, `probs`, `answer` (`yes`, `no`, `unsure`, or `null` if the backend failed), `confidence`, `backend`, `model`, `ms`, `request_path`, `request_sha256`, and `detail: unavailable` if the backend failed (§4.8) |
+| `change` | `op`, `path`, `result` (`applied`, `already_applied` or `failed`), `message` (why it failed, else `null`); between the change's `effect_start` and `effect_end` (§4.9) |
 | `sweep` | `cmd`, `question`, `yes`, `no`, `unsure`, `skipped` (lines not asked), `stopped` (`deadline`, `ask_unavailable` or `null`), `path` (the report file) |
 | `effect_start` / `effect_end` | `cmd`, `exit`, `ms`, `timed_out` (end only) |
 | `would_do` | `cmd` |

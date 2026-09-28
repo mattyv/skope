@@ -11,6 +11,7 @@
 // can't be checked before the run: its text is only known after
 // interpolation.
 
+import { changeCmd } from "../ast.js";
 import type { CoreProgram, Section } from "../contracts.gen.js";
 import { sectionId } from "../preprocess/slug.js";
 
@@ -64,6 +65,8 @@ function targets(body: Stmt[], kind: FakeKind): Target[] {
     };
     if ("run" in st) return [{ src: st.src, binds: st.run.as, ask: false, text: cmd(st.run) }];
     if ("ask_each" in st) return [{ src: st.src, ask: false, text: template(st.ask_each.cmd) }];
+    // A plan change is faked by its descriptor (`edit PATH`), like a command.
+    if ("change" in st) return [{ src: st.src, ask: false, text: template([{ lit: changeCmd(st.change) }]) }];
     if ("do" in st) return [{ src: st.src, ask: false, text: cmd(st.do) }];
     if ("if_yes" in st) return [{ src: st.src, ask: false, text: cmd(st.if_yes.run ?? st.if_yes.do) }];
     if ("check" in st && "succeeds" in st.check.cond) return [{ src: st.src, ask: false, text: template(st.check.cond.succeeds) }];

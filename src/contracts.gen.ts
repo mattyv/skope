@@ -15,7 +15,18 @@ export type ParamValue =
       src: Src;
     };
 export type Stmt =
-  StmtRun | StmtDo | StmtCheck | StmtAsk | StmtForEach | StmtAskEach | StmtIfYes | StmtThen | StmtPage | StmtHandOff | StmtStop;
+  | StmtRun
+  | StmtDo
+  | StmtChange
+  | StmtCheck
+  | StmtAsk
+  | StmtForEach
+  | StmtAskEach
+  | StmtIfYes
+  | StmtThen
+  | StmtPage
+  | StmtHandOff
+  | StmtStop;
 export type Name = string;
 /**
  * Text split into literal and variable parts, so the core never scans for `{`. How a variable is shown in a question is decided by the core from its value's origin (SPEC §3.5).
@@ -139,6 +150,32 @@ export interface Anchor {
 export interface StmtDo {
   src: Src;
   do: DoBody;
+  else: Else;
+}
+/**
+ * `**edit**`, `**create**` or `**delete**` `PATH` (plans, docs/design/plan-mode.md). To the core, a `do` whose command is `OP PATH`; the host applies the change itself and never runs it as a command.
+ */
+export interface StmtChange {
+  src: Src;
+  change: {
+    op: "edit" | "create" | "delete";
+    /**
+     * A literal path, relative to the repository root.
+     */
+    path: string;
+    /**
+     * edit only: the lines to replace.
+     */
+    old?: string;
+    /**
+     * edit and create: the replacement or the file's content.
+     */
+    new?: string;
+    /**
+     * edit only: replace every occurrence.
+     */
+    all?: boolean;
+  };
   else: Else;
 }
 /**
@@ -361,6 +398,7 @@ export type Event =
   | SweepEvent
   | EffectStartEvent
   | EffectEndEvent
+  | ChangeEvent
   | WouldDoEvent
   | PageEvent
   | WouldPageEvent
@@ -743,6 +781,44 @@ export interface EffectEndEvent {
   exit: number | null;
   ms: number;
   timed_out: boolean;
+}
+/**
+ * A plan's edit, create or delete, applied by the host (docs/design/plan-mode.md). Comes between the change's effect_start and effect_end.
+ */
+export interface ChangeEvent {
+  /**
+   * UTC, ISO 8601.
+   */
+  ts: string;
+  /**
+   * null before a run exists.
+   */
+  run_id: string | null;
+  /**
+   * null before a run exists.
+   */
+  skill: string | null;
+  /**
+   * null before a run exists.
+   */
+  skill_hash: string | null;
+  host: string;
+  /**
+   * The section's display name.
+   */
+  section?: string;
+  line: number;
+  event: "change";
+  op: "edit" | "create" | "delete";
+  path: string;
+  /**
+   * already_applied: the change was already in place, so the plan can be re-run.
+   */
+  result: "applied" | "already_applied" | "failed";
+  /**
+   * Why it failed; null otherwise.
+   */
+  message: string | null;
 }
 /**
  * Dry run: a do command that didn't run.

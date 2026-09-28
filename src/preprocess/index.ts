@@ -15,6 +15,7 @@ import { githubSlug, sectionId } from "./slug.js";
 import {
   parseAsk,
   parseAskEach,
+  parseChange,
   parseCheck,
   parseDo,
   parseForEach,
@@ -256,6 +257,32 @@ class Preprocessor {
         if (r === GRAMMAR_ERROR) return grammarError('`**page** "text"`');
         noNested();
         return { src, page: r };
+      }
+      case "edit":
+      case "create":
+      case "delete": {
+        const r = parseChange(rest, this.resolve, keyword);
+        const form = {
+          edit: "`**edit** `PATH` [· all] [ELSE]`, then an ```old block and a ```new block",
+          create: "`**create** `PATH` [ELSE]`, then a ```new block",
+          delete: "`**delete** `PATH` [ELSE]` with nothing under it",
+        }[keyword];
+        if (r === GRAMMAR_ERROR) return grammarError(`${form}; PATH is literal`);
+        noNested();
+        const fences = item.blocks.map((b) => (b.kind === "opaque" ? b.fence : undefined));
+        const want = { edit: ["old", "new"], create: ["new"], delete: [] }[keyword];
+        if (fences.length !== want.length || !fences.every((f, i) => f?.info === want[i])) return grammarError(form);
+        const [a, b] = fences as { content: string }[];
+        if (keyword === "edit") {
+          if (a?.content.trim() === "") return grammarError(`${form}; the old block can't be empty`);
+          return {
+            src,
+            change: { op: keyword, path: r.path, old: a?.content as string, new: b?.content as string, all: r.all },
+            else: r.else,
+          };
+        }
+        if (keyword === "create") return { src, change: { op: keyword, path: r.path, new: a?.content as string }, else: r.else };
+        return { src, change: { op: keyword, path: r.path }, else: r.else };
       }
       case "hand off":
       case "stop": {

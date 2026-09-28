@@ -409,6 +409,7 @@ run moves from section to section until it ends.
 | **page** "…" | Pages a human and ends the run |
 | **hand off** | Hands the incident to a person or agent, with the section's prose as instructions |
 | **stop** | Ends the run |
+| **edit** / **create** / **delete** `path` | Changes a file, with the exact old and new text in code blocks under the step. For plans; skipped in a dry run. |
 
 Variables come from `run … as x` (the command's trimmed output), from an
 `ask`'s answer, and from params. They can go into `check`, `ask` questions

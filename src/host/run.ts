@@ -3,6 +3,7 @@
 // event goes to stdout as JSON Lines; every error and warning also gets a
 // readable stderr line (SPEC §7.1, §10).
 
+import { execFileSync } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { hostname } from "node:os";
@@ -19,9 +20,10 @@ import { CODE_MEANINGS } from "../contracts.gen.js";
 import { Interp, unsafeInputs } from "../interp.js";
 import { lint } from "../lint.js";
 import { preprocess } from "../preprocess/index.js";
+import { applyChange, type Change } from "../runner/change.js";
 import { type Config, defaultConfig, defaultConfigPath, loadConfig } from "../runner/config.js";
 import { type Diagnostic, diagnosticLine, plainText, type Stage } from "../runner/events.js";
-import { commandEnv, execCommand, stopAll } from "../runner/exec.js";
+import { commandEnv, type ExecResult, execCommand, stopAll } from "../runner/exec.js";
 import { createFakeClock, fakeExec } from "../runner/fakeExec.js";
 import { type FakeKind, resolveFakeKeys } from "../runner/fakeKeys.js";
 import { expandCommands, fakesError } from "../runner/fakes.js";
@@ -69,6 +71,31 @@ export const PREAMBLE =
 class End extends Error {
   constructor(readonly ending: Ending) {
     super(ending);
+  }
+}
+
+/** Every plan change in the program, by its line. */
+function changesOf(program: CoreProgram): Map<number, Change> {
+  const out = new Map<number, Change>();
+  const walk = (body: Section["body"]) => {
+    for (const st of body) {
+      if ("change" in st) out.set(st.src, st.change as Change);
+      if ("for_each" in st) walk(st.for_each.body as Section["body"]);
+    }
+  };
+  for (const s of Object.values(program.sections)) if ("body" in s) walk(s.body);
+  return out;
+}
+
+/** The git work tree `dir` is in, else `dir` itself: where a plan's paths are relative to. */
+function repoRoot(dir: string): string {
+  try {
+    return (
+      execFileSync("git", ["rev-parse", "--show-toplevel"], { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim() ||
+      dir
+    );
+  } catch {
+    return dir;
   }
 }
 
@@ -388,8 +415,24 @@ export async function runSkill(o: RunOptions): Promise<number> {
     const started = Date.now();
     let asks = 0;
     let sweepN = 0;
+    // Plan changes are applied here, by line, never run as commands (docs/design/plan-mode.md).
+    // With --fake-exec they're faked like any command: a test never touches the files.
+    const changes = changesOf(program);
+    let root: string | undefined;
+    const applyPlanChange = (c: Change, src: number): ExecResult => {
+      root ??= repoRoot(dirname(resolve(o.file)));
+      const r = applyChange(root, c);
+      const message = r.result === "failed" ? r.message : null;
+      emit({ event: "change", line: src, op: c.op, path: c.path, result: r.result, message });
+      if (message !== null) say(`skope: ${c.op} ${c.path} failed: ${message}\n`);
+      return { exit: message === null ? 0 : 1, signal: null, stdout: "", stderr: message ?? "", timedOut: false, truncated: false };
+    };
     const handlers: Handlers = {
-      exec: async (next) => halt(await (fakeRun ? fakeRun(next) : execCommand(next.cmd, { timeoutMs: next.timeoutMs, env }))),
+      exec: async (next) => {
+        const change = next.exec === "do" && !fakeRun ? changes.get(next.src) : undefined;
+        if (change) return halt(applyPlanChange(change, next.src));
+        return halt(await (fakeRun ? fakeRun(next) : execCommand(next.cmd, { timeoutMs: next.timeoutMs, env })));
+      },
       async ask(request, src, item) {
         // Redacted before it's saved or sent. Option ids are left alone: the answer is keyed by them.
         const r = (s: string) => redactor.redact(s);

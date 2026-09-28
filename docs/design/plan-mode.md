@@ -1,6 +1,6 @@
 # Design: skope as the plan in plan mode
 
-Status: draft, revised after review. Not built.
+Status: v1 in progress. Built: item 1 (edit, create, delete) and item 2 (confinement; paths are literal). The rest is not built yet.
 
 ## Problem
 
@@ -129,12 +129,15 @@ Type errors after the grammar change. Read the record, fix the plan, resume from
 
 ## How it fits the core
 
-- An edit is structured, so it is not an `Exec(cmd, …)`. New requests and
-  events: `Next.Edit(kind, path, old, new, all, src)`, `EditEv`,
-  `WouldEditEv`, `EditAlreadyAppliedEv`.
-- Proven: dry-run safety (P3) extended — a dry run never returns `Edit`;
-  taint (P4) extended — PATH renders from author text and fixed-choice
-  params only; termination (P1) and the rest unchanged.
+- As built: to the core a change is a `do` whose command is its
+  descriptor (`edit PATH`), the same way a sweep is a `run` to the core. The
+  core never sees the text, so it needs nothing new: dry-run safety (P3),
+  the effect events and termination apply unchanged. The host applies the
+  change by its line and never runs the descriptor. Paths are literal in v1,
+  so taint has nothing to check; params with choices can come later.
+- Considered: a structured `Next.Edit(...)` with its own events. It would
+  add proof work for no new guarantee, since the core would still not see
+  file contents.
 - Host-tested: matching, idempotence, confinement, line endings, atomic
   write, the static diff and the stale check. The core is pure and never
   sees file contents.
@@ -161,6 +164,23 @@ Type errors after the grammar change. Read the record, fix the plan, resume from
 
 - Generating plans. The agent writes them; skope checks and runs them.
 - Letting run output reach an edit, its path, or a command.
+
+## Approval hooks (research, for item 7)
+
+- **Claude Code:** `PostToolUse` with matcher `ExitPlanMode` fires only after
+  the person approves (PreToolUse and PermissionRequest fire before, so they
+  must not be used). stdin has `tool_input.plan`, `tool_input.planFilePath`,
+  `tool_response.plan` (the approved text, after any edits by the person),
+  `cwd`, `session_id` and `transcript_path`. Goes in `~/.claude/settings.json`.
+- **Codex CLI:** plan approval isn't a tool call. Choosing "Yes, implement this
+  plan" submits the user message `Implement the plan.`, so the hook is
+  `UserPromptSubmit` matching that text (or the clear-context prefix); the
+  plan text comes from the transcript's last `<proposed_plan>`. Codex hooks
+  need the person's trust in `/hooks`, pinned by hash.
+- **Both:** the agent could run the approval command itself through its shell.
+  The hook entry point must check it was called as a hook: the transcript
+  must end in the approval (an `ExitPlanMode` tool result, or the user
+  message), for this plan file.
 
 ## Open questions
 

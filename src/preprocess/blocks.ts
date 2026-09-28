@@ -25,7 +25,9 @@ export type Block =
   | { kind: "paragraph"; inline: Token; line: number }
   | { kind: "list"; line: number; items: Item[] }
   | { kind: "quote"; blocks: Block[] }
-  | { kind: "opaque" }; // code, HTML, rules: nothing inside is an instruction
+  // Code, HTML, rules: nothing inside is an instruction. A fenced block keeps its text, for `edit`
+  // and `create` (docs/design/plan-mode.md).
+  | { kind: "opaque"; fence?: { info: string; content: string; line: number } };
 
 export interface Parsed {
   blocks: Block[];
@@ -88,6 +90,8 @@ export function parseBlocks(body: string, offset: number): Parsed {
         top().blocks.push({ kind: "paragraph", inline: tokens[i + 1] as Token, line: lineOf(t) });
         break;
       case "fence":
+        top().blocks.push({ kind: "opaque", fence: { info: t.info.trim(), content: t.content, line: lineOf(t) } });
+        break;
       case "code_block":
       case "html_block":
       case "hr":

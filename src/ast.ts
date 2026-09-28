@@ -150,16 +150,19 @@ function askForm(a: J, at: string): D {
   }
 }
 
+/** The command text a change shows as in events and --effects. */
+export const changeCmd = (c: { op: string; path: string }) => `${c.op} ${c.path}`;
+
 function stmt(v: unknown, at: string): D {
   const [k, s] = tag(
     v,
     at,
-    ["run", "do", "check", "ask", "for_each", "ask_each", "if_yes", "then", "page", "hand_off", "stop"],
+    ["run", "do", "check", "ask", "for_each", "ask_each", "if_yes", "then", "page", "hand_off", "stop", "change"],
     ["src", "else"],
   );
   const src = nat(s.src, `${at}.src`);
   const where = `${at} (line ${s.src})`;
-  const hasElse = ["run", "do"].includes(k);
+  const hasElse = ["run", "do", "change"].includes(k);
   obj(s, where, hasElse ? ["src", k, "else"] : ["src", k]);
   switch (k) {
     case "run": {
@@ -173,6 +176,13 @@ function stmt(v: unknown, at: string): D {
     }
     case "do":
       return SkopeAst.Stmt.create_Do(src, doBody(s.do, `${where}.do`), els(s.else, `${where}.else`));
+    case "change": {
+      // To the core a change is a `do` of its descriptor (`edit PATH`): an effect, so dry-run safety
+      // and the effect events apply unchanged. The host applies it by src and never runs it as a command.
+      const c = obj(s.change, `${where}.change`, ["op", "path"], ["old", "new", "all"]);
+      const cmd = [{ lit: changeCmd(c as { op: string; path: string }) }];
+      return SkopeAst.Stmt.create_Do(src, SkopeAst.DoBody.create_DoCmd(parts(cmd, `${where}.change`)), els(s.else, `${where}.else`));
+    }
     case "check": {
       const c = obj(s.check, `${where}.check`, ["cond", "then", "else"]);
       // SPEC §3.4: `check COND` needs a target, an else, or both.
