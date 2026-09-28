@@ -745,6 +745,27 @@ person approves before it runs, usually written by an agent in plan mode.
   skipped section is `E-UNBOUND`. With changes that re-apply safely, an
   agent fixes the plan and resumes where it failed. `run_start` and the
   handoff record carry `from`.
+- **Approval.** A plan always needs an approval, and it always sits beside
+  the plan file, whatever the config's `approvals` says. The agent that
+  wrote the plan must not approve it: the person does, in their agent's
+  plan mode, and a hook writes the approval (`skope --install-hooks` adds
+  it). The plan the person approves carries the line
+  `skope plan: PATH HASH12`, where HASH12 is the first 12 hex digits of the
+  plan's effects hash; `skope --plan-approved` approves PATH only if its
+  effects still have that hash, so a plan changed after the person saw it
+  doesn't run.
+  - **Claude Code:** a `PostToolUse` hook on `ExitPlanMode`, which runs only
+    once the person approves. The hook also checks the session transcript
+    (it must be under Claude Code's directory): the call is the latest
+    `ExitPlanMode` and wasn't rejected.
+  - **Codex:** approving a plan sends the message `Implement the plan.`, so
+    the hook is `UserPromptSubmit`, matching that message; the plan line
+    comes from the transcript, whose last user message after it must be
+    that approval.
+  - Each approval approves one plan: a ledger in the agent's config
+    directory records the ones used. The agent could run `--plan-approved`
+    itself with made-up input; these checks rest on the transcripts and the
+    ledger living in directories the agent can't write without asking.
 
 ---
 
@@ -939,10 +960,14 @@ Shipped Dafny code MUST NOT contain `assume`, `{:axiom}` or
     there;
   - install `$SKOPE_VERSION` if set, otherwise the latest release;
   - download from `$SKOPE_DOWNLOAD_URL` if set, for mirrors and tests;
-  - install skope's agent skills with `skope --install-skill`
-    when Claude Code's directory (`$CLAUDE_CONFIG_DIR`, else `~/.claude`)
-    exists, unless `$SKOPE_NO_SKILL` is set, and never fail the install
-    over it; otherwise say how to install it;
+  - install skope's agent skills with `skope --install-skill` into each of
+    Claude Code's directory (`$CLAUDE_CONFIG_DIR`, else `~/.claude`) and
+    Codex's (`$CODEX_HOME`, else `~/.codex`) that exists, unless
+    `$SKOPE_NO_SKILL` is set, and never fail the install over it; otherwise
+    say how to install them;
+  - add the plan-mode approval hook with `skope --install-hooks` when either
+    exists, unless `$SKOPE_NO_HOOKS` is set, never failing the install
+    over it (§4.9);
   - finish by running `skope --version`.
 
   A global npm install installs the skills the same way, from a
@@ -1227,9 +1252,14 @@ skope --demo [DIR]        write the disk-full skill (fixtures/disk-full/SKILL.md
                           ./skope-demo), and print what to try; never overwrites, needs no config
                           or API key; takes no skill file or other option
 skope --install-skill [DIR]
-                          write the agent skills write-skope-skill and run-skope-skill into
-                          DIR/<name>/ (default: $CLAUDE_CONFIG_DIR/skills, else ~/.claude/skills),
+                          write the agent skills write-skope-skill, run-skope-skill and
+                          plan-with-skope into DIR/<name>/ (default: $CLAUDE_CONFIG_DIR/skills, else
+                          ~/.claude/skills, and Codex's skills directory if Codex is set up),
                           replacing older copies; takes no skill file or other option
+skope --install-hooks [claude|codex]
+                          add the plan-mode approval hook (§4.9) to Claude Code's settings.json and
+                          Codex's config.toml: both that exist, or the one named
+skope --plan-approved     the hook: reads its JSON on stdin; not for running by hand
 ~~~
 
 `skope` with no arguments prints the same options to stderr and exits 40,
@@ -1949,10 +1979,11 @@ Installer tests (§5.5), in M6, against a local download server via
   leaves nothing installed. So does a missing `SHA256SUMS`.
 - `SKOPE_VERSION` picks the version; an unknown platform exits non-zero and
   names it.
-- It runs `skope --install-skill` into Claude Code's directory when that
-  exists, and not when `SKOPE_NO_SKILL` is set; stdout stays the one
-  `--version` line.
-- `skope --install-skill` writes both skills as committed; each is a valid
+- It runs `skope --install-skill` into Claude Code's and Codex's
+  directories when they exist, and not when `SKOPE_NO_SKILL` is set; it runs
+  `skope --install-hooks` unless `SKOPE_NO_HOOKS` is set; stdout stays the
+  one `--version` line.
+- `skope --install-skill` writes every skill as committed; each is a valid
   Agent Skill; and write-skope-skill's example skill and `tests.yaml` pass
   `--lint` and `--test`.
 

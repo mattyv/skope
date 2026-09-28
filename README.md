@@ -130,12 +130,16 @@ Or run the container image, `ghcr.io/mattyv/skope:0.1.0-beta.3`.
 project, so don't `npm install skope`. A package under a different name
 will follow.
 
-If you use Claude Code (`~/.claude` exists), the installer also installs
-two agent skills:
+If you use Claude Code (`~/.claude`) or Codex (`~/.codex`), the installer
+also installs three agent skills:
 [`write-skope-skill`](skills/write-skope-skill/SKILL.md) has an agent write
-skope skills test first, and
+skope skills test first,
 [`run-skope-skill`](skills/run-skope-skill/SKILL.md) has one run a skope
-skill through skope, never by hand, and take over when skope hands off. Set `SKOPE_NO_SKILL=1` to skip them.
+skill through skope, never by hand, and take over when skope hands off, and
+[`plan-with-skope`](skills/plan-with-skope/SKILL.md) has one write its
+plan-mode plan as a skope plan (see [Plans](#plans)). Set `SKOPE_NO_SKILL=1`
+to skip them. It also adds a plan-approval hook to Claude Code's
+`settings.json` and Codex's `config.toml`; set `SKOPE_NO_HOOKS=1` to skip it.
 
 ### Try it
 
@@ -385,6 +389,28 @@ Every step is one line of JSON on stdout:
 ```json
 {"ts":"2026-09-23T03:12:44Z","run_id":"r-8f2c","skill":"disk-full","skill_hash":"sha256:…","host":"hk-app-03","event":"would_do","section":"Clean up","line":44,"cmd":"journalctl --vacuum-size=500M"}
 ```
+
+## Plans
+
+In Claude Code's or Codex's plan mode, an agent with
+[`plan-with-skope`](skills/plan-with-skope/SKILL.md) writes its plan as a
+skope plan: a checklist of `edit`, `create` and `delete` steps, with the
+exact old and new text, and checks such as `npm test` that hand back to the
+agent when they fail. You read the plan, every command it can run, and one
+diff of every file it changes (`skope PLAN --effects --diff`). When you
+approve it in plan mode, a hook approves it for skope, and skope then runs
+exactly that:
+
+- nothing runs that isn't in the plan, and not once the plan changes;
+- a file someone else changed since you approved stops the run
+  (`E-PLAN-STALE`);
+- a failed check hands back to the agent with its output, and the agent
+  fixes the plan and resumes (`--from SECTION`); edits already made are
+  skipped.
+
+The agent never approves its own plan. `skope --install-hooks` adds the
+hook if the installer didn't. See SPEC §4.9 and
+[the design](docs/design/plan-mode.md).
 
 ## The language
 

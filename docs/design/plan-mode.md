@@ -1,6 +1,6 @@
 # Design: skope as the plan in plan mode
 
-Status: v1 in progress. Built: items 1–6 and 8 (changes, confinement with literal paths, effects and pinned files, the static diff, `--from`, `kind: plan`, progress). Plans' commands also run at the repository root. Not built yet: 7 and 9 (approval hooks, the skill).
+Status: v1 built. Plans' commands also run at the repository root, and plans always keep their approval beside the plan file. v2 is not built.
 
 ## Problem
 

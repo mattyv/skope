@@ -222,8 +222,14 @@ export async function runSkill(o: RunOptions): Promise<number> {
     // The skill's scope: every command it could run, and whether that set is approved (SPEC §7.4).
     const effects = effectsOf(program, choices);
     // `beside-skill` keeps the approval in the skill's own folder, for review in the repository.
+    // A plan's approval always sits beside it, whatever the config says: nothing in a plan runs
+    // unapproved, and the plan-mode hook (skope --plan-approved) writes it there.
     const approvalsDir =
-      config.approvals === undefined ? undefined : config.approvals === "beside-skill" ? dirname(resolve(o.file)) : config.approvals;
+      program.kind === "plan" || config.approvals === "beside-skill"
+        ? dirname(resolve(o.file))
+        : config.approvals === undefined
+          ? undefined
+          : config.approvals;
     const approval = () => {
       try {
         return approvalsDir === undefined ? null : readApproval(approvalsDir, program.skill);

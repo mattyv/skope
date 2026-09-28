@@ -15,8 +15,10 @@
 #   SKOPE_INSTALL_DIR   Where to install. Defaults to ~/.local/bin. Never
 #                      uses sudo.
 #   SKOPE_NO_SKILL      Set to skip installing skope's agent skills
-#                      (write-skope-skill, run-skope-skill) into Claude
-#                      Code's skills directory.
+#                      (write-skope-skill, run-skope-skill, plan-with-skope)
+#                      into Claude Code's and Codex's skills directories.
+#   SKOPE_NO_HOOKS      Set to skip adding the plan-mode approval hook to
+#                      Claude Code's settings.json and Codex's config.toml.
 set -eu
 
 repo="mattyv/skope"
@@ -119,16 +121,28 @@ case ":$PATH:" in
     ;;
 esac
 
-# --- skope's agent skills (SPEC §5.5): into Claude Code's
-# skills directory if Claude Code is set up here. Never fails the install. ---
+# --- skope's agent skills (SPEC §5.5): into Claude Code's and Codex's
+# skills directories, for each that's set up here. Never fails the install. ---
 claude_dir="${CLAUDE_CONFIG_DIR:-"$HOME/.claude"}"
+codex_dir="${CODEX_HOME:-"$HOME/.codex"}"
 if [ -n "${SKOPE_NO_SKILL:-}" ]; then
   :
-elif [ -d "$claude_dir" ]; then
-  "$install_dir/skope" --install-skill "$claude_dir/skills" >&2 ||
-    say "Couldn't install skope's agent skills; run skope --install-skill to try again."
+elif [ -d "$claude_dir" ] || [ -d "$codex_dir" ]; then
+  for agent_dir in "$claude_dir" "$codex_dir"; do
+    [ -d "$agent_dir" ] || continue
+    "$install_dir/skope" --install-skill "$agent_dir/skills" >&2 ||
+      say "Couldn't install skope's agent skills; run skope --install-skill to try again."
+  done
 else
   say "To teach an agent to write and run skope skills: skope --install-skill [DIR]"
+fi
+
+# --- the plan-mode approval hook (docs/design/plan-mode.md): approving a skope
+# plan in Claude Code's or Codex's plan mode approves it for skope. Never fails
+# the install. ---
+if [ -z "${SKOPE_NO_HOOKS:-}" ] && { [ -d "$claude_dir" ] || [ -d "$codex_dir" ]; }; then
+  "$install_dir/skope" --install-hooks >&2 ||
+    say "Couldn't add the plan-mode hook; run skope --install-hooks to try again."
 fi
 
 "$install_dir/skope" --version
