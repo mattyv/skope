@@ -14,7 +14,8 @@
 //
 // `skope --install-hooks` adds the hook to ~/.claude/settings.json and ~/.codex/config.toml.
 
-import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { lint } from "../lint.js";
@@ -25,12 +26,15 @@ import { pinnedStates, planChanges, repoRoot } from "./plan.js";
 
 /** What Codex sends when the person approves a plan (codex-rs/tui/src/chatwidget/plan_implementation.rs). */
 export const CODEX_APPROVAL = "Implement the plan.";
-const PLAN_LINE = /skope plan: (\S+) ([0-9a-f]{12})\b/g;
+const PLAN_LINE = /skope plan: (\S+) ([0-9a-f]{64})\b/g;
+/** The start of Codex's "clear context and implement" message, which carries the plan itself (plan_implementation.rs). */
+export const CODEX_CLEAR_CONTEXT =
+  "A previous agent produced the plan below to accomplish the user's task. Implement the plan in a fresh context";
 
 export const claudeDir = () => process.env.CLAUDE_CONFIG_DIR || join(homedir(), ".claude");
 export const codexDir = () => process.env.CODEX_HOME || join(homedir(), ".codex");
 
-/** The last `skope plan: PATH HASH12` line in a text. */
+/** The last `skope plan: PATH HASH` line in a text (HASH: the plan's whole sha256 effects hash, in hex). */
 export function planLine(text: string): { path: string; hash: string } | null {
   const all = [...text.matchAll(PLAN_LINE)];
   const m = all.at(-1);
@@ -94,29 +98,52 @@ export function useOnce(dir: string, key: string): boolean {
   return true;
 }
 
-/** Codex: the transcript's last user message is the approval, after the plan line. Returns the
- * approval's position as its key, or why not. */
-export function codexApproved(transcript: string): { key: string } | string {
-  if (!inside(codexDir(), transcript)) return `the transcript isn't in ${codexDir()}`;
-  const entries = lines(transcript);
-  let lastPlan = -1;
-  let lastApproval = -1;
-  entries.forEach((entry, i) => {
-    if (JSON.stringify(entry).match(PLAN_LINE)) lastPlan = i;
-    for (const o of objects(entry))
-      if (o.role === "user" && JSON.stringify(o).includes(CODEX_APPROVAL)) {
-        lastApproval = i;
-        break;
-      }
-  });
-  if (lastPlan < 0) return "the transcript has no skope plan line";
-  return lastApproval > lastPlan
-    ? { key: `${realpathSync(transcript)}:${lastApproval}` }
-    : "the transcript's last user message after the plan isn't its approval";
+const NO_PLAN_LINE = "the approved plan has no skope plan line";
+
+/** The text of a Codex transcript entry's user message, if it is one. */
+function userText(entry: unknown): string | null {
+  for (const o of objects(entry))
+    if (o.role === "user") {
+      const texts = [...objects(o)].flatMap((x) => (typeof x.text === "string" ? [x.text] : []));
+      return texts.join("\n") || (typeof o.content === "string" ? o.content : "");
+    }
+  return null;
 }
 
-/** Approves `file` if it's a plan whose effects hash starts with `hash`. Null on success, else why not. */
-export function approvePlan(file: string, hash: string): string | null {
+/**
+ * Codex: the transcript's last user message is the approval, and the plan is the one the person
+ * approved: the last `<proposed_plan>` before that message ("Implement the plan."), or the plan
+ * inside it (the clear-context message). Returns the plan line and a key for the approval, or why
+ * not. Fails closed if the transcript doesn't have the message yet.
+ */
+export function codexApproved(transcript: string): { key: string; plan: { path: string; hash: string } } | string {
+  if (!inside(codexDir(), transcript)) return `the transcript isn't in ${codexDir()}`;
+  const entries = lines(transcript);
+  let at = -1;
+  for (let i = entries.length - 1; i >= 0 && at < 0; i--) if (userText(entries[i]) !== null) at = i;
+  const approval = at < 0 ? "" : (userText(entries[at]) ?? "").trim();
+  let source: string | null = null;
+  if (approval === CODEX_APPROVAL) {
+    for (let i = at - 1; i >= 0 && source === null; i--) {
+      const m = [...JSON.stringify(entries[i]).matchAll(/<proposed_plan>([\s\S]*?)<\/proposed_plan>/g)].at(-1);
+      if (m) source = JSON.parse(`"${m[1]}"`) as string;
+    }
+    if (source === null) return "no plan was proposed before the approval";
+  } else if (approval.startsWith(CODEX_CLEAR_CONTEXT)) source = approval;
+  else return "the transcript's last user message isn't a plan approval";
+  const plan = planLine(source);
+  if (!plan) return NO_PLAN_LINE;
+  return { key: `${realpathSync(transcript)}:${at}`, plan };
+}
+
+/** Where an agent's tool keeps approvals of skope plans: in its own config directory, which the
+ * agent can't write without asking, never in the repository. */
+export const planApprovalsDir = (agentDir: string) => join(agentDir, "skope", "approvals");
+/** A plan's approval file name: from its real path, so each plan file has its own. */
+export const planApprovalName = (file: string) => `plan-${createHash("sha256").update(realpathSync(file)).digest("hex").slice(0, 32)}`;
+
+/** Approves `file` into `agentDir` if it's a plan whose effects hash is `hash`. Null on success, else why not. */
+export function approvePlan(file: string, hash: string, agentDir: string): string | null {
   let text: string;
   try {
     text = readFileSync(file, "utf8");
@@ -130,10 +157,14 @@ export function approvePlan(file: string, hash: string): string | null {
   if (found.errors.length > 0) return `${file} doesn't lint: ${found.errors.map((e) => `${e.code} at line ${e.line}`).join(", ")}`;
   if (program.kind !== "plan") return `${file} isn't a plan (kind: plan)`;
   const effects = effectsOf(program, choices);
-  if (!effects.hash.startsWith(`sha256:${hash}`))
-    return `${file} changed after the person saw it (its effects are ${effects.hash.slice(7, 19)}, the approved plan said ${hash})`;
-  const dir = dirname(resolve(file));
-  writeApproval(dir, effects, pinnedStates(repoRoot(dir), planChanges(program)));
+  if (effects.hash !== `sha256:${hash}`)
+    return `${file} changed after the person saw it (its effects are ${effects.hash.slice(7, 19)}…, the approved plan said ${hash.slice(0, 12)}…)`;
+  writeApproval(
+    planApprovalsDir(agentDir),
+    effects,
+    pinnedStates(repoRoot(dirname(resolve(file))), planChanges(program)),
+    planApprovalName(file),
+  );
   return null;
 }
 
@@ -150,44 +181,41 @@ export function planApproved(stdin: string, out: (s: string) => void, err: (s: s
   const event = input.hook_event_name;
   const cwd = typeof input.cwd === "string" ? input.cwd : process.cwd();
   const transcript = typeof input.transcript_path === "string" ? input.transcript_path : "";
-  let text: string;
+  let plan: { path: string; hash: string } | null;
   let check: () => string | null;
+  let agentDir: string;
   let claude = false;
   if (event === "PostToolUse" && input.tool_name === "ExitPlanMode") {
     // The approved text, after any edits the person made (tool_response.plan), else what was proposed.
     const resp = input.tool_response as { plan?: unknown } | undefined;
     const inp = input.tool_input as { plan?: unknown } | undefined;
-    text = typeof resp?.plan === "string" ? resp.plan : typeof inp?.plan === "string" ? inp.plan : "";
+    plan = planLine(typeof resp?.plan === "string" ? resp.plan : typeof inp?.plan === "string" ? inp.plan : "");
     const id = String(input.tool_use_id ?? "");
     check = () => claudeApproved(transcript, id) ?? (useOnce(claudeDir(), id) ? null : "that approval was already used");
+    agentDir = claudeDir();
     claude = true;
   } else if (
     event === "UserPromptSubmit" &&
     typeof input.prompt === "string" &&
-    input.prompt.trim().startsWith(CODEX_APPROVAL.slice(0, -1))
+    (input.prompt.trim() === CODEX_APPROVAL || input.prompt.startsWith(CODEX_CLEAR_CONTEXT))
   ) {
-    // "Implement the plan." carries no plan text; the clear-context variant carries the plan itself.
-    let transcriptText = "";
-    try {
-      transcriptText = readFileSync(transcript, "utf8");
-    } catch {}
-    text = input.prompt.includes("skope plan:") ? input.prompt : transcriptText;
-    check = () => {
-      if (input.prompt !== CODEX_APPROVAL) return inside(codexDir(), transcript) ? null : `the transcript isn't in ${codexDir()}`;
-      const r = codexApproved(transcript);
-      if (typeof r === "string") return r;
-      return useOnce(codexDir(), r.key) ? null : "that approval was already used";
-    };
+    // Only what the transcript says the person approved counts, never the hook's input.
+    const r = codexApproved(transcript);
+    if (typeof r === "string") {
+      if (r !== NO_PLAN_LINE) say(`didn't approve the plan: ${r}`);
+      return 0;
+    }
+    plan = r.plan;
+    check = () => (useOnce(codexDir(), r.key) ? null : "that approval was already used");
+    agentDir = codexDir();
   } else return 0; // not a plan approval
-  const plan = planLine(text);
   if (!plan) return 0; // not a skope plan
-  const file = resolve(cwd, plan.path);
-  const why = check() ?? approvePlan(file, plan.hash);
+  const why = check() ?? approvePlan(resolve(repoRoot(cwd), plan.path), plan.hash, agentDir);
   if (why !== null) {
     say(`didn't approve ${plan.path}: ${why}`);
     return 0;
   }
-  const next = `skope approved ${plan.path} (${plan.hash}). Run it with: SKOPE_CALLER=agent skope ${plan.path} --apply`;
+  const next = `skope approved ${plan.path}. Run it with: SKOPE_CALLER=agent skope ${plan.path} --apply`;
   say(`approved ${plan.path}`);
   if (claude) out(`${JSON.stringify({ hookSpecificOutput: { hookEventName: "PostToolUse", additionalContext: next } })}\n`);
   else out(`${next}\n`);
@@ -197,7 +225,8 @@ export function planApproved(stdin: string, out: (s: string) => void, err: (s: s
 /** How a hook should run this skope: the standalone binary, or node with this CLI script. */
 export function selfCommand(): string {
   const q = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`;
-  const script = process.argv[1];
+  // npm's bin is a symlink to the script: resolve it, or the hook would run node with no script.
+  const script = process.argv[1] ? realpathSync(process.argv[1]) : undefined;
   return script?.endsWith(".js")
     ? `${q(process.execPath)} ${q(resolve(script))} --plan-approved`
     : `${q(process.execPath)} --plan-approved`;
@@ -207,16 +236,29 @@ export function selfCommand(): string {
 export function installClaudeHook(dir: string, command: string): string {
   const path = join(dir, "settings.json");
   const settings = existsSync(path) ? (JSON.parse(readFileSync(path, "utf8")) as Record<string, unknown>) : {};
+  const isObj = (v: unknown) => typeof v === "object" && v !== null && !Array.isArray(v);
+  if (!isObj(settings) || (settings.hooks !== undefined && !isObj(settings.hooks)))
+    throw new Error(`${path} isn't shaped as expected; add the hook by hand (see SPEC §4.9)`);
   settings.hooks ??= {};
   const hooks = settings.hooks as Record<string, unknown[]>;
+  if (hooks.PostToolUse !== undefined && !Array.isArray(hooks.PostToolUse))
+    throw new Error(`${path}: hooks.PostToolUse isn't a list; add the hook by hand (see SPEC §4.9)`);
   hooks.PostToolUse ??= [];
   const post = hooks.PostToolUse as { matcher?: string; hooks?: { type: string; command: string }[] }[];
   const ours = (h: { command?: string }) => h.command?.includes("--plan-approved") === true;
   for (const entry of post) entry.hooks = (entry.hooks ?? []).filter((h) => !ours(h));
   hooks.PostToolUse = post.filter((e) => (e.hooks ?? []).length > 0);
   (hooks.PostToolUse as unknown[]).push({ matcher: "ExitPlanMode", hooks: [{ type: "command", command }] });
-  writeFileSync(path, `${JSON.stringify(settings, null, 2)}\n`);
+  writeAtomic(path, `${JSON.stringify(settings, null, 2)}\n`);
   return path;
+}
+
+/** Writes a temp file beside `path` and renames it over, so a crash never leaves half a config. */
+function writeAtomic(path: string, text: string) {
+  mkdirSync(dirname(path), { recursive: true });
+  const tmp = `${path}.skope-${process.pid}.tmp`;
+  writeFileSync(tmp, text);
+  renameSync(tmp, path);
 }
 
 /** Adds the hook to Codex's config.toml, unless it's there. Codex asks the person to trust it (/hooks). */
@@ -224,6 +266,11 @@ export function installCodexHook(dir: string, command: string): string {
   const path = join(dir, "config.toml");
   const text = existsSync(path) ? readFileSync(path, "utf8") : "";
   if (text.includes("--plan-approved")) return path;
+  // A second UserPromptSubmit table would be a duplicate key if the file declares one inline: say what to add instead.
+  if (/UserPromptSubmit/.test(text))
+    throw new Error(
+      `${path} already has UserPromptSubmit hooks; add this to them by hand: { type = "command", command = ${JSON.stringify(command)} }`,
+    );
   const block = [
     "",
     "# skope: approve a skope plan when the person approves it in plan mode (skope --install-hooks)",
@@ -233,7 +280,7 @@ export function installCodexHook(dir: string, command: string): string {
     `command = ${JSON.stringify(command)}`,
     "",
   ].join("\n");
-  writeFileSync(path, `${text.replace(/\n*$/, "\n")}${block}`);
+  writeAtomic(path, `${text.replace(/\n*$/, "\n")}${block}`);
   return path;
 }
 
