@@ -149,8 +149,13 @@ Then put this in the plan you present for approval, word for word from
 skope plan: PATH 3f1c…(64 hex digits)…9e0a
 ```
 
-Replace `PATH` with the exact path used for `--effects`. Follow the line with
-a short summary, the commands `--effects` lists, and the diff.
+Replace `PATH` with the exact path used for `--effects`. In Claude Code the
+approved plan is the plan file, so this line must be inside the file: put it
+in the prose under the title, on its own line. It is prose, so the hash does
+not cover it, and you can update it in place after each `--effects`. A line
+that only appears in your chat message is never seen by the hook, and the
+hook then records nothing. Follow the line, in your message, with a short
+summary, the commands `--effects` lists, and the diff.
 The hook approves only that file, only with that hash: if you change the
 plan after the person saw it, it won't run. The hash covers edits and
 commands, not prose, so rewording an explanation after review keeps the

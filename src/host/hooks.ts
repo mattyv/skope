@@ -28,6 +28,8 @@ import { pinnedStates, planChanges, repoRoot, rootForPlan } from "./plan.js";
 /** What Codex sends when the person approves a plan (codex-rs/tui/src/chatwidget/plan_implementation.rs). */
 export const CODEX_APPROVAL = "Implement the plan.";
 const PLAN_LINE = /skope plan: (\S+) ([0-9a-f]{64})\b/g;
+/** A fenced skope block: the mark of a skope plan or skill, whether or not it carries a plan line. */
+const SKOPE_BLOCK = /^```skope\s*$/m;
 /** The start of Codex's "clear context and implement" message, which carries the plan itself (plan_implementation.rs). */
 export const CODEX_CLEAR_CONTEXT =
   "A previous agent produced the plan below to accomplish the user's task. Implement the plan in a fresh context";
@@ -220,10 +222,21 @@ export function planApproved(stdin: string, out: (s: string) => void, err: (s: s
     // The approved text, after any edits the person made (tool_response.plan), else what was proposed.
     const resp = input.tool_response as { plan?: unknown } | undefined;
     const inp = input.tool_input as { plan?: unknown } | undefined;
-    plan = planLine(typeof resp?.plan === "string" ? resp.plan : typeof inp?.plan === "string" ? inp.plan : "");
+    const text = typeof resp?.plan === "string" ? resp.plan : typeof inp?.plan === "string" ? inp.plan : "";
+    plan = planLine(text);
     const id = typeof input.tool_use_id === "string" ? input.tool_use_id : "";
     if (!id) {
       say("didn't record the plan approval: the hook has no tool_use_id");
+      return 0;
+    }
+    if (!plan && SKOPE_BLOCK.test(text)) {
+      // A skope plan whose `skope plan:` line lives only in the agent's chat message: Claude Code
+      // hands the hook the plan file, so the line must be in the file. Silence here cost a
+      // whole approval round; tell the agent what to do.
+      const fix =
+        "skope recorded nothing: the approved plan has a skope block but no `skope plan: PATH HASH` line. Put that line inside the plan file (it is prose; the hash ignores it), re-enter plan mode and present the plan again.";
+      say("no `skope plan:` line in the approved plan; nothing recorded");
+      out(`${JSON.stringify({ hookSpecificOutput: { hookEventName: "PostToolUse", additionalContext: fix } })}\n`);
       return 0;
     }
     if (plan) claudeProvenance = { transcript, tool_use_id: id, ...plan };
