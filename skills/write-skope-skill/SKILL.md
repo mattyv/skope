@@ -184,6 +184,14 @@ Rules that keep a skill safe and testable:
   outputs in a command (`$(( {a} - {b} ))` is `E-TAINT`): measure both in
   one command, or compare them with `check {after} < {before}`.
 - **Every section ends** in `stop`, `page`, `hand off` or `then [X]`.
+- **Write guidance plainly.** A section's first paragraph is what the model
+  sees when that section is an `ask` option, and what the person reads to
+  approve the skill. Active voice, positive statements, concrete nouns and
+  verbs, no filler; one topic per paragraph with its point first. Say what
+  the section does and when it is the right choice, not that it is
+  "robust" or "ensures" something.
+- **To route on an answer, use the `[Section]` option list.** `**if yes**`
+  only takes `run CMD` or `do CMD`; it cannot jump to a section.
 - **Give params that reach a `do` fixed choices** (`svc: { default: web,
   choices: [web, api] }`), so `--effects` lists every value and the approval
   pins them. A param without choices can be any safe value.
