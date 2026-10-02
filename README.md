@@ -114,9 +114,9 @@ the shell, the pager and the backend, is ordinary tested TypeScript.
 skope is in beta. Install the beta by name:
 
 ```console
-$ curl -fsSL https://github.com/mattyv/skope/releases/download/v0.1.0-beta.4/install.sh | SKOPE_VERSION=0.1.0-beta.4 sh
+$ curl -fsSL https://github.com/mattyv/skope/releases/download/v0.1.0-beta.5/install.sh | SKOPE_VERSION=0.1.0-beta.5 sh
 $ skope --version
-skope 0.1.0-beta.4 (build identity …)
+skope 0.1.0-beta.5 (build identity …)
 ```
 
 That installs a single self-contained binary for Linux (x64, arm64) or
@@ -124,7 +124,7 @@ macOS (Apple silicon) into `~/.local/bin`. It doesn't need Node. The
 installer checks the download against the release's checksums before
 installing anything. Set `SKOPE_INSTALL_DIR` to install elsewhere.
 
-Or run the container image, `ghcr.io/mattyv/skope:0.1.0-beta.4`.
+Or run the container image, `ghcr.io/mattyv/skope:0.1.0-beta.5`.
 
 **Not on npm yet.** The `skope` name on npm belongs to an unrelated
 project, so don't `npm install skope`. A package under a different name
