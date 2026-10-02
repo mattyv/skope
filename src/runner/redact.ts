@@ -59,6 +59,8 @@ export interface RedactOptions {
 
 export interface Redactor {
   usingDefaults: boolean;
+  /** Arbitrary patterns and multiline literals need whole-output redaction. */
+  deferStreaming: boolean;
   /**
    * Redacts the whole text. `truncated`: the capture cap cut the start, so
    * the partial first line is dropped first (SPEC §9).
@@ -82,6 +84,7 @@ export function buildRedactor(opts: RedactOptions = {}): Redactor {
   };
   return {
     usingDefaults,
+    deferStreaming: !!opts.patterns?.length || !!opts.literals?.some((s) => /[\r\n]/.test(s)),
     redact,
     redactedTail: (text, maxBytes, truncated = false) => tailBytes(redact(text, { truncated }), maxBytes),
   };

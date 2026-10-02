@@ -291,8 +291,8 @@ export function planApproved(stdin: string, out: (s: string) => void, err: (s: s
   }
   useOnce(agentDir, key); // Validation and persistence succeeded; a failed attempt remains retryable.
   const next = claude
-    ? `skope recorded the approval for ${plan.path}; skope will verify Claude's transcript before running. Run it with: SKOPE_CALLER=agent skope ${plan.path} --apply`
-    : `skope recorded the approval for ${plan.path}; skope will verify Codex's transcript before running. Run it with: SKOPE_CALLER=agent skope ${plan.path} --apply`;
+    ? `skope recorded the approval for ${plan.path}; skope will verify Claude's transcript before running. Run it with: SKOPE_CALLER=agent skope ${plan.path} --apply --stream`
+    : `skope recorded the approval for ${plan.path}; skope will verify Codex's transcript before running. Run it with: SKOPE_CALLER=agent skope ${plan.path} --apply --stream`;
   say(`recorded approval for ${plan.path}`);
   if (claude) out(`${JSON.stringify({ hookSpecificOutput: { hookEventName: "PostToolUse", additionalContext: next } })}\n`);
   else out(`${next}\n`);

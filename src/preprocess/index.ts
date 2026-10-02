@@ -7,6 +7,7 @@
 // comes from markdown-it (blocks.ts), so what runs is what renders.
 
 import type { CoreProgram, List, OtherSection, Section, Stmt } from "../contracts.gen.js";
+import { parsePatch } from "../runner/patch.js";
 import { type Block, type Item, isPlainText, parseBlocks, plainText } from "./blocks.js";
 import { mkErr, type ParseError } from "./errors.js";
 import { parseFrontmatter } from "./frontmatter.js";
@@ -259,11 +260,13 @@ class Preprocessor {
         noNested();
         return { src, page: r };
       }
+      case "patch":
       case "edit":
       case "create":
       case "delete": {
         const r = parseChange(rest, this.resolve, keyword);
         const form = {
+          patch: "`**patch** `PATH` [ELSE]`, then a ```diff block for exactly that file",
           edit: "`**edit** `PATH` [· all] [ELSE]`, then an ```old block and a ```new block",
           create: "`**create** `PATH` [ELSE]`, then a ```new block",
           delete: "`**delete** `PATH` [ELSE]` with nothing under it",
@@ -271,9 +274,18 @@ class Preprocessor {
         if (r === GRAMMAR_ERROR) return grammarError(`${form}; PATH is literal`);
         noNested();
         const fences = item.blocks.map((b) => (b.kind === "opaque" ? b.fence : undefined));
-        const want = { edit: ["old", "new"], create: ["new"], delete: [] }[keyword];
+        const want = { patch: ["diff"], edit: ["old", "new"], create: ["new"], delete: [] }[keyword];
         if (fences.length !== want.length || !fences.every((f, i) => f?.info === want[i])) return grammarError(form);
         const [a, b] = fences as { content: string }[];
+        if (keyword === "patch") {
+          try {
+            const files = parsePatch(a?.content ?? "");
+            if (files.length !== 1 || files[0]?.path !== r.path) return grammarError(`${form}; headers must name PATH`);
+          } catch (err) {
+            return grammarError(`${form}; ${(err as Error).message}`);
+          }
+          return { src, change: { op: keyword, path: r.path, patch: a?.content as string }, else: r.else };
+        }
         if (keyword === "edit") {
           if (a?.content.trim() === "") return grammarError(`${form}; the old block can't be empty`);
           return {

@@ -1,6 +1,6 @@
 # Design: skope as the plan in plan mode
 
-Status: v1 built, revised after a second review. Plans' commands run at the repository root, and plan approvals live in the agent tool's config directory, never beside the plan (item 7 below predates that). Claude Code can keep its skope plan in its own `~/.claude/plans/` directory; the approval pins the working repository root. v2 is not built.
+Status: v1 built, revised after a second review. Plans' commands run at the repository root, and plan approvals live in the agent tool's config directory, never beside the plan (item 7 below predates that). Claude Code can keep its skope plan in its own `~/.claude/plans/` directory; the approval pins the working repository root. v2 is not built. Unified-patch edits and prototype/diff import are now supported; these are host features and do not change the proven core.
 
 ## Problem
 
@@ -196,3 +196,36 @@ Type errors after the grammar change. Read the record, fix the plan, resume from
   and how does it learn which plan file was presented? (Candidate: the plan
   text names the file; the hook reads it from the approved plan.)
 - Resume granularity: is a section enough, given idempotent edits?
+
+## Unified patches and compact approval
+
+Plans can use `**patch** `PATH` with a `diff` fence containing one standard
+unified file diff. The parser checks the header path and hunk counts. The
+host applies exact positions and context, preserves existing line endings
+and permissions, and supports final-newline markers. It performs no offset
+search or fuzzy application. The patch body enters the effects hash.
+File simulation, approval pins, and execution use the same patch rules.
+Pinned after-states let resumed plans skip completed patches.
+
+`skope plan --from-tree DIR --output PATH [--check COMMAND]...` compares the
+current repository (or `--base DIR`) with a complete prototype tree. It
+writes a self-contained executable plan with one patch per file and checks
+that hand off to Fix. It never reverts or changes the base files. Git-ignored
+output and `.skope/` are omitted. Text changes only: binary files, symlinks,
+mode changes, and line-ending conversions fail generation.
+`skope plan --from-diff FILE` embeds an existing diff into the same format.
+Later changes to the imported file do not affect execution.
+
+`skope plan PATH --review --diff` shows the complete review once.
+`skope plan PATH --review` then emits only the marker, file list, and commands
+for approval. Both agents use `.skope/plans/` for the executable plan.
+Claude's native plan file holds the compact brief. The approval hook follows
+the marker to the executable plan, computes its effects, pins file states,
+and verifies the host transcript before execution. The brief cannot grant
+approval itself. This avoids deliberately submitting the full executable
+plan twice; the host controls its own transcript echoing.
+
+Every real run writes redacted `events.jsonl` in its run directory. Readable
+output does not replace this record. The final stderr line reports the run
+outcome and counts file changes and check results; JSON stdout is unchanged
+for runs without `--stream`.

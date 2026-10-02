@@ -32,9 +32,11 @@ export interface Effects {
 }
 
 /** The sha256 of a change's op, path and text, in hex: whole, so no other text can match it. */
-export const changeHash = (c: { op: string; path: string; old?: string; new?: string; all?: boolean }) =>
+export const changeHash = (c: { op: string; path: string; old?: string; new?: string; all?: boolean; patch?: string }) =>
   createHash("sha256")
-    .update(JSON.stringify([c.op, c.path, c.old ?? null, c.new ?? null, c.all ?? false]))
+    .update(
+      JSON.stringify(c.op === "patch" ? [c.op, c.path, c.patch ?? null] : [c.op, c.path, c.old ?? null, c.new ?? null, c.all ?? false]),
+    )
     .digest("hex");
 
 /** Every value a list-bound variable can take: a list's items, or its action items' commands. */

@@ -4,7 +4,7 @@
 // capture time, and stopping every live command when skope is interrupted.
 
 import { execFileSync, spawn } from "node:child_process";
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, test, vi } from "vitest";
@@ -322,4 +322,21 @@ describe("stopAll (SPEC §4.4: skope interrupted, P2-13)", () => {
     expect(liveCommands()).toBe(0);
     await stopAll(20_000);
   });
+});
+
+test("output observers receive both channels while the command is still running", async () => {
+  const ack = marker("stream-ack");
+  const seen: Record<string, string> = { stdout: "", stderr: "" };
+  const r = await execCommand(`printf 'ready\\n'; printf 'warning\\n' >&2; while [ ! -f '${ack}' ]; do sleep 0.01; done`, {
+    env,
+    timeoutMs: 3000,
+    onOutput(channel, chunk) {
+      seen[channel] += chunk.toString();
+      if (seen.stdout && seen.stderr) writeFileSync(ack, "ack");
+    },
+  });
+  expect(r.exit).toBe(0);
+  expect(seen).toEqual({ stdout: r.stdout, stderr: r.stderr });
+  expect(r.stdout).toBe("ready\n");
+  expect(r.stderr).toBe("warning\n");
 });

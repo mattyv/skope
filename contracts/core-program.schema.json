@@ -771,7 +771,7 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["src", "change", "else"],
-      "description": "`**edit**`, `**create**` or `**delete**` `PATH` (plans, docs/design/plan-mode.md). To the core, a `do` whose command is `OP PATH`; the host applies the change itself and never runs it as a command.",
+      "description": "`**edit**`, `**create**`, `**delete**` or `**patch**` `PATH` (plans, docs/design/plan-mode.md). To the core, a `do` whose command is `OP PATH`; the host applies the change itself and never runs it as a command.",
       "properties": {
         "src": {
           "$ref": "#/$defs/src"
@@ -782,7 +782,7 @@
           "required": ["op", "path"],
           "properties": {
             "op": {
-              "enum": ["edit", "create", "delete"]
+              "enum": ["edit", "create", "delete", "patch"]
             },
             "path": {
               "type": "string",
@@ -801,6 +801,11 @@
             "all": {
               "type": "boolean",
               "description": "edit only: replace every occurrence."
+            },
+            "patch": {
+              "type": "string",
+              "minLength": 1,
+              "description": "patch only: a unified diff containing exactly this file."
             }
           }
         },
