@@ -3,7 +3,7 @@
 // `skope --install-hooks` puts it in their settings.
 
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -297,7 +297,10 @@ describe("Claude Code: PostToolUse on ExitPlanMode", () => {
 describe("Codex: UserPromptSubmit with the approval message", () => {
   const session = (w: ReturnType<typeof world>, ...xs: unknown[]) => {
     const t = join(w.codex, "sessions", `s${Math.random()}.jsonl`);
-    writeFileSync(t, jsonl(...xs));
+    writeFileSync(
+      t,
+      jsonl({ type: "session_meta", payload: { id: "session-1" } }, { type: "turn_context", payload: { turn_id: "turn-1" } }, ...xs),
+    );
     return t;
   };
   const say = (role: string, text: string) => ({
@@ -305,7 +308,14 @@ describe("Codex: UserPromptSubmit with the approval message", () => {
     payload: { type: "message", role, content: [{ type: "input_text", text }] },
   });
   const submit = (w: ReturnType<typeof world>, transcript: string) =>
-    w.hook({ hook_event_name: "UserPromptSubmit", prompt: "Implement the plan.", cwd: w.repo, transcript_path: transcript });
+    w.hook({
+      hook_event_name: "UserPromptSubmit",
+      prompt: "Implement the plan.",
+      session_id: "session-1",
+      turn_id: "turn-1",
+      cwd: w.repo,
+      transcript_path: transcript,
+    });
 
   test("approves the plan the transcript last proposed, once", () => {
     const w = world();
@@ -315,10 +325,59 @@ describe("Codex: UserPromptSubmit with the approval message", () => {
     expect(submit(w, t).stderr).toContain("already used");
   });
 
-  test("doesn't approve without the person's message last", () => {
+  test("records the hook before the user message, then verifies the matching turn at apply", async () => {
     const w = world();
-    const t = session(w, say("user", "Implement the plan."), say("assistant", `<proposed_plan>\n${w.line}\n</proposed_plan>`));
-    expect(submit(w, t).stderr).toContain("no plan was proposed before the approval");
+    const t = session(w, say("assistant", `<proposed_plan>\n${w.line}\n</proposed_plan>`));
+    expect(submit(w, t).stderr).toContain("recorded approval");
+    expect(w.approved()).toBe(true);
+    const env = { CLAUDE_CONFIG_DIR: w.claude, CODEX_HOME: w.codex };
+    const before = await runSkope([w.plan, "--apply"], { env });
+    expect(before.events.find((e) => e.event === "error")).toMatchObject({ code: "E-NOT-APPROVED" });
+    expect(readFileSync(join(w.repo, "a.txt"), "utf8")).toBe("old\n");
+    appendFileSync(t, jsonl(say("user", "Implement the plan.")));
+    const after = await runSkope([w.plan, "--apply", "--no-page"], { env });
+    expect(after.events.at(-1)).toMatchObject({ outcome: "stopped" });
+    expect(readFileSync(join(w.repo, "a.txt"), "utf8")).toBe("new\n");
+  });
+
+  test.each(["wrong turn", "wrong session", "rejected", "different plan", "user supplied plan"])("blocks apply with %s", async (kind) => {
+    const w = world();
+    const proposed = say("assistant", `<proposed_plan>\n${w.line}\n</proposed_plan>`);
+    const t = session(w, proposed);
+    expect(submit(w, t).status).toBe(0);
+    expect(w.approved()).toBe(true);
+    const entries: unknown[] = [
+      { type: "session_meta", payload: { id: kind === "wrong session" ? "other-session" : "session-1" } },
+      proposed,
+      { type: "turn_context", payload: { turn_id: kind === "wrong turn" ? "other-turn" : "turn-1" } },
+    ];
+    if (kind === "different plan")
+      entries.push(say("assistant", `<proposed_plan>${w.line.replace(w.hash, "a".repeat(64))}</proposed_plan>`));
+    if (kind === "user supplied plan") entries.splice(1, 1, say("user", `<proposed_plan>${w.line}</proposed_plan>`));
+    entries.push(say("user", kind === "rejected" ? "No, keep planning." : "Implement the plan."));
+    writeFileSync(t, jsonl(...entries));
+    const run = await runSkope([w.plan, "--apply"], { env: { CLAUDE_CONFIG_DIR: w.claude, CODEX_HOME: w.codex } });
+    expect(run.events.find((e) => e.event === "error")).toMatchObject({ code: "E-NOT-APPROVED" });
+    expect(readFileSync(join(w.repo, "a.txt"), "utf8")).toBe("old\n");
+  });
+
+  test.each(["changed", "missing"])("a %s plan does not consume the approval", (kind) => {
+    const w = world();
+    const t = session(w, say("assistant", `<proposed_plan>${w.line}</proposed_plan>`));
+    if (kind === "missing") unlinkSync(w.plan);
+    else writeFileSync(w.plan, PLAN.replace("  new\n", "  changed\n"));
+    expect(submit(w, t).stderr).toContain(kind === "missing" ? "can't read" : "changed after");
+    expect(existsSync(join(w.codex, "skope", "used-approvals"))).toBe(false);
+    writeFileSync(w.plan, PLAN);
+    expect(submit(w, t).stderr).toContain("recorded approval");
+    expect(w.approved()).toBe(true);
+  });
+
+  test("requires the hook session and turn IDs", () => {
+    const w = world();
+    const t = session(w, say("assistant", `<proposed_plan>${w.line}</proposed_plan>`));
+    const r = w.hook({ hook_event_name: "UserPromptSubmit", prompt: "Implement the plan.", cwd: w.repo, transcript_path: t });
+    expect(r.stderr).toContain("session_id and turn_id");
     expect(w.approved()).toBe(false);
   });
 
@@ -339,8 +398,15 @@ describe("Codex: UserPromptSubmit with the approval message", () => {
     const w = world();
     const prompt = `${CODEX_CLEAR_CONTEXT}. Plan:\n${w.line}\n`;
     const t = session(w, say("user", prompt));
-    const r = w.hook({ hook_event_name: "UserPromptSubmit", prompt, cwd: w.repo, transcript_path: t });
-    expect(r.stderr).toContain("approved");
+    const r = w.hook({
+      hook_event_name: "UserPromptSubmit",
+      prompt,
+      session_id: "session-1",
+      turn_id: "turn-1",
+      cwd: w.repo,
+      transcript_path: t,
+    });
+    expect(r.stderr).toContain("recorded approval");
     expect(w.approved()).toBe(true);
   });
 

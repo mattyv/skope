@@ -32,6 +32,8 @@ export interface ExecOptions {
   input?: string;
   /** Default 1 MiB (SPEC §4.4). */
   capBytes?: number;
+  /** Raw output observer; callers must redact before displaying it. */
+  onOutput?: (channel: "stdout" | "stderr", chunk: Buffer) => void;
 }
 
 export const DEFAULT_GRACE_MS = 5000;
@@ -220,8 +222,14 @@ export function execCommand(cmd: string, opts: ExecOptions): Promise<ExecResult>
       stop(graceMs);
     }, opts.timeoutMs);
 
-    child.stdout?.on("data", (c: Buffer) => stdout.push(c));
-    child.stderr?.on("data", (c: Buffer) => stderr.push(c));
+    child.stdout?.on("data", (c: Buffer) => {
+      stdout.push(c);
+      opts.onOutput?.("stdout", c);
+    });
+    child.stderr?.on("data", (c: Buffer) => {
+      stderr.push(c);
+      opts.onOutput?.("stderr", c);
+    });
     child.on("error", (err) => {
       done();
       reject(err);

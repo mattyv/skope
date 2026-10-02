@@ -4,7 +4,7 @@
 // readable stderr line (SPEC §7.1, §10).
 
 import { createHash, randomBytes } from "node:crypto";
-import { mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { hostname } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { load as loadYaml } from "js-yaml";
@@ -29,10 +29,12 @@ import { type FakeKind, resolveFakeKeys } from "../runner/fakeKeys.js";
 import { expandCommands, fakesError } from "../runner/fakes.js";
 import { acquireLock, LockError } from "../runner/lock.js";
 import { sendPage } from "../runner/pager.js";
+import { ReadableOutput } from "../runner/readable.js";
 import { buildRedactor, type Redactor, redactDeep } from "../runner/redact.js";
+import { OutputStream } from "../runner/stream.js";
 import type { AskRequest, Response, RunConfig, Val } from "../step.js";
 import { describe, diffEffects, effectsOf, readApproval, writeApproval } from "./effects.js";
-import { claudeApproved, claudeDir, codexDir, planApprovalName, planApprovalsDir } from "./hooks.js";
+import { claudeApproved, claudeDir, codexApproved, codexDir, planApprovalName, planApprovalsDir } from "./hooks.js";
 import { escapePage, type Handlers, type LoopResult, runLoop } from "./loop.js";
 import { fileHash, pinnedStates, planChanges, planDiff, repoRoot, rootForPlan, staleFiles } from "./plan.js";
 import { readOnly } from "./verify.js";
@@ -50,6 +52,7 @@ export interface RunOptions {
   diff?: boolean;
   /** One stderr line per command as it starts. */
   progress?: boolean;
+  stream?: boolean;
   apply: boolean;
   dryRun: boolean;
   noPage: boolean;
@@ -105,6 +108,10 @@ export async function runSkill(o: RunOptions): Promise<number> {
   const dryRun = o.mode === "run" && o.apply !== o.dryRun ? o.dryRun : null;
   let askCalls = 0;
   let effects = 0;
+  let eventLog: string | null = null;
+  const totals = { applied: 0, already: 0, passed: 0, failed: 0, timedOut: 0 };
+  const summary = () =>
+    `${totals.applied} change${totals.applied === 1 ? "" : "s"} applied, ${totals.already} already in place; ${totals.passed} check${totals.passed === 1 ? "" : "s"} passed, ${totals.failed} failed, ${totals.timedOut} timed out`;
   // Whether the last ask's backend call failed, which the handler already said on stderr.
   let askFailed = false;
   // Everything that leaves skope is redacted (SPEC §9): events, stderr, pages, the handoff record, and
@@ -115,14 +122,33 @@ export async function runSkill(o: RunOptions): Promise<number> {
   const toOut = (s: string) => (o.test ? o.test.out(s) : process.stdout.write(s));
   const say = (s: string) => toErr(plainText(redactor.redact(s)));
 
+  const readable = o.stream ? new ReadableOutput(say) : undefined;
+
   const emit = (e: Record<string, unknown>) => {
     // Counted here, not taken from the core's outcome, so a run that ends in error still reports them.
     if (e.event === "ask" || e.event === "sweep_item") askCalls++;
     if (e.event === "effect_start") effects++;
+    if (e.event === "change" && e.result === "applied") totals.applied++;
+    if (e.event === "change" && e.result === "already_applied") totals.already++;
+    if (e.event === "check_cmd" || e.event === "check") {
+      if (e.timed_out) totals.timedOut++;
+      else if (e.event === "check" ? e.result === true : e.exit === 0) totals.passed++;
+      else totals.failed++;
+    }
     // The core found the answer invalid, which counts as unavailable (SPEC §4.2): say so, as for a failed call.
     if ((e.event === "ask" || e.event === "sweep_item") && e.detail !== undefined && !askFailed)
       say("skope: the backend's answer was invalid, so it counts as the backend being unavailable\n");
-    toOut(`${JSON.stringify(redactDeep(redactor, { ts: new Date().toISOString(), ...run, host, ...e }))}\n`);
+    const json = `${JSON.stringify(redactDeep(redactor, { ts: new Date().toISOString(), ...run, host, ...e }))}\n`;
+    if (eventLog) {
+      try {
+        appendFileSync(eventLog, json);
+      } catch (err) {
+        eventLog = null;
+        fail("E-IO", "runtime", `can't append the run record: ${(err as Error).message}`);
+      }
+    }
+    if (readable) readable.event(redactDeep(redactor, { ...run, ...e, ...(e.event === "outcome" ? { summary: summary() } : {}) }));
+    else toOut(json);
     // A sweep's answers are the point of running it: say where they are (SPEC §4.8).
     if (e.event === "sweep" && !o.test) {
       const early = e.stopped
@@ -149,6 +175,10 @@ export async function runSkill(o: RunOptions): Promise<number> {
   const end = (ending: Ending, reason: string | null = null) => {
     flush();
     emit({ event: "outcome", outcome: ending, reason, ask_calls: askCalls, effects, dry_run: dryRun });
+    if (!o.stream && run.run_id !== null)
+      say(
+        `skope: ${ending === "stopped" ? (dryRun ? "preview finished" : "finished") : ending}; ${summary()}${dryRun ? "; changes were skipped" : ""}\n`,
+      );
     return EXIT[ending];
   };
   const fail = (code: string, stage: Stage, message: string, line?: number): never => {
@@ -311,6 +341,19 @@ export async function runSkill(o: RunOptions): Promise<number> {
           approved = null;
         }
       }
+      if (isPlanFile && approved?.codex) {
+        const proof = approved.codex;
+        try {
+          if (
+            proof.hash !== effects.hash.slice(7) ||
+            realpathSync(resolve(approved.root ?? "", proof.path)) !== realpathSync(o.file) ||
+            codexApproved(proof) !== null
+          )
+            approved = null;
+        } catch {
+          approved = null;
+        }
+      }
       if (isPlanFile && approved?.root !== undefined && approved.root !== planRoot())
         fail("E-NOT-APPROVED", "args", `${program.skill} was approved for ${approved.root}, but this run would use ${planRoot()}`);
       if (approved?.effects_hash !== effects.hash || (isPlanFile && planChanges(program).length > 0 && !approved?.files))
@@ -450,6 +493,15 @@ export async function runSkill(o: RunOptions): Promise<number> {
     } catch (err) {
       return fail("E-IO", "runtime", `can't create run directory ${runDir}: ${(err as Error).message}`);
     }
+    if (!o.test) {
+      eventLog = join(runDir, "events.jsonl");
+      try {
+        writeFileSync(eventLog, "", { flag: "wx", mode: 0o600 });
+      } catch (err) {
+        eventLog = null;
+        fail("E-IO", "runtime", `can't create the run record: ${(err as Error).message}`);
+      }
+    }
     Object.assign(run, { run_id: runId, skill: program.skill, skill_hash: `sha256:${sha256hex(text)}` });
     const { version, build } = IDENTITY;
     emit({
@@ -496,6 +548,12 @@ export async function runSkill(o: RunOptions): Promise<number> {
       const now = fileHash(root, c.path);
       if (program.kind === "plan" && (!states || now === null || !states.includes(now)))
         fail("E-PLAN-STALE", "runtime", `${c.path} changed since the plan was approved, other than by the plan itself`);
+      // Pinned after-states, rather than a patch's context alone, decide
+      // re-runs. Insertion/deletion-only hunks can match more than one state.
+      if (c.op === "patch" && states && now !== null && states.indexOf(now) > (changeIndex.get(src) ?? Number.POSITIVE_INFINITY)) {
+        emit({ event: "change", line: src, op: c.op, path: c.path, result: "already_applied", message: null });
+        return { exit: 0, signal: null, stdout: "", stderr: "", timedOut: false, truncated: false };
+      }
       let r = applyChange(root, c);
       // A change whose text can't say it's already in place (an edit that deletes lines) is already
       // applied if the file is in a state the approval pinned as after this change.
@@ -511,17 +569,47 @@ export async function runSkill(o: RunOptions): Promise<number> {
     const isPlan = program.kind === "plan";
     let execs = 0;
     let lastLog: string | null = null;
-    const progress = o.progress || (!o.test && process.stderr.isTTY === true);
+    const progress = o.stream || o.progress || (!o.test && process.stderr.isTTY === true);
     const handlers: Handlers = {
       exec: async (next) => {
         const n = ++execs;
-        if (progress) say(`skope: [${n}] ${next.exec} ${next.cmd}\n`);
         const change = next.exec === "do" && !fakeRun ? changes.get(next.src) : undefined;
+        if (readable) {
+          const section = Object.values(program.sections)
+            .filter((s) => s.src <= next.src)
+            .sort((a, b) => b.src - a.src)[0];
+          if (section) readable.section(section.name);
+          const label = change
+            ? `${change.op === "edit" || change.op === "patch" ? "Update" : change.op === "create" ? "Create" : "Delete"} ${change.path}`
+            : `${next.exec === "check" ? "Check" : "Run"}: ${next.cmd}`;
+          say(`  [${n}] ${label}\n`);
+        } else if (progress) say(`skope: [${n}] ${next.exec} ${next.cmd}\n`);
         if (change) return halt(applyPlanChange(change, next.src));
         // A plan's commands run at the repository root, where its paths are relative to.
         if (isPlan) root ??= planRoot();
         const cwd = isPlan ? root : undefined;
-        const r = await (fakeRun ? fakeRun(next) : execCommand(next.cmd, { timeoutMs: next.timeoutMs, env, cwd }));
+        const streams = o.stream
+          ? {
+              stdout: new OutputStream(redactor, (s) => toErr(plainText(s))),
+              stderr: new OutputStream(redactor, (s) => toErr(plainText(s))),
+            }
+          : undefined;
+        const r = await (fakeRun
+          ? fakeRun(next)
+          : execCommand(next.cmd, {
+              timeoutMs: next.timeoutMs,
+              env,
+              cwd,
+              onOutput: streams ? (channel, chunk) => streams[channel].push(chunk) : undefined,
+            }));
+        if (streams) {
+          if (fakeRun) {
+            streams.stdout.push(Buffer.from(r.stdout));
+            streams.stderr.push(Buffer.from(r.stderr));
+          }
+          streams.stdout.end();
+          streams.stderr.end();
+        }
         if (isPlan) {
           lastLog = join(runDir, `exec-${n}.log`);
           const stdout = redactor.redact(r.stdout, { truncated: r.truncated });
@@ -633,7 +721,7 @@ export async function runSkill(o: RunOptions): Promise<number> {
       }
       emit({ event: "handoff_record", ...at, path, record });
       // A handoff exits 20, which reads like a failure: say in words what happened and where the record is.
-      if (!o.test)
+      if (!o.test && !o.stream)
         say(`skope: handed off (${result.outcome.reason}) in ${at.section}; a person or agent takes it from here. Record: ${path}\n`);
       const optedOut = o.noPage || process.env.SKOPE_CALLER === "agent" || config.on_handoff === "none";
       if (!optedOut) {

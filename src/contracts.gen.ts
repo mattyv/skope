@@ -157,12 +157,12 @@ export interface StmtDo {
   else: Else;
 }
 /**
- * `**edit**`, `**create**` or `**delete**` `PATH` (plans, docs/design/plan-mode.md). To the core, a `do` whose command is `OP PATH`; the host applies the change itself and never runs it as a command.
+ * `**edit**`, `**create**`, `**delete**` or `**patch**` `PATH` (plans, docs/design/plan-mode.md). To the core, a `do` whose command is `OP PATH`; the host applies the change itself and never runs it as a command.
  */
 export interface StmtChange {
   src: Src;
   change: {
-    op: "edit" | "create" | "delete";
+    op: "edit" | "create" | "delete" | "patch";
     /**
      * A literal path, relative to the repository root.
      */
@@ -179,6 +179,10 @@ export interface StmtChange {
      * edit only: replace every occurrence.
      */
     all?: boolean;
+    /**
+     * patch only: a unified diff containing exactly this file.
+     */
+    patch?: string;
   };
   else: Else;
 }
@@ -817,7 +821,7 @@ export interface ChangeEvent {
   section?: string;
   line: number;
   event: "change";
-  op: "edit" | "create" | "delete";
+  op: "edit" | "create" | "delete" | "patch";
   path: string;
   /**
    * already_applied: the change was already in place, so the plan can be re-run.

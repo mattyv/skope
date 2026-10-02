@@ -23,13 +23,15 @@ import {
   writeFileSync,
 } from "node:fs";
 import { dirname, isAbsolute, join, relative, sep } from "node:path";
+import { patchText } from "./patch.js";
 
 export interface Change {
-  op: "edit" | "create" | "delete";
+  op: "edit" | "create" | "delete" | "patch";
   path: string;
   old?: string;
   new?: string;
   all?: boolean;
+  patch?: string;
 }
 
 export type ChangeResult = { result: "applied" | "already_applied" } | { result: "failed"; message: string };
@@ -70,7 +72,7 @@ function readText(path: string, file: string): { text: string; eol: "\n" | "\r\n
   const eol = crlf > 0 ? "\r\n" : "\n";
   const text = eol === "\r\n" ? raw.replace(/\r\n/g, "\n") : raw;
   const finalNewline = text === "" || text.endsWith("\n");
-  return { text: finalNewline ? text : `${text}\n`, eol, finalNewline };
+  return { text, eol, finalNewline };
 }
 
 /** Where `needle` (whole lines, ending in a newline) starts at a line start in `text`. */
@@ -103,14 +105,23 @@ function writeText(file: string, text: string, eol: "\n" | "\r\n", finalNewline:
  * `\n`. Pure, so the static diff and the stale check use the same rules as a run. Throws Refused.
  */
 export function changeText(text: string | null, c: Change): { result: "applied"; after: string | null } | { result: "already_applied" } {
+  if (c.op === "patch") {
+    try {
+      return patchText(text, c.path, c.patch ?? "");
+    } catch (err) {
+      throw new Refused((err as Error).message);
+    }
+  }
   if (c.op === "delete") return text === null ? { result: "already_applied" } : { result: "applied", after: null };
   const content = withNewline(c.new ?? "");
   if (c.op === "create") {
     if (text === null) return { result: "applied", after: content };
-    if (text === content) return { result: "already_applied" };
+    if (withNewline(text) === content) return { result: "already_applied" };
     throw new Refused(`${c.path}: already exists with other content`);
   }
   if (text === null) throw new Refused(`${c.path}: no such file`);
+  const finalNewline = text === "" || text.endsWith("\n");
+  text = withNewline(text);
   const old = withNewline(c.old ?? "");
   const hits = lineMatches(text, old);
   if (hits.length === 0) {
@@ -126,7 +137,8 @@ export function changeText(text: string | null, c: Change): { result: "applied";
     out += text.slice(from, i) + content;
     from = i + old.length;
   }
-  return { result: "applied", after: out + text.slice(from) };
+  const after = out + text.slice(from);
+  return { result: "applied", after: finalNewline ? after : after.replace(/\n$/, "") };
 }
 
 /** A file's text as a change sees it (null if there's no file), or why it can't be changed. */
@@ -148,8 +160,9 @@ export function applyChange(root: string, c: Change): ChangeResult {
     const r = changeText(before?.text ?? null, c);
     if (r.result === "already_applied") return r;
     if (r.after === null) unlinkSync(file);
-    else if (before) writeText(file, r.after, before.eol, before.finalNewline, statSync(file).mode & 0o7777);
-    else writeText(file, r.after, "\n", true);
+    else if (before)
+      writeText(file, r.after, before.eol, c.op === "patch" ? r.after.endsWith("\n") : before.finalNewline, statSync(file).mode & 0o7777);
+    else writeText(file, r.after, "\n", c.op === "patch" ? r.after.endsWith("\n") : true);
     return { result: "applied" };
   } catch (err) {
     if (err instanceof Refused) return { result: "failed", message: err.message };

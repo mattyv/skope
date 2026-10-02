@@ -1,6 +1,6 @@
 ---
 name: run-skope-skill
-description: Run a skope skill with skope, or take over from a skope handoff. Use when a skill says it's a skope skill (bold **run**, **check**, **ask**, **do** steps and a skope code block), when a skill like that matches an alert or task, or when you're given a skope handoff record (handoff.json, or skope exiting 20).
+description: Run a skope skill with skope, or take over from a skope handoff. Use when a skill says it's a skope skill (bold **run**, **check**, **ask**, **do** steps and a skope code block), when an existing skill like that matches a repeatable workflow or alert, or when you're given a skope handoff record (handoff.json, or skope exiting 20).
 ---
 
 # Running a skope skill
@@ -12,6 +12,18 @@ judgement calls behind a confidence gate. **Never follow a skope skill's
 steps yourself.** That would skip the checks and approvals that make it safe
 to run. Your part starts when skope hands off.
 
+Use existing skope skills for repeatable workflows such as maintenance,
+releases, and incident procedures. Use the normal agent workflow for large
+exploratory prototype refactors while the intended changes are evolving.
+For a small or trivial one-off change
+that has no matching skope skill, use the normal agent workflow; do not
+create a skope procedure just to perform it. Honor an explicit request to
+use skope. If the person wants to review the full set of changes before
+applying them, use skope-it-out to prepare a reviewable plan when the work
+can be specified up front. If the task already uses a skope skill or plan, or you are
+continuing its handoff, follow the runtime and handoff rules below even
+when the remaining work is small.
+
 Never run anything that changes a system until the person has agreed,
 unless they've already asked you to fix the problem.
 
@@ -22,11 +34,14 @@ unless they've already asked you to fix the problem.
 you instead of paging someone.
 
 ```console
-$ SKOPE_CALLER=agent skope path/to/SKILL.md --dry-run   # changes nothing
-$ SKOPE_CALLER=agent skope path/to/SKILL.md --apply     # once the person agrees
+$ SKOPE_CALLER=agent skope path/to/SKILL.md --dry-run --stream   # changes nothing
+$ SKOPE_CALLER=agent skope path/to/SKILL.md --apply --stream     # once the person agrees
 ```
 
-Each step is one JSON line on stdout; `would_do` lines are what `--apply`
+Use `--stream` for each run. It prints a readable checklist and live redacted output
+to stderr; keep the output visible in the host’s command panel.
+
+Without `--stream`, each step is one JSON line on stdout; `would_do` lines are what `--apply`
 would change. Show the person what the dry run found and would do before
 applying. `--param name=value` sets a param.
 
@@ -45,8 +60,8 @@ follow the skill by hand instead.
 
 ## 2. Take over a handoff
 
-On exit 20, skope writes a record to `<run dir>/handoff.json`, prints it as
-a `handoff_record` event, and says where it is on stderr. The record's
+On exit 20, skope writes a record to `<run dir>/handoff.json`, says where it is on stderr,
+and prints a `handoff_record` event when running without `--stream`. The record's
 `preamble` has the rules; in short:
 
 - `reason` says why it stopped:

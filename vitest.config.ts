@@ -10,6 +10,7 @@ const slow = [
   "tests/host/cli.test.ts",
   "tests/host/skill-test*.test.ts",
   "tests/core/property.test.ts",
+  "tests/e2e/**",
 ];
 
 // Agent worktrees live under .claude/worktrees; their tests aren't ours.

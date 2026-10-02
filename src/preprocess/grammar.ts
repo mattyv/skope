@@ -18,6 +18,7 @@ export const KEYWORDS = [
   "hand off",
   "stop",
   "edit",
+  "patch",
   "create",
   "delete",
 ] as const;

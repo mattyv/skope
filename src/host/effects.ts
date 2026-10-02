@@ -32,9 +32,11 @@ export interface Effects {
 }
 
 /** The sha256 of a change's op, path and text, in hex: whole, so no other text can match it. */
-export const changeHash = (c: { op: string; path: string; old?: string; new?: string; all?: boolean }) =>
+export const changeHash = (c: { op: string; path: string; old?: string; new?: string; all?: boolean; patch?: string }) =>
   createHash("sha256")
-    .update(JSON.stringify([c.op, c.path, c.old ?? null, c.new ?? null, c.all ?? false]))
+    .update(
+      JSON.stringify(c.op === "patch" ? [c.op, c.path, c.patch ?? null] : [c.op, c.path, c.old ?? null, c.new ?? null, c.all ?? false]),
+    )
     .digest("hex");
 
 /** Every value a list-bound variable can take: a list's items, or its action items' commands. */
@@ -158,6 +160,8 @@ export interface Approval {
   root?: string;
   /** Claude's hook may run before its successful tool result reaches the transcript. Verify this before running. */
   claude?: { transcript: string; tool_use_id: string; path: string; hash: string };
+  /** Codex submits its hook before recording the prompt. Verify the matching session and turn before running. */
+  codex?: { transcript: string; session_id: string; turn_id: string; prompt: string; path: string; hash: string };
 }
 
 const approvalPath = (dir: string, skill: string) => join(dir, `${skill}.approval.json`);
@@ -184,6 +188,7 @@ export function writeApproval(
   name = e.skill,
   root?: string,
   claude?: Approval["claude"],
+  codex?: Approval["codex"],
 ): string {
   mkdirSync(dir, { recursive: true });
   const path = approvalPath(dir, name);
@@ -196,6 +201,7 @@ export function writeApproval(
     ...(files ? { files } : {}),
     ...(root ? { root } : {}),
     ...(claude ? { claude } : {}),
+    ...(codex ? { codex } : {}),
   };
   const tmp = `${path}.${process.pid}.tmp`;
   writeFileSync(tmp, `${JSON.stringify(approval, null, 2)}\n`);

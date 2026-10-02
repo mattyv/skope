@@ -58,7 +58,7 @@ export function parseRun(rest: string, resolve: Resolve) {
 }
 
 /** `**edit** `PATH` [· all] [ELSE]`, `**create** `PATH` [ELSE]`, `**delete** `PATH` [ELSE]`: the text is in fenced blocks. */
-export function parseChange(rest: string, resolve: Resolve, op: "edit" | "create" | "delete") {
+export function parseChange(rest: string, resolve: Resolve, op: "edit" | "create" | "delete" | "patch") {
   const cur = new Cursor(rest);
   if (!cur.eat(T.sp)) return fail();
   const path = cur.codeSpan();

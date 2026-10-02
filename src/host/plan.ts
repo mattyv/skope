@@ -6,7 +6,7 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { realpathSync } from "node:fs";
-import { dirname, isAbsolute, join, relative, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import type { CoreProgram, Section } from "../contracts.gen.js";
 import { type Change, changeText, currentText } from "../runner/change.js";
 
@@ -31,7 +31,10 @@ export function rootForPlan(file: string, cwd: string, claudeConfigDir: string):
   } catch {
     // No Claude plans directory, or this isn't a file in it.
   }
-  return realpathSync(repoRoot(dirname(resolve(file))));
+  // A plan in `.skope/plans/` belongs to the folder holding `.skope`, git work tree or not.
+  const dir = dirname(resolve(file));
+  const home = basename(dir) === "plans" && basename(dirname(dir)) === ".skope" ? dirname(dirname(dir)) : dir;
+  return realpathSync(repoRoot(home));
 }
 
 /** Every change in the plan, in document order, loops included. */
@@ -117,9 +120,15 @@ export function planDiff(root: string, changes: Change[]): string {
 
 /** A unified diff with 3 lines of context. Plans change little per file, so a plain LCS on the
  * part between the common prefix and suffix is fast enough. */
-export function unifiedDiff(path: string, before: string | null, after: string | null): string {
-  const a = before === null ? [] : before.replace(/\n$/, "").split("\n");
-  const b = after === null ? [] : after.replace(/\n$/, "").split("\n");
+export function unifiedDiff(path: string, before: string | null, after: string | null, context = 3): string {
+  const split = (text: string | null) => {
+    if (text === null || text === "") return [];
+    const lines = text.replace(/\n$/, "").split("\n");
+    if (!text.endsWith("\n")) lines[lines.length - 1] += "\0";
+    return lines;
+  };
+  const a = split(before);
+  const b = split(after);
   let pre = 0;
   while (pre < a.length && pre < b.length && a[pre] === b[pre]) pre++;
   let suf = 0;
@@ -129,9 +138,12 @@ export function unifiedDiff(path: string, before: string | null, after: string |
   // LCS table over the middle, flat: L(i, j) is the LCS length of am[i..] and bm[j..].
   const n = am.length;
   const m = bm.length;
-  const T = new Uint32Array((n + 1) * (m + 1));
+  // Bound memory for large prototype changes. The fallback remains exact,
+  // replacing the changed middle without finding its shortest alignment.
+  const coarse = (n + 1) * (m + 1) > 4_000_000;
+  const T = new Uint32Array(coarse ? 0 : (n + 1) * (m + 1));
   const L = (i: number, j: number) => T[i * (m + 1) + j] as number;
-  for (let i = n - 1; i >= 0; i--)
+  for (let i = coarse ? -1 : n - 1; i >= 0; i--)
     for (let j = m - 1; j >= 0; j--) T[i * (m + 1) + j] = am[i] === bm[j] ? L(i + 1, j + 1) + 1 : Math.max(L(i + 1, j), L(i, j + 1));
   type Op = { t: " " | "-" | "+"; s: string; ai: number; bi: number };
   const ops: Op[] = [];
@@ -140,8 +152,8 @@ export function unifiedDiff(path: string, before: string | null, after: string |
   let i = 0;
   let j = 0;
   while (i < n || j < m) {
-    if (i < n && j < m && am[i] === bm[j]) ops.push({ t: " ", s: at(am, i), ai: pre + i++, bi: pre + j++ });
-    else if (i < n && (j === m || L(i + 1, j) >= L(i, j + 1))) ops.push({ t: "-", s: at(am, i), ai: pre + i++, bi: pre + j });
+    if (!coarse && i < n && j < m && am[i] === bm[j]) ops.push({ t: " ", s: at(am, i), ai: pre + i++, bi: pre + j++ });
+    else if (i < n && (coarse || j === m || L(i + 1, j) >= L(i, j + 1))) ops.push({ t: "-", s: at(am, i), ai: pre + i++, bi: pre + j });
     else ops.push({ t: "+", s: at(bm, j), ai: pre + i, bi: pre + j++ });
   }
   for (let k = 0; k < suf; k++) ops.push({ t: " ", s: at(a, a.length - suf + k), ai: a.length - suf + k, bi: b.length - suf + k });
@@ -150,16 +162,20 @@ export function unifiedDiff(path: string, before: string | null, after: string |
   const changed = ops.map((o, k) => (o.t === " " ? -1 : k)).filter((k) => k >= 0);
   let h = 0;
   while (h < changed.length) {
-    const start = Math.max(0, (changed[h] as number) - 3);
-    let end = Math.min(ops.length, (changed[h] as number) + 4);
-    while (h + 1 < changed.length && (changed[h + 1] as number) - 3 <= end) end = Math.min(ops.length, (changed[++h] as number) + 4);
+    const start = Math.max(0, (changed[h] as number) - context);
+    let end = Math.min(ops.length, (changed[h] as number) + context + 1);
+    while (h + 1 < changed.length && (changed[h + 1] as number) - context <= end)
+      end = Math.min(ops.length, (changed[++h] as number) + context + 1);
     h++;
     const hunk = ops.slice(start, end);
     const aLen = hunk.filter((o) => o.t !== "+").length;
     const bLen = hunk.filter((o) => o.t !== "-").length;
     const aStart = aLen === 0 ? (hunk[0]?.ai ?? 0) : (hunk.find((o) => o.t !== "+")?.ai ?? 0) + 1;
     const bStart = bLen === 0 ? (hunk[0]?.bi ?? 0) : (hunk.find((o) => o.t !== "-")?.bi ?? 0) + 1;
-    lines.push(`@@ -${aStart},${aLen} +${bStart},${bLen} @@`, ...hunk.map((o) => o.t + o.s));
+    lines.push(
+      `@@ -${aStart},${aLen} +${bStart},${bLen} @@`,
+      ...hunk.map((o) => (o.s.endsWith("\0") ? `${o.t}${o.s.slice(0, -1)}\n\\ No newline at end of file` : o.t + o.s)),
+    );
   }
   return `${lines.join("\n")}\n`;
 }

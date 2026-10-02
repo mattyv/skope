@@ -179,7 +179,7 @@ function stmt(v: unknown, at: string): D {
     case "change": {
       // To the core a change is a `do` of its descriptor (`edit PATH`): an effect, so dry-run safety
       // and the effect events apply unchanged. The host applies it by src and never runs it as a command.
-      const c = obj(s.change, `${where}.change`, ["op", "path"], ["old", "new", "all"]);
+      const c = obj(s.change, `${where}.change`, ["op", "path"], ["old", "new", "all", "patch"]);
       const cmd = [{ lit: changeCmd(c as { op: string; path: string }) }];
       return SkopeAst.Stmt.create_Do(src, SkopeAst.DoBody.create_DoCmd(parts(cmd, `${where}.change`)), els(s.else, `${where}.else`));
     }

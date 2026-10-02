@@ -5,16 +5,18 @@ import { readFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 import IDENTITY from "./build-identity.js";
 import { writeDemo } from "./host/demo.js";
+import { generatePlan } from "./host/generatePlan.js";
 import { installHooks, planApproved } from "./host/hooks.js";
 import { installSkill } from "./host/installSkill.js";
 import { runSkill } from "./host/run.js";
 import { runTests } from "./host/test.js";
 import { plainText } from "./runner/events.js";
 
-const USAGE = `usage: skope <SKILL.md> (--apply | --dry-run) [--from SECTION] [--progress] [--no-page] [--param k=v]... [--fake answers.yaml] [--fake-exec cmds.yaml] [--config path]
+const USAGE = `usage: skope <SKILL.md> (--apply | --dry-run) [--from SECTION] [--progress] [--stream] [--no-page] [--param k=v]... [--fake answers.yaml] [--fake-exec cmds.yaml] [--config path]
        skope <SKILL.md> --lint | --verify [--trace events.jsonl] | --effects [--diff] | --approve
        skope <SKILL.md> --test [--scenario DIR or NAME] [--live] [--runs N] [--param k=v]... [--config path]
        skope --demo [DIR] | --install-skill [DIR] | --install-hooks [claude|codex]
+       skope plan --from-tree DIR --output PATH [--check COMMAND]... | plan PATH --review
        skope --version | --help`;
 
 // SPEC §7's option list.
@@ -24,6 +26,7 @@ const HELP = `usage: skope <path/to/SKILL.md> [options]
   --no-page               with --apply: don't page on handoff
   --from SECTION          start at this section instead of the entry: resume a plan after fixing it
   --progress              one line on stderr per command as it starts (the default when stderr is a terminal)
+  --stream                readable checklist and live redacted output on stderr, instead of JSON
   --param k=v             override a param from the skope block (repeatable, typed, safe-value checked)
   --verify                run the explore handler and print the verify report; run nothing
   --trace events.jsonl    with --verify: check that one run's path is one the explorer can take
@@ -49,10 +52,12 @@ const HELP = `usage: skope <path/to/SKILL.md> [options]
                           Codex's config.toml (both that are set up, unless one is named): approving a
                           skope plan in plan mode approves it for skope; nothing else goes with it
   --plan-approved         the hook itself: reads the hook's JSON on stdin (not for running by hand)
+  plan                    generate a plan from a prototype tree or diff; skope plan --help
   --version               print the release version and build identity
   --help                  print this`;
 
 async function main(argv: string[]): Promise<number> {
+  if (argv[0] === "plan") return generatePlan(argv.slice(1));
   // Bare `skope` is someone finding out what it does: the options, not an error event.
   if (argv.length === 0) {
     process.stderr.write(`${HELP}\n`);
@@ -90,6 +95,7 @@ async function main(argv: string[]): Promise<number> {
     if (positionals.length !== 1) usage = "give exactly one skill file";
     else if (values.trace !== undefined && !values.verify) usage = "--trace goes with --verify";
     else if (values.diff && !values.effects) usage = "--diff goes with --effects";
+    else if (values.stream && !(values.apply || values["dry-run"])) usage = "--stream goes with --apply or --dry-run";
     else if ((values.from !== undefined || values.progress) && !(values.apply || values["dry-run"] || values.lint || values.verify))
       usage = "--from and --progress go with a run (--apply or --dry-run), or --from with --lint or --verify";
     else if (modes > 1 || (values.test && modes > 0))
@@ -122,6 +128,7 @@ async function main(argv: string[]): Promise<number> {
     from: values.from,
     diff: values.diff ?? false,
     progress: values.progress ?? false,
+    stream: values.stream ?? false,
     apply: values.apply ?? false,
     dryRun: values["dry-run"] ?? false,
     noPage: values["no-page"] ?? false,
@@ -146,6 +153,7 @@ function parse(argv: string[]) {
       from: { type: "string" },
       diff: { type: "boolean" },
       progress: { type: "boolean" },
+      stream: { type: "boolean" },
       lint: { type: "boolean" },
       effects: { type: "boolean" },
       approve: { type: "boolean" },

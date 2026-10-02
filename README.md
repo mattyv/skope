@@ -114,9 +114,9 @@ the shell, the pager and the backend, is ordinary tested TypeScript.
 skope is in beta. Install the beta by name:
 
 ```console
-$ curl -fsSL https://github.com/mattyv/skope/releases/download/v0.1.0-beta.3/install.sh | SKOPE_VERSION=0.1.0-beta.3 sh
+$ curl -fsSL https://github.com/mattyv/skope/releases/download/v0.1.0-beta.4/install.sh | SKOPE_VERSION=0.1.0-beta.4 sh
 $ skope --version
-skope 0.1.0-beta.3 (build identity …)
+skope 0.1.0-beta.4 (build identity …)
 ```
 
 That installs a single self-contained binary for Linux (x64, arm64) or
@@ -124,7 +124,7 @@ macOS (Apple silicon) into `~/.local/bin`. It doesn't need Node. The
 installer checks the download against the release's checksums before
 installing anything. Set `SKOPE_INSTALL_DIR` to install elsewhere.
 
-Or run the container image, `ghcr.io/mattyv/skope:0.1.0-beta.3`.
+Or run the container image, `ghcr.io/mattyv/skope:0.1.0-beta.4`.
 
 **Not on npm yet.** The `skope` name on npm belongs to an unrelated
 project, so don't `npm install skope`. A package under a different name
@@ -160,7 +160,15 @@ $ skope SKILL.md --verify   # every path it can take, and how each ends
 $ skope SKILL.md --dry-run --fake answers.yaml --fake-exec commands.yaml
 ```
 
-skope's output is JSON on stdout, one event per line, for scripts and
+Use `--stream` with `--apply` or `--dry-run` for a readable checklist and
+live redacted command output on stderr, instead of JSON events. Complete lines
+appear as they arrive; partial lines wait for a newline or command exit.
+Text that may contain multiline secrets, and output covered by custom
+redaction patterns, waits until command exit. Streaming buffers are capped
+at 1 MiB per channel; oversized pending output is omitted. The agent skills
+use this flag for runs and resumes.
+
+Without `--stream`, skope's output is JSON on stdout, one event per line, for scripts and
 agents; a person reads stderr: errors, `--verify`'s summary, and one line
 when a run hands off. `--test` prints its JSON only when stdout isn't a
 terminal, so at a terminal you see just the PASS lines. In the dry run, the faked model
@@ -392,12 +400,45 @@ Every step is one line of JSON on stdout:
 
 ## Plans
 
+Skope is useful for repeatable workflows, bounded changes where exact approval
+matters, and reviewing the complete changes before applying them. Use normal
+editing for trivial one-off changes and large exploratory prototype refactors
+while the intended changes are still evolving, unless skope is requested.
+
+Generate a plan from a complete prototype tree or an existing unified diff:
+
+```console
+$ skope plan --from-tree /path/to/prototype --output .skope/plans/change.md --check 'npm run typecheck' --check 'npm test'
+$ skope plan --from-diff changes.diff --output .skope/plans/change.md --check 'npm test'
+$ skope plan .skope/plans/change.md --review --diff
+$ skope plan .skope/plans/change.md --review
+```
+
+The current repository is the base (`--base DIR` overrides it). Generation
+leaves the base files alone and records no approval. A missing file in the
+prototype is a deletion, so supply a complete tree. Git-ignored output and
+`.skope/` files are excluded. Binary files, symlinks, mode changes, and
+line-ending conversions are refused. Existing output plans are never overwritten.
+New files are created with mode 0644. The imported patch text is embedded in the plan and covered by its approval
+hash; source diff files are not read at execution time.
+
+`--review --diff` prints the command list and one complete readable diff.
+After review, `--review` prints the compact summary and exact approval marker
+for the host's plan mode, without copying the executable plan or diff again.
+It computes the hash directly: no placeholder in the executable plan is needed.
+
+Every real run writes redacted events to `<run dir>/events.jsonl`, including
+when `--stream` hides JSON output. Runs finish with one readable summary of
+changes applied, changes already in place, and check results.
+
+
 To use `skope-it-out`, enter plan mode in Claude Code or Codex and ask the
 agent to plan a code change. You can say "Use skope-it-out to plan this" to request it
 explicitly. In Codex, trust the installed approval hook with `/hooks` before
-approving your first plan. Claude Code writes the skope plan in its own plan
-file under `~/.claude/plans/`; Codex uses `.skope/plans/` in the repository.
-Neither requires a decision about committing the plan during approval.
+approving your first plan. Both agents keep the executable plan in
+`.skope/plans/` in the repository. Claude Code uses its native plan file
+under `~/.claude/plans/` for a compact approval brief pointing to that plan.
+Existing executable plans in Claude’s plans directory still work.
 If you installed skope during an open Claude Code session, check `/hooks`
 before approving the first plan. It should show skope's `PostToolUse` hook
 for `ExitPlanMode`. Claude Code normally picks up settings edits automatically;
@@ -408,10 +449,10 @@ hook is active, even if its file and hash are unchanged.
 
 In Claude Code's or Codex's plan mode, an agent with
 [`skope-it-out`](skills/skope-it-out/SKILL.md) writes its plan as a
-skope plan: a checklist of `edit`, `create` and `delete` steps, with the
-exact old and new text, and checks such as `npm test` that hand back to the
+skope plan: a checklist of unified `patch` steps (or `edit`, `create` and
+`delete` steps) and checks such as `npm test` that hand back to the
 agent when they fail. You read the plan, every command it can run, and one
-diff of every file it changes (`skope PLAN --effects --diff`). When you
+diff of every file it changes (`skope plan PLAN --review --diff`). When you
 approve it in plan mode, a hook approves it for skope, and skope then runs
 exactly that:
 
@@ -452,6 +493,7 @@ run moves from section to section until it ends.
 | **page** "…" | Pages a human and ends the run |
 | **hand off** | Hands the incident to a person or agent, with the section's prose as instructions |
 | **stop** | Ends the run |
+| **patch** `path` | Applies the single-file unified diff in the step’s `diff` fence, at exact positions with exact context. Supports creation and deletion via `/dev/null` headers. Skipped in a dry run. |
 | **edit** / **create** / **delete** `path` | Changes a file, with the exact old and new text in code blocks under the step. For plans; skipped in a dry run. |
 
 Variables come from `run … as x` (the command's trimmed output), from an
@@ -618,6 +660,10 @@ $ DAFNY=/path/to/dafny npm run core   # verify the proofs and rebuild core/gener
 
 `npm run core` skips Dafny when the `.dfy` files haven't changed since its
 last successful run; `npm run core -- --force` rebuilds anyway.
+
+Plan mode has end-to-end tests in `tests/e2e`: simulated Claude Code and
+Codex sessions through the real CLI and hook
+([tests/e2e/README.md](tests/e2e/README.md)).
 
 ## Read more
 

@@ -841,7 +841,7 @@
           "const": "change"
         },
         "op": {
-          "enum": ["edit", "create", "delete"]
+          "enum": ["edit", "create", "delete", "patch"]
         },
         "path": {
           "type": "string"

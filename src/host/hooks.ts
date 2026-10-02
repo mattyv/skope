@@ -9,7 +9,7 @@
 // `skope --plan-approved` is that hook. The approved plan names a skope plan file and its effects
 // hash (`skope plan: PATH HASH12`); the hook approves that file only if its effects still have
 // that hash, so a plan changed after the person saw it doesn't run. Because the agent could run
-// the command itself, a Claude approval is checked against the successful transcript result again
+// the command itself, each approval is checked against the matching transcript evidence again
 // before the plan runs. The hook may fire before that result is written. It never blocks
 // the agent: problems go to stderr, and it exits 0.
 //
@@ -22,7 +22,7 @@ import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { lint } from "../lint.js";
 import { preprocess } from "../preprocess/index.js";
 import { plainText } from "../runner/events.js";
-import { effectsOf, writeApproval } from "./effects.js";
+import { type Approval, effectsOf, writeApproval } from "./effects.js";
 import { pinnedStates, planChanges, repoRoot, rootForPlan } from "./plan.js";
 
 /** What Codex sends when the person approves a plan (codex-rs/tui/src/chatwidget/plan_implementation.rs). */
@@ -130,40 +130,50 @@ export function useOnce(dir: string, key: string): boolean {
 
 const NO_PLAN_LINE = "the approved plan has no skope plan line";
 
-/** The text of a Codex transcript entry's user message, if it is one. */
-function userText(entry: unknown): string | null {
-  for (const o of objects(entry))
-    if (o.role === "user") {
-      const texts = [...objects(o)].flatMap((x) => (typeof x.text === "string" ? [x.text] : []));
-      return texts.join("\n") || (typeof o.content === "string" ? o.content : "");
-    }
-  return null;
+/** Read only actual Codex message records, not quoted messages or tool output. */
+function codexMessage(entry: unknown, role: string): string | null {
+  const e = entry as { type?: string; payload?: { type?: string; role?: string; content?: { text?: string }[] } };
+  const p = e?.payload;
+  if (e?.type !== "response_item" || p?.type !== "message" || p.role !== role || !Array.isArray(p.content)) return null;
+  return p.content.flatMap((part) => (typeof part?.text === "string" ? [part.text] : [])).join("\n");
 }
 
-/**
- * Codex: the transcript's last user message is the approval, and the plan is the one the person
- * approved: the last `<proposed_plan>` before that message ("Implement the plan."), or the plan
- * inside it (the clear-context message). Returns the plan line and a key for the approval, or why
- * not. Fails closed if the transcript doesn't have the message yet.
- */
-export function codexApproved(transcript: string): { key: string; plan: { path: string; hash: string } } | string {
-  if (!inside(codexDir(), transcript)) return `the transcript isn't in ${codexDir()}`;
-  const entries = lines(transcript);
-  let at = -1;
-  for (let i = entries.length - 1; i >= 0 && at < 0; i--) if (userText(entries[i]) !== null) at = i;
-  const approval = at < 0 ? "" : (userText(entries[at]) ?? "").trim();
-  let source: string | null = null;
-  if (approval === CODEX_APPROVAL) {
-    for (let i = at - 1; i >= 0 && source === null; i--) {
-      const m = [...JSON.stringify(entries[i]).matchAll(/<proposed_plan>([\s\S]*?)<\/proposed_plan>/g)].at(-1);
-      if (m) source = JSON.parse(`"${m[1]}"`) as string;
+function codexPlan(entries: unknown[], prompt: string): { path: string; hash: string } | string {
+  let source: string | undefined;
+  if (prompt.startsWith(CODEX_CLEAR_CONTEXT)) source = prompt;
+  else {
+    for (let i = entries.length - 1; i >= 0 && source === undefined; i--) {
+      const text = codexMessage(entries[i], "assistant");
+      if (text !== null) source = [...text.matchAll(/<proposed_plan>([\s\S]*?)<\/proposed_plan>/g)].at(-1)?.[1];
     }
-    if (source === null) return "no plan was proposed before the approval";
-  } else if (approval.startsWith(CODEX_CLEAR_CONTEXT)) source = approval;
-  else return "the transcript's last user message isn't a plan approval";
-  const plan = planLine(source);
-  if (!plan) return NO_PLAN_LINE;
-  return { key: `${realpathSync(transcript)}:${at}`, plan };
+  }
+  if (source === undefined) return "no plan was proposed before the approval";
+  return planLine(source) ?? NO_PLAN_LINE;
+}
+
+function codexSessionMatches(entries: unknown[], sessionId: string): boolean {
+  const first = entries[0] as { type?: string; payload?: { id?: string } } | undefined;
+  return first?.type === "session_meta" && first.payload?.id === sessionId;
+}
+
+/** Verify deferred Codex evidence at apply time, after UserPromptSubmit has returned. */
+export function codexApproved(proof: NonNullable<Approval["codex"]>): string | null {
+  if (!inside(codexDir(), proof.transcript)) return `the transcript isn't in ${codexDir()}`;
+  const entries = lines(proof.transcript);
+  if (!codexSessionMatches(entries, proof.session_id)) return "the transcript session differs from the hook";
+  if (proof.prompt.trim() !== CODEX_APPROVAL && !proof.prompt.startsWith(CODEX_CLEAR_CONTEXT))
+    return "the hook prompt isn't a plan approval";
+  let turn: string | undefined;
+  let at = -1;
+  for (let i = 0; i < entries.length; i++) {
+    const e = entries[i] as { type?: string; payload?: { type?: string; turn_id?: string } };
+    if (e?.type === "turn_context" || (e?.type === "event_msg" && e.payload?.type === "task_started")) turn = e.payload?.turn_id;
+    if (turn === proof.turn_id && codexMessage(e, "user") !== null) at = i;
+  }
+  if (at < 0 || codexMessage(entries[at], "user") !== proof.prompt) return "the transcript has no matching approval in the hook's turn";
+  const plan = codexPlan(entries.slice(0, at), proof.prompt);
+  if (typeof plan === "string") return plan;
+  return plan.path === proof.path && plan.hash === proof.hash ? null : "the hook's plan differs from the approved transcript";
 }
 
 /** Where an agent's tool keeps approvals of skope plans: in its own config directory, which the
@@ -178,7 +188,8 @@ export function approvePlan(
   hash: string,
   agentDir: string,
   cwd = dirname(resolve(file)),
-  claude?: { transcript: string; tool_use_id: string; path: string; hash: string },
+  claude?: Approval["claude"],
+  codex?: Approval["codex"],
 ): string | null {
   let text: string;
   try {
@@ -196,7 +207,7 @@ export function approvePlan(
   if (effects.hash !== `sha256:${hash}`)
     return `${file} changed after the person saw it (its effects are ${effects.hash.slice(7, 19)}…, the approved plan said ${hash.slice(0, 12)}…)`;
   const root = rootForPlan(file, cwd, claudeDir());
-  writeApproval(planApprovalsDir(agentDir), effects, pinnedStates(root, planChanges(program)), planApprovalName(file), root, claude);
+  writeApproval(planApprovalsDir(agentDir), effects, pinnedStates(root, planChanges(program)), planApprovalName(file), root, claude, codex);
   return null;
 }
 
@@ -214,10 +225,11 @@ export function planApproved(stdin: string, out: (s: string) => void, err: (s: s
   const cwd = typeof input.cwd === "string" ? input.cwd : process.cwd();
   const transcript = typeof input.transcript_path === "string" ? input.transcript_path : "";
   let plan: { path: string; hash: string } | null;
-  let check: () => string | null;
+  let key: string;
   let agentDir: string;
   let claude = false;
-  let claudeProvenance: { transcript: string; tool_use_id: string; path: string; hash: string } | undefined;
+  let claudeProvenance: Approval["claude"];
+  let codexProvenance: Approval["codex"];
   if (event === "PostToolUse" && input.tool_name === "ExitPlanMode") {
     // The approved text, after any edits the person made (tool_response.plan), else what was proposed.
     const resp = input.tool_response as { plan?: unknown } | undefined;
@@ -234,15 +246,17 @@ export function planApproved(stdin: string, out: (s: string) => void, err: (s: s
       // hands the hook the plan file, so the line must be in the file. Silence here cost a
       // whole approval round; tell the agent what to do.
       const fix =
-        "skope recorded nothing: the approved plan has a skope block but no `skope plan: PATH HASH` line. Put that line inside the plan file (it is prose; the hash ignores it), re-enter plan mode and present the plan again.";
+        "skope recorded nothing: the approved plan has a skope block but no `skope plan: PATH HASH` line. Put that line inside the native plan approval brief, re-enter plan mode and present the plan again.";
       say("no `skope plan:` line in the approved plan; nothing recorded");
       out(`${JSON.stringify({ hookSpecificOutput: { hookEventName: "PostToolUse", additionalContext: fix } })}\n`);
       return 0;
     }
     if (plan) claudeProvenance = { transcript, tool_use_id: id, ...plan };
-    check = () =>
-      (!inside(claudeDir(), transcript) ? `the transcript isn't in ${claudeDir()}` : null) ??
-      (useOnce(claudeDir(), id) ? null : "that approval was already used");
+    if (!inside(claudeDir(), transcript)) {
+      say(`didn't record the plan approval: the transcript isn't in ${claudeDir()}`);
+      return 0;
+    }
+    key = id;
     agentDir = claudeDir();
     claude = true;
   } else if (
@@ -250,26 +264,49 @@ export function planApproved(stdin: string, out: (s: string) => void, err: (s: s
     typeof input.prompt === "string" &&
     (input.prompt.trim() === CODEX_APPROVAL || input.prompt.startsWith(CODEX_CLEAR_CONTEXT))
   ) {
-    // Only what the transcript says the person approved counts, never the hook's input.
-    const r = codexApproved(transcript);
+    // This synchronous hook runs before Codex records the user message. Pin the hook's
+    // provenance now; the transcript must independently confirm it before any plan runs.
+    const sessionId = typeof input.session_id === "string" ? input.session_id : "";
+    const turnId = typeof input.turn_id === "string" ? input.turn_id : "";
+    if (!sessionId || !turnId) {
+      say("didn't record the plan approval: the hook needs session_id and turn_id");
+      return 0;
+    }
+    if (!inside(codexDir(), transcript)) {
+      say(`didn't record the plan approval: the transcript isn't in ${codexDir()}`);
+      return 0;
+    }
+    const entries = lines(transcript);
+    if (!codexSessionMatches(entries, sessionId)) {
+      say("didn't record the plan approval: the transcript session differs from the hook");
+      return 0;
+    }
+    const r = codexPlan(entries, input.prompt);
     if (typeof r === "string") {
       if (r !== NO_PLAN_LINE) say(`didn't approve the plan: ${r}`);
       return 0;
     }
-    plan = r.plan;
-    check = () => (useOnce(codexDir(), r.key) ? null : "that approval was already used");
+    plan = r;
+    key = JSON.stringify([realpathSync(transcript), sessionId, turnId]);
+    codexProvenance = { transcript: realpathSync(transcript), session_id: sessionId, turn_id: turnId, prompt: input.prompt, ...plan };
     agentDir = codexDir();
   } else return 0; // not a plan approval
   if (!plan) return 0; // not a skope plan
-  const why = check() ?? approvePlan(resolve(repoRoot(cwd), plan.path), plan.hash, agentDir, cwd, claudeProvenance);
+  const ledger = join(agentDir, "skope", "used-approvals");
+  if (existsSync(ledger) && readFileSync(ledger, "utf8").split("\n").includes(key)) {
+    say(`didn't approve ${plan.path}: that approval was already used`);
+    return 0;
+  }
+  const why = approvePlan(resolve(repoRoot(cwd), plan.path), plan.hash, agentDir, cwd, claudeProvenance, codexProvenance);
   if (why !== null) {
     say(`didn't approve ${plan.path}: ${why}`);
     return 0;
   }
+  useOnce(agentDir, key); // Validation and persistence succeeded; a failed attempt remains retryable.
   const next = claude
-    ? `skope recorded the approval for ${plan.path}; skope will verify Claude's transcript before running. Run it with: SKOPE_CALLER=agent skope ${plan.path} --apply`
-    : `skope approved ${plan.path}. Run it with: SKOPE_CALLER=agent skope ${plan.path} --apply`;
-  say(claude ? `recorded approval for ${plan.path}` : `approved ${plan.path}`);
+    ? `skope recorded the approval for ${plan.path}; skope will verify Claude's transcript before running. Run it with: SKOPE_CALLER=agent skope ${plan.path} --apply --stream`
+    : `skope recorded the approval for ${plan.path}; skope will verify Codex's transcript before running. Run it with: SKOPE_CALLER=agent skope ${plan.path} --apply --stream`;
+  say(`recorded approval for ${plan.path}`);
   if (claude) out(`${JSON.stringify({ hookSpecificOutput: { hookEventName: "PostToolUse", additionalContext: next } })}\n`);
   else out(`${next}\n`);
   return 0;

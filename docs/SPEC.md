@@ -774,12 +774,18 @@ person approves before it runs, usually written by an agent in plan mode.
   - **Codex:** approving a plan sends a user message, so the hook is
     `UserPromptSubmit`: either `Implement the plan.`, and the plan line comes
     from the last `<proposed_plan>` before it, or the clear-context message,
-    which carries the plan itself. Either way the message and the plan come
-    from the session transcript (under Codex's directory), whose last user
-    message must be the approval, never from the hook's input. The person
-    must trust the hook in Codex (`/hooks`).
+    which carries the plan itself. The synchronous hook runs before Codex
+    writes that user message. It records a pending approval with the
+    transcript path, session ID, turn ID, prompt and plan line. Before any
+    execution, skope requires the same session and the matching user message
+    in that turn in the transcript under Codex's directory. The plan line
+    must match the last assistant `<proposed_plan>` before the message, or
+    the plan carried by the clear-context message. A pending hook record
+    alone cannot authorize a run. The person must trust the hook in Codex
+    (`/hooks`).
   - Each approval approves one plan: a ledger in the agent tool's config
-    directory records the ones used.
+    directory records the ones used, after plan validation and approval
+    persistence succeed. Failed validation can be retried.
   - **The limit:** these checks rest on the approvals, transcripts and
     ledger living in directories the agent can't write without asking. An
     agent allowed to write there, or to run arbitrary shell commands
@@ -1249,6 +1255,7 @@ skope <path/to/SKILL.md> [options]
   --no-page               with --apply: don't page on handoff (§8)
   --from SECTION          start at this section instead of the entry (§4.9); also with --lint and --verify
   --progress              one stderr line per command as it starts; the default when stderr is a terminal
+  --stream                readable checklist and live redacted command output on stderr instead of stdout JSON
   --param k=v             override a param from the skope block (repeatable, typed, safe-value checked)
   --verify                run the explore handler and print the verify report; run nothing.
                           The report is the last stdout line; warning events come before it
@@ -2683,3 +2690,48 @@ The only gain would be one backend call instead of several, about 100ms each.
   is 25 values per question, multiplied through every later branch.
 - Real cases are buckets anyway ("under an hour / a few hours / a day"),
   which a `choice` covers.
+
+### Readable run output (`--stream`)
+
+`--stream` is valid only with `--apply` or `--dry-run`. It replaces stdout
+JSON events with a plain-text checklist on stderr: section headings, command
+starts, file changes, check results, and the final outcome. It includes
+command progress even when stderr is not a terminal. Runs without the flag
+keep the existing JSON Lines interface. Captured results, logs, handoff
+records, approvals, and exit codes are unchanged.
+
+Child stdout and stderr are framed separately as UTF-8 lines and redacted
+before display. Partial lines wait for a newline or command exit. Potential
+multiline secret values, custom patterns, and multiline literal secrets
+defer output until command exit. Pending output is capped at 1 MiB per
+channel; exceeding the cap omits the pending output and the remainder of
+that channel, with a readable notice. Capture retains its existing cap.
+
+### Unified patch edits and generated plans
+
+`**patch** `PATH` takes exactly one `diff` fence containing a unified patch
+whose old and new headers name PATH, with `/dev/null` for creation/deletion.
+Patch paths stay inside the repository and cannot touch `.git`. Hunk counts,
+positions, context, and EOF newline markers must match; no fuzz or offsets.
+The patch is lowered to a `do` descriptor for the core. Its complete text
+enters the effects hash; host simulation and application share the rules.
+Existing file modes and line endings are preserved. Approved after-states
+are used to skip previously applied patches during a resumed plan.
+
+`skope plan --from-tree DIR --output PATH [--base DIR] [--check CMD]...`
+imports the difference between the current base tree and a complete prototype.
+`skope plan --from-diff FILE` embeds a unified diff into the same plan format.
+Generation validates and simulates patches, writes the output exclusively,
+and neither applies nor approves anything. Binary files, symlinks, mode
+changes, and line-ending conversions are refused. `.skope/` and ignored build
+output are excluded from tree comparison. Missing prototype files are deleted.
+
+`skope plan PATH --review [--diff]` prints the exact approval marker, changed
+file list, and command list. `--diff` adds one complete diff for review; the
+short form is suitable for the native plan-mode approval text. Hook provenance
+and exact effects/file-state checks are unchanged.
+
+Every real run appends its redacted events to `<run dir>/events.jsonl` (mode
+0600), even with `--stream`. It finishes with a readable stderr summary of
+file changes applied/already in place and checks passed/failed/timed out.
+Without `--stream`, the JSON Lines stdout interface remains unchanged.

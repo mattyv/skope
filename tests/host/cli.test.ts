@@ -628,3 +628,48 @@ describe("final review nits", () => {
     expect(find(r.events, "error", "E-PARAM-UNSAFE")?.message).toContain("A-Z a-z 0-9 . _ / : @ % + = , -");
   });
 });
+
+test("--stream prints a readable checklist and redacted output without JSON", async () => {
+  const r = await runSkope(
+    [skill('- **run** `printf "hello\\npassword=hidden\\n"; printf "warning\\n" >&2`\n- **stop**'), "--apply", "--stream"],
+    {
+      env: { SKOPE_CALLER: "agent" },
+    },
+  );
+  expect(r.code).toBe(0);
+  expect(r.stderr).toContain("[1] Run:");
+  expect(r.stderr).toContain("hello\n");
+  expect(r.stderr).toContain("[REDACTED]\n");
+  expect(r.stderr).toContain("warning\n");
+  expect(r.stderr).not.toContain("hidden");
+  expect(r.stderr).toContain("[ok] Passed");
+  expect(r.stderr).toContain("Finished.");
+  expect(r.stdout).toBe("");
+});
+
+test("--stream is rejected outside a run", async () => {
+  const r = await runSkope([skill("- **stop**"), "--lint", "--stream"]);
+  expect(r.code).toBe(40);
+  expect(r.stderr).toContain("--stream goes with --apply or --dry-run");
+});
+
+test("--stream explains a failed command and where to continue", async () => {
+  const r = await runSkope([skill("- **run** `exit 7`\n- **stop**"), "--apply", "--stream"], {
+    env: { SKOPE_CALLER: "agent" },
+  });
+  expect(r.code).toBe(20);
+  expect(r.stdout).toBe("");
+  expect(r.stderr).toContain("[!] Failed (exit 7)");
+  expect(r.stderr).toContain("Needs attention. A command or check failed.");
+  expect(r.stderr).toContain("Details for continuing:");
+});
+
+test("--stream previews changes without running them", async () => {
+  const r = await runSkope([skill("- **do** `exit 7`\n- **stop**"), "--dry-run", "--stream"]);
+  expect(r.code).toBe(0);
+  expect(r.stdout).toBe("");
+  expect(r.stderr).toContain("Previewing tiny");
+  expect(r.stderr).toContain("Would change: exit 7");
+  expect(r.stderr).toContain("Preview finished. Changes were skipped.");
+  expect(r.stderr).not.toContain("Failed (exit 7)");
+});

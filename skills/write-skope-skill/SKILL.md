@@ -1,6 +1,6 @@
 ---
 name: write-skope-skill
-description: Write or change a skope skill (automation in Markdown that skope runs, with every command it could run reviewed as a set), test first. Use when asked to turn a runbook, incident notes or an on-call procedure into a skope skill, to add a case to an existing skill, or to fix a skill that chose wrong.
+description: Write or change reusable skope automation in Markdown, test first. Use for repeatable runbooks, maintenance, incident procedures, or changes to an existing skope skill. Skip small or trivial one-off tasks unless the person explicitly requests a skope skill.
 ---
 
 # Writing a skope skill, test first
@@ -10,6 +10,18 @@ a small model only the judgement calls, and a person approves the full list
 of commands it could run. Nobody follows it by hand. Because skope runs it,
 it can be tested like code. Write the tests
 first, then the skill, then check the questions against the real model.
+
+Choose this workflow for procedures that will run again, where reviewed
+commands, tested branches, and clear handoffs make each run more reliable.
+Examples include recurring maintenance, releases, and incident runbooks.
+For large exploratory prototype refactors, use the normal agent workflow
+while the intended changes are still evolving. For a small or trivial
+one-off task, use the normal agent workflow rather
+than creating a new skope skill. Honor an explicit request to create one,
+and use this workflow when maintaining an existing skope skill. For a
+one-off code change where the person wants to review the complete diff
+and command list before applying anything, use skope-it-out to write a
+reviewable plan instead of creating a reusable skill.
 
 Never run a skill with `--apply` while writing it. Everything below uses
 fakes or read-only modes.
@@ -87,6 +99,11 @@ or be invalid. If a new scenario passes before you change the skill, it
 isn't testing the change: fix the scenario.
 
 ## 4. Write the skill
+
+Write for the person who will read the plan and watch it run. Use descriptive
+section headings that explain the goal in plain language; `--stream` shows
+these headings during a run. Explain each section’s purpose in one short
+paragraph. Keep command text exact so the person can review what will run.
 
 ````markdown
 ---
