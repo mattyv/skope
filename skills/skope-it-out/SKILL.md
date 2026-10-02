@@ -135,6 +135,8 @@ A check failed. The record has the command's output; fix the plan and resume.
   indentation; add a line of context if it isn't unique, or `· all` to
   change every match. An empty `new` deletes the lines. Use `create` with a
   path and `new` block to add a file, or `delete` with a path to remove one.
+  Represent a move as a deletion and a creation. Create the Git branch
+  before applying the plan; do not put Git commands in a code-change plan.
 - **Checks after each group of edits**, cheapest first (types, then tests),
   each with `· else [Fix]`. The Fix section hands off; it's how you get
   feedback.
@@ -142,6 +144,34 @@ A check failed. The record has the command's output; fix the plan and resume.
   section.
 - **Commands** are for building and testing, not for changing files: every
   change is a `patch`, `edit`, `create` or `delete`, so the person sees its text.
+- **Judgement calls** use the rest of the skope language, documented in the
+  write-skope-skill skill: `run … as var`, `do`, `ask … · sure N%`,
+  `for each`, `page`, and `params` with fixed `choices` (one approval, several
+  presets). Use them where a plan would otherwise hand off blindly: `run`
+  the failing log, `ask` whether it is a flake or a real failure, and route
+  to a retest or to Fix. `**if yes**` only takes `run CMD` or
+  `do CMD`, so to route on an answer use the `[Section]` option-list form of
+  `ask`. Run formatters in check mode and include formatting changes in
+  explicit edits. Approval pins the file states produced by those edits;
+  a formatter's fix command can leave a pinned file in an unapproved state,
+  causing a later edit or resumed run to fail with `E-PLAN-STALE`.
+- **Set `limits`** when a `check` can run long: a plan's `run_timeout`
+  defaults to 10 minutes, and a fresh sanitizer build that hits it fails
+  the plan.
+- **Explain why, in prose.** The person reads the plan to decide whether to
+  approve it, so each section opens with a paragraph saying what it does and
+  why, and each edit or group of edits is preceded by a paragraph saying why
+  it is there and what breaks without it. Prose between list items is
+  allowed; the lists still run in document order. A Context section before
+  the first instruction section states the problem, the constraint, what was
+  considered and left alone, and what is out of scope.
+- **Write the prose plainly.** Active voice. Positive statements. Concrete
+  nouns and verbs, not "robust" or "seamless". Cut every word that does no
+  work. One topic per paragraph, its point in the first sentence. Say what
+  the code does, not what it "ensures" or "leverages". A guidance paragraph
+  is also what the model sees when a section is an `ask` option, so clarity
+  there changes which branch runs.
+
 - Use descriptive section headings: `--stream` shows them while the plan
   runs. Keep prose short: a line under each heading saying what the section does.
 
@@ -149,10 +179,14 @@ A check failed. The record has the command's output; fix the plan and resume.
 
 ```console
 $ skope PATH --lint
+$ skope PATH --verify
 $ skope plan PATH --review --diff
 ```
 
-Fix lint errors or any patch that cannot apply. Show the complete diff and
+Fix lint errors or any patch that cannot apply. Read `--verify` for unreachable
+sections, how each path ends, and the worst-case run time against
+`limits.deadline`. Correct those problems before approval.
+`--dry-run` requires approval, so use `--review --diff` for the preview. Show the complete diff and
 command list once for the person to review. Then generate the short text
 for approval:
 
@@ -171,6 +205,12 @@ Generation and `--review` compute the approval marker, so no placeholder
 hash or hash insertion into the executable plan is needed. Recompute the
 brief after any edit. The hook approves only the referenced file with that
 hash, and still verifies the person's approval in the host transcript.
+
+In Claude Code, the hook runs after the person accepts `ExitPlanMode`.
+In Codex, it runs on `UserPromptSubmit` when approval sends
+`Implement the plan.` or the fresh-context implementation message carrying
+the approved plan. If the person rejects the plan or leaves plan mode
+without approving, return to plan mode and present the plan again.
 
 The approval is the person's: skope refuses `--approve` on a plan, and an
 approval file you write counts for nothing. Never run

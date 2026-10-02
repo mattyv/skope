@@ -274,6 +274,17 @@ describe("Claude Code: PostToolUse on ExitPlanMode", () => {
     expect(readFileSync(join(w.repo, "a.txt"), "utf8")).toBe("old\n");
   });
 
+  test("a skope plan approved without its plan line records nothing, and says so to the agent", () => {
+    // Claude Code passes the plan file as the approved text; an agent that put the
+    // `skope plan:` line only in its chat message gets a silent non-approval otherwise.
+    const w = world();
+    const r = claudeHook(w, { plan: PLAN });
+    expect(r.status).toBe(0);
+    expect(w.approved()).toBe(false);
+    expect(r.stderr).toContain("no `skope plan:` line");
+    expect(JSON.parse(r.stdout).hookSpecificOutput.additionalContext).toContain("skope plan:");
+  });
+
   test("a plan that isn't a skope plan, or another tool, is none of its business", () => {
     const w = world();
     const r = claudeHook(w, { plan: "Just prose, no skope line." });
