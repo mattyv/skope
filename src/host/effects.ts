@@ -158,6 +158,8 @@ export interface Approval {
   root?: string;
   /** Claude's hook may run before its successful tool result reaches the transcript. Verify this before running. */
   claude?: { transcript: string; tool_use_id: string; path: string; hash: string };
+  /** Codex submits its hook before recording the prompt. Verify the matching session and turn before running. */
+  codex?: { transcript: string; session_id: string; turn_id: string; prompt: string; path: string; hash: string };
 }
 
 const approvalPath = (dir: string, skill: string) => join(dir, `${skill}.approval.json`);
@@ -184,6 +186,7 @@ export function writeApproval(
   name = e.skill,
   root?: string,
   claude?: Approval["claude"],
+  codex?: Approval["codex"],
 ): string {
   mkdirSync(dir, { recursive: true });
   const path = approvalPath(dir, name);
@@ -196,6 +199,7 @@ export function writeApproval(
     ...(files ? { files } : {}),
     ...(root ? { root } : {}),
     ...(claude ? { claude } : {}),
+    ...(codex ? { codex } : {}),
   };
   const tmp = `${path}.${process.pid}.tmp`;
   writeFileSync(tmp, `${JSON.stringify(approval, null, 2)}\n`);

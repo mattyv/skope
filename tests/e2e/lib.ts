@@ -174,7 +174,8 @@ export function codexSession(w: World, name: string, opts: { clearContext?: bool
   const path = `.skope/plans/${name}.md`;
   const file = join(w.repo, path);
   const transcript = join(w.codex, "sessions", `${name}.jsonl`);
-  writeFileSync(transcript, "");
+  writeFileSync(transcript, jsonl({ type: "session_meta", payload: { id: name } }));
+  let turn = 0;
   let current: string | null = null;
   const message = (role: string, text: string) =>
     jsonl({
@@ -202,13 +203,23 @@ export function codexSession(w: World, name: string, opts: { clearContext?: bool
       const prompt = opts.clearContext
         ? `A previous agent produced the plan below to accomplish the user's task. Implement the plan in a fresh context.\n\n${current}\n`
         : "Implement the plan.";
-      // Codex writes the person's message to the session before the hook runs.
-      appendFileSync(transcript, message("user", prompt));
-      return w.skope(
+      // Codex runs this synchronous hook before it records the user message.
+      const turnId = `${name}-${++turn}`;
+      appendFileSync(transcript, jsonl({ type: "event_msg", payload: { type: "task_started", turn_id: turnId } }));
+      const result = w.skope(
         ["--plan-approved"],
         w.repo,
-        JSON.stringify({ hook_event_name: "UserPromptSubmit", prompt, cwd: o.cwd ?? w.repo, transcript_path: transcript }),
+        JSON.stringify({
+          hook_event_name: "UserPromptSubmit",
+          prompt,
+          session_id: name,
+          turn_id: turnId,
+          cwd: o.cwd ?? w.repo,
+          transcript_path: transcript,
+        }),
       );
+      appendFileSync(transcript, message("user", prompt));
+      return result;
     },
     reject() {
       if (!current) throw new Error("present the plan first");

@@ -115,7 +115,10 @@ Type errors after the grammar change. Read the record, fix the plan, resume from
    the installed hook. Claude Code may write the successful `ExitPlanMode`
    result to the transcript after the hook runs. Skope records the hook's
    plan and tool-use ID, then verifies the transcript result when the agent
-   runs the plan. The agent's own hash alone never grants approval.
+   runs the plan. Codex also runs its synchronous `UserPromptSubmit` hook
+   before recording the prompt. Skope pins the session ID, turn ID, prompt
+   and plan, then requires matching transcript evidence before execution.
+   The agent's own hash alone never grants approval.
 8. **Progress.** One stderr line per instruction (`[3/12] check npm test…`)
    when stderr is a terminal or `--progress` is given.
 9. **The `skope-it-out` skill**, installed with skope. In Claude Code plan
@@ -175,12 +178,17 @@ Type errors after the grammar change. Read the record, fix the plan, resume from
 - **Codex CLI:** plan approval isn't a tool call. Choosing "Yes, implement this
   plan" submits the user message `Implement the plan.`, so the hook is
   `UserPromptSubmit` matching that text (or the clear-context prefix); the
-  plan text comes from the transcript's last `<proposed_plan>`. Codex hooks
-  need the person's trust in `/hooks`, pinned by hash.
+  plan text comes from the transcript's last assistant `<proposed_plan>`.
+  The hook runs before the prompt is recorded: Codex calls
+  `inspect_pending_input` before `record_pending_input` in
+  [turn.rs (0.159.3)](https://github.com/openai/codex/blob/rust-v0.159.3/codex-rs/core/src/session/turn.rs).
+  Record pending provenance at the hook and verify the session, turn,
+  message and plan at apply time. Waiting inside the hook cannot fix this
+  ordering. Codex hooks need the person's trust in `/hooks`, pinned by hash.
 - **Both:** the agent could run the approval command itself through its shell.
-  The hook entry point must check it was called as a hook: the transcript
-  must end in the approval (an `ExitPlanMode` tool result, or the user
-  message), for this plan file.
+  Before execution, skope must check the transcript for the matching
+  approval (an `ExitPlanMode` tool result, or the user message), for this
+  plan file. Hook input alone cannot authorize execution.
 
 ## Open questions
 

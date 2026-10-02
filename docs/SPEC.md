@@ -774,12 +774,18 @@ person approves before it runs, usually written by an agent in plan mode.
   - **Codex:** approving a plan sends a user message, so the hook is
     `UserPromptSubmit`: either `Implement the plan.`, and the plan line comes
     from the last `<proposed_plan>` before it, or the clear-context message,
-    which carries the plan itself. Either way the message and the plan come
-    from the session transcript (under Codex's directory), whose last user
-    message must be the approval, never from the hook's input. The person
-    must trust the hook in Codex (`/hooks`).
+    which carries the plan itself. The synchronous hook runs before Codex
+    writes that user message. It records a pending approval with the
+    transcript path, session ID, turn ID, prompt and plan line. Before any
+    execution, skope requires the same session and the matching user message
+    in that turn in the transcript under Codex's directory. The plan line
+    must match the last assistant `<proposed_plan>` before the message, or
+    the plan carried by the clear-context message. A pending hook record
+    alone cannot authorize a run. The person must trust the hook in Codex
+    (`/hooks`).
   - Each approval approves one plan: a ledger in the agent tool's config
-    directory records the ones used.
+    directory records the ones used, after plan validation and approval
+    persistence succeed. Failed validation can be retried.
   - **The limit:** these checks rest on the approvals, transcripts and
     ledger living in directories the agent can't write without asking. An
     agent allowed to write there, or to run arbitrary shell commands

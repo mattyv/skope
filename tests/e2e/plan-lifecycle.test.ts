@@ -194,7 +194,7 @@ describe("tool-specific", () => {
     const s = sessions.codex(w, "fresh", { clearContext: true } as never);
     s.write(plan("fresh", `## Change\n${edit("a.txt", "one\n", "two\n")}\n- **stop**`));
     s.present();
-    expect(s.approve().stderr).toContain("approved");
+    expect(s.approve().stderr).toContain("recorded approval");
     expect(s.apply().code).toBe(0);
     expect(w.read("a.txt")).toBe("two\n");
   });
